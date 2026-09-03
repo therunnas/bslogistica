@@ -122,7 +122,7 @@ export function useContractRules(operationId: string | null | undefined) {
   }, [operations.data, contracts.data, operationId]);
 }
 
-export const sumBy = <T,>(list: T[], pick: (item: T) => number) =>
+export const sumBy = <T>(list: T[], pick: (item: T) => number) =>
   list.reduce((acc, item) => acc + (Number(pick(item)) || 0), 0);
 
 export const inPeriod = (date: string, start: string, end: string) => date >= start && date <= end;

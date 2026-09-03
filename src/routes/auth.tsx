@@ -11,13 +11,13 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Entrar | OpLog Gestão de Diárias" },
+      { title: "Entrar | BS Logística" },
       {
         name: "description",
         content:
-          "Acesse o painel OpLog para controlar apontamentos, diárias, horas extras e faturamento das operações.",
+          "Acesse o painel da BS Logística para controlar apontamentos, diárias, horas extras e faturamento das operações.",
       },
-      { property: "og:title", content: "Entrar | OpLog Gestão de Diárias" },
+      { property: "og:title", content: "Entrar | BS Logística" },
       {
         property: "og:description",
         content: "Painel interno de gestão operacional e financeira de mão de obra terceirizada.",
@@ -76,10 +76,10 @@ function AuthPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 grid size-10 place-items-center rounded-md bg-primary font-display font-bold text-primary-foreground">
-            OL
+            BS
           </div>
           <CardTitle className="font-display text-xl">
-            {mode === "signin" ? "Entrar no OpLog" : "Criar acesso"}
+            {mode === "signin" ? "Entrar" : "Criar acesso"}
           </CardTitle>
           <CardDescription>
             Painel interno de gestão de diárias, horas extras e faturamento.

@@ -20,7 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEmployees } from "@/lib/queries";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
@@ -30,12 +37,12 @@ import type { Employee } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/colaboradores")({
   head: () => ({
     meta: [
-      { title: "Colaboradores | OpLog" },
+      { title: "Colaboradores | BS Logística" },
       {
         name: "description",
         content: "Cadastro de colaboradores com função, contato e custo por diária.",
       },
-      { property: "og:title", content: "Colaboradores | OpLog" },
+      { property: "og:title", content: "Colaboradores | BS Logística" },
       { property: "og:description", content: "Cadastro de equipe e custo por diária." },
     ],
   }),
@@ -81,7 +88,7 @@ function EmployeesPage() {
       daily_cost: Number(form.daily_cost) || 0,
       status: form.status,
     };
-    if (form.id) payload['id'] = form.id;
+    if (form.id) payload["id"] = form.id;
     save.mutate(payload, { onSuccess: () => setOpen(false) });
   }
 

@@ -24,7 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useClients, useContracts } from "@/lib/queries";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { brl, dateBR, num, todayISO } from "@/lib/format";
@@ -33,13 +40,13 @@ import type { Client, Contract } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/clientes")({
   head: () => ({
     meta: [
-      { title: "Clientes e contratos | OpLog" },
+      { title: "Clientes e contratos | BS Logística" },
       {
         name: "description",
         content:
           "Cadastro de clientes e regras de cobrança: valor da diária, jornada, fator e tolerância de hora extra.",
       },
-      { property: "og:title", content: "Clientes e contratos | OpLog" },
+      { property: "og:title", content: "Clientes e contratos | BS Logística" },
       {
         property: "og:description",
         content: "Clientes e regras de cobrança por diária e hora extra.",
@@ -112,7 +119,7 @@ function ClientsPage() {
       status: clientForm.status,
       notes: clientForm.notes || null,
     };
-    if (clientForm.id) payload['id'] = clientForm.id;
+    if (clientForm.id) payload["id"] = clientForm.id;
     saveClient.mutate(payload, { onSuccess: () => setClientOpen(false) });
   }
 
@@ -144,7 +151,7 @@ function ClientsPage() {
       valid_to: contractForm.valid_to || null,
       status: contractForm.status,
     };
-    if (contractForm.id) payload['id'] = contractForm.id;
+    if (contractForm.id) payload["id"] = contractForm.id;
     saveContract.mutate(payload, { onSuccess: () => setContractOpen(false) });
   }
 

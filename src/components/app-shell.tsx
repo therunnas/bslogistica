@@ -48,9 +48,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         <div className="flex h-16 items-center gap-2 border-b border-border px-5">
           <div className="grid size-8 place-items-center rounded-md bg-primary font-display text-sm font-bold text-primary-foreground">
-            OL
+            BS
           </div>
-          <span className="font-display text-base font-semibold">OpLog</span>
+          <span className="font-display text-base font-semibold">BS Logística</span>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {nav.map(({ to, label, icon: Icon }) => (
@@ -79,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button variant="outline" size="icon" onClick={() => setOpen((v) => !v)}>
             <Menu className="size-4" />
           </Button>
-          <span className="font-display font-semibold">OpLog</span>
+          <span className="font-display font-semibold">BS Logística</span>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
       </div>
@@ -100,9 +100,7 @@ export function PageHeader({
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight">{title}</h1>
-        {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        ) : null}
+        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
       </div>
       {action}
     </div>

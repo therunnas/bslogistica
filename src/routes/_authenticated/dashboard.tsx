@@ -27,12 +27,13 @@ import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard operacional | OpLog" },
+      { title: "Dashboard operacional | BS Logística" },
       {
         name: "description",
-        content: "Diárias, horas extras, receita, custo e margem do período por cliente e operação.",
+        content:
+          "Diárias, horas extras, receita, custo e margem do período por cliente e operação.",
       },
-      { property: "og:title", content: "Dashboard operacional | OpLog" },
+      { property: "og:title", content: "Dashboard operacional | BS Logística" },
       {
         property: "og:description",
         content: "Indicadores de diárias, horas extras, receita, custo e margem por período.",
@@ -68,7 +69,10 @@ function Dashboard() {
   }, [period]);
 
   const byClient = useMemo(() => {
-    const map = new Map<string, { name: string; receita: number; custo: number; diarias: number }>();
+    const map = new Map<
+      string,
+      { name: string; receita: number; custo: number; diarias: number }
+    >();
     period.forEach((r) => {
       const item = map.get(r.clientId) ?? {
         name: r.clientName,
@@ -145,10 +149,13 @@ function Dashboard() {
             <Kpi label="Custo de mão de obra" value={brl(kpis.cost)} />
             <Kpi label="Margem" value={brl(kpis.margin)} />
             <Kpi label="Margem %" value={pct(kpis.marginPct)} />
-            <Kpi label="Colaboradores ativos no período" value={num(
-              new Set(period.filter((r) => r.status !== "absent").map((r) => r.employeeId)).size,
-              0,
-            )} />
+            <Kpi
+              label="Colaboradores ativos no período"
+              value={num(
+                new Set(period.filter((r) => r.status !== "absent").map((r) => r.employeeId)).size,
+                0,
+              )}
+            />
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -204,10 +211,7 @@ function Dashboard() {
                     <PieChart>
                       <Pie data={byType} dataKey="value" nameKey="name" outerRadius={90} label>
                         {byType.map((_, i) => (
-                          <Cell
-                            key={i}
-                            fill={i === 0 ? "var(--chart-1)" : "var(--chart-2)"}
-                          />
+                          <Cell key={i} fill={i === 0 ? "var(--chart-1)" : "var(--chart-2)"} />
                         ))}
                       </Pie>
                       <Tooltip formatter={(v: number) => brl(v)} />

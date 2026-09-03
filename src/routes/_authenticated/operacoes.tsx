@@ -24,8 +24,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useClients, useContracts, useEmployees, useOperations, useShifts, useTeam } from "@/lib/queries";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  useClients,
+  useContracts,
+  useEmployees,
+  useOperations,
+  useShifts,
+  useTeam,
+} from "@/lib/queries";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { brl, dateBR, minutesToLabel, todayISO } from "@/lib/format";
 import { shiftPlannedMinutes } from "@/lib/billing";
@@ -34,13 +48,13 @@ import type { Operation, Shift } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/operacoes")({
   head: () => ({
     meta: [
-      { title: "Operações e turnos | OpLog" },
+      { title: "Operações e turnos | BS Logística" },
       {
         name: "description",
         content:
           "Operações fixas e avulsas de carga e descarga, com turnos, intervalos e equipe alocada.",
       },
-      { property: "og:title", content: "Operações e turnos | OpLog" },
+      { property: "og:title", content: "Operações e turnos | BS Logística" },
       {
         property: "og:description",
         content: "Operações fixas e avulsas com turnos e equipe alocada.",
@@ -131,7 +145,7 @@ function OperationsPage() {
       status: opForm.status,
       notes: opForm.notes || null,
     };
-    if (opForm.id) payload['id'] = opForm.id;
+    if (opForm.id) payload["id"] = opForm.id;
     saveOperation.mutate(payload, { onSuccess: () => setOpOpen(false) });
   }
 
@@ -159,7 +173,7 @@ function OperationsPage() {
       crosses_midnight: shiftForm.crosses_midnight,
       status: shiftForm.status,
     };
-    if (shiftForm.id) payload['id'] = shiftForm.id;
+    if (shiftForm.id) payload["id"] = shiftForm.id;
     saveShift.mutate(payload, { onSuccess: () => setShiftOpen(false) });
   }
 
@@ -455,7 +469,9 @@ function OperationsPage() {
               <Checkbox
                 id="crosses"
                 checked={shiftForm.crosses_midnight}
-                onCheckedChange={(v) => setShiftForm({ ...shiftForm, crosses_midnight: Boolean(v) })}
+                onCheckedChange={(v) =>
+                  setShiftForm({ ...shiftForm, crosses_midnight: Boolean(v) })
+                }
               />
               <Label htmlFor="crosses">Vira a meia-noite</Label>
             </div>
@@ -494,8 +510,7 @@ function OperationsPage() {
                     <Checkbox
                       checked={!!member}
                       onCheckedChange={() =>
-                        teamOpen &&
-                        toggleTeam(teamOpen.id, employee.id, opShifts[0]?.id ?? null)
+                        teamOpen && toggleTeam(teamOpen.id, employee.id, opShifts[0]?.id ?? null)
                       }
                     />
                     <div>

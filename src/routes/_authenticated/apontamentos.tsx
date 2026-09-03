@@ -17,7 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   useClients,
   useEmployees,
@@ -28,19 +35,24 @@ import {
   useTimesheets,
 } from "@/lib/queries";
 import { useContractRules } from "@/lib/ledger";
-import { attendanceLabel, calcEntry, shiftPlannedMinutes, type AttendanceStatus } from "@/lib/billing";
+import {
+  attendanceLabel,
+  calcEntry,
+  shiftPlannedMinutes,
+  type AttendanceStatus,
+} from "@/lib/billing";
 import { brl, minutesToLabel, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/apontamentos")({
   head: () => ({
     meta: [
-      { title: "Apontamento diário | OpLog" },
+      { title: "Apontamento diário | BS Logística" },
       {
         name: "description",
         content:
           "Registre presença, faltas, horários e horas extras por turno e gere as diárias faturáveis do dia.",
       },
-      { property: "og:title", content: "Apontamento diário | OpLog" },
+      { property: "og:title", content: "Apontamento diário | BS Logística" },
       {
         property: "og:description",
         content: "Presença, horários e horas extras por turno, com cálculo automático da diária.",
@@ -111,7 +123,8 @@ function TimesheetPage() {
   const teamMembers = useMemo(
     () =>
       (team.data ?? []).filter(
-        (t) => t.operation_id === operationId && (!shiftId || !t.shift_id || t.shift_id === shiftId),
+        (t) =>
+          t.operation_id === operationId && (!shiftId || !t.shift_id || t.shift_id === shiftId),
       ),
     [team.data, operationId, shiftId],
   );
@@ -224,10 +237,7 @@ function TimesheetPage() {
   const toggleStatus = useMutation({
     mutationFn: async (status: "open" | "closed") => {
       if (!timesheet) throw new Error("Salve o apontamento antes de fechar.");
-      const { error } = await supabase
-        .from("timesheets")
-        .update({ status })
-        .eq("id", timesheet.id);
+      const { error } = await supabase.from("timesheets").update({ status }).eq("id", timesheet.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -244,9 +254,8 @@ function TimesheetPage() {
   }
 
   const clientName =
-    clients.data?.find(
-      (c) => c.id === operationList.find((o) => o.id === operationId)?.client_id,
-    )?.name ?? "—";
+    clients.data?.find((c) => c.id === operationList.find((o) => o.id === operationId)?.client_id)
+      ?.name ?? "—";
 
   return (
     <div>

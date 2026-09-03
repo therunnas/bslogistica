@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "OpLog | Gestão de diárias, horas extras e faturamento" },
+      { title: "BS Logística | Gestão de diárias, horas extras e faturamento" },
       {
         name: "description",
         content:
           "Controle operações fixas e avulsas de mão de obra terceirizada: apontamento de diárias, horas extras, custos e faturamento por cliente.",
       },
-      { property: "og:title", content: "OpLog | Gestão de diárias e faturamento" },
+      { property: "og:title", content: "BS Logística | Gestão de diárias e faturamento" },
       {
         property: "og:description",
         content:
@@ -53,9 +53,9 @@ function Landing() {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2">
           <div className="grid size-8 place-items-center rounded-md bg-primary font-display text-sm font-bold text-primary-foreground">
-            OL
+            BS
           </div>
-          <span className="font-display text-lg font-semibold">OpLog</span>
+          <span className="font-display text-lg font-semibold">BS Logística</span>
         </div>
         <Button asChild>
           <Link to="/auth">Entrar</Link>

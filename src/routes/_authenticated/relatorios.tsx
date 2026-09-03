@@ -8,7 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format";
 import { attendanceLabel, marginPct } from "@/lib/billing";
@@ -16,13 +23,13 @@ import { attendanceLabel, marginPct } from "@/lib/billing";
 export const Route = createFileRoute("/_authenticated/relatorios")({
   head: () => ({
     meta: [
-      { title: "Relatórios de diárias e resultado | OpLog" },
+      { title: "Relatórios de diárias e resultado | BS Logística" },
       {
         name: "description",
         content:
           "Relatórios por colaborador, operação e lançamento: diárias, faltas, horas extras, receita, custo e margem.",
       },
-      { property: "og:title", content: "Relatórios de diárias e resultado | OpLog" },
+      { property: "og:title", content: "Relatórios de diárias e resultado | BS Logística" },
       {
         property: "og:description",
         content: "Diárias, faltas, horas extras, custo e margem por colaborador e operação.",
@@ -46,7 +53,14 @@ function ReportsPage() {
   const byEmployee = useMemo(() => {
     const map = new Map<
       string,
-      { name: string; dailies: number; absences: number; otMinutes: number; cost: number; billed: number }
+      {
+        name: string;
+        dailies: number;
+        absences: number;
+        otMinutes: number;
+        cost: number;
+        billed: number;
+      }
     >();
     period.forEach((r) => {
       const item = map.get(r.employeeId) ?? {
@@ -70,7 +84,14 @@ function ReportsPage() {
   const byOperation = useMemo(() => {
     const map = new Map<
       string,
-      { name: string; client: string; dailies: number; otMinutes: number; billed: number; cost: number }
+      {
+        name: string;
+        client: string;
+        dailies: number;
+        otMinutes: number;
+        billed: number;
+        cost: number;
+      }
     >();
     period.forEach((r) => {
       const item = map.get(r.operationId) ?? {

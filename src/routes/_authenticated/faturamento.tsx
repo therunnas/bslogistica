@@ -17,7 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useClients, useInvoices } from "@/lib/queries";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { brl, dateBR, minutesToHours, minutesToLabel, monthRange, num } from "@/lib/format";
@@ -26,13 +33,13 @@ import { marginPct, round2 } from "@/lib/billing";
 export const Route = createFileRoute("/_authenticated/faturamento")({
   head: () => ({
     meta: [
-      { title: "Faturamento por período | OpLog" },
+      { title: "Faturamento por período | BS Logística" },
       {
         name: "description",
         content:
           "Feche o período por cliente, some diárias e horas extras e gere a fatura com itens por operação.",
       },
-      { property: "og:title", content: "Faturamento por período | OpLog" },
+      { property: "og:title", content: "Faturamento por período | BS Logística" },
       {
         property: "og:description",
         content: "Fechamento de diárias e horas extras por cliente e período.",
@@ -58,7 +65,8 @@ function BillingPage() {
   const period = useMemo(
     () =>
       rows.filter(
-        (r) => r.clientId === selectedClient && inPeriod(r.date, start, end) && r.status !== "absent",
+        (r) =>
+          r.clientId === selectedClient && inPeriod(r.date, start, end) && r.status !== "absent",
       ),
     [rows, selectedClient, start, end],
   );
@@ -219,7 +227,10 @@ function BillingPage() {
             <Button variant="outline" onClick={exportCsv} disabled={!period.length}>
               <Download className="size-4" /> Exportar CSV
             </Button>
-            <Button onClick={() => generate.mutate()} disabled={!period.length || generate.isPending}>
+            <Button
+              onClick={() => generate.mutate()}
+              disabled={!period.length || generate.isPending}
+            >
               <FileText className="size-4" /> Gerar fatura
             </Button>
           </div>
