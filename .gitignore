@@ -38,3 +38,6 @@ supabase/.temp/
 *.njsproj
 *.sln
 *.sw?
+
+# Saídas locais de ferramentas (não fazem parte do projeto)
+Claude outputs/
