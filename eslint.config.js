@@ -6,7 +6,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // .vercel guarda a saída do build. Sem ignorá-la, o eslint-plugin-prettier
+  // tenta reformatar os bundles minificados e o lint leva minutos em vez de segundos.
+  { ignores: ["dist", ".output", ".vinxi", ".vercel"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
