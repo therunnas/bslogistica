@@ -51,7 +51,7 @@ export default function Landing() {
           <span className="font-display text-lg font-semibold">BS Logística</span>
         </div>
         <Button asChild>
-          <Link href="/auth">Entrar</Link>
+          <Link href="/login">Entrar</Link>
         </Button>
       </header>
 
@@ -67,7 +67,7 @@ export default function Landing() {
           </p>
           <div className="mt-8 flex gap-3">
             <Button asChild size="lg">
-              <Link href="/auth">Acessar o painel</Link>
+              <Link href="/login">Acessar o painel</Link>
             </Button>
           </div>
         </section>
