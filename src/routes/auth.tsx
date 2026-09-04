@@ -24,17 +24,24 @@ export const Route = createFileRoute("/auth")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      // Painel interno: fora do índice dos buscadores.
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: AuthPage,
 });
 
+/**
+ * Tela de entrada do painel.
+ *
+ * Sistema interno: não há criação de conta por aqui. Os acessos são criados
+ * pelo administrador no painel do Supabase, e o papel em user_roles é o que
+ * libera os dados — quem entra sem papel não enxerga nada, por causa da RLS.
+ */
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -47,23 +54,9 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/dashboard", replace: true });
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: { full_name: fullName },
-          },
-        });
-        if (error) throw error;
-        toast.success("Conta criada. Verifique seu e-mail para confirmar o acesso.");
-        setMode("signin");
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate({ to: "/dashboard", replace: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível autenticar.");
     } finally {
@@ -78,31 +71,19 @@ function AuthPage() {
           <div className="mb-2 grid size-10 place-items-center rounded-md bg-primary font-display font-bold text-primary-foreground">
             BS
           </div>
-          <CardTitle className="font-display text-xl">
-            {mode === "signin" ? "Entrar" : "Criar acesso"}
-          </CardTitle>
+          <CardTitle className="font-display text-xl">Entrar</CardTitle>
           <CardDescription>
             Painel interno de gestão de diárias, horas extras e faturamento.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-3">
-            {mode === "signup" ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="fullName">Nome completo</Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                />
-              </div>
-            ) : null}
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -113,23 +94,19 @@ function AuthPage() {
               <Input
                 id="password"
                 type="password"
-                minLength={6}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
+              {loading ? "Aguarde..." : "Entrar"}
             </Button>
           </form>
-          <button
-            type="button"
-            className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          >
-            {mode === "signin" ? "Não tem acesso? Criar conta" : "Já tenho conta. Entrar"}
-          </button>
+          <p className="text-center text-sm text-muted-foreground">
+            Precisa de acesso? Fale com o administrador do sistema.
+          </p>
         </CardContent>
       </Card>
     </div>
