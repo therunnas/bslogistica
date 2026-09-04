@@ -1,3 +1,7 @@
+"use client";
+
+// Lê window.matchMedia e mantém estado: precisa rodar no navegador.
+// A diretiva é ignorada pelo Vite, então a aplicação TanStack não muda.
 import * as React from "react";
 
 const MOBILE_BREAKPOINT = 768;
