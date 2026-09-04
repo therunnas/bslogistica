@@ -41,3 +41,8 @@ supabase/.temp/
 
 # Saídas locais de ferramentas (não fazem parte do projeto)
 Claude outputs/
+
+# Next.js
+.next/
+next-env.d.ts
+*.tsbuildinfo
