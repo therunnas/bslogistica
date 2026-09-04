@@ -2,29 +2,16 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
+import { lerAmbienteSupabase } from "./env";
 import type { Database } from "./types";
 
 /**
- * Cliente do Supabase para o navegador (Next.js).
+ * Cliente do Supabase para o navegador.
  *
- * A chave publicável é pública por natureza: viaja no JavaScript da página.
- * Quem protege os dados é a RLS do banco, não o sigilo desta chave. A chave
- * secreta nunca entra aqui — ela só existe no servidor, em server.ts.
+ * Usa a chave publicável. A sessão fica em cookies, e não em localStorage, para
+ * que o servidor consiga lê-la ao renderizar — é o que o @supabase/ssr faz.
  */
 export function criarClienteNavegador() {
-  const url = process.env["NEXT_PUBLIC_SUPABASE_URL"];
-  const chave = process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
-
-  if (!url || !chave) {
-    const faltando = [
-      ...(!url ? ["NEXT_PUBLIC_SUPABASE_URL"] : []),
-      ...(!chave ? ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] : []),
-    ];
-    throw new Error(
-      `Variáveis de ambiente do Supabase ausentes: ${faltando.join(", ")}. ` +
-        "Defina-as no .env local e nas variáveis de ambiente da hospedagem.",
-    );
-  }
-
+  const { url, chave } = lerAmbienteSupabase();
   return createBrowserClient<Database>(url, chave);
 }
