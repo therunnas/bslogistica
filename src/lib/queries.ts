@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { obterCliente } from "@/integrations/supabase/registro";
 import type {
   Client,
   Contract,
@@ -13,7 +13,7 @@ import type {
 } from "./types";
 
 async function fetchAll<T>(table: string, order: string, ascending = true): Promise<T[]> {
-  const { data, error } = await supabase
+  const { data, error } = await obterCliente()
     .from(table as never)
     .select("*")
     .order(order, { ascending });

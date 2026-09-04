@@ -12,6 +12,11 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { registrarCliente } from "@/integrations/supabase/registro";
+
+// A camada de dados (queries.ts, mutations.ts) busca o cliente no registro,
+// porque a aplicação Next.js registra outro — com sessão em cookies.
+registrarCliente(supabase);
 
 function NotFoundComponent() {
   return (
