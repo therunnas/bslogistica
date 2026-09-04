@@ -1,1 +1,9 @@
-project_id = "eosqwhjlytoawanhzmhz"
+# Projeto BSLOG (sa-east-1). O ref anterior aqui, "eosqwhjlytoawanhzmhz", era do
+# projeto que o Lovable gerenciava e já foi deletado — qualquer comando do CLI
+# que lesse este arquivo apontaria para um projeto inexistente.
+project_id = "qaibhlucbpetxrtswulf"
+
+# Sem seção [auth] de propósito. "supabase config push" envia este arquivo
+# inteiro: com a seção ausente, o CLI aplicaria seus padrões a toda a
+# configuração de autenticação do projeto e sobrescreveria o que está em uso.
+# Antes de usar config push, descreva aqui a configuração real e completa.
