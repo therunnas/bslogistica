@@ -86,3 +86,28 @@ faturamento de um apontamento não seja sobrescrito silenciosamente.
 
 Testes a criar junto: sucesso, rollback em falha, apontamento já faturado,
 usuário sem permissão e tentativa de faturamento duplicado.
+
+## Reincidência observada horas depois
+
+O mesmo comportamento voltou a acontecer no mesmo dia, com duas faturas geradas
+às 14:47 e às 16:49.
+
+Antes delas, a fatura `e66e6b17…` (criada 13:03) era a única com apontamento
+vinculado. Depois, ficou com **zero**: a fatura `a76268d8…`, criada às 16:49
+para o mesmo cliente e período sobreposto, **moveu o vínculo para si**.
+
+O número de faturas órfãs passou de **3 para 4**.
+
+| Momento | Faturas | Órfãs |
+|---|---|---|
+| Primeiro diagnóstico | 4 | 3 |
+| Depois de mais duas gerações | 6 | 4 |
+
+Isto confirma, com um segundo caso e sem nenhuma intervenção no banco, que
+gerar uma fatura sobre período já faturado **desliga silenciosamente a fatura
+anterior** do trabalho que ela cobre. Nada na interface avisa, e a fatura antiga
+continua existindo como documento fechado, agora sem lastro.
+
+Vale notar a velocidade com que o problema se acumula: em poucas horas de uso
+normal foram geradas seis faturas para seis apontamentos, quatro delas órfãs.
+Não é um caso raro que exige condição incomum — acontece no uso corriqueiro.
