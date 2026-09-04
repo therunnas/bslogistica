@@ -23,18 +23,10 @@ export function Providers({ children }: { children: ReactNode }) {
     return null;
   });
 
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            // Sem refetch a cada foco de janela: o painel é de uso contínuo e
-            // isso gerava recarga constante.
-            refetchOnWindowFocus: false,
-          },
-        },
-      }),
-  );
+  // Sem opções próprias, de propósito: a aplicação TanStack usa
+  // `new QueryClient()` puro, e qualquer ajuste aqui faria as duas se
+  // comportarem de forma diferente durante a migração.
+  const [queryClient] = useState(() => new QueryClient());
 
   return (
     <QueryClientProvider client={queryClient}>
