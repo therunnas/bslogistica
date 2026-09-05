@@ -89,5 +89,6 @@ repositório.
 
 O histórico de migrations foi reconciliado em 05/09/2026: as versões
 `20260903205051` e `20260905163000` tiveram os efeitos auditados no banco e
-foram marcadas como aplicadas com `supabase migration repair`. `supabase
-migration list --linked` mostra as seis alinhadas.
+foram marcadas como aplicadas com `supabase migration repair`. Depois disso a
+`20260905203000` foi aplicada pelo fluxo normal, com `supabase db push`, e
+`supabase migration list --linked` mostra as **sete alinhadas**.

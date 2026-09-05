@@ -160,6 +160,22 @@ cobrança. A hora extra é `(diária ÷ horas do turno) × fator`, aplicada ao
 excedente que ultrapassar a tolerância definida no contrato. O turno trata
 virada de meia-noite.
 
+## Alocação de colaboradores
+
+Um colaborador ocupa **no máximo uma alocação ativa** por vez: uma operação e um
+turno. Enquanto ela existir, ele não pode estar em outro turno da mesma operação
+nem em qualquer turno de outra, mesmo que os horários não se sobreponham. Mover
+alguém exige desalocar antes.
+
+A regra não depende da interface: o índice parcial
+`operation_team_um_ativo_por_colaborador` — `UNIQUE (employee_id) WHERE active`,
+criado pela migration `20260905203000` — a garante no Postgres. É ele que
+impede duas sessões simultâneas de alocarem a mesma pessoa: a segunda recebe
+`23505`.
+
+Um vínculo com `shift_id` nulo também ocupa o colaborador. Ele é o caso das
+operações sem turno cadastrado.
+
 ## Banco
 
 Projeto Supabase **BSLOG**. RLS ativa em todas as tabelas do schema `public`, e

@@ -1,8 +1,11 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Pencil, Plus, Trash2, Users } from "lucide-react";
 import { PageHeader } from "../_components/app-shell";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,6 +74,7 @@ const emptyShift = {
 };
 
 export function PainelOperacoes() {
+  const queryClient = useQueryClient();
   const clients = useClients();
   const contracts = useContracts();
   const operations = useOperations();
@@ -82,16 +86,162 @@ export function PainelOperacoes() {
   const removeOperation = useDeleteRow("operations");
   const saveShift = useSaveRow("shifts");
   const removeShift = useDeleteRow("shifts");
-  const saveTeam = useSaveRow("operation_team");
-  const removeTeam = useDeleteRow("operation_team");
 
   const [opOpen, setOpOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState<Operation | null>(null);
+  const [equipeBusca, setEquipeBusca] = useState("");
+  const [equipeFiltro, setEquipeFiltro] = useState<"todos" | "aqui" | "disponivel" | "outra">(
+    "todos",
+  );
+
+  /**
+   * Alocação e desalocação não usam o CRUD genérico porque precisam de
+   * tratamento próprio de erro: se o banco recusar por exclusividade (23505),
+   * a mensagem técnica não serve para o usuário, e a lista precisa ser
+   * recarregada para mostrar quem pegou o colaborador primeiro.
+   */
+  const alocarEquipe = useMutation({
+    mutationFn: async (v: { employeeId: string; shiftId: string | null; vinculoId?: string }) => {
+      if (!teamOpen) throw new Error("Nenhuma operação selecionada.");
+      const cliente = criarClienteNavegador();
+      if (v.vinculoId) {
+        // Troca de turno na mesma operação: move o vínculo existente em vez de
+        // criar um segundo. Assim nunca existem duas linhas ativas, nem por um
+        // instante.
+        const { error } = await cliente
+          .from("operation_team")
+          .update({ shift_id: v.shiftId })
+          .eq("id", v.vinculoId);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await cliente.from("operation_team").insert({
+        operation_id: teamOpen.id,
+        employee_id: v.employeeId,
+        shift_id: v.shiftId,
+        active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["operation_team"] }),
+    onError: async (error: unknown) => {
+      await queryClient.invalidateQueries({ queryKey: ["operation_team"] });
+      const codigo = typeof error === "object" && error && "code" in error ? error.code : undefined;
+      toast.error(
+        codigo === "23505"
+          ? "Este colaborador já foi alocado em outra operação. Atualize a equipe e tente novamente."
+          : error instanceof Error
+            ? error.message
+            : "Não foi possível alocar o colaborador.",
+      );
+    },
+  });
+
+  const desalocarEquipe = useMutation({
+    mutationFn: async (vinculoId: string) => {
+      const { error } = await criarClienteNavegador()
+        .from("operation_team")
+        .delete()
+        .eq("id", vinculoId);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["operation_team"] }),
+    onError: (error: Error) => toast.error(error.message),
+  });
   const [opForm, setOpForm] = useState(emptyOperation);
   const [shiftForm, setShiftForm] = useState(emptyShift);
 
+  /**
+   * Um grupo por turno da operação. O grupo "sem turno" só aparece quando a
+   * operação não tem turno nenhum — caso das avulsas — ou quando ainda existe
+   * vínculo antigo gravado sem `shift_id`, para que ele continue visível e
+   * possa ser desfeito em vez de sumir da tela.
+   */
+  const equipeGrupos = useMemo(() => {
+    type Grupo = { id: string | null; nome: string; horario: string; alocados: number };
+    if (!teamOpen) return [] as Grupo[];
+    const membros = (team.data ?? []).filter((t) => t.operation_id === teamOpen.id);
+    const contar = (shiftId: string | null) =>
+      membros.filter((t) => (t.shift_id ?? null) === shiftId).length;
+
+    const turnos: Grupo[] = (shifts.data ?? [])
+      .filter((s) => s.operation_id === teamOpen.id)
+      .map((s) => ({
+        id: s.id,
+        nome: s.name,
+        horario: `${s.start_time.slice(0, 5)}–${s.end_time.slice(0, 5)}`,
+        alocados: contar(s.id),
+      }));
+
+    const semTurno = contar(null);
+    if (!turnos.length || semTurno > 0) {
+      turnos.push({ id: null, nome: "Sem turno", horario: "definido", alocados: semTurno });
+    }
+    return turnos;
+  }, [teamOpen, shifts.data, team.data]);
+
+  /**
+   * Uma linha por colaborador, com a alocação ativa dele — em qualquer operação.
+   *
+   * A regra é exclusividade global: um colaborador ocupa no máximo uma operação
+   * e um turno por vez. Por isso a linha carrega o vínculo ativo onde quer que
+   * ele esteja, e não só os vínculos desta operação: é o que permite mostrar
+   * "alocado em OPP" e bloquear a alocação aqui.
+   *
+   * Busca e filtros são locais — os colaboradores já vieram do servidor, então
+   * digitar não dispara consulta nova.
+   */
+  const equipeLinhas = useMemo(() => {
+    if (!teamOpen) return [];
+    const ativos = (team.data ?? []).filter((t) => t.active);
+    const termo = equipeBusca.trim().toLowerCase();
+
+    return (employees.data ?? [])
+      .map((employee) => {
+        const vinculos = ativos.filter((t) => t.employee_id === employee.id);
+        const alocacao = vinculos[0] ?? null;
+        const situacao: "disponivel" | "aqui" | "outra" = !alocacao
+          ? "disponivel"
+          : alocacao.operation_id === teamOpen.id
+            ? "aqui"
+            : "outra";
+        return { employee, alocacao, situacao, conflito: vinculos.length > 1 };
+      })
+      .filter(({ employee, situacao }) => {
+        if (equipeFiltro !== "todos" && equipeFiltro !== situacao) return false;
+        if (!termo) return true;
+        return (
+          employee.name.toLowerCase().includes(termo) ||
+          (employee.role ?? "").toLowerCase().includes(termo)
+        );
+      });
+  }, [teamOpen, team.data, employees.data, equipeBusca, equipeFiltro]);
+
+  /** Contadores do cabeçalho: sobre todos os colaboradores, não sobre o filtro. */
+  const equipeResumo = useMemo(() => {
+    if (!teamOpen) return { total: 0, aqui: 0, disponivel: 0, outra: 0 };
+    const ativos = (team.data ?? []).filter((t) => t.active);
+    let aqui = 0;
+    let disponivel = 0;
+    let outra = 0;
+    (employees.data ?? []).forEach((employee) => {
+      const alocacao = ativos.find((t) => t.employee_id === employee.id);
+      if (!alocacao) disponivel += 1;
+      else if (alocacao.operation_id === teamOpen.id) aqui += 1;
+      else outra += 1;
+    });
+    return { total: (employees.data ?? []).length, aqui, disponivel, outra };
+  }, [teamOpen, team.data, employees.data]);
+
   const clientName = (id: string) => clients.data?.find((c) => c.id === id)?.name ?? "—";
+  const operationName = (id: string | undefined) =>
+    operations.data?.find((o) => o.id === id)?.name ?? "outra operação";
+  const shiftLabel = (id: string | null) => {
+    if (!id) return "sem turno";
+    const s = shifts.data?.find((x) => x.id === id);
+    return s ? `${s.name} · ${s.start_time.slice(0, 5)}–${s.end_time.slice(0, 5)}` : "turno";
+  };
   const contractName = (id: string | null) =>
     contracts.data?.find((c) => c.id === id)?.name ?? "Valor acordado";
   const clientContracts = useMemo(
@@ -159,20 +309,6 @@ export function PainelOperacoes() {
     saveShift.mutate(payload, { onSuccess: () => setShiftOpen(false) });
   }
 
-  function toggleTeam(operationId: string, employeeId: string, shiftId: string | null) {
-    const existing = (team.data ?? []).find(
-      (t) => t.operation_id === operationId && t.employee_id === employeeId,
-    );
-    if (existing) removeTeam.mutate(existing.id);
-    else
-      saveTeam.mutate({
-        operation_id: operationId,
-        employee_id: employeeId,
-        shift_id: shiftId,
-        active: true,
-      });
-  }
-
   return (
     <div>
       <PageHeader
@@ -194,7 +330,12 @@ export function PainelOperacoes() {
       <div className="space-y-4">
         {(operations.data ?? []).map((operation) => {
           const opShifts = (shifts.data ?? []).filter((s) => s.operation_id === operation.id);
-          const opTeam = (team.data ?? []).filter((t) => t.operation_id === operation.id);
+          // Pessoas distintas com vínculo ativo nesta operação, não linhas da tabela.
+          const opTeam = new Set(
+            (team.data ?? [])
+              .filter((t) => t.operation_id === operation.id && t.active)
+              .map((t) => t.employee_id),
+          );
           return (
             <Card key={operation.id}>
               <CardContent className="p-5">
@@ -217,7 +358,7 @@ export function PainelOperacoes() {
                   </div>
                   <div className="flex gap-1">
                     <Button variant="outline" size="sm" onClick={() => setTeamOpen(operation)}>
-                      <Users className="size-4" /> Equipe ({opTeam.length})
+                      <Users className="size-4" /> Equipe ({opTeam.size})
                     </Button>
                     <Button
                       variant="outline"
@@ -469,48 +610,168 @@ export function PainelOperacoes() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!teamOpen} onOpenChange={(v) => !v && setTeamOpen(null)}>
-        <DialogContent>
+      <Dialog
+        open={!!teamOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setTeamOpen(null);
+            setEquipeBusca("");
+            setEquipeFiltro("todos");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-[95vw] sm:max-w-4xl lg:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Equipe — {teamOpen?.name}</DialogTitle>
             <DialogDescription>
-              Marque os colaboradores alocados. A cobrança considera apenas quem trabalhou no dia.
+              Cada colaborador ocupa uma única operação e turno por vez. Para movê-lo, desaloque na
+              operação atual antes.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-80 space-y-2 overflow-y-auto">
-            {(employees.data ?? []).map((employee) => {
-              const member = (team.data ?? []).find(
-                (t) => t.operation_id === teamOpen?.id && t.employee_id === employee.id,
-              );
-              const opShifts = (shifts.data ?? []).filter((s) => s.operation_id === teamOpen?.id);
-              return (
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>{equipeResumo.total} colaboradores</span>
+            <span>
+              Alocados aqui: <strong className="text-foreground">{equipeResumo.aqui}</strong>
+            </span>
+            <span>
+              Disponíveis: <strong className="text-foreground">{equipeResumo.disponivel}</strong>
+            </span>
+            <span>
+              Outras operações: <strong className="text-foreground">{equipeResumo.outra}</strong>
+            </span>
+            {equipeGrupos.map((grupo) => (
+              <span key={`resumo-${grupo.id ?? "sem-turno"}`}>
+                {grupo.nome}: <strong className="text-foreground">{grupo.alocados}</strong>
+              </span>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              placeholder="Buscar colaborador..."
+              value={equipeBusca}
+              onChange={(e) => setEquipeBusca(e.target.value)}
+              className="sm:flex-1"
+            />
+            {/* flex-wrap: os quatro filtros quebram para a linha de baixo em vez
+                de esticarem o modal e criarem barra horizontal. */}
+            <div className="flex flex-wrap gap-1">
+              {(
+                [
+                  ["todos", "Todos"],
+                  ["aqui", "Alocados aqui"],
+                  ["disponivel", "Disponíveis"],
+                  ["outra", "Em outra operação"],
+                ] as const
+              ).map(([valor, rotulo]) => (
+                <Button
+                  key={valor}
+                  type="button"
+                  size="sm"
+                  className="shrink-0"
+                  variant={equipeFiltro === valor ? "default" : "outline"}
+                  onClick={() => setEquipeFiltro(valor)}
+                >
+                  {rotulo}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="max-h-[55vh] overflow-y-auto overflow-x-hidden rounded-md border border-border">
+            <div className="sticky top-0 z-10 hidden border-b border-border bg-background px-3 py-2 sm:flex sm:items-center">
+              <p className="flex-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Colaborador
+              </p>
+              <p className="w-[22rem] shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Alocação
+              </p>
+            </div>
+
+            {equipeLinhas.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">
+                Nenhum colaborador encontrado com esses critérios.
+              </p>
+            ) : (
+              equipeLinhas.map(({ employee, alocacao, situacao, conflito }) => (
                 <div
                   key={employee.id}
-                  className="flex items-center justify-between rounded-md border border-border p-3"
+                  className="flex flex-col gap-2 border-b border-border px-3 py-2 last:border-b-0 sm:flex-row sm:items-center"
                 >
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={!!member}
-                      onCheckedChange={() =>
-                        teamOpen && toggleTeam(teamOpen.id, employee.id, opShifts[0]?.id ?? null)
-                      }
-                    />
-                    <div>
-                      <p className="text-sm font-medium">{employee.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {employee.role ?? "—"} · custo {brl(employee.daily_cost)}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{employee.name}</p>
+                    <p className="break-words text-xs text-muted-foreground">
+                      {employee.role ?? "—"} · custo {brl(employee.daily_cost)}
+                    </p>
+                    {conflito ? (
+                      <p className="text-xs font-medium text-destructive">
+                        Conflito: mais de uma alocação ativa. Revise antes de continuar.
                       </p>
-                    </div>
+                    ) : null}
                   </div>
-                  {member?.shift_id ? (
-                    <Badge variant="secondary">
-                      {shifts.data?.find((s) => s.id === member.shift_id)?.name ?? "turno"}
-                    </Badge>
-                  ) : null}
+
+                  <div className="flex w-full min-w-0 items-center gap-2 sm:w-[22rem] sm:shrink-0">
+                    {situacao === "outra" ? (
+                      <p className="min-w-0 break-words text-xs text-muted-foreground">
+                        <Badge variant="outline" className="mr-1">
+                          Indisponível
+                        </Badge>
+                        Alocado em {operationName(alocacao?.operation_id)} ·{" "}
+                        {shiftLabel(alocacao?.shift_id ?? null)}
+                      </p>
+                    ) : (
+                      <>
+                        <Select
+                          value={
+                            situacao === "aqui" ? (alocacao?.shift_id ?? "sem-turno") : "nenhum"
+                          }
+                          onValueChange={(v) =>
+                            alocarEquipe.mutate({
+                              employeeId: employee.id,
+                              shiftId: v === "sem-turno" ? null : v,
+                              ...(alocacao ? { vinculoId: alocacao.id } : {}),
+                            })
+                          }
+                        >
+                          <SelectTrigger className="min-w-0 flex-1">
+                            <SelectValue placeholder="Selecionar turno" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {situacao === "disponivel" ? (
+                              <SelectItem value="nenhum" disabled>
+                                Selecionar turno
+                              </SelectItem>
+                            ) : null}
+                            {equipeGrupos.map((grupo) => (
+                              <SelectItem
+                                key={`opt-${grupo.id ?? "sem-turno"}`}
+                                value={grupo.id ?? "sem-turno"}
+                              >
+                                {grupo.nome}
+                                {grupo.id ? ` · ${grupo.horario}` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {situacao === "aqui" && alocacao ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => desalocarEquipe.mutate(alocacao.id)}
+                          >
+                            Desalocar
+                          </Button>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
+
           <DialogFooter>
             <Button onClick={() => setTeamOpen(null)}>Concluir</Button>
           </DialogFooter>

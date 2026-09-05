@@ -143,11 +143,18 @@ export function PainelApontamentos() {
     [entries.data, timesheet?.id],
   );
 
+  /**
+   * Correspondência exata de operação e turno.
+   *
+   * Antes um vínculo sem `shift_id` aparecia em todos os turnos da operação.
+   * Com a alocação passando a ser sempre operação + turno, isso trazia gente de
+   * fora do turno para a folha. Vínculo sem turno agora só aparece quando o
+   * turno selecionado também é "sem turno" — caso das operações avulsas.
+   */
   const teamMembers = useMemo(
     () =>
       (team.data ?? []).filter(
-        (t) =>
-          t.operation_id === operationId && (!turnoId || !t.shift_id || t.shift_id === turnoId),
+        (t) => t.operation_id === operationId && t.active && (t.shift_id ?? "") === turnoId,
       ),
     [team.data, operationId, turnoId],
   );
@@ -466,7 +473,7 @@ export function PainelApontamentos() {
               ) : computed.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-muted-foreground">
-                    Nenhum colaborador alocado nesta operação. Monte a equipe em Operações.
+                    Nenhum colaborador alocado neste turno. Configure a equipe em Operações.
                   </TableCell>
                 </TableRow>
               ) : (
