@@ -54,6 +54,24 @@ interface DraftEntry {
   notes: string;
 }
 
+/**
+ * O rascunho carrega a identidade do contexto que ele representa e o conjunto
+ * de linhas que o usuário tocou.
+ *
+ * Guardar os três juntos é o que impede a edição manual de ser descartada: o
+ * rascunho só é reconstruído do zero quando `key` muda, e enquanto ela não muda
+ * as linhas em `dirty` têm precedência sobre o que vem do servidor.
+ */
+interface DraftState {
+  key: string;
+  rows: DraftEntry[];
+  dirty: ReadonlySet<string>;
+}
+
+/** Identidade do contexto: um rascunho pertence a uma operação, turno e data. */
+const contextoDe = (operationId: string, turnoId: string, date: string) =>
+  `${operationId}|${turnoId}|${date}`;
+
 export function PainelApontamentos() {
   const queryClient = useQueryClient();
   const clients = useClients();
@@ -65,9 +83,25 @@ export function PainelApontamentos() {
   const entries = useEntries();
 
   const [operationId, setOperationId] = useState("");
-  const [shiftId, setShiftId] = useState("");
+  // null = ainda não escolhido; "" = "sem turno" escolhido de propósito.
+  // A distinção evita que a seleção deliberada de "sem turno" seja tratada
+  // como ausência de escolha e substituída pelo primeiro turno da operação.
+  const [shiftId, setShiftId] = useState<string | null>(null);
   const [date, setDate] = useState(todayISO());
-  const [draft, setDraft] = useState<DraftEntry[]>([]);
+  const [draft, setDraft] = useState<DraftState | null>(null);
+
+  const turnoId = shiftId ?? "";
+
+  /**
+   * Enquanto qualquer uma dessas consultas não terminou, o rascunho não pode
+   * ser montado nem salvo: sem `entries` uma linha já gravada pareceria nova, e
+   * o Salvar tentaria inserir por cima de uma que já existe.
+   *
+   * Usa `isLoading` (primeira carga), não `isFetching`: um refetch em segundo
+   * plano não pode bloquear a tela nem desmontar o rascunho.
+   */
+  const carregando =
+    shifts.isLoading || team.isLoading || timesheets.isLoading || entries.isLoading;
 
   const operationList = operations.data ?? [];
   useEffect(() => {
@@ -78,11 +112,20 @@ export function PainelApontamentos() {
     () => (shifts.data ?? []).filter((s) => s.operation_id === operationId),
     [shifts.data, operationId],
   );
+  // Só escolhe um turno quando não há escolha válida para a operação atual.
+  // Antes este efeito forçava o primeiro turno sempre que `operationShifts`
+  // mudava de identidade, desfazendo a seleção do usuário a cada refetch.
   useEffect(() => {
-    setShiftId(operationShifts[0]?.id ?? "");
+    setShiftId((atual) => {
+      if (atual === "") return atual;
+      if (atual !== null && operationShifts.some((s) => s.id === atual)) return atual;
+      // Sem turno disponível, continua `null` (não escolhido) em vez de "" —
+      // assim um turno cadastrado depois ainda é selecionado automaticamente.
+      return operationShifts[0]?.id ?? null;
+    });
   }, [operationShifts]);
 
-  const shift = operationShifts.find((s) => s.id === shiftId) ?? null;
+  const shift = operationShifts.find((s) => s.id === turnoId) ?? null;
   const plannedMinutes = shiftPlannedMinutes(shift);
   const rules = useContractRules(operationId);
 
@@ -90,11 +133,9 @@ export function PainelApontamentos() {
     () =>
       (timesheets.data ?? []).find(
         (t) =>
-          t.operation_id === operationId &&
-          t.work_date === date &&
-          (t.shift_id ?? "") === (shiftId ?? ""),
+          t.operation_id === operationId && t.work_date === date && (t.shift_id ?? "") === turnoId,
       ),
-    [timesheets.data, operationId, date, shiftId],
+    [timesheets.data, operationId, date, turnoId],
   );
 
   const existingEntries = useMemo(
@@ -106,12 +147,16 @@ export function PainelApontamentos() {
     () =>
       (team.data ?? []).filter(
         (t) =>
-          t.operation_id === operationId && (!shiftId || !t.shift_id || t.shift_id === shiftId),
+          t.operation_id === operationId && (!turnoId || !t.shift_id || t.shift_id === turnoId),
       ),
-    [team.data, operationId, shiftId],
+    [team.data, operationId, turnoId],
   );
 
+  const contextKey = contextoDe(operationId, turnoId, date);
+
   useEffect(() => {
+    if (carregando) return;
+
     const base = teamMembers.map((member) => {
       const existing = existingEntries.find((e) => e.employee_id === member.employee_id);
       return {
@@ -135,15 +180,54 @@ export function PainelApontamentos() {
         breakMinutes: e.break_minutes,
         notes: e.notes ?? "",
       }));
-    setDraft([...base, ...extras]);
-  }, [teamMembers, existingEntries, shift?.start_time, shift?.end_time, shift?.break_minutes]);
+    const servidor = [...base, ...extras];
+
+    setDraft((atual) => {
+      // Contexto novo (outra operação, turno ou data): o rascunho anterior não
+      // se aplica mais. Reconstrói inteiro e zera o que estava marcado.
+      if (!atual || atual.key !== contextKey) {
+        return { key: contextKey, rows: servidor, dirty: new Set<string>() };
+      }
+
+      // Mesmo contexto: os dados chegaram por carga ou refetch. As linhas que o
+      // usuário tocou são preservadas; só o `entryId` é atualizado, para que uma
+      // linha recém-gravada em outra aba não volte a ser tratada como nova.
+      const anteriores = new Map(atual.rows.map((row) => [row.employeeId, row]));
+      const mescladas = servidor.map((linha) => {
+        const anterior = anteriores.get(linha.employeeId);
+        return atual.dirty.has(linha.employeeId) && anterior
+          ? { ...anterior, entryId: linha.entryId }
+          : linha;
+      });
+
+      // Linha tocada que sumiu da equipe no servidor continua visível até salvar
+      // ou trocar de contexto — senão a digitação desapareceria da tela.
+      const pendentes = atual.rows.filter(
+        (row) =>
+          atual.dirty.has(row.employeeId) &&
+          !servidor.some((linha) => linha.employeeId === row.employeeId),
+      );
+
+      return { key: contextKey, rows: [...mescladas, ...pendentes], dirty: atual.dirty };
+    });
+  }, [
+    contextKey,
+    carregando,
+    teamMembers,
+    existingEntries,
+    shift?.start_time,
+    shift?.end_time,
+    shift?.break_minutes,
+  ]);
+
+  const linhas = draft?.rows ?? [];
 
   const employeeMap = useMemo(
     () => new Map((employees.data ?? []).map((e) => [e.id, e])),
     [employees.data],
   );
 
-  const computed = draft.map((row) => {
+  const computed = linhas.map((row) => {
     const employee = employeeMap.get(row.employeeId);
     const calc = calcEntry({
       status: row.status,
@@ -169,15 +253,24 @@ export function PainelApontamentos() {
 
   const isClosed = timesheet?.status === "closed";
 
+  // Uma linha só é gravada se o usuário a tocou ou se ela ainda não existe no
+  // banco. É isso que impede um Salvar destinado a um colaborador de regravar
+  // os demais com valores recalculados no navegador.
+  const aSalvar = computed.filter(
+    ({ row }) => !row.entryId || (draft?.dirty.has(row.employeeId) ?? false),
+  );
+
   const saveAll = useMutation({
     mutationFn: async () => {
+      if (!aSalvar.length) return { gravadas: 0 };
+
       let timesheetId = timesheet?.id;
       if (!timesheetId) {
         const { data, error } = await criarClienteNavegador()
           .from("timesheets")
           .insert({
             operation_id: operationId,
-            shift_id: shiftId || null,
+            shift_id: turnoId || null,
             work_date: date,
             status: "open",
           })
@@ -186,7 +279,7 @@ export function PainelApontamentos() {
         if (error) throw error;
         timesheetId = data.id;
       }
-      const payload = computed.map(({ row, calc }) => ({
+      const payload = aSalvar.map(({ row, calc }) => ({
         ...(row.entryId ? { id: row.entryId } : {}),
         timesheet_id: timesheetId!,
         employee_id: row.employeeId,
@@ -203,16 +296,25 @@ export function PainelApontamentos() {
         cost_amount: calc.costAmount,
         notes: row.notes || null,
       }));
-      if (payload.length) {
-        const { error } = await criarClienteNavegador()
-          .from("timesheet_entries")
-          .upsert(payload as never);
-        if (error) throw error;
-      }
+      const { error } = await criarClienteNavegador()
+        .from("timesheet_entries")
+        .upsert(payload as never);
+      if (error) throw error;
+      return { gravadas: payload.length };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["timesheets"] });
-      queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] });
+    onSuccess: async ({ gravadas }) => {
+      if (!gravadas) {
+        toast.info("Nenhuma alteração para salvar.");
+        return;
+      }
+      // Espera o refetch terminar antes de limpar `dirty`. Se limpasse antes, a
+      // reconstrução seguinte poderia rodar sobre dados ainda anteriores ao
+      // save e devolver ao rascunho os valores que acabaram de ser trocados.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["timesheets"] }),
+        queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] }),
+      ]);
+      setDraft((atual) => (atual ? { ...atual, dirty: new Set<string>() } : atual));
       toast.success("Apontamento salvo.");
     },
     onError: (error: Error) => toast.error(error.message),
@@ -235,9 +337,18 @@ export function PainelApontamentos() {
   });
 
   function update(employeeId: string, patch: Partial<DraftEntry>) {
-    setDraft((rows) =>
-      rows.map((row) => (row.employeeId === employeeId ? { ...row, ...patch } : row)),
-    );
+    setDraft((atual) => {
+      if (!atual) return atual;
+      // Set novo a cada edição: mutar o atual não mudaria a referência e a
+      // precedência da linha editada poderia não ser vista pela renderização.
+      const dirty = new Set(atual.dirty);
+      dirty.add(employeeId);
+      return {
+        key: atual.key,
+        rows: atual.rows.map((row) => (row.employeeId === employeeId ? { ...row, ...patch } : row)),
+        dirty,
+      };
+    });
   }
 
   const clientName =
@@ -259,7 +370,10 @@ export function PainelApontamentos() {
               {isClosed ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
               {isClosed ? "Reabrir" : "Fechar dia"}
             </Button>
-            <Button onClick={() => saveAll.mutate()} disabled={isClosed || !draft.length}>
+            <Button
+              onClick={() => saveAll.mutate()}
+              disabled={isClosed || carregando || saveAll.isPending || !linhas.length}
+            >
               <Save className="size-4" /> Salvar
             </Button>
           </div>
@@ -286,7 +400,7 @@ export function PainelApontamentos() {
           <div className="space-y-1.5">
             <Label>Turno</Label>
             <Select
-              value={shiftId || "none"}
+              value={turnoId || "none"}
               onValueChange={(v) => setShiftId(v === "none" ? "" : v)}
             >
               <SelectTrigger>
@@ -343,7 +457,13 @@ export function PainelApontamentos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {computed.length === 0 ? (
+              {carregando ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-muted-foreground">
+                    Carregando equipe e apontamentos…
+                  </TableCell>
+                </TableRow>
+              ) : computed.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-muted-foreground">
                     Nenhum colaborador alocado nesta operação. Monte a equipe em Operações.
