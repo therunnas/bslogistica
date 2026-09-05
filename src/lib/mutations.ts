@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/lib/notificacoes";
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 
 type Row = Record<string, unknown>;

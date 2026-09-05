@@ -18,7 +18,10 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <Toaster richColors position="top-right" />
+      {/* top-center: no canto superior direito o toast cobria justamente os
+          botões de ação das telas — Salvar, Novo colaborador, Nova operação —
+          e obrigava a esperar ele sumir para continuar. */}
+      <Toaster richColors position="top-center" offset="16px" mobileOffset="12px" />
     </QueryClientProvider>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notificacoes";
 import { Lock, LockOpen, Save } from "lucide-react";
 import { PageHeader } from "../_components/app-shell";
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
