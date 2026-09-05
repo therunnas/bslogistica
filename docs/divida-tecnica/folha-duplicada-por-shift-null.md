@@ -14,7 +14,7 @@ A tela de apontamentos procura a folha existente por três campos:
     t.operation_id === operationId &&
     t.work_date === date &&
     (t.shift_id ?? "") === (shiftId ?? ""),
-)
+);
 ```
 
 `timesheets.shift_id` aceita `NULL`, e a tela grava `shift_id: shiftId || null` — ou
@@ -32,9 +32,9 @@ unicidade sobre `(operation_id, work_date, shift_id)`.
 
 Reproduzido em 04/09/2026, na operação de teste "Op. salmo":
 
-| Folha | Criada | `shift_id` | Apontamento |
-|---|---|---|---|
-| `dce2c888…` | 13:56:46 | **NULL** | Felipe, saída 15:00, 480 min, R$ 180,00 |
+| Folha       | Criada   | `shift_id`  | Apontamento                             |
+| ----------- | -------- | ----------- | --------------------------------------- |
+| `dce2c888…` | 13:56:46 | **NULL**    | Felipe, saída 15:00, 480 min, R$ 180,00 |
 | `661a43e6…` | 14:05:56 | `224aeafe…` | Felipe, saída 17:30, 630 min, R$ 264,38 |
 
 Mesma operação, mesma data, mesmo colaborador. Felipe aparece duas vezes no
@@ -76,12 +76,12 @@ A tela de apontamentos **não oferece exclusão**. Não há botão, e não há c
 enquanto clientes, colaboradores e operações usam `useDeleteRow`, a tela de
 apontamentos não a importa nenhuma vez:
 
-| Tela | ocorrências de `useDeleteRow` |
-|---|---|
-| clientes | 3 |
-| colaboradores | 2 |
-| operações | 4 |
-| **apontamentos** | **0** |
+| Tela             | ocorrências de `useDeleteRow` |
+| ---------------- | ----------------------------- |
+| clientes         | 3                             |
+| colaboradores    | 2                             |
+| operações        | 4                             |
+| **apontamentos** | **0**                         |
 
 Folha e apontamento, uma vez criados, só podem ser editados. Nunca removidos.
 

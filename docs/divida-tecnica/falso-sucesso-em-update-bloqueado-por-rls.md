@@ -29,13 +29,13 @@ número de linhas afetadas nunca é consultado.
 
 Testado no banco, simulando a sessão de cada perfil e revertendo com rollback:
 
-| Ação | Admin | Operacional |
-|---|---|---|
-| `UPDATE clients` | 1 linha | **0 linhas, sem erro** |
+| Ação               | Admin   | Operacional            |
+| ------------------ | ------- | ---------------------- |
+| `UPDATE clients`   | 1 linha | **0 linhas, sem erro** |
 | `UPDATE employees` | 1 linha | **0 linhas, sem erro** |
-| `UPDATE contracts` | — | **0 linhas, sem erro** |
-| `INSERT clients` | — | erro de RLS |
-| `INSERT invoices` | — | erro de RLS |
+| `UPDATE contracts` | —       | **0 linhas, sem erro** |
+| `INSERT clients`   | —       | erro de RLS            |
+| `INSERT invoices`  | —       | erro de RLS            |
 
 Ou seja: a RLS **protege os dados corretamente**. O problema é só o que a
 interface diz ao usuário sobre o que aconteceu.

@@ -17,13 +17,13 @@ ALL | operation_team_staff | USING: is_staff()
 
 Em comparação, as demais tabelas de cadastro separam leitura de escrita:
 
-| Tabela | Leitura | Escrita |
-|---|---|---|
-| `clients` | `is_staff()` | `has_role(admin)` |
-| `employees` | `is_staff()` | `has_role(admin)` |
-| `contracts` | `is_staff()` | `has_role(admin)` |
-| `invoices` | `is_staff()` | `has_role(admin)` |
-| **`operation_team`** | `is_staff()` | **`is_staff()`** |
+| Tabela               | Leitura      | Escrita           |
+| -------------------- | ------------ | ----------------- |
+| `clients`            | `is_staff()` | `has_role(admin)` |
+| `employees`          | `is_staff()` | `has_role(admin)` |
+| `contracts`          | `is_staff()` | `has_role(admin)` |
+| `invoices`           | `is_staff()` | `has_role(admin)` |
+| **`operation_team`** | `is_staff()` | **`is_staff()`**  |
 
 Ou seja, um usuário `operacional` pode incluir, alterar e remover alocações de
 equipe, enquanto não consegue mexer em cliente, colaborador ou contrato.

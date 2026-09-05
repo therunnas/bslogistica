@@ -38,10 +38,10 @@ do servidor como única fonte de verdade e descarta o trabalho local.
 Mesma entrada — Felipe, presente, 06:00 às **17:30**, intervalo 60 — em datas
 diferentes para não interferir uma na outra:
 
-| Aplicação | Data | Gravado |
-|---|---|---|
-| Next.js | 21/10/2026 | 15:00 · 480 min · 0 extra · R$ 180,00 · custo R$ 120,00 |
-| TanStack | 22/10/2026 | 15:00 · 480 min · 0 extra · R$ 180,00 · custo R$ 120,00 |
+| Aplicação | Data       | Gravado                                                 |
+| --------- | ---------- | ------------------------------------------------------- |
+| Next.js   | 21/10/2026 | 15:00 · 480 min · 0 extra · R$ 180,00 · custo R$ 120,00 |
+| TanStack  | 22/10/2026 | 15:00 · 480 min · 0 extra · R$ 180,00 · custo R$ 120,00 |
 
 Idênticos. **Não é regressão da migração** — o defeito já existe na aplicação em
 uso, e a versão Next.js o reproduz fielmente.

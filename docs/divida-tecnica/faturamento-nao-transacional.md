@@ -31,12 +31,12 @@ vinculado, o mesmo trabalho pode ser cobrado repetidamente.
 Quatro faturas, todas do cliente **Salmonela**, três delas cobrindo exatamente
 o mesmo período.
 
-| # | ID | Período | Total | Soma dos itens | Itens | Apontamentos vinculados | Criada |
-|---|---|---|---|---|---|---|---|
-| 1 | `d5bb5206-ffb9-477a-af9a-df199760dca7` | 01/09 a 30/09 | R$ 0,00 | R$ 0,00 | 1 | **0 — órfã** | 12:30:44 |
-| 2 | `7aa38d0f-d765-4fa9-af6c-b3a03f8483da` | 01/09 a 30/09 | R$ 0,00 | R$ 0,00 | 1 | **0 — órfã** | 12:33:26 |
-| 3 | `4528e427-beae-4dfc-b0c6-90a9630df4c7` | 01/09 a 30/09 | R$ 264,38 | R$ 264,38 | 2 | **0 — órfã** | 12:37:29 |
-| 4 | `e66e6b17-09e4-46a6-8a89-19707cf82295` | 01/09 a 11/09 | R$ 264,38 | R$ 264,38 | 2 | 1 | 13:03:53 |
+| #   | ID                                     | Período       | Total     | Soma dos itens | Itens | Apontamentos vinculados | Criada   |
+| --- | -------------------------------------- | ------------- | --------- | -------------- | ----- | ----------------------- | -------- |
+| 1   | `d5bb5206-ffb9-477a-af9a-df199760dca7` | 01/09 a 30/09 | R$ 0,00   | R$ 0,00        | 1     | **0 — órfã**            | 12:30:44 |
+| 2   | `7aa38d0f-d765-4fa9-af6c-b3a03f8483da` | 01/09 a 30/09 | R$ 0,00   | R$ 0,00        | 1     | **0 — órfã**            | 12:33:26 |
+| 3   | `4528e427-beae-4dfc-b0c6-90a9630df4c7` | 01/09 a 30/09 | R$ 264,38 | R$ 264,38      | 2     | **0 — órfã**            | 12:37:29 |
+| 4   | `e66e6b17-09e4-46a6-8a89-19707cf82295` | 01/09 a 11/09 | R$ 264,38 | R$ 264,38      | 2     | 1                       | 13:03:53 |
 
 Todas com situação `closed`.
 
@@ -53,9 +53,9 @@ no mesmo cliente.
 
 ### Apontamento faturado mais de uma vez
 
-| Colaborador | Data | Valor | Fatura vinculada hoje | Faturas que cobrem a data |
-|---|---|---|---|---|
-| Felipe | 04/09/2026 | R$ 264,38 | `e66e6b17…` | **4** |
+| Colaborador | Data       | Valor     | Fatura vinculada hoje | Faturas que cobrem a data |
+| ----------- | ---------- | --------- | --------------------- | ------------------------- |
+| Felipe      | 04/09/2026 | R$ 264,38 | `e66e6b17…`           | **4**                     |
 
 O mesmo dia de trabalho está no intervalo das quatro faturas. Somando os
 documentos emitidos, ele foi cobrado quatro vezes, embora só a última mantenha
@@ -98,10 +98,10 @@ para o mesmo cliente e período sobreposto, **moveu o vínculo para si**.
 
 O número de faturas órfãs passou de **3 para 4**.
 
-| Momento | Faturas | Órfãs |
-|---|---|---|
-| Primeiro diagnóstico | 4 | 3 |
-| Depois de mais duas gerações | 6 | 4 |
+| Momento                      | Faturas | Órfãs |
+| ---------------------------- | ------- | ----- |
+| Primeiro diagnóstico         | 4       | 3     |
+| Depois de mais duas gerações | 6       | 4     |
 
 Isto confirma, com um segundo caso e sem nenhuma intervenção no banco, que
 gerar uma fatura sobre período já faturado **desliga silenciosamente a fatura
