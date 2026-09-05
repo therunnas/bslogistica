@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { useClients, useInvoices } from "@/lib/queries";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
-import { brl, dateBR, minutesToHours, minutesToLabel, monthRange, num } from "@/lib/format";
+import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
 import { marginPct, round2 } from "@/lib/billing";
 
 export function PainelFaturamento() {
@@ -44,11 +44,22 @@ export function PainelFaturamento() {
 
   const selectedClient = clientId || clients.data?.[0]?.id || "";
 
+  /**
+   * Mesma regra de elegibilidade da RPC `gerar_fatura`: cliente, período,
+   * presença e `invoice_id` ainda nulo.
+   *
+   * O `invoiceId === null` existe para a prévia não oferecer como faturável um
+   * lançamento que o banco vai recusar. A autoridade continua sendo a RPC —
+   * isto aqui é só coerência de tela.
+   */
   const period = useMemo(
     () =>
       rows.filter(
         (r) =>
-          r.clientId === selectedClient && inPeriod(r.date, start, end) && r.status !== "absent",
+          r.clientId === selectedClient &&
+          inPeriod(r.date, start, end) &&
+          r.status !== "absent" &&
+          r.invoiceId === null,
       ),
     [rows, selectedClient, start, end],
   );
@@ -98,71 +109,50 @@ export function PainelFaturamento() {
   const dailiesValue = round2(totals.billed - totals.otValue);
   const overtimeValue = totals.otValue;
 
+  /**
+   * Uma única chamada transacional. Antes eram três escritas independentes a
+   * partir do navegador — insert da fatura, insert dos itens e update do
+   * vínculo — sem transação e sem filtrar lançamento já faturado, o que deixava
+   * fatura órfã e permitia cobrar o mesmo trabalho de novo.
+   *
+   * Os totais não são mais enviados daqui: a função os soma no servidor, a
+   * partir dos snapshots gravados no apontamento.
+   */
   const generate = useMutation({
     mutationFn: async () => {
       if (!selectedClient) throw new Error("Selecione um cliente.");
-      if (!period.length) throw new Error("Nenhum lançamento faturável no período.");
-      const { data: invoice, error } = await criarClienteNavegador()
-        .from("invoices")
-        .insert({
-          client_id: selectedClient,
-          period_start: start,
-          period_end: end,
-          status: "closed",
-          total_dailies: totals.dailies,
-          total_overtime: round2(minutesToHours(totals.otMinutes)),
-          total_amount: round2(totals.billed),
-          total_cost: round2(totals.cost),
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
 
-      const items = byOperation.flatMap((op) => {
-        const opRows = period.filter((r) => r.operationId === op.id);
-        const ot = round2(sumBy(opRows, (r) => r.otValue));
-        const list = [
-          {
-            invoice_id: invoice.id,
-            operation_id: op.id,
-            description: `${op.name} — diárias`,
-            quantity: op.dailies,
-            unit_price: op.dailies ? round2((op.billed - ot) / op.dailies) : 0,
-            amount: round2(op.billed - ot),
-          },
-        ];
-        if (ot > 0) {
-          list.push({
-            invoice_id: invoice.id,
-            operation_id: op.id,
-            description: `${op.name} — horas extras`,
-            quantity: round2(minutesToHours(op.otMinutes)),
-            unit_price: op.otMinutes ? round2(ot / minutesToHours(op.otMinutes)) : 0,
-            amount: round2(ot),
-          });
-        }
-        return list;
+      const { data, error } = await criarClienteNavegador().rpc("gerar_fatura", {
+        _client_id: selectedClient,
+        _period_start: start,
+        _period_end: end,
       });
-      const { error: itemsError } = await criarClienteNavegador()
-        .from("invoice_items")
-        .insert(items as never);
-      if (itemsError) throw itemsError;
-
-      const { error: linkError } = await criarClienteNavegador()
-        .from("timesheet_entries")
-        .update({ invoice_id: invoice.id })
-        .in(
-          "id",
-          period.map((r) => r.entryId),
-        );
-      if (linkError) throw linkError;
+      if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] });
-      toast.success("Fatura gerada.");
+    onSuccess: async (invoice) => {
+      // O vínculo muda `timesheet_entries.invoice_id`, que alimenta o ledger —
+      // e o ledger alimenta Dashboard, Relatórios e a prévia desta tela.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] }),
+      ]);
+      toast.success(
+        invoice
+          ? `Fatura gerada: ${brl(invoice.total_amount)} em ${num(invoice.total_dailies, 0)} diárias.`
+          : "Fatura gerada.",
+      );
     },
-    onError: (error: Error) => toast.error(error.message),
+    // A mensagem do Postgres é escrita em pt-BR pela própria função
+    // ("Nenhum lançamento faturável…", "Apenas administradores…", "Período
+    // inválido…"), então vale mais que qualquer texto genérico daqui.
+    onError: (error: unknown) => {
+      const mensagem =
+        typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "Não foi possível gerar a fatura.";
+      toast.error(mensagem);
+    },
   });
 
   function exportCsv() {

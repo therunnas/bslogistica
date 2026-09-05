@@ -83,6 +83,11 @@ As duas primeiras afetam valores cobrados e merecem prioridade.
 4. Revisão final e merge do PR #1 em `main`
 5. Publicar em produção
 
-Itens menores pendentes: reconciliar o histórico da migration `20260903205051`,
-ativar a proteção contra senha vazada, e decidir sobre o projeto Vercel
-duplicado `bslogistica-sistema`, hoje desconectado do repositório.
+Itens menores pendentes: ativar a proteção contra senha vazada e decidir sobre
+o projeto Vercel duplicado `bslogistica-sistema`, hoje desconectado do
+repositório.
+
+O histórico de migrations foi reconciliado em 05/09/2026: as versões
+`20260903205051` e `20260905163000` tiveram os efeitos auditados no banco e
+foram marcadas como aplicadas com `supabase migration repair`. `supabase
+migration list --linked` mostra as seis alinhadas.

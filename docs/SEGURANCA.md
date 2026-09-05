@@ -95,9 +95,12 @@ levanta erro, e a interface mostra "Registro salvo." sem ter salvo. Não é falh
 de proteção — os dados ficam íntegros —, mas engana o usuário. Ver
 [dívida técnica](divida-tecnica/falso-sucesso-em-update-bloqueado-por-rls.md).
 
-**Migration `20260903205051` fora do histórico** — o efeito está aplicado no
-banco (verificado na ACL da função), mas não consta no histórico remoto.
-Reconciliar com `supabase migration repair`.
+**Vínculo de fatura gravável por não-admin** — a policy de
+`timesheet_entries` exige apenas `is_staff()`, e a coluna `invoice_id` está
+coberta por ela. Um usuário `operacional` pode desfazer o lastro de uma fatura
+fechada escrevendo direto pela API. Precisa ser fechado antes de existir a
+primeira conta `operacional`. Ver
+[dívida técnica](divida-tecnica/rls-vinculo-de-fatura-permissivo.md).
 
 **Sem FK de `profiles` e `user_roles` para `auth.users`** — remover usuário pelo
 painel não limpa essas tabelas e deixa registros órfãos. Ao remover uma conta,
