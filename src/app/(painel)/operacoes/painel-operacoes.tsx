@@ -1,8 +1,5 @@
 "use client";
 
-// Portado de src/routes/_authenticated/operacoes.tsx sem alteração de
-// comportamento. É client component porque usa estado, React Query e
-// formulários controlados.
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, Users } from "lucide-react";
 import { PageHeader } from "../_components/app-shell";

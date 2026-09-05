@@ -1,8 +1,5 @@
 "use client";
 
-// Portado de src/routes/_authenticated/relatorios.tsx sem alteração de
-// comportamento. É client component porque usa estado, React Query e
-// gera o CSV no navegador.
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { PageHeader } from "../_components/app-shell";

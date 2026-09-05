@@ -1,8 +1,5 @@
 "use client";
 
-// Portado de src/routes/_authenticated/dashboard.tsx sem alteração de
-// comportamento: mesmos cálculos, mesmos gráficos, mesmo layout. É client
-// component porque usa estado, React Query e recharts.
 import { useMemo, useState } from "react";
 import {
   Bar,

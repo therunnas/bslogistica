@@ -1,5 +1,5 @@
 # Projeto BSLOG (sa-east-1). O ref anterior aqui, "eosqwhjlytoawanhzmhz", era do
-# projeto que o Lovable gerenciava e já foi deletado — qualquer comando do CLI
+# projeto anterior, já deletado — qualquer comando do CLI
 # que lesse este arquivo apontaria para um projeto inexistente.
 project_id = "qaibhlucbpetxrtswulf"
 

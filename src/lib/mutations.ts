@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { obterCliente } from "@/integrations/supabase/registro";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
 
 type Row = Record<string, unknown>;
 
@@ -11,11 +11,11 @@ export function useSaveRow(table: string, invalidate: string[] = [table]) {
     mutationFn: async (row: Row) => {
       const { id, ...rest } = row as { id?: string };
       const query = id
-        ? obterCliente()
+        ? criarClienteNavegador()
             .from(table as never)
             .update(rest as never)
             .eq("id", id)
-        : obterCliente()
+        : criarClienteNavegador()
             .from(table as never)
             .insert(rest as never);
       const { error } = await query;
@@ -33,7 +33,7 @@ export function useDeleteRow(table: string, invalidate: string[] = [table]) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await obterCliente()
+      const { error } = await criarClienteNavegador()
         .from(table as never)
         .delete()
         .eq("id", id);

@@ -1,16 +1,11 @@
 "use client";
 
-// Portado de src/routes/_authenticated/faturamento.tsx. O corpo é idêntico:
-// as únicas mudanças são o import do PageHeader e a troca do cliente Supabase
-// direto por obterCliente(). A lógica de geração de fatura foi preservada
-// como está, inclusive o defeito das três escritas não transacionais, que
-// está documentado em docs/divida-tecnica e será corrigido depois.
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Download, FileText } from "lucide-react";
 import { PageHeader } from "../_components/app-shell";
-import { obterCliente } from "@/integrations/supabase/registro";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -107,7 +102,7 @@ export function PainelFaturamento() {
     mutationFn: async () => {
       if (!selectedClient) throw new Error("Selecione um cliente.");
       if (!period.length) throw new Error("Nenhum lançamento faturável no período.");
-      const { data: invoice, error } = await obterCliente()
+      const { data: invoice, error } = await criarClienteNavegador()
         .from("invoices")
         .insert({
           client_id: selectedClient,
@@ -148,12 +143,12 @@ export function PainelFaturamento() {
         }
         return list;
       });
-      const { error: itemsError } = await obterCliente()
+      const { error: itemsError } = await criarClienteNavegador()
         .from("invoice_items")
         .insert(items as never);
       if (itemsError) throw itemsError;
 
-      const { error: linkError } = await obterCliente()
+      const { error: linkError } = await criarClienteNavegador()
         .from("timesheet_entries")
         .update({ invoice_id: invoice.id })
         .in(

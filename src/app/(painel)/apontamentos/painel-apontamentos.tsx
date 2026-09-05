@@ -1,15 +1,11 @@
 "use client";
 
-// Portado de src/routes/_authenticated/apontamentos.tsx. O corpo é idêntico:
-// as únicas mudanças são o import do PageHeader e a troca do cliente Supabase
-// direto por obterCliente(), porque as duas aplicações guardam a sessão em
-// lugares diferentes. Nenhum cálculo foi tocado.
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Lock, LockOpen, Save } from "lucide-react";
 import { PageHeader } from "../_components/app-shell";
-import { obterCliente } from "@/integrations/supabase/registro";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -177,7 +173,7 @@ export function PainelApontamentos() {
     mutationFn: async () => {
       let timesheetId = timesheet?.id;
       if (!timesheetId) {
-        const { data, error } = await obterCliente()
+        const { data, error } = await criarClienteNavegador()
           .from("timesheets")
           .insert({
             operation_id: operationId,
@@ -208,7 +204,7 @@ export function PainelApontamentos() {
         notes: row.notes || null,
       }));
       if (payload.length) {
-        const { error } = await obterCliente()
+        const { error } = await criarClienteNavegador()
           .from("timesheet_entries")
           .upsert(payload as never);
         if (error) throw error;
@@ -225,7 +221,7 @@ export function PainelApontamentos() {
   const toggleStatus = useMutation({
     mutationFn: async (status: "open" | "closed") => {
       if (!timesheet) throw new Error("Salve o apontamento antes de fechar.");
-      const { error } = await obterCliente()
+      const { error } = await criarClienteNavegador()
         .from("timesheets")
         .update({ status })
         .eq("id", timesheet.id);

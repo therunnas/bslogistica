@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { obterCliente } from "@/integrations/supabase/registro";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import type {
   Client,
   Contract,
@@ -13,7 +13,7 @@ import type {
 } from "./types";
 
 async function fetchAll<T>(table: string, order: string, ascending = true): Promise<T[]> {
-  const { data, error } = await obterCliente()
+  const { data, error } = await criarClienteNavegador()
     .from(table as never)
     .select("*")
     .order(order, { ascending });
