@@ -40,3 +40,7 @@ Claude outputs/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+# Restos de outras plataformas e de ferramentas locais
+.wrangler
+.claude/
