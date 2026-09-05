@@ -579,6 +579,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      gerar_fatura: {
+        Args: {
+          _client_id: string;
+          _period_start: string;
+          _period_end: string;
+        };
+        Returns: Database["public"]["Tables"]["invoices"]["Row"];
+      };
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"];

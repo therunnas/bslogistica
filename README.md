@@ -1,29 +1,83 @@
-# Welcome to your Lovable project
+# BS Logística — sistema de gestão
 
-This project was built with [Lovable](https://lovable.dev).
+Painel interno de gestão operacional e financeira de mão de obra terceirizada:
+clientes e contratos, colaboradores, operações e turnos, apontamento de diárias
+e horas extras, faturamento por período e relatórios.
 
-## Build with Lovable
+Sistema de uso interno. Não há cadastro público — os acessos são criados pelo
+administrador no painel do Supabase.
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+## Stack
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+Next.js 16 com App Router · React 19 · TypeScript estrito · Tailwind CSS 4 ·
+shadcn/ui · Supabase (Postgres, Auth e RLS) · TanStack Query · Vercel.
 
-## Development
+## Instalação
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requer Node.js 20.9 ou superior.
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```bash
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-## Built with
+Abre em http://localhost:3000.
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+## Variáveis de ambiente
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+```
+
+As duas são públicas por natureza: viajam no JavaScript da página. Quem protege
+os dados é a RLS do banco. **A chave secreta do Supabase (`service_role`) não é
+usada por esta aplicação e não deve entrar no `.env`.**
+
+## Comandos
+
+| Comando          | O que faz                   |
+| ---------------- | --------------------------- |
+| `npm run dev`    | servidor de desenvolvimento |
+| `npm run build`  | build de produção           |
+| `npm run start`  | serve o build               |
+| `npm run lint`   | ESLint com Prettier         |
+| `npm run format` | formata o código            |
+
+## Estrutura
+
+```
+src/
+├── app/                      rotas (App Router)
+│   ├── page.tsx              landing pública
+│   ├── login/                entrada no painel
+│   └── (painel)/             área protegida — 7 telas
+├── components/ui/            shadcn/ui
+├── integrations/supabase/    clientes, tipos do banco
+├── lib/                      regras de cálculo, queries, formatação
+└── proxy.ts                  renovação de sessão
+```
+
+Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+
+## Deploy
+
+Vercel, projeto `bs-logistica-sistema`. O `vercel.json` declara o framework; o
+build usa o script `build`. As duas variáveis precisam existir no ambiente — sem
+elas o build falha na pré-renderização, de propósito, em vez de publicar uma
+aplicação quebrada.
+
+O site institucional (`bslogistica.com.br`) é outro projeto e outro repositório.
+
+## Documentação
+
+| Documento                                      | Conteúdo                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| [Arquitetura](docs/ARQUITETURA.md)             | organização do código, autenticação, fluxo de dados, módulos |
+| [Segurança](docs/SEGURANCA.md)                 | RLS, papéis, segredos, pendências abertas                    |
+| [Estado do projeto](docs/ESTADO_DO_PROJETO.md) | situação atual e próximos passos                             |
+| [Dívidas técnicas](docs/divida-tecnica/)       | defeitos conhecidos, com causa e reprodução                  |
+
+**Antes de mexer em apontamentos ou faturamento, leia as dívidas técnicas.** Há
+problemas ali que afetam valores cobrados.

@@ -1,3 +1,6 @@
+"use client";
+
+// Lê window.matchMedia e mantém estado: precisa rodar no navegador.
 import * as React from "react";
 
 const MOBILE_BREAKPOINT = 768;

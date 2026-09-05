@@ -8,12 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
-.output
-.vinxi
-.tanstack/**
-.nitro
 *.local
 
 # Local environment and provider state
@@ -41,3 +35,12 @@ supabase/.temp/
 
 # Saídas locais de ferramentas (não fazem parte do projeto)
 Claude outputs/
+
+# Next.js
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Restos de outras plataformas e de ferramentas locais
+.wrangler
+.claude/
