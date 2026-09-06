@@ -77,6 +77,190 @@ por natureza; quem protege os dados é a RLS.
 
 `npm audit`: **0 vulnerabilidades**.
 
+## Segundo fator (MFA)
+
+**Estado:** VALIDADO em 06/09/2026.
+
+| Item | Estado |
+| --- | --- |
+| MFA / TOTP | **VALIDADO** |
+| AAL2 | **VALIDADO** |
+| Proteção server-side | **VALIDADA** |
+
+Implementado e validado em 06/09/2026, na segunda tentativa. O primeiro teste
+manual reprovou — QR quebrado e chave manual recusada pelo autenticador —, a
+causa foi identificada e corrigida, e o segundo teste passou. O histórico fica
+registrado em "Primeiro teste manual" mais abaixo, porque a causa foi uma
+contradição entre duas fontes oficiais e vale a pena não repeti-la.
+
+Confirmado no teste manual: QR funcionando; enrollment TOTP concluído; código de
+seis dígitos aceito; logout e login funcionando; **senha sozinha não libera o
+painel quando existe fator verificado**; TOTP eleva a sessão para AAL2; e o
+painel só abre depois do AAL2.
+
+Antes desta data não havia MFA nenhum: a busca por `mfa`, `totp`, `aal`,
+`enroll`, `challenge` e `factor` em `src/` não devolvia uma única ocorrência
+real. Entrar no painel exigia apenas e-mail e senha.
+
+**O que existe agora.** TOTP pelo MFA oficial do Supabase — nenhum segredo é
+gerado, guardado ou conferido pela aplicação, e não existe tabela própria de
+OTP. `enroll` devolve o QR e o segredo já criados pelo Supabase;
+`challengeAndVerify` confere o código no servidor dele.
+
+**Onde a exigência é aplicada.** Em `src/app/(painel)/_autorizacao.ts`, no
+servidor, dentro da mesma função que já decidia sessão e papel:
+
+```ts
+const { data: nivel } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+if (nivel.nextLevel !== "aal2")    return { situacao: "mfa-ausente", ... };
+if (nivel.currentLevel !== "aal2") return { situacao: "mfa-pendente", ... };
+```
+
+Essa função é confiável como verificação de servidor, e não como enfeite de
+interface: por dentro ela chama `getUser(jwt)`, que valida o token contra o
+Supabase, e calcula `nextLevel` a partir de `user.factors` filtrados por
+`status === 'verified'` — dado que vem do servidor, não do cookie.
+`currentLevel` sai da claim `aal` do mesmo token já validado.
+
+O layout de `(painel)` é Server Component: sem AAL2 ele redireciona antes de
+qualquer HTML ser enviado. Não há caminho de "esconder no cliente" a ser burlado
+desativando JavaScript.
+
+**Sem trancar ninguém para fora.** A tela `/mfa` fica fora do grupo `(painel)`,
+justamente para não ser barrada pela guarda que a invoca. Ela exige sessão e
+papel, mas não exige AAL2 — é o que se vem obter ali. Quem não tem fator cadastra
+o primeiro; quem já tem responde ao desafio. O botão Sair continua disponível nas
+duas situações.
+
+**Fatores hoje:** duas contas admin, **dois fatores TOTP `verified`**, nenhum
+fator pendente e nenhum admin sem segundo fator. Conferido por leitura direta de
+`auth.mfa_factors`, sem tocar na coluna de segredo — evidência independente do
+relato do teste manual.
+
+**Como foi verificado.** Por tipos, lint e build; pela API conferida na versão
+instalada (`@supabase/auth-js`, via supabase-js 2.115.0) em vez de presumida; e
+por teste manual ponta a ponta com as duas contas admin reais. O enrollment TOTP
+estar habilitado no projeto deixou de ser suposição: o cadastro concluiu.
+
+### Primeiro teste manual — reprovado, corrigido
+
+**Sintomas.** QR quebrado na tela `/mfa`; chave manual recusada como inválida
+pelo autenticador.
+
+**Causa do QR.** O campo `totp.qr_code` do Supabase já vem como data URL
+completo — a referência oficial usa `src={data.totp.qr_code}` direto. O
+comentário do tipo em `@supabase/auth-js` afirma o contrário, que é preciso
+prefixar `data:image/svg+xml;utf-8,`. A implementação seguiu o comentário do
+tipo, o prefixo entrou duas vezes, e o `src` virou texto percent-encoded em vez
+de SVG. Confirmado por teste em navegador: o formato de data URL usado não é
+inválido em si — ele carrega normalmente quando aplicado uma vez só.
+
+**Causa da chave.** O valor em si nunca esteve errado. Conferido direto no banco,
+sem ler o segredo: 32 caracteres, apenas o alfabeto Base32 (`[A-Z2-7]`), sem
+espaço, sem quebra de linha e sem caractere invisível. O problema era de entrega
+— a chave era exibida num `<input>` estreito, de onde é fácil copiar só o
+trecho visível, e chave truncada é recusada como inválida.
+
+**Correção.** O `src` do QR passa a respeitar o valor recebido: usa como está
+quando já é data URL, e só monta o data URL quando vier SVG cru — funciona nos
+dois formatos, sem depender de qual das duas fontes está correta hoje. A chave
+manual saiu do `<input>` e virou bloco monoespaçado com quebra, seleção total e
+botão de copiar. A tela passa a avisar que recarregar gera chave nova.
+
+O `alt` do QR é neutro de propósito: a referência do Supabase sugere usar
+`totp.uri` ali, mas essa URI carrega o segredo TOTP e ele ficaria legível no
+DOM. Nenhum log, toast ou atributo registra segredo, QR ou URI.
+
+**Fatores não verificados.** As duas tentativas deixaram um fator `unverified`
+em cada conta admin. Não foram removidos por fora: o próprio fluxo de cadastro
+apaga os fatores TOTP não verificados da conta antes de criar o novo, usando
+`unenroll` com a sessão do próprio usuário. Nenhum fator verificado é tocado, e
+nenhuma outra conta é afetada.
+
+### Segundo teste manual — aprovado
+
+Executado em 06/09/2026, cobrindo os quatro passos que estavam pendentes:
+
+1. TOTP habilitado no projeto — confirmado pelo cadastro ter concluído;
+2. cadastro do fator levado até o fim, nas duas contas admin;
+3. logout e novo login: o painel só abriu depois do código de seis dígitos;
+4. senha sozinha, com fator verificado presente, não libera o painel.
+
+**A operação passa a depender do segundo fator.** Perder o aplicativo
+autenticador de uma conta admin sem ter a outra disponível deixa o painel
+inacessível para aquela conta — a remoção de um fator verificado exige o painel
+do Supabase. Com duas contas admin cadastradas, uma cobre a outra; manter as duas
+ativas é o que evita esse cenário.
+
+## Auditoria final de produção — 06/09/2026
+
+**Resultado: APROVADA.** Leitura completa de banco, aplicação e infraestrutura,
+mais a validação manual do segundo fator. **Zero bloqueios.**
+
+As pendências abaixo seguem abertas e **não bloqueiam produção**, todas por
+decisão registrada: **HSTS** pendente até o domínio final; **CSP** como hardening
+posterior; **SEC-004** (proteção contra senha vazada) como risco aceito no plano
+Free; **SEC-010** adiado, severidade baixa; e **redesign visual** fora do escopo.
+
+**Banco** — 18 verificações, nenhuma classificada como bloqueio:
+
+| Verificação | Resultado |
+| --- | --- |
+| Tabelas `public` sem RLS | nenhuma |
+| Tabelas com RLS mas sem policy | nenhuma |
+| Policies que alcançam `anon` | nenhuma |
+| Policies de escrita em `user_roles` | nenhuma |
+| `SECURITY DEFINER` sem `search_path` fixo | nenhuma |
+| Funções com `EXECUTE` para `PUBLIC` | nenhuma |
+| Funções com `EXECUTE` para `anon` | nenhuma |
+| `TRUNCATE` para `anon`/`authenticated` | 0 grants |
+| Migrations local × remoto | 8 de 8 iguais, zero divergentes |
+
+As quatro funções `SECURITY DEFINER` — `rls_auto_enable`,
+`provision_bslog_user`, `handle_bslog_auth_user_created` e `gerar_fatura` — todas
+com `search_path` fixo.
+
+**Autorização** — a suíte `supabase/tests/002_autorizacao.sql` roda contra o
+banco remoto em transação descartável e passa inteira. 25 controles, 25 PASS,
+0 FAIL: admin lê e escreve; autenticado sem papel não lê nem escreve; `anon` não
+alcança dado de negócio; `user_roles` não aceita autoelevação; `billed_amount`,
+`cost_amount` e `invoice_id` ficam intactos para quem não é autorizado; e
+`gerar_fatura` recusa não-admin com 42501.
+
+**Auth** — `disable_signup: true`, único provider `email`,
+`mailer_autoconfirm: false`, `saml_enabled: false`, `passkeys_enabled: false`,
+`anonymous_users: false` — lidos da API do projeto, não presumidos.
+
+**Frontend** — nenhum `eval`, nenhum `new Function`, nenhum `.innerHTML`. Existe
+um `dangerouslySetInnerHTML` em `src/components/ui/chart.tsx`, componente do
+shadcn **importado por zero arquivos**: não é alcançável, e o que ele injetaria
+são cores de tema escritas no código, nunca dado do banco. O único `src` dinâmico
+é o QR do MFA, entregue como data URI em `<img>` — onde SVG não executa script.
+
+**Segredos** — a única variável lida em `src/` é `NODE_ENV`; as do Supabase
+passam por `lerAmbienteSupabase()` e são as duas públicas. Nenhuma chave não
+pública referenciada no cliente. O único `.env*` versionado é `.env.example`.
+
+**Infra** — zero arquivos `.map` no build do cliente, então nenhum source map é
+servido ao navegador. Sentry com `userInfo: false`, `httpBodies: []`,
+`cookies: false`, headers e query params desligados nos três runtimes.
+
+### Pontos de atenção que não bloqueiam
+
+**`anon` tem grants de tabela nas 12 tabelas de `public`.** Herdados do
+`GRANT ALL` das default privileges do Supabase. Não é acesso: nenhuma policy
+alcança `anon`, e a RLS nega por padrão quem não tem policy — verificado em
+execução, `anon` lê 0 linhas. É superfície desnecessária, não vulnerabilidade.
+Fechar com `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon` é candidato a
+uma etapa própria, porque muda o retorno da API de "vazio" para 42501 e merece
+ser testado antes.
+
+**`authenticated` tem `INSERT`, `UPDATE` e `DELETE` em `user_roles`.** Mesma
+origem. Hoje só a RLS impede manipulação de papel — e impede: `INSERT` levanta
+42501, `UPDATE` e `DELETE` afetam zero linhas, e ninguém se promove. Um
+`REVOKE` seria uma segunda tranca, em defesa em profundidade. Não é urgente
+porque a primeira tranca está provada em execução.
+
 ## Pendências abertas
 
 Nenhuma bloqueia produção. Todas estão documentadas.
@@ -241,7 +425,7 @@ inicial. Obrigatório reavaliar antes de reabrir o signup.
 
 ### SEC-011 — `EXECUTE` excessivo em funções auxiliares
 
-**Status:** CORRIGIDO NA MIGRATION — pendente de aplicação no banco
+**Status:** CORRIGIDO — migration aplicada e grants verificados no banco em 06/09/2026
 **Severidade:** informativa
 
 **Diagnóstico.** `public.is_staff()` e `public.update_updated_at_column()` ficam
@@ -275,8 +459,9 @@ triggers continuam funcionando de qualquer forma, porque o Postgres exige
 premissa não pôde ser testada contra o banco nesta etapa, e errar nela quebraria
 todo `UPDATE` do sistema. O ganho seria nulo; o risco, não.
 
-**Condição para fechamento:** migration aplicada e a verificação abaixo sem
-`anon` nem `PUBLIC` nas duas ACLs.
+**Verificado em 06/09/2026:** `is_staff()` — PUBLIC não executa, `anon` não
+executa, `authenticated` executa. `update_updated_at_column()` — PUBLIC não
+executa, `anon` não executa. A consulta abaixo reproduz a conferência.
 
 ```sql
 SELECT p.proname, coalesce(array_to_string(p.proacl, ' ~ '), '(NULO = PUBLIC EXECUTA)') AS acl
@@ -286,7 +471,7 @@ WHERE n.nspname = 'public' AND p.proname IN ('is_staff', 'update_updated_at_colu
 
 ### SEC-009 — `TRUNCATE` concedido a `anon` e `authenticated`
 
-**Status:** CORRIGIDO NA MIGRATION — pendente de aplicação e de confirmação
+**Status:** HARDENING PREVENTIVO APLICADO — verificado no banco em 06/09/2026 / estado anterior não provado
 **Severidade:** média se confirmado
 
 **Diagnóstico.** As tabelas de `public` provavelmente concedem `TRUNCATE` a
@@ -318,8 +503,10 @@ TRUNCATE`, para que a próxima tabela criada não volte a nascer com ele.
 `service_role` e `postgres` mantêm `TRUNCATE`: são os papéis de manutenção e
 restauração.
 
-**Condição para fechamento:** migration aplicada e a verificação abaixo
-devolvendo zero linhas.
+**Verificado em 06/09/2026:** zero grants de `TRUNCATE` para `anon` e para
+`authenticated`. O estado anterior ao `REVOKE` não foi medido e já não pode ser
+— o hardening entra no registro como preventivo. A consulta abaixo reproduz a
+conferência.
 
 ```sql
 SELECT table_name, grantee FROM information_schema.role_table_grants
