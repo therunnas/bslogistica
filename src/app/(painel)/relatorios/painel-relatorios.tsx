@@ -20,6 +20,7 @@ import {
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format";
 import { attendanceLabel, marginPct } from "@/lib/billing";
+import { montarCsv } from "@/lib/csv";
 
 export function PainelRelatorios() {
   const initial = monthRange();
@@ -106,21 +107,19 @@ export function PainelRelatorios() {
       "Receita",
       "Custo",
     ];
-    const lines = period.map((r) =>
-      [
-        r.date,
-        r.clientName,
-        r.operationName,
-        r.shiftName,
-        r.employeeName,
-        attendanceLabel[r.status],
-        r.workedMinutes,
-        r.overtimeMinutes,
-        r.billed.toFixed(2),
-        r.cost.toFixed(2),
-      ].join(";"),
-    );
-    const csv = [header.join(";"), ...lines].join("\n");
+    const lines = period.map((r) => [
+      r.date,
+      r.clientName,
+      r.operationName,
+      r.shiftName,
+      r.employeeName,
+      attendanceLabel[r.status],
+      r.workedMinutes,
+      r.overtimeMinutes,
+      r.billed.toFixed(2),
+      r.cost.toFixed(2),
+    ]);
+    const csv = montarCsv(header, lines);
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;

@@ -241,19 +241,184 @@ inicial. Obrigatório reavaliar antes de reabrir o signup.
 
 ### SEC-011 — `EXECUTE` excessivo em funções auxiliares
 
-**Status:** PENDENTE — informativo
+**Status:** CORRIGIDO NA MIGRATION — pendente de aplicação no banco
 **Severidade:** informativa
-**Motivo:** `public.is_staff()` e `public.update_updated_at_column()` têm
-`EXECUTE` concedido a `anon` e a `PUBLIC`, ficando expostas em `/rest/v1/rpc/`.
 
-**Risco atual:** nenhum bypass. `is_staff()` devolve `false` para anônimo — não
-vaza dado; `update_updated_at_column()` é função de trigger e falha fora desse
-contexto. É superfície desnecessária, não falha de autorização. Contrasta com o
-cuidado já aplicado a `gerar_fatura`, `provision_bslog_user` e `rls_auto_enable`,
-todas com `REVOKE`.
-**Mitigação atual:** a RLS não depende desse grant para proteger dados.
-**Condição para fechamento:** `REVOKE EXECUTE ... FROM PUBLIC, anon` nas duas,
-preservando `authenticated` em `is_staff()` — as policies dependem dela.
+**Diagnóstico.** `public.is_staff()` e `public.update_updated_at_column()` ficam
+alcançáveis por `anon` e por `PUBLIC`, e portanto expostas em `/rest/v1/rpc/`.
+
+**Evidência.** O Postgres concede `EXECUTE` a `PUBLIC` em toda função nova. A
+migration `20260903175718` revogou de `anon` mas **não de `PUBLIC`**:
+
+```sql
+REVOKE ALL ON FUNCTION public.is_staff() FROM anon;
+GRANT EXECUTE ON FUNCTION public.is_staff() TO authenticated, service_role;
+```
+
+O privilégio continua chegando ao `anon` pela via do `PUBLIC`. Compare com
+`has_role`, que na `20260903173220` foi revogada de `PUBLIC, anon` — ali o padrão
+certo já tinha sido aplicado. `update_updated_at_column` foi criada na
+`20260903173204` sem `REVOKE` nenhum.
+
+**Risco.** Nenhum bypass. `is_staff()` devolve `false` para anônimo e não vaza
+dado; `update_updated_at_column()` é função de trigger e falha fora desse
+contexto. É superfície desnecessária, não falha de autorização.
+
+**Correção.** `supabase/migrations/20260906050000_007_hardening_grants.sql`:
+`REVOKE ALL ... FROM PUBLIC` e `FROM anon` nas duas funções, reafirmando
+`GRANT EXECUTE ... TO authenticated, service_role` em `is_staff()` — as policies
+de SELECT das tabelas de negócio dependem dela.
+
+`authenticated` é preservado em `update_updated_at_column()` de propósito: os
+triggers continuam funcionando de qualquer forma, porque o Postgres exige
+`EXECUTE` de quem **cria** o trigger e não reavalia a cada disparo — mas essa
+premissa não pôde ser testada contra o banco nesta etapa, e errar nela quebraria
+todo `UPDATE` do sistema. O ganho seria nulo; o risco, não.
+
+**Condição para fechamento:** migration aplicada e a verificação abaixo sem
+`anon` nem `PUBLIC` nas duas ACLs.
+
+```sql
+SELECT p.proname, coalesce(array_to_string(p.proacl, ' ~ '), '(NULO = PUBLIC EXECUTA)') AS acl
+FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.proname IN ('is_staff', 'update_updated_at_column');
+```
+
+### SEC-009 — `TRUNCATE` concedido a `anon` e `authenticated`
+
+**Status:** CORRIGIDO NA MIGRATION — pendente de aplicação e de confirmação
+**Severidade:** média se confirmado
+
+**Diagnóstico.** As tabelas de `public` provavelmente concedem `TRUNCATE` a
+`anon` e a `authenticated`.
+
+**Evidência — indireta, e é importante dizer isso.** O achado se apoia no
+bootstrap padrão do Supabase, que deixa configurado:
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+```
+
+`ALL` inclui `TRUNCATE`. Os `GRANT` explícitos da `20260903173204` concedem
+apenas `SELECT, INSERT, UPDATE, DELETE`, mas **somam-se** ao default em vez de
+substituí-lo. Não foi possível confirmar o estado real contra o banco nesta
+etapa: a sessão não tinha credencial de acesso, e improvisar autenticação está
+fora das regras do projeto.
+
+**Risco.** `TRUNCATE` **não passa pela RLS**. Um `DELETE` de quem não é staff é
+barrado pela policy; um `TRUNCATE` esvaziaria a tabela inteira sem consultar
+policy nenhuma. Atenuante real: o PostgREST não expõe `TRUNCATE`, então
+alcançá-lo exige conexão direta ao Postgres, que o JWT do painel não dá. O
+privilégio está errado; a via de exploração pela API não existe hoje.
+
+**Correção.** Na mesma migration: `REVOKE TRUNCATE ON ALL TABLES IN SCHEMA
+public` de `anon` e de `authenticated`, mais `ALTER DEFAULT PRIVILEGES ... REVOKE
+TRUNCATE`, para que a próxima tabela criada não volte a nascer com ele.
+`service_role` e `postgres` mantêm `TRUNCATE`: são os papéis de manutenção e
+restauração.
+
+**Condição para fechamento:** migration aplicada e a verificação abaixo
+devolvendo zero linhas.
+
+```sql
+SELECT table_name, grantee FROM information_schema.role_table_grants
+WHERE table_schema = 'public' AND privilege_type = 'TRUNCATE'
+  AND grantee IN ('anon', 'authenticated');
+```
+
+### SEC-007 — Injeção de fórmula na exportação CSV
+
+**Status:** CORRIGIDO — validado em 06/09/2026
+**Severidade:** média
+
+**Diagnóstico.** As duas exportações CSV do painel montavam o arquivo
+concatenando valores do banco com `;`, sem escape algum e sem neutralizar
+fórmula.
+
+**Evidência.** Em `painel-faturamento.tsx` e `painel-relatorios.tsx`:
+
+```ts
+const lines = period.map((r) => [r.date, r.operationName, ...].join(";"));
+const csv = [header.join(";"), ...lines].join("\n");
+```
+
+`operationName`, `shiftName`, `employeeName` e `clientName` são texto livre
+digitado no painel. Dois problemas somados:
+
+- **quebra estrutural** — um `;`, uma aspa ou uma quebra de linha dentro de um
+  nome desalinha as colunas do arquivo inteiro;
+- **execução de fórmula** — Excel e LibreOffice avaliam célula iniciada por `=`,
+  `+`, `-`, `@`, TAB ou CR. Um colaborador cadastrado como `=SUM(1+1)` vira
+  fórmula na planilha de quem abrir o relatório; a família `=HYPERLINK`,
+  `=WEBSERVICE` e `=cmd|...` chega a exfiltrar dado ou disparar processo. Aspas
+  não protegem: o Excel remove as aspas antes de decidir se a célula é fórmula.
+
+**Correção.** `src/lib/csv.ts` centraliza a montagem. Toda célula sai entre
+aspas com as aspas internas duplicadas (RFC 4180), o registro termina em CRLF, e
+valor que comece com caractere de fórmula recebe apóstrofo inicial — marcador de
+texto que a planilha consome ao exibir, recomendação da OWASP.
+
+Número puro passa intacto de propósito: `-123` é o número -123 em qualquer
+planilha, não uma fórmula, e neutralizá-lo transformaria toda coluna de custo
+negativo em texto que não soma. O que é neutralizado é `-` seguido de conteúdo
+não numérico, como uma chamada de comando embutida.
+
+**Evidência da correção.** 14 casos testados diretamente, sem instalar
+dependência: fórmula clássica, `+123`, `-123`, injeção real usando `-`, prefixo
+`@`, TAB inicial, texto comum, vírgula, aspas, quebra de linha, `;`, acentos,
+decimal brasileiro e `null`. Resultado: 4 células neutralizadas, 10 intactas,
+**14 de 14 reconstruídas com o conteúdo original** ao reler o arquivo, e **zero
+células** ainda iniciando por caractere de fórmula.
+
+### SEC-006 — Mass assignment no CRUD genérico
+
+**Status:** FALSO POSITIVO / RISCO DE DESIGN — sem correção necessária
+**Severidade:** nenhuma no modelo atual
+
+**Diagnóstico.** `useSaveRow` em `src/lib/mutations.ts` desestrutura
+`{ id, ...rest }` e envia `rest` inteiro ao Supabase, sem allowlist de colunas.
+
+**Evidência.** O padrão existe e alimenta `clients`, `contracts`, `employees`,
+`operations` e `shifts`. Mas ele **não é a fronteira de segurança**: é código de
+navegador. Quem quisesse acrescentar campos arbitrários não precisaria passar por
+essa função — bastaria chamar o PostgREST direto com o próprio JWT. Não existe
+handler de servidor que a allowlist estaria protegendo: todo caminho de escrita é
+cliente → PostgREST, e o controle é a RLS.
+
+E a RLS decide sobre a **linha**, não sobre o conjunto de colunas do payload: um
+usuário não autorizado tem a operação inteira recusada, independentemente de
+quais campos tenha enviado.
+
+Verificado nas policies da `20260903175718`:
+
+- `clients`, `contracts`, `employees`, `invoices`, `invoice_items` — escrita
+  exige `has_role(auth.uid(), 'admin')` em `USING` e em `WITH CHECK`;
+- `operations`, `shifts`, `operation_team`, `timesheets`, `timesheet_entries` —
+  exigem `is_staff()`;
+- `user_roles` — só existe policy de `SELECT` de linhas próprias, e o grant de
+  tabela é apenas `SELECT`. Sem `INSERT`, `UPDATE` ou `DELETE`: **não há
+  autoelevação**;
+- todas as policies são `TO authenticated`; `anon` não alcança nenhuma tabela de
+  negócio.
+
+**Resposta à pergunta central** — um usuário não autorizado consegue acrescentar
+campos arbitrários e modificar dados que não deveria? **Não.** Sem papel,
+`is_staff()` e `has_role()` devolvem `false` e toda escrita é recusada, com ou
+sem campos extras.
+
+**Por que continua sendo risco de design.** O dia em que existir uma conta
+`operacional`, `is_staff()` passa a ser verdadeiro para ela, e as tabelas
+operacionais aceitam qualquer coluna que o payload trouxer — incluindo
+`billed_amount`, `cost_amount` e `invoice_id` em `timesheet_entries`. Isso já está
+rastreado como dívida técnica em
+[`rls-vinculo-de-fatura-permissivo.md`](divida-tecnica/rls-vinculo-de-fatura-permissivo.md)
+e [`escrita-em-operation-team.md`](divida-tecnica/escrita-em-operation-team.md), e
+a correção certa é na RLS e nos privilégios de coluna, não numa allowlist no
+navegador — que o atacante contorna ignorando o navegador.
+
+**Condição para reabertura:** criação da primeira conta não-admin. Antes disso,
+fechar as duas dívidas acima.
 
 ### Line endings mistos na working tree
 
