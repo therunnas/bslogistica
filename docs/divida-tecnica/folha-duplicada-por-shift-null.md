@@ -1,111 +1,152 @@
 # Folha duplicada quando o turno é nulo
 
 **Levantado em:** 04/09/2026
-**Situação:** diagnóstico apenas. Nada foi corrigido.
-**Correção prevista:** depois da migração para Next.js.
+**Rediagnosticado em:** 06/09/2026 — parte do diagnóstico original estava errada
+**Situação:** RESOLVIDA pela migration `20260906180000_008_unicidade_diaria`
+**Escopo:** integridade financeira e regra de negócio. Não é vulnerabilidade de
+segurança: nada aqui permite acesso indevido, escalonamento ou vazamento.
 
-## Causa técnica
+## O que o diagnóstico original errou
 
-A tela de apontamentos procura a folha existente por três campos:
+Duas afirmações de 04/09 não se sustentaram na verificação de 06/09:
 
-```js
-(timesheets.data ?? []).find(
-  (t) =>
-    t.operation_id === operationId &&
-    t.work_date === date &&
-    (t.shift_id ?? "") === (shiftId ?? ""),
-);
-```
+**"Não há restrição de unicidade sobre `(operation_id, work_date, shift_id)`."**
+Falso — `timesheets_operation_id_shift_id_work_date_key` existe desde a primeira
+migration. O problema é outro: ela é **NULLS DISTINCT**, o padrão do Postgres
+(`indnullsnotdistinct = false`, conferido no banco). NULL nunca é igual a NULL
+para efeito de unicidade, então N folhas `(operação, NULL, data)` sempre foram
+aceitas — e `(op, NULL, data)` jamais colide com `(op, turno, data)`.
 
-`timesheets.shift_id` aceita `NULL`, e a tela grava `shift_id: shiftId || null` — ou
-seja, uma folha salva antes de a lista de turnos carregar fica com `NULL`.
+**"Salvar antes de a lista de turnos carregar cria folha com `shift_id` nulo."**
+Já não é verdade. O botão Salvar é bloqueado por `carregando`, que inclui
+`shifts.isLoading`. O caminho para uma folha nula deixou de ser a corrida de
+carregamento e passou a ser a escolha explícita de "Sem turno definido".
 
-Como a comparação normaliza `NULL` para string vazia, uma folha com `shift_id`
-nulo **nunca casa** com uma seleção de turno válida. O código então segue para o
-ramo que cria uma folha nova, em vez de reaproveitar a existente.
+O caso "Op. salmo / Felipe" citado na versão anterior não existe mais: aquelas
+tabelas foram zeradas no reset de 05/09.
 
-Resultado: duas folhas para a mesma operação e a mesma data, uma com turno nulo
-e outra com turno preenchido. O banco não impede — não há restrição de
-unicidade sobre `(operation_id, work_date, shift_id)`.
+## Causa real
 
-## Estado observado
-
-Reproduzido em 04/09/2026, na operação de teste "Op. salmo":
-
-| Folha       | Criada   | `shift_id`  | Apontamento                             |
-| ----------- | -------- | ----------- | --------------------------------------- |
-| `dce2c888…` | 13:56:46 | **NULL**    | Felipe, saída 15:00, 480 min, R$ 180,00 |
-| `661a43e6…` | 14:05:56 | `224aeafe…` | Felipe, saída 17:30, 630 min, R$ 264,38 |
-
-Mesma operação, mesma data, mesmo colaborador. Felipe aparece duas vezes no
-mesmo dia, somando **R$ 444,38** por uma única jornada.
-
-## Impacto financeiro
-
-O apontamento é a origem da diária faturável. Duas folhas para o mesmo dia
-significam duas diárias contadas para o mesmo colaborador: o cliente pode ser
-cobrado em dobro, e o custo de mão de obra aparece inflado no dashboard e nos
-relatórios.
-
-O erro é silencioso. Nada na interface avisa que já existe folha para aquele dia.
-
-## Como reproduzir
-
-1. Abrir apontamentos numa operação cuja lista de turnos ainda não carregou.
-2. Salvar — a folha nasce com `shift_id` nulo.
-3. Recarregar, com o turno já selecionado, e salvar de novo.
-4. Uma segunda folha é criada, em vez de a primeira ser atualizada.
-
-## Direção da correção
-
-Três frentes, que se somam:
-
-- **No banco:** índice único sobre `(operation_id, work_date, shift_id)`, tratando
-  nulos de forma explícita. É a única barreira que não depende do frontend.
-- **Na tela:** não permitir salvar sem turno selecionado, quando a operação tem
-  turnos cadastrados.
-- **Na busca:** decidir se folha com turno nulo deve casar com qualquer turno,
-  em vez de com nenhum.
-
-Conferir antes se existem folhas duplicadas em produção, e como consolidá-las
-sem perder apontamento.
-
-## Agravante: a duplicata não tem como ser desfeita
-
-A tela de apontamentos **não oferece exclusão**. Não há botão, e não há código —
-enquanto clientes, colaboradores e operações usam `useDeleteRow`, a tela de
-apontamentos não a importa nenhuma vez:
-
-| Tela             | ocorrências de `useDeleteRow` |
-| ---------------- | ----------------------------- |
-| clientes         | 3                             |
-| colaboradores    | 2                             |
-| operações        | 4                             |
-| **apontamentos** | **0**                         |
-
-Folha e apontamento, uma vez criados, só podem ser editados. Nunca removidos.
-
-Na prática, uma folha duplicada é **permanente**: segue contando diária em dobro
-no dashboard, nos relatórios e no faturamento, e não há caminho pela interface
-para corrigi-la.
-
-O único jeito de removê-la hoje é apagar a **operação** inteira, o que dispara a
-cascata do banco:
+A invariável que interessa atravessa duas tabelas:
 
 ```
-timesheets.operation_id        -> operations  ON DELETE CASCADE
-timesheet_entries.timesheet_id -> timesheets  ON DELETE CASCADE
-shifts.operation_id            -> operations  ON DELETE CASCADE
+operation_id, work_date  ->  timesheets
+employee_id, status      ->  timesheet_entries
 ```
 
-Isso apaga junto todas as folhas, apontamentos e turnos daquela operação —
-inclusive os corretos. Serve para descartar dados de teste, não para corrigir um
-registro em produção.
+O Postgres não expressa `UNIQUE` entre tabelas, e os uniques existentes resolvem
+outra coisa: `(timesheet_id, employee_id)` só olha dentro de uma folha, e
+`(operation_id, shift_id, work_date)` garante uma folha por turno — o que é
+correto, porque dois turnos no mesmo dia são legítimos.
 
-Vale notar que `invoice_items.operation_id` é `ON DELETE SET NULL`: apagar uma
-operação já faturada deixa itens de fatura órfãos, apontando para nada. Some com
-a origem do que foi cobrado.
+Somando a isso `calcEntry`, que dá `daily_rate` inteiro a todo lançamento não
+`absent`, o mesmo colaborador em dois turnos da mesma operação e data rende
+**duas diárias**. Não era preciso `shift_id` nulo para isso: o caminho por turnos
+reais era o mais fácil de percorrer, e foi o que aconteceu de verdade.
 
-Portanto, a correção precisa incluir uma forma de excluir ou cancelar folha e
-apontamento pela interface, com as devidas restrições — por exemplo, impedir a
-exclusão de apontamento já vinculado a fatura.
+## Estado observado em 06/09/2026
+
+| | |
+| --- | --- |
+| Folhas com `shift_id NULL` | 0 |
+| Vínculos `operation_team` sem turno | 0 |
+| Pares operação+data com folha NULL e folha com turno | nenhum |
+| Colaboradores com duas diárias na mesma operação+data | **1** |
+
+O caso real veio por dois turnos reais, não por nulo:
+
+| Colaborador | Data | Operação | Turno | Jornada | Faturado |
+| --- | --- | --- | --- | --- | --- |
+| Gabriel Jesus Rocha | 05/09/2026 | Itajai ludovic | Matutino | 1200 min | R$ 450,00 |
+| Gabriel Jesus Rocha | 05/09/2026 | Itajai ludovic | Noturno | 480 min | R$ 180,00 |
+
+Ambos já faturados, na mesma invoice.
+
+## A invariável adotada
+
+> **Um colaborador gera no máximo UMA diária faturável por operação e data.**
+> Trabalhar além da jornada prevista vira **hora extra** no lançamento
+> existente, nunca uma segunda diária. Dois turnos no mesmo dia continuam
+> válidos — para colaboradores diferentes.
+
+`absent` não conta como diária. `present` e `replacement` contam — o mesmo
+recorte que `public.gerar_fatura` usa para faturar, então a função de
+faturamento não precisou de nenhuma alteração.
+
+## Como foi corrigido
+
+**No banco, que é onde a garantia mora.** A chave foi desnormalizada para
+`timesheet_entries` (`operation_id`, `work_date`), mantida exclusivamente por
+trigger `BEFORE INSERT OR UPDATE` que relê a folha pai e **sobrescreve** o que
+vier no payload — um POST ao PostgREST informando outra operação tem o valor
+substituído. Sobre ela, um índice único parcial:
+
+```sql
+CREATE UNIQUE INDEX timesheet_entries_uma_diaria_por_operacao_dia
+  ON public.timesheet_entries (employee_id, operation_id, work_date)
+  WHERE status <> 'absent' AND id <> '<id legado>';
+```
+
+Índice, e não trigger de validação: só o índice é avaliado no commit. Um
+`SELECT ... EXISTS` seguido de `INSERT` não é atômico em READ COMMITTED e deixa
+duas transações concorrentes passarem — é o que torna o índice a única defesa
+que vale contra duas abas, chamada direta à API e concorrência.
+
+Mover a folha pai propaga a chave aos filhos por trigger `AFTER UPDATE`; se a
+movimentação criar colisão, o índice recusa e o UPDATE da folha é desfeito na
+mesma transação.
+
+**O P1-1 fica fechado pelo mesmo desenho**, porque o índice ignora `shift_id`:
+duas diárias para a mesma pessoa/operação/data colidem venha a folha de um turno
+real ou de nenhum. Some-se o índice parcial
+`timesheets_uma_folha_sem_turno` — `UNIQUE (operation_id, work_date) WHERE
+shift_id IS NULL` —, que fecha a duplicação de folha herdada do NULLS DISTINCT.
+
+**Na tela**, três mudanças, todas de UX — a garantia continua sendo o banco:
+"Sem turno definido" deixa de ser oferecido quando a operação tem turnos, a menos
+que exista contexto sem turno herdado, para que o histórico continue alcançável;
+o Salvar é bloqueado, com aviso nomeando colaborador e turno, quando alguém já
+tem diária no dia em outra folha; e o `23505` do banco é traduzido para a mesma
+mensagem de negócio, em vez de erro técnico.
+
+## Exceção histórica preservada
+
+O lançamento `a453c848-3478-4388-858a-12546103d10b` — Noturno, 480 min,
+R$ 180,00, já faturado — é anterior à invariável e está **excluído do índice por
+id literal**. Nada nele foi alterado: valores, status, `invoice_id` e os itens da
+fatura seguem exatamente como foram cobrados.
+
+O par dele, `5ebf2a8b-cf39-4862-869f-030e7f49377d` (Matutino, 1200 min,
+R$ 450,00), permanece **sob** o índice como a diária canônica do dia. O critério
+é objetivo: sob a regra nova, a diária é a da maior jornada e o excedente
+deveria ter sido hora extra — o excedente é o que sai do índice.
+
+A exclusão vale para aquele id, não para a chave: uma diária **nova** para o
+mesmo colaborador, operação e data continua sendo recusada com `23505` (testado).
+
+Acrescentar outro id à exclusão para "resolver" um conflito futuro é contornar a
+regra, não aplicá-la. O caminho certo é lançar o período extra como hora extra na
+diária existente.
+
+**Pendência comercial, fora do escopo técnico:** sob a regra nova, o correto
+teria sido uma diária de R$ 450,00 mais hora extra pelos 480 minutos do Noturno.
+A diferença em relação aos R$ 180,00 cobrados se resolve como ajuste em fatura
+futura, com a origem registrada — nunca reescrevendo o que já foi faturado.
+
+## O que continua em aberto
+
+**A conversão não é automática.** O índice **impede** a segunda diária, mas não
+**transforma** as horas do segundo turno em extra. Hoje `calcEntry` compara o
+trabalhado com a jornada do turno selecionado; com um lançamento só, as horas do
+outro turno precisam entrar como excedente do lançamento existente. Isso é
+decisão de produto — qual turno hospeda o lançamento e como a tela oferece somar
+horas de outro turno — e ainda não foi implementado.
+
+**Exclusão de folha e apontamento continua não existindo** na interface, como
+apontado na versão anterior deste documento e ainda válido: a tela de
+apontamentos não importa `useDeleteRow` nenhuma vez. Uma folha criada por engano
+segue sem caminho de correção pela tela. A cascata por exclusão da operação
+(`ON DELETE CASCADE` em `timesheets` e `timesheet_entries`) apaga também o que
+está correto, e `invoice_items.operation_id` é `ON DELETE SET NULL` — apagar
+operação já faturada deixa item de fatura órfão. Serve para descartar dado de
+teste, não para corrigir produção.

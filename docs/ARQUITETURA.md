@@ -160,6 +160,33 @@ cobrança. A hora extra é `(diária ÷ horas do turno) × fator`, aplicada ao
 excedente que ultrapassar a tolerância definida no contrato. O turno trata
 virada de meia-noite.
 
+## Diária por colaborador
+
+**Um colaborador gera no máximo uma diária faturável por operação e data.**
+Trabalhar além da jornada prevista vira hora extra no lançamento existente, e
+nunca uma segunda diária. Dois turnos no mesmo dia continuam válidos para
+colaboradores diferentes.
+
+`absent` não conta como diária; `present` e `replacement` contam — o mesmo
+recorte que `gerar_fatura` usa para faturar.
+
+A regra não depende da interface. A chave `(employee_id, operation_id,
+work_date)` é mantida em `timesheet_entries` por trigger que relê a folha pai e
+sobrescreve o que vier no payload, e o índice parcial
+`timesheet_entries_uma_diaria_por_operacao_dia` — criado pela migration
+`20260906180000` — a garante no Postgres. Índice, e não validação em trigger:
+só ele é avaliado no commit, e portanto só ele resiste a duas abas, a chamada
+direta ao PostgREST e a concorrência.
+
+O índice exclui um id literal, de um lançamento já faturado e anterior à regra.
+É exceção histórica registrada em
+[dívida técnica](divida-tecnica/folha-duplicada-por-shift-null.md), não mecanismo
+de escape.
+
+Folha sem turno tem índice próprio, `timesheets_uma_folha_sem_turno`: o
+`UNIQUE (operation_id, shift_id, work_date)` não cobre esse caso porque trata
+NULLs como distintos entre si.
+
 ## Alocação de colaboradores
 
 Um colaborador ocupa **no máximo uma alocação ativa** por vez: uma operação e um
