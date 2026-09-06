@@ -77,6 +77,127 @@ por natureza; quem protege os dados é a RLS.
 
 `npm audit`: **0 vulnerabilidades**.
 
+## Segundo fator (MFA)
+
+**Estado:** implementado em 06/09/2026. **Ainda não exercitado em execução** —
+ver a ressalva no fim desta seção.
+
+Antes desta data não havia MFA nenhum: a busca por `mfa`, `totp`, `aal`,
+`enroll`, `challenge` e `factor` em `src/` não devolvia uma única ocorrência
+real. Entrar no painel exigia apenas e-mail e senha.
+
+**O que existe agora.** TOTP pelo MFA oficial do Supabase — nenhum segredo é
+gerado, guardado ou conferido pela aplicação, e não existe tabela própria de
+OTP. `enroll` devolve o QR e o segredo já criados pelo Supabase;
+`challengeAndVerify` confere o código no servidor dele.
+
+**Onde a exigência é aplicada.** Em `src/app/(painel)/_autorizacao.ts`, no
+servidor, dentro da mesma função que já decidia sessão e papel:
+
+```ts
+const { data: nivel } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+if (nivel.nextLevel !== "aal2")    return { situacao: "mfa-ausente", ... };
+if (nivel.currentLevel !== "aal2") return { situacao: "mfa-pendente", ... };
+```
+
+Essa função é confiável como verificação de servidor, e não como enfeite de
+interface: por dentro ela chama `getUser(jwt)`, que valida o token contra o
+Supabase, e calcula `nextLevel` a partir de `user.factors` filtrados por
+`status === 'verified'` — dado que vem do servidor, não do cookie.
+`currentLevel` sai da claim `aal` do mesmo token já validado.
+
+O layout de `(painel)` é Server Component: sem AAL2 ele redireciona antes de
+qualquer HTML ser enviado. Não há caminho de "esconder no cliente" a ser burlado
+desativando JavaScript.
+
+**Sem trancar ninguém para fora.** A tela `/mfa` fica fora do grupo `(painel)`,
+justamente para não ser barrada pela guarda que a invoca. Ela exige sessão e
+papel, mas não exige AAL2 — é o que se vem obter ali. Quem não tem fator cadastra
+o primeiro; quem já tem responde ao desafio. O botão Sair continua disponível nas
+duas situações.
+
+**Fatores hoje:** zero. Ambas as contas admin (`bsoperacao@gmail.com` e
+`bcviniciuslc@gmail.com`) estão sem fator verificado e serão levadas à tela de
+cadastro no próximo acesso ao painel.
+
+**Ressalva honesta.** O fluxo foi verificado por tipos, lint e build, e a API foi
+conferida na versão instalada (`@supabase/auth-js`, via supabase-js 2.115.0) em
+vez de presumida. Mas **não foi exercitado com uma conta real**: exercitá-lo
+exige autenticar como admin, o que esta etapa não podia fazer. Falta também
+confirmar no painel do Supabase que **TOTP enrollment está habilitado** no
+projeto — a API pública de settings não expõe esse campo, e o CLI não tem
+subcomando de leitura da config remota.
+
+Antes de considerar o MFA operante:
+
+1. confirmar TOTP habilitado em Authentication → Multi-Factor Authentication;
+2. entrar com uma conta admin e cadastrar o fator até o fim;
+3. sair, entrar de novo e confirmar que o painel só abre depois do código;
+4. repetir com a segunda conta admin.
+
+## Auditoria final de produção — 06/09/2026
+
+Leitura completa de banco, aplicação e infraestrutura. **Zero bloqueios.**
+
+**Banco** — 18 verificações, nenhuma classificada como bloqueio:
+
+| Verificação | Resultado |
+| --- | --- |
+| Tabelas `public` sem RLS | nenhuma |
+| Tabelas com RLS mas sem policy | nenhuma |
+| Policies que alcançam `anon` | nenhuma |
+| Policies de escrita em `user_roles` | nenhuma |
+| `SECURITY DEFINER` sem `search_path` fixo | nenhuma |
+| Funções com `EXECUTE` para `PUBLIC` | nenhuma |
+| Funções com `EXECUTE` para `anon` | nenhuma |
+| `TRUNCATE` para `anon`/`authenticated` | 0 grants |
+| Migrations local × remoto | 8 de 8 iguais, zero divergentes |
+
+As quatro funções `SECURITY DEFINER` — `rls_auto_enable`,
+`provision_bslog_user`, `handle_bslog_auth_user_created` e `gerar_fatura` — todas
+com `search_path` fixo.
+
+**Autorização** — a suíte `supabase/tests/002_autorizacao.sql` roda contra o
+banco remoto em transação descartável e passa inteira. 25 controles, 25 PASS,
+0 FAIL: admin lê e escreve; autenticado sem papel não lê nem escreve; `anon` não
+alcança dado de negócio; `user_roles` não aceita autoelevação; `billed_amount`,
+`cost_amount` e `invoice_id` ficam intactos para quem não é autorizado; e
+`gerar_fatura` recusa não-admin com 42501.
+
+**Auth** — `disable_signup: true`, único provider `email`,
+`mailer_autoconfirm: false`, `saml_enabled: false`, `passkeys_enabled: false`,
+`anonymous_users: false` — lidos da API do projeto, não presumidos.
+
+**Frontend** — nenhum `eval`, nenhum `new Function`, nenhum `.innerHTML`. Existe
+um `dangerouslySetInnerHTML` em `src/components/ui/chart.tsx`, componente do
+shadcn **importado por zero arquivos**: não é alcançável, e o que ele injetaria
+são cores de tema escritas no código, nunca dado do banco. O único `src` dinâmico
+é o QR do MFA, entregue como data URI em `<img>` — onde SVG não executa script.
+
+**Segredos** — a única variável lida em `src/` é `NODE_ENV`; as do Supabase
+passam por `lerAmbienteSupabase()` e são as duas públicas. Nenhuma chave não
+pública referenciada no cliente. O único `.env*` versionado é `.env.example`.
+
+**Infra** — zero arquivos `.map` no build do cliente, então nenhum source map é
+servido ao navegador. Sentry com `userInfo: false`, `httpBodies: []`,
+`cookies: false`, headers e query params desligados nos três runtimes.
+
+### Pontos de atenção que não bloqueiam
+
+**`anon` tem grants de tabela nas 12 tabelas de `public`.** Herdados do
+`GRANT ALL` das default privileges do Supabase. Não é acesso: nenhuma policy
+alcança `anon`, e a RLS nega por padrão quem não tem policy — verificado em
+execução, `anon` lê 0 linhas. É superfície desnecessária, não vulnerabilidade.
+Fechar com `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon` é candidato a
+uma etapa própria, porque muda o retorno da API de "vazio" para 42501 e merece
+ser testado antes.
+
+**`authenticated` tem `INSERT`, `UPDATE` e `DELETE` em `user_roles`.** Mesma
+origem. Hoje só a RLS impede manipulação de papel — e impede: `INSERT` levanta
+42501, `UPDATE` e `DELETE` afetam zero linhas, e ninguém se promove. Um
+`REVOKE` seria uma segunda tranca, em defesa em profundidade. Não é urgente
+porque a primeira tranca está provada em execução.
+
 ## Pendências abertas
 
 Nenhuma bloqueia produção. Todas estão documentadas.
@@ -241,7 +362,7 @@ inicial. Obrigatório reavaliar antes de reabrir o signup.
 
 ### SEC-011 — `EXECUTE` excessivo em funções auxiliares
 
-**Status:** CORRIGIDO NA MIGRATION — pendente de aplicação no banco
+**Status:** CORRIGIDO — migration aplicada e grants verificados no banco em 06/09/2026
 **Severidade:** informativa
 
 **Diagnóstico.** `public.is_staff()` e `public.update_updated_at_column()` ficam
@@ -275,8 +396,9 @@ triggers continuam funcionando de qualquer forma, porque o Postgres exige
 premissa não pôde ser testada contra o banco nesta etapa, e errar nela quebraria
 todo `UPDATE` do sistema. O ganho seria nulo; o risco, não.
 
-**Condição para fechamento:** migration aplicada e a verificação abaixo sem
-`anon` nem `PUBLIC` nas duas ACLs.
+**Verificado em 06/09/2026:** `is_staff()` — PUBLIC não executa, `anon` não
+executa, `authenticated` executa. `update_updated_at_column()` — PUBLIC não
+executa, `anon` não executa. A consulta abaixo reproduz a conferência.
 
 ```sql
 SELECT p.proname, coalesce(array_to_string(p.proacl, ' ~ '), '(NULO = PUBLIC EXECUTA)') AS acl
@@ -286,7 +408,7 @@ WHERE n.nspname = 'public' AND p.proname IN ('is_staff', 'update_updated_at_colu
 
 ### SEC-009 — `TRUNCATE` concedido a `anon` e `authenticated`
 
-**Status:** CORRIGIDO NA MIGRATION — pendente de aplicação e de confirmação
+**Status:** HARDENING PREVENTIVO APLICADO — verificado no banco em 06/09/2026 / estado anterior não provado
 **Severidade:** média se confirmado
 
 **Diagnóstico.** As tabelas de `public` provavelmente concedem `TRUNCATE` a
@@ -318,8 +440,10 @@ TRUNCATE`, para que a próxima tabela criada não volte a nascer com ele.
 `service_role` e `postgres` mantêm `TRUNCATE`: são os papéis de manutenção e
 restauração.
 
-**Condição para fechamento:** migration aplicada e a verificação abaixo
-devolvendo zero linhas.
+**Verificado em 06/09/2026:** zero grants de `TRUNCATE` para `anon` e para
+`authenticated`. O estado anterior ao `REVOKE` não foi medido e já não pode ser
+— o hardening entra no registro como preventivo. A consulta abaixo reproduz a
+conferência.
 
 ```sql
 SELECT table_name, grantee FROM information_schema.role_table_grants
