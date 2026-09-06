@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
+import { Check, Copy, ShieldCheck } from "lucide-react";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { toast } from "@/lib/notificacoes";
@@ -13,6 +13,25 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const NOME_DO_FATOR = "BS Logística";
+
+/**
+ * Fonte do <img> do QR.
+ *
+ * O campo `totp.qr_code` do Supabase já vem como data URL completo — a
+ * referência oficial usa `src={data.totp.qr_code}` direto, sem montar nada.
+ * O comentário do tipo em @supabase/auth-js diz o contrário, que é preciso
+ * prefixar `data:image/svg+xml;utf-8,`; seguir esse comentário foi o que
+ * quebrou o QR na primeira tentativa, porque o prefixo entrava duas vezes e o
+ * conteúdo virava texto em vez de SVG.
+ *
+ * Como as duas fontes se contradizem, aqui a decisão é pelo valor recebido:
+ * se já é data URL, usa como está; se for SVG cru, aí sim monta o data URL.
+ * Funciona nos dois formatos e não depende de qual está certo hoje.
+ */
+function fonteDoQr(valor: string): string {
+  if (valor.startsWith("data:")) return valor;
+  return `data:image/svg+xml;utf-8,${encodeURIComponent(valor)}`;
+}
 
 /**
  * Segundo fator por TOTP, usando exclusivamente o MFA oficial do Supabase.
@@ -45,6 +64,7 @@ export function PainelMfa({
   const [preparando, setPreparando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [falha, setFalha] = useState("");
+  const [copiado, setCopiado] = useState(false);
 
   // enroll cria um fator a cada chamada. Sem esta trava, um segundo render em
   // desenvolvimento (StrictMode) deixaria fatores órfãos na conta.
@@ -106,6 +126,17 @@ export function PainelMfa({
     void preparar();
   }, [preparar]);
 
+  async function copiarChave() {
+    try {
+      await navigator.clipboard.writeText(segredo);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sem permissão de área de transferência o texto continua selecionável.
+      toast.info("Selecione a chave e copie manualmente.");
+    }
+  }
+
   async function confirmar(evento: React.FormEvent) {
     evento.preventDefault();
     setEnviando(true);
@@ -165,19 +196,45 @@ export function PainelMfa({
               {cadastrando && qr && (
                 <div className="space-y-3">
                   <div className="grid place-items-center rounded-md border border-border bg-white p-4">
-                    {/* O QR chega do Supabase como SVG. Vai em <img> com data URI,
-                        e não inline, porque SVG embutido no HTML pode carregar
-                        script — em <img> não executa nada. */}
+                    {/* Vai em <img>, e não inline no HTML: SVG embutido pode
+                        carregar script, dentro de <img> não executa nada.
+                        O alt é neutro de propósito — a referência do Supabase
+                        sugere usar totp.uri ali, mas essa URI carrega o segredo
+                        TOTP, que passaria a ficar legível no DOM. */}
                     <img
-                      src={`data:image/svg+xml;utf-8,${encodeURIComponent(qr)}`}
+                      src={fonteDoQr(qr)}
                       alt="QR code para cadastrar o segundo fator"
                       className="size-44"
                     />
                   </div>
+
                   <div className="space-y-1.5">
-                    <Label htmlFor="segredo">Não consegue escanear? Use este código</Label>
-                    <Input id="segredo" readOnly value={segredo} className="font-mono text-xs" />
+                    <Label htmlFor="segredo">Não consegue escanear? Use esta chave</Label>
+                    {/* Bloco selecionável em vez de <input>: numa caixa de texto
+                        estreita é fácil copiar só o pedaço visível, e uma chave
+                        truncada é recusada pelo autenticador como inválida. */}
+                    <p
+                      id="segredo"
+                      className="rounded-md border border-border bg-muted/50 p-3 font-mono text-sm break-all select-all"
+                    >
+                      {segredo}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={copiarChave}
+                    >
+                      {copiado ? <Check className="size-4" /> : <Copy className="size-4" />}
+                      {copiado ? "Chave copiada" : "Copiar chave"}
+                    </Button>
                   </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Conclua o cadastro nesta mesma tela: recarregar a página gera uma chave nova e
+                    invalida a anterior.
+                  </p>
                 </div>
               )}
 

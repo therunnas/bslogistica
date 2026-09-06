@@ -79,8 +79,12 @@ por natureza; quem protege os dados é a RLS.
 
 ## Segundo fator (MFA)
 
-**Estado:** implementado em 06/09/2026. **Ainda não exercitado em execução** —
-ver a ressalva no fim desta seção.
+**Estado:** PENDENTE DE VALIDAÇÃO MANUAL.
+
+Implementado em 06/09/2026. O primeiro teste manual, na Preview do PR #8,
+**falhou**: o QR aparecia quebrado e a chave manual era recusada pelo aplicativo
+autenticador. A correção está aplicada, mas **uma nova validação manual continua
+necessária** — ver "Primeiro teste manual" mais abaixo.
 
 Antes desta data não havia MFA nenhum: a busca por `mfa`, `totp`, `aal`,
 `enroll`, `challenge` e `factor` em `src/` não devolvia uma única ocorrência
@@ -127,6 +131,41 @@ exige autenticar como admin, o que esta etapa não podia fazer. Falta também
 confirmar no painel do Supabase que **TOTP enrollment está habilitado** no
 projeto — a API pública de settings não expõe esse campo, e o CLI não tem
 subcomando de leitura da config remota.
+
+### Primeiro teste manual — reprovado, corrigido
+
+**Sintomas.** QR quebrado na tela `/mfa`; chave manual recusada como inválida
+pelo autenticador.
+
+**Causa do QR.** O campo `totp.qr_code` do Supabase já vem como data URL
+completo — a referência oficial usa `src={data.totp.qr_code}` direto. O
+comentário do tipo em `@supabase/auth-js` afirma o contrário, que é preciso
+prefixar `data:image/svg+xml;utf-8,`. A implementação seguiu o comentário do
+tipo, o prefixo entrou duas vezes, e o `src` virou texto percent-encoded em vez
+de SVG. Confirmado por teste em navegador: o formato de data URL usado não é
+inválido em si — ele carrega normalmente quando aplicado uma vez só.
+
+**Causa da chave.** O valor em si nunca esteve errado. Conferido direto no banco,
+sem ler o segredo: 32 caracteres, apenas o alfabeto Base32 (`[A-Z2-7]`), sem
+espaço, sem quebra de linha e sem caractere invisível. O problema era de entrega
+— a chave era exibida num `<input>` estreito, de onde é fácil copiar só o
+trecho visível, e chave truncada é recusada como inválida.
+
+**Correção.** O `src` do QR passa a respeitar o valor recebido: usa como está
+quando já é data URL, e só monta o data URL quando vier SVG cru — funciona nos
+dois formatos, sem depender de qual das duas fontes está correta hoje. A chave
+manual saiu do `<input>` e virou bloco monoespaçado com quebra, seleção total e
+botão de copiar. A tela passa a avisar que recarregar gera chave nova.
+
+O `alt` do QR é neutro de propósito: a referência do Supabase sugere usar
+`totp.uri` ali, mas essa URI carrega o segredo TOTP e ele ficaria legível no
+DOM. Nenhum log, toast ou atributo registra segredo, QR ou URI.
+
+**Fatores não verificados.** As duas tentativas deixaram um fator `unverified`
+em cada conta admin. Não foram removidos por fora: o próprio fluxo de cadastro
+apaga os fatores TOTP não verificados da conta antes de criar o novo, usando
+`unenroll` com a sessão do próprio usuário. Nenhum fator verificado é tocado, e
+nenhuma outra conta é afetada.
 
 Antes de considerar o MFA operante:
 
