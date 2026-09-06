@@ -168,13 +168,22 @@ $anon$;
 -- ---------------------------------------------------------------------------
 -- 4. USER_ROLES — sem escrita, sem autoelevação.
 -- ---------------------------------------------------------------------------
--- Aqui o bloqueio vem do GRANT de tabela, que é só `select`, antes mesmo da
--- RLS. Por isso o esperado é 42501 e não zero linhas afetadas.
+-- O bloqueio aqui é da RLS, não do GRANT. Medido no banco em 06/09/2026:
+-- `authenticated` tem INSERT, UPDATE e DELETE em user_roles, herdados do
+-- `GRANT ALL` das default privileges do Supabase — o GRANT explícito da
+-- 20260903173204 concede só `select`, mas soma-se ao default em vez de
+-- substituí-lo. Quem barra é a policy: só existe `user_roles_select_own`.
+--
+-- Daí duas semânticas diferentes, e é por isso que os testes abaixo não são
+-- simétricos: o INSERT viola o WITH CHECK e levanta 42501; o UPDATE e o DELETE
+-- não têm policy, o USING não casa nenhuma linha, e o comando termina afetando
+-- zero linhas **sem erro nenhum**.
 
 do $papeis$
 declare
   _n bigint;
   _bloqueou boolean;
+  _afetadas integer;
 begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated')::text, true);
@@ -192,19 +201,13 @@ begin
   end;
   if not _bloqueou then raise exception 'AUTOELEVAÇÃO: conseguiu se conceder admin'; end if;
 
-  _bloqueou := false;
-  begin
-    update public.user_roles set user_id = '22222222-2222-4222-8222-222222222222';
-  exception when insufficient_privilege then _bloqueou := true;
-  end;
-  if not _bloqueou then raise exception 'USER_ROLES UPDATE: não foi bloqueado'; end if;
+  update public.user_roles set user_id = '22222222-2222-4222-8222-222222222222';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 0 then raise exception 'USER_ROLES UPDATE: afetou % linhas', _afetadas; end if;
 
-  _bloqueou := false;
-  begin
-    delete from public.user_roles;
-  exception when insufficient_privilege then _bloqueou := true;
-  end;
-  if not _bloqueou then raise exception 'USER_ROLES DELETE: não foi bloqueado'; end if;
+  delete from public.user_roles;
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 0 then raise exception 'USER_ROLES DELETE: afetou % linhas', _afetadas; end if;
 
   raise notice 'USER_ROLES: PASS (sem insert, update, delete ou autoelevação)';
 end
