@@ -54,5 +54,9 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Sem matcher, o proxy rodaria também sobre arquivos estáticos e imagens,
   // gastando uma verificação de sessão em cada CSS e cada ícone.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)"],
+  // monitoring é a rota de túnel do Sentry (tunnelRoute em next.config.ts).
+  // Sem excluí-la, cada evento enviado ao Sentry dispararia uma validação de
+  // token contra o Supabase — e uma futura guarda de rota aqui bloquearia o
+  // relato de erros do cliente sem aviso.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|monitoring).*)"],
 };
