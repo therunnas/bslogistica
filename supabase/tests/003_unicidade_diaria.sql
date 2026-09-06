@@ -326,8 +326,52 @@ $t12$;
 -- Duas transações concorrentes inserindo a mesma chave terminam com uma delas
 -- recebendo 23505, porque nenhuma das duas precisa ter enxergado a outra.
 
-insert into res values (16, 'concorrência', 'garantida por índice único',
+insert into res values (19, 'concorrência', 'garantida por índice único',
                         'não exercitada nesta suíte — ver comentário', 'INFO');
+
+-- ---------------------------------------------------------------------------
+-- 17. A exceção histórica está amarrada à chave inteira, não só ao id
+-- ---------------------------------------------------------------------------
+-- Trocar o colaborador do lançamento legado faz a linha deixar de casar com a
+-- tupla isenta, e ela passa a ser coberta pelo índice. O alvo escolhido já tem
+-- diária faturável nessa operação e data, então a colisão é imediata.
+--
+-- O UPDATE roda dentro de um bloco com EXCEPTION: a subtransação é desfeita em
+-- qualquer desfecho, então o lançamento legado volta ao estado original ainda
+-- dentro deste bloco — e não só no rollback do final. O teste 18 confere.
+do $t17$
+declare _err text := '-';
+begin
+  begin
+    update public.timesheet_entries
+       set employee_id = '90adc471-8b06-40ba-8182-ef1abcddeca8'
+     where id = 'a453c848-3478-4388-858a-12546103d10b';
+    -- Chegar aqui significa que o índice não cobriu a linha alterada.
+    raise exception 'ROLLBACK_DO_TESTE' using errcode = 'P0001';
+  exception
+    when unique_violation then _err := '23505';
+    when others then _err := case when sqlerrm = 'ROLLBACK_DO_TESTE' then 'sem erro' else sqlstate end;
+  end;
+  insert into res values (17, 'trocar colaborador do legado deixa de ser exceção', '23505',
+                          'sqlstate=' || _err,
+                          case when _err = '23505' then 'PASS' else 'FAIL' end);
+end
+$t17$;
+
+-- ---------------------------------------------------------------------------
+-- 18. E o legado continua intacto depois da tentativa
+-- ---------------------------------------------------------------------------
+do $t18$
+declare _emp uuid; _b numeric; _inv uuid;
+begin
+  select employee_id, billed_amount, invoice_id into _emp, _b, _inv
+    from public.timesheet_entries where id = 'a453c848-3478-4388-858a-12546103d10b';
+  insert into res values (18, 'legado intacto após a tentativa', 'colaborador e valor originais',
+                          format('emp=%s billed=%s faturado=%s', right(_emp::text, 4), _b, _inv is not null),
+                          case when _emp = '7f1e83f7-97e2-499e-ab7f-d69684740526'
+                                and _b = 180.00 and _inv is not null then 'PASS' else 'FAIL' end);
+end
+$t18$;
 
 
 select n, teste, esperado, obtido, status from res order by n;

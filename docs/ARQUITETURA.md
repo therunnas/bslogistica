@@ -178,8 +178,10 @@ sobrescreve o que vier no payload, e o índice parcial
 só ele é avaliado no commit, e portanto só ele resiste a duas abas, a chamada
 direta ao PostgREST e a concorrência.
 
-O índice exclui um id literal, de um lançamento já faturado e anterior à regra.
-É exceção histórica registrada em
+O índice tem uma única exceção: um lançamento já faturado e anterior à regra,
+isento apenas enquanto `id`, `employee_id`, `operation_id` e `work_date`
+continuarem os do registro histórico — mudou a chave, volta a ser coberto. É
+exceção registrada em
 [dívida técnica](divida-tecnica/folha-duplicada-por-shift-null.md), não mecanismo
 de escape.
 

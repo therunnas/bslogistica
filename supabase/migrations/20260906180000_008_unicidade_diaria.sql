@@ -198,20 +198,34 @@ CREATE TRIGGER trg_timesheets_propaga_chave
 -- é objetivo: sob a regra nova, a diária é a da maior jornada e o excedente
 -- deveria ter virado hora extra. O excedente é o que sai do índice.
 --
--- Esta exclusão NÃO autoriza novas duplicidades e NÃO é mecanismo de escape:
--- vale para um id literal, já existente e já faturado. Acrescentar outro id
--- aqui para "resolver" um conflito futuro é contornar a regra, não aplicá-la —
--- o caminho certo é lançar o período extra como hora extra na diária existente.
+-- A exceção é amarrada à CHAVE DE NEGÓCIO INTEIRA, e não só ao id. Excluir
+-- apenas por id isentaria aquela linha para sempre, inclusive se ela passasse a
+-- apontar para outro colaborador, outra operação ou outra data — viraria uma
+-- brecha permanente com nome de exceção histórica. Com as quatro colunas
+-- amarradas, a isenção existe apenas enquanto a linha continuar sendo
+-- exatamente o registro histórico conhecido; mudou qualquer parte da chave,
+-- ela volta a ser coberta pelo índice como qualquer outra.
+--
+-- Esta exclusão NÃO autoriza novas duplicidades e NÃO é mecanismo de escape.
+-- Acrescentar outra tupla aqui para "resolver" um conflito futuro é contornar a
+-- regra, não aplicá-la — o caminho certo é lançar o período extra como hora
+-- extra na diária existente.
 
 CREATE UNIQUE INDEX IF NOT EXISTS timesheet_entries_uma_diaria_por_operacao_dia
   ON public.timesheet_entries (employee_id, operation_id, work_date)
   WHERE status <> 'absent'::public.attendance_status
-    AND id <> 'a453c848-3478-4388-858a-12546103d10b'::uuid;
+    AND NOT (
+      id           = 'a453c848-3478-4388-858a-12546103d10b'::uuid
+      AND employee_id  = '7f1e83f7-97e2-499e-ab7f-d69684740526'::uuid
+      AND operation_id = 'f2cb1dfc-620f-4262-817f-3379590052bb'::uuid
+      AND work_date    = '2026-09-05'::date
+    );
 
 COMMENT ON INDEX public.timesheet_entries_uma_diaria_por_operacao_dia IS
   'Uma diária faturável por colaborador, operação e data. Falta não conta. '
-  'Exclui um id legado, já faturado e anterior à regra — exceção histórica, '
-  'não mecanismo de escape para novas duplicidades.';
+  'A única exceção é um lançamento legado já faturado, isento apenas enquanto '
+  'id, employee_id, operation_id e work_date continuarem os do registro '
+  'histórico — mudou a chave, volta a ser coberto. Não é mecanismo de escape.';
 
 
 -- ---------------------------------------------------------------------------

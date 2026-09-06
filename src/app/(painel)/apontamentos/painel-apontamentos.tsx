@@ -69,6 +69,26 @@ interface DraftState {
   dirty: ReadonlySet<string>;
 }
 
+/** Índice que garante a invariável de diária, em public.timesheet_entries. */
+const INDICE_DA_DIARIA = "timesheet_entries_uma_diaria_por_operacao_dia";
+
+/**
+ * O erro é mesmo violação da invariável de diária?
+ *
+ * `code === "23505"` sozinho não serve: qualquer unique da tabela devolve o
+ * mesmo código, e afirmar "já possui diária" diante de outra violação mandaria
+ * o usuário procurar um problema que não existe. O PostgrestError não expõe
+ * campo `constraint` — só `message`, `details`, `hint` e `code` —, então a
+ * identificação é pelo nome do índice, que o Postgres escreve na mensagem de
+ * unique_violation.
+ */
+function ehViolacaoDeDiaria(erro: unknown): boolean {
+  if (typeof erro !== "object" || erro === null) return false;
+  const e = erro as { code?: string; message?: string; details?: string; hint?: string };
+  if (e.code !== "23505") return false;
+  return `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`.includes(INDICE_DA_DIARIA);
+}
+
 /**
  * Mensagem única para a violação da invariável de diária, venha ela da
  * checagem local ou do 23505 do banco. O texto é o mesmo de propósito: para
@@ -401,18 +421,26 @@ export function PainelApontamentos() {
       toast.success("Apontamento salvo.");
     },
     onError: (error: unknown) => {
-      // 23505 aqui só pode vir do índice de unicidade da diária: é a corrida
-      // que a checagem local não pega, com outra aba gravando no intervalo.
+      // A corrida que a checagem local não pega: outra aba gravou no intervalo.
+      if (ehViolacaoDeDiaria(error)) {
+        toast.error(mensagemDeDiariaDuplicada());
+        return;
+      }
       const codigo =
         typeof error === "object" && error && "code" in error
           ? (error as { code?: string }).code
           : undefined;
+      // Outro 23505 existe — `(timesheet_id, employee_id)`, por exemplo. Aqui a
+      // mensagem é neutra de propósito: não se afirma qual regra foi violada, e
+      // `details` não é exibido porque carrega os valores da chave.
+      if (codigo === "23505") {
+        toast.error(
+          "Já existe um registro conflitante para estes dados. Recarregue a página e confira antes de salvar de novo.",
+        );
+        return;
+      }
       toast.error(
-        codigo === "23505"
-          ? mensagemDeDiariaDuplicada()
-          : error instanceof Error
-            ? error.message
-            : "Não foi possível salvar o apontamento.",
+        error instanceof Error ? error.message : "Não foi possível salvar o apontamento.",
       );
     },
   });

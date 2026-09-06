@@ -112,17 +112,30 @@ mensagem de negócio, em vez de erro técnico.
 ## Exceção histórica preservada
 
 O lançamento `a453c848-3478-4388-858a-12546103d10b` — Noturno, 480 min,
-R$ 180,00, já faturado — é anterior à invariável e está **excluído do índice por
-id literal**. Nada nele foi alterado: valores, status, `invoice_id` e os itens da
-fatura seguem exatamente como foram cobrados.
+R$ 180,00, já faturado — é anterior à invariável e está **excluído do índice**.
+Nada nele foi alterado: valores, status, `invoice_id` e os itens da fatura
+seguem exatamente como foram cobrados.
+
+A isenção é amarrada à **chave de negócio inteira**, não só ao id:
+
+```sql
+AND NOT (id = <id> AND employee_id = <emp> AND operation_id = <op> AND work_date = <data>)
+```
+
+Excluir só por id isentaria aquela linha para sempre, inclusive se ela passasse a
+apontar para outro colaborador, outra operação ou outra data — viraria brecha
+permanente com nome de exceção histórica. Amarrada às quatro colunas, a isenção
+vale apenas enquanto a linha continuar sendo exatamente o registro conhecido;
+mudou qualquer parte da chave, ela volta a ser coberta pelo índice.
 
 O par dele, `5ebf2a8b-cf39-4862-869f-030e7f49377d` (Matutino, 1200 min,
 R$ 450,00), permanece **sob** o índice como a diária canônica do dia. O critério
 é objetivo: sob a regra nova, a diária é a da maior jornada e o excedente
 deveria ter sido hora extra — o excedente é o que sai do índice.
 
-A exclusão vale para aquele id, não para a chave: uma diária **nova** para o
-mesmo colaborador, operação e data continua sendo recusada com `23505` (testado).
+Uma diária **nova** para o mesmo colaborador, operação e data continua sendo
+recusada com `23505`, e trocar o colaborador do próprio registro legado também
+passa a ser recusado — ambos testados (testes 15 e 17).
 
 Acrescentar outro id à exclusão para "resolver" um conflito futuro é contornar a
 regra, não aplicá-la. O caminho certo é lançar o período extra como hora extra na
