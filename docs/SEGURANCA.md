@@ -255,23 +255,44 @@ todas com `REVOKE`.
 **Condição para fechamento:** `REVOKE EXECUTE ... FROM PUBLIC, anon` nas duas,
 preservando `authenticated` em `is_staff()` — as policies dependem dela.
 
-### Line endings mistos no repositório
+### Line endings mistos na working tree
 
-**Status:** PENDENTE — não é vulnerabilidade
-**Severidade:** nenhuma em segurança; bloqueia a validação
-**Motivo:** o repositório tem fins de linha mistos **nos próprios blobs**: 62 dos
-122 arquivos de texto rastreados estão em CRLF e 60 em LF. Não há
-`.gitattributes`, e `core.autocrlf` está como `true` nesta máquina.
+**Status:** CORRIGIDO — normalizado em 06/09/2026
+**Severidade:** nenhuma em segurança; bloqueava a validação
 
-O `eslint-plugin-prettier` marca cada `CR` como erro, então `npm run lint` falha
-com milhares de erros de formatação, sem nenhum problema real de código.
+**Causa real.** Os blobs versionados já estavam 100% em LF: a verificação byte a
+byte do HEAD mostrou zero CRLF nos 122 arquivos de texto, e a única ocorrência
+de `0d0a` no repositório é dado binário dentro de `public/favicon.ico`.
 
-**Risco atual:** nenhum para segurança. O efeito é impedir que o lint sirva de
-sinal — um erro real se perderia no meio do ruído.
-**Mitigação atual:** `tsc`, `build` e `npm audit` continuam limpos e cobrem o que
-importa.
-**Condição para fechamento:** decidir entre normalizar tudo para LF com
-`.gitattributes` (`* text=auto eol=lf`), o que reescreve 62 arquivos num commit
-próprio e dedicado, ou configurar `endOfLine: "auto"` no Prettier, que tolera o
-estado misto sem tocar nos arquivos. A primeira é a correção de raiz; a segunda é
-de uma linha.
+O CRLF existia apenas no disco, e a cadeia era esta:
+
+- `core.autocrlf = true`, definido pelo Git for Windows em escopo **system**
+  (`C:/Program Files/Git/etc/gitconfig`), gravava CRLF na working tree a cada
+  checkout;
+- não havia `.gitattributes` no repositório para sobrepor essa configuração;
+- o Prettier, cujo `endOfLine` padrão é `lf`, acusava cada `CR` como erro.
+
+O resultado eram 63 arquivos em CRLF e 59 em LF no disco, com `npm run lint`
+falhando com 4955 erros `prettier/prettier` — nenhum deles problema real de
+código.
+
+**Solução aplicada.** `.gitattributes` com `* text=auto eol=lf`. O `eol=lf`
+sobrepõe o `core.autocrlf` e garante LF no disco em qualquer clone, sem depender
+da configuração pessoal de cada máquina; o `text=auto` deixa a detecção de
+binário com o git, a mesma que já classificava `public/favicon.ico` como `-text`
+sem regra explícita.
+
+`git add --renormalize .` alterou **zero blobs**, como esperado de um
+repositório que já estava em LF. A working tree foi regravada a partir do
+índice, e os 123 arquivos permaneceram idênticos ao HEAD hash a hash — o binário
+inclusive. Nenhuma mudança funcional: `prettier --write` e `eslint --fix` não
+foram usados.
+
+**Resultado.** `w/crlf` passou de 63 para 0. `npm run lint` saiu de 4955 erros
+para 0, restando apenas o warning preexistente de `react-hooks/exhaustive-deps`
+em `src/app/(painel)/apontamentos/painel-apontamentos.tsx:107`. `tsc`, `build`,
+`npm audit` e `git diff --check` seguem limpos.
+
+Foi descartada a alternativa de configurar `endOfLine: "auto"` no Prettier: ela
+tolera o estado misto em vez de corrigi-lo, e mascararia o problema no lint em
+vez de resolvê-lo no repositório.

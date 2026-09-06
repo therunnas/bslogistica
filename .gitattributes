@@ -1,0 +1,13 @@
+# Normalização de fins de linha.
+#
+# Os blobs versionados já estão em LF. O que quebrava o lint era o checkout:
+# core.autocrlf=true, definido no Git for Windows em escopo system, gravava
+# CRLF na working tree, e o Prettier (endOfLine padrão "lf") acusava cada CR.
+#
+# `eol=lf` sobrepõe core.autocrlf e garante LF no disco em qualquer máquina,
+# sem depender da configuração pessoal de cada clone.
+#
+# `text=auto` deixa o git detectar binário pelo conteúdo — é a mesma detecção
+# que já classifica public/favicon.ico como -text hoje, sem regra explícita.
+
+* text=auto eol=lf
