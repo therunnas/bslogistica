@@ -84,7 +84,9 @@ substituído. Sobre ela, um índice único parcial:
 ```sql
 CREATE UNIQUE INDEX timesheet_entries_uma_diaria_por_operacao_dia
   ON public.timesheet_entries (employee_id, operation_id, work_date)
-  WHERE status <> 'absent' AND id <> '<id legado>';
+  WHERE status <> 'absent'
+    AND NOT (id = <id> AND employee_id = <emp>
+             AND operation_id = <op> AND work_date = <data>);
 ```
 
 Índice, e não trigger de validação: só o índice é avaliado no commit. Um
