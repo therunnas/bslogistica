@@ -30,6 +30,7 @@ import { useClients, useInvoices } from "@/lib/queries";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
 import { marginPct, round2 } from "@/lib/billing";
+import { montarCsv } from "@/lib/csv";
 
 export function PainelFaturamento() {
   const initial = monthRange();
@@ -167,20 +168,18 @@ export function PainelFaturamento() {
       "Valor faturado",
       "Custo",
     ];
-    const lines = period.map((r) =>
-      [
-        r.date,
-        r.operationName,
-        r.shiftName,
-        r.employeeName,
-        r.status,
-        r.workedMinutes,
-        r.overtimeMinutes,
-        r.billed.toFixed(2),
-        r.cost.toFixed(2),
-      ].join(";"),
-    );
-    const csv = [header.join(";"), ...lines].join("\n");
+    const lines = period.map((r) => [
+      r.date,
+      r.operationName,
+      r.shiftName,
+      r.employeeName,
+      r.status,
+      r.workedMinutes,
+      r.overtimeMinutes,
+      r.billed.toFixed(2),
+      r.cost.toFixed(2),
+    ]);
+    const csv = montarCsv(header, lines);
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
