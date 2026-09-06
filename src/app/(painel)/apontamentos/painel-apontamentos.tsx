@@ -69,6 +69,20 @@ interface DraftState {
   dirty: ReadonlySet<string>;
 }
 
+/**
+ * Mensagem única para a violação da invariável de diária, venha ela da
+ * checagem local ou do 23505 do banco. O texto é o mesmo de propósito: para
+ * quem aponta, é o mesmo problema, e a diferença entre "detectado antes" e
+ * "recusado pelo banco" não muda o que precisa ser feito.
+ */
+function mensagemDeDiariaDuplicada(detalhe?: string) {
+  return (
+    "Este colaborador já possui uma diária nesta operação e data. " +
+    "Registre o período adicional como hora extra no apontamento existente." +
+    (detalhe ? ` (${detalhe})` : "")
+  );
+}
+
 /** Identidade do contexto: um rascunho pertence a uma operação, turno e data. */
 const contextoDe = (operationId: string, turnoId: string, date: string) =>
   `${operationId}|${turnoId}|${date}`;
@@ -259,6 +273,50 @@ export function PainelApontamentos() {
     { dailies: 0, overtime: 0, billed: 0, cost: 0 },
   );
 
+  /**
+   * Colaboradores que já têm diária faturável nesta operação e data, em outra
+   * folha — outro turno, ou a folha sem turno.
+   *
+   * Serve só para a interface avisar antes e nomear onde a diária está. A
+   * garantia é o índice único no banco: esta leitura é do cache do navegador e
+   * não enxerga o que outra aba acabou de gravar.
+   */
+  const diariaEmOutraFolha = useMemo(() => {
+    const outrasFolhas = new Map(
+      (timesheets.data ?? [])
+        .filter(
+          (t) => t.operation_id === operationId && t.work_date === date && t.id !== timesheet?.id,
+        )
+        .map((t) => [t.id, t] as const),
+    );
+    const nomeDoTurno = (shiftId: string | null) =>
+      (shifts.data ?? []).find((s) => s.id === shiftId)?.name ?? "sem turno";
+
+    const mapa = new Map<string, string>();
+    for (const entrada of entries.data ?? []) {
+      if (entrada.status === "absent") continue;
+      const folha = outrasFolhas.get(entrada.timesheet_id);
+      if (folha) mapa.set(entrada.employee_id, nomeDoTurno(folha.shift_id));
+    }
+    return mapa;
+  }, [timesheets.data, entries.data, shifts.data, operationId, date, timesheet?.id]);
+
+  /**
+   * "Sem turno" só é oferecido quando faz sentido: operação avulsa, ou quando
+   * já existe contexto sem turno herdado — vínculo antigo ou folha já gravada.
+   * Nesses casos a opção precisa continuar alcançável para que o histórico
+   * possa ser visto e remanejado; some-la apagaria o caminho, não o problema.
+   */
+  const ofereceSemTurno =
+    operationShifts.length === 0 ||
+    turnoId === "" ||
+    (team.data ?? []).some(
+      (t) => t.operation_id === operationId && t.active && t.shift_id === null,
+    ) ||
+    (timesheets.data ?? []).some(
+      (t) => t.operation_id === operationId && t.work_date === date && t.shift_id === null,
+    );
+
   const isClosed = timesheet?.status === "closed";
 
   // Uma linha só é gravada se o usuário a tocou ou se ela ainda não existe no
@@ -268,9 +326,26 @@ export function PainelApontamentos() {
     ({ row }) => !row.entryId || (draft?.dirty.has(row.employeeId) ?? false),
   );
 
+  // Só conta como conflito o que geraria diária: falta não entra, e linha já
+  // gravada nesta folha também não — ela é a própria diária do dia.
+  const conflitos = aSalvar.filter(
+    ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
+  );
+
   const saveAll = useMutation({
     mutationFn: async () => {
       if (!aSalvar.length) return { gravadas: 0 };
+
+      if (conflitos.length) {
+        const primeiro = conflitos[0]!;
+        const nome = employeeMap.get(primeiro.row.employeeId)?.name ?? "colaborador";
+        const turno = diariaEmOutraFolha.get(primeiro.row.employeeId);
+        throw new Error(
+          mensagemDeDiariaDuplicada(
+            `${nome} — turno ${turno}${conflitos.length > 1 ? ` e mais ${conflitos.length - 1}` : ""}`,
+          ),
+        );
+      }
 
       let timesheetId = timesheet?.id;
       if (!timesheetId) {
@@ -325,7 +400,21 @@ export function PainelApontamentos() {
       setDraft((atual) => (atual ? { ...atual, dirty: new Set<string>() } : atual));
       toast.success("Apontamento salvo.");
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: unknown) => {
+      // 23505 aqui só pode vir do índice de unicidade da diária: é a corrida
+      // que a checagem local não pega, com outra aba gravando no intervalo.
+      const codigo =
+        typeof error === "object" && error && "code" in error
+          ? (error as { code?: string }).code
+          : undefined;
+      toast.error(
+        codigo === "23505"
+          ? mensagemDeDiariaDuplicada()
+          : error instanceof Error
+            ? error.message
+            : "Não foi possível salvar o apontamento.",
+      );
+    },
   });
 
   const toggleStatus = useMutation({
@@ -381,7 +470,9 @@ export function PainelApontamentos() {
             </Button>
             <Button
               onClick={() => saveAll.mutate()}
-              disabled={isClosed || carregando || saveAll.isPending || !linhas.length}
+              disabled={
+                isClosed || carregando || saveAll.isPending || !linhas.length || !!conflitos.length
+              }
             >
               <Save className="size-4" /> Salvar
             </Button>
@@ -416,7 +507,7 @@ export function PainelApontamentos() {
                 <SelectValue placeholder="Sem turno" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Sem turno definido</SelectItem>
+                {ofereceSemTurno ? <SelectItem value="none">Sem turno definido</SelectItem> : null}
                 {operationShifts.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} ({s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)})
@@ -439,6 +530,18 @@ export function PainelApontamentos() {
           </div>
         </CardContent>
       </Card>
+
+      {conflitos.length ? (
+        <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {mensagemDeDiariaDuplicada()}{" "}
+          {conflitos
+            .map(({ row }) => {
+              const nome = employeeMap.get(row.employeeId)?.name ?? "colaborador";
+              return `${nome} (turno ${diariaEmOutraFolha.get(row.employeeId)})`;
+            })
+            .join(", ")}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
