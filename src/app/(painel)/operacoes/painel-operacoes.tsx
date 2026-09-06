@@ -44,7 +44,7 @@ import {
   useShifts,
   useTeam,
 } from "@/lib/queries";
-import { useDeleteRow, useSaveRow } from "@/lib/mutations";
+import { exigirLinhaAfetada, useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { brl, dateBR, minutesToLabel, todayISO } from "@/lib/format";
 import { shiftPlannedMinutes } from "@/lib/billing";
 import type { Operation, Shift } from "@/lib/types";
@@ -109,11 +109,12 @@ export function PainelOperacoes() {
         // Troca de turno na mesma operação: move o vínculo existente em vez de
         // criar um segundo. Assim nunca existem duas linhas ativas, nem por um
         // instante.
-        const { error } = await cliente
+        const { error, count } = await cliente
           .from("operation_team")
-          .update({ shift_id: v.shiftId })
+          .update({ shift_id: v.shiftId }, { count: "exact" })
           .eq("id", v.vinculoId);
         if (error) throw error;
+        exigirLinhaAfetada(count, "mudar o turno do colaborador");
         return;
       }
       const { error } = await cliente.from("operation_team").insert({
@@ -140,11 +141,12 @@ export function PainelOperacoes() {
 
   const desalocarEquipe = useMutation({
     mutationFn: async (vinculoId: string) => {
-      const { error } = await criarClienteNavegador()
+      const { error, count } = await criarClienteNavegador()
         .from("operation_team")
-        .delete()
+        .delete({ count: "exact" })
         .eq("id", vinculoId);
       if (error) throw error;
+      exigirLinhaAfetada(count, "desalocar o colaborador");
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["operation_team"] }),
     onError: (error: Error) => toast.error(error.message),
