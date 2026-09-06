@@ -6,6 +6,7 @@ import { toast } from "@/lib/notificacoes";
 import { Lock, LockOpen, Save } from "lucide-react";
 import { PageHeader } from "../_components/app-shell";
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { exigirLinhaAfetada } from "@/lib/mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -330,11 +331,12 @@ export function PainelApontamentos() {
   const toggleStatus = useMutation({
     mutationFn: async (status: "open" | "closed") => {
       if (!timesheet) throw new Error("Salve o apontamento antes de fechar.");
-      const { error } = await criarClienteNavegador()
+      const { error, count } = await criarClienteNavegador()
         .from("timesheets")
-        .update({ status })
+        .update({ status }, { count: "exact" })
         .eq("id", timesheet.id);
       if (error) throw error;
+      exigirLinhaAfetada(count, "atualizar o status do apontamento");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timesheets"] });

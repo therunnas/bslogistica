@@ -44,3 +44,6 @@ next-env.d.ts
 # Restos de outras plataformas e de ferramentas locais
 .wrangler
 .claude/
+
+# Sentry Config File
+.env.sentry-build-plugin
