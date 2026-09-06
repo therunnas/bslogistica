@@ -120,30 +120,43 @@ contas admin, e usuário sem papel ou anônimo não lê nem escreve nada),
 
 ### SEC-003 — Cabeçalhos de segurança HTTP
 
-**Status:** PARCIAL
-**Severidade:** média
-**Motivo:** os quatro cabeçalhos independentes de domínio estão implementados em
-`next.config.ts`, mas ainda não foram confirmados numa resposta HTTP real.
+**Status:** CORRIGIDO — validado em 06/09/2026
+**Severidade original:** média
 
-Concluído:
+Os quatro cabeçalhos independentes de domínio estão implementados em
+`next.config.ts`, aplicados a todas as rotas via `headers()`:
 
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `X-Frame-Options: DENY`
 - `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`
 
-Pendente: teste HTTP real; HSTS; CSP.
+**Validação:** executada por requisição HTTP contra o **build local de produção**
+do Next.js (`npm run build` seguido de `npm start`, em `localhost:3000`). Os
+quatro cabeçalhos foram confirmados nas três rotas testadas:
 
-**Risco atual:** baixo. A configuração compila e o build passa; o que falta é a
-verificação empírica de que o servidor os entrega.
-**Mitigação atual:** nenhuma necessária — os cabeçalhos são defesa adicional, não
-substituem a RLS.
-**Condição para fechamento:** cabeçalhos confirmados por resposta HTTP no
-ambiente publicado, nas rotas `/login`, `/dashboard` e uma rota do painel.
+| Rota | Status | Cabeçalhos |
+| ---- | ------ | ---------- |
+| `/login` | 200 | os quatro presentes |
+| `/dashboard` | 307 → `/login` | os quatro presentes |
+| `/` | 200 | os quatro presentes |
 
-Ponto a observar na primeira Preview: `X-Frame-Options: DENY` impede que a
-aplicação seja embutida em iframe. Se a funcionalidade de comentários de preview
-da Vercel depender disso, avaliar `SAMEORIGIN` ou uma CSP com `frame-ancestors`.
+O `307` em `/dashboard` é o comportamento esperado para requisição não
+autenticada, e confirma que os cabeçalhos acompanham também as respostas de
+redirecionamento.
+
+A validação foi feita contra a aplicação local, e não contra a Preview da
+Vercel, porque a Deployment Protection intercepta as requisições no gateway SSO
+antes de chegarem ao Next — nesse caminho os cabeçalhos observados são os da
+plataforma, não os da aplicação.
+
+Ponto a observar quando houver ambiente publicado sem SSO:
+`X-Frame-Options: DENY` impede que a aplicação seja embutida em iframe. Se a
+funcionalidade de comentários de preview da Vercel depender disso, avaliar
+`SAMEORIGIN` ou uma CSP com `frame-ancestors`.
+
+HSTS e CSP **não** fazem parte deste fechamento e seguem pendentes nos dois itens
+a seguir.
 
 ### SEC-003a — HSTS
 
