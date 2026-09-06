@@ -79,12 +79,24 @@ por natureza; quem protege os dados é a RLS.
 
 ## Segundo fator (MFA)
 
-**Estado:** PENDENTE DE VALIDAÇÃO MANUAL.
+**Estado:** VALIDADO em 06/09/2026.
 
-Implementado em 06/09/2026. O primeiro teste manual, na Preview do PR #8,
-**falhou**: o QR aparecia quebrado e a chave manual era recusada pelo aplicativo
-autenticador. A correção está aplicada, mas **uma nova validação manual continua
-necessária** — ver "Primeiro teste manual" mais abaixo.
+| Item | Estado |
+| --- | --- |
+| MFA / TOTP | **VALIDADO** |
+| AAL2 | **VALIDADO** |
+| Proteção server-side | **VALIDADA** |
+
+Implementado e validado em 06/09/2026, na segunda tentativa. O primeiro teste
+manual reprovou — QR quebrado e chave manual recusada pelo autenticador —, a
+causa foi identificada e corrigida, e o segundo teste passou. O histórico fica
+registrado em "Primeiro teste manual" mais abaixo, porque a causa foi uma
+contradição entre duas fontes oficiais e vale a pena não repeti-la.
+
+Confirmado no teste manual: QR funcionando; enrollment TOTP concluído; código de
+seis dígitos aceito; logout e login funcionando; **senha sozinha não libera o
+painel quando existe fator verificado**; TOTP eleva a sessão para AAL2; e o
+painel só abre depois do AAL2.
 
 Antes desta data não havia MFA nenhum: a busca por `mfa`, `totp`, `aal`,
 `enroll`, `challenge` e `factor` em `src/` não devolvia uma única ocorrência
@@ -120,17 +132,15 @@ papel, mas não exige AAL2 — é o que se vem obter ali. Quem não tem fator ca
 o primeiro; quem já tem responde ao desafio. O botão Sair continua disponível nas
 duas situações.
 
-**Fatores hoje:** zero. Ambas as contas admin (`bsoperacao@gmail.com` e
-`bcviniciuslc@gmail.com`) estão sem fator verificado e serão levadas à tela de
-cadastro no próximo acesso ao painel.
+**Fatores hoje:** duas contas admin, **dois fatores TOTP `verified`**, nenhum
+fator pendente e nenhum admin sem segundo fator. Conferido por leitura direta de
+`auth.mfa_factors`, sem tocar na coluna de segredo — evidência independente do
+relato do teste manual.
 
-**Ressalva honesta.** O fluxo foi verificado por tipos, lint e build, e a API foi
-conferida na versão instalada (`@supabase/auth-js`, via supabase-js 2.115.0) em
-vez de presumida. Mas **não foi exercitado com uma conta real**: exercitá-lo
-exige autenticar como admin, o que esta etapa não podia fazer. Falta também
-confirmar no painel do Supabase que **TOTP enrollment está habilitado** no
-projeto — a API pública de settings não expõe esse campo, e o CLI não tem
-subcomando de leitura da config remota.
+**Como foi verificado.** Por tipos, lint e build; pela API conferida na versão
+instalada (`@supabase/auth-js`, via supabase-js 2.115.0) em vez de presumida; e
+por teste manual ponta a ponta com as duas contas admin reais. O enrollment TOTP
+estar habilitado no projeto deixou de ser suposição: o cadastro concluiu.
 
 ### Primeiro teste manual — reprovado, corrigido
 
@@ -167,16 +177,30 @@ apaga os fatores TOTP não verificados da conta antes de criar o novo, usando
 `unenroll` com a sessão do próprio usuário. Nenhum fator verificado é tocado, e
 nenhuma outra conta é afetada.
 
-Antes de considerar o MFA operante:
+### Segundo teste manual — aprovado
 
-1. confirmar TOTP habilitado em Authentication → Multi-Factor Authentication;
-2. entrar com uma conta admin e cadastrar o fator até o fim;
-3. sair, entrar de novo e confirmar que o painel só abre depois do código;
-4. repetir com a segunda conta admin.
+Executado em 06/09/2026, cobrindo os quatro passos que estavam pendentes:
+
+1. TOTP habilitado no projeto — confirmado pelo cadastro ter concluído;
+2. cadastro do fator levado até o fim, nas duas contas admin;
+3. logout e novo login: o painel só abriu depois do código de seis dígitos;
+4. senha sozinha, com fator verificado presente, não libera o painel.
+
+**A operação passa a depender do segundo fator.** Perder o aplicativo
+autenticador de uma conta admin sem ter a outra disponível deixa o painel
+inacessível para aquela conta — a remoção de um fator verificado exige o painel
+do Supabase. Com duas contas admin cadastradas, uma cobre a outra; manter as duas
+ativas é o que evita esse cenário.
 
 ## Auditoria final de produção — 06/09/2026
 
-Leitura completa de banco, aplicação e infraestrutura. **Zero bloqueios.**
+**Resultado: APROVADA.** Leitura completa de banco, aplicação e infraestrutura,
+mais a validação manual do segundo fator. **Zero bloqueios.**
+
+As pendências abaixo seguem abertas e **não bloqueiam produção**, todas por
+decisão registrada: **HSTS** pendente até o domínio final; **CSP** como hardening
+posterior; **SEC-004** (proteção contra senha vazada) como risco aceito no plano
+Free; **SEC-010** adiado, severidade baixa; e **redesign visual** fora do escopo.
 
 **Banco** — 18 verificações, nenhuma classificada como bloqueio:
 
