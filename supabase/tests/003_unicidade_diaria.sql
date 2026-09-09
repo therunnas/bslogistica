@@ -4,10 +4,9 @@
 -- COMO RODAR: cole o arquivo inteiro no SQL Editor e execute de uma vez. Tudo
 -- acontece dentro de uma transação que termina em `rollback`; nada persiste.
 --
--- Diferente do 002, este arquivo NÃO aborta no primeiro problema: cada teste
--- mede e registra numa tabela temporária, e o resultado sai como tabela no
--- final. Abortar esconde os testes seguintes, e foi exatamente o que atrasou o
--- diagnóstico da suíte anterior.
+-- Cada teste mede e registra numa tabela temporária para que o relatório mostre
+-- todos os resultados. Depois da tabela final, qualquer FAIL levanta exceção e
+-- faz o processo terminar com código diferente de zero.
 --
 -- Os testes rodam como o papel da sessão (postgres, no SQL Editor). Aqui isso é
 -- proposital e não invalida nada: o que está sob teste é índice e trigger, que
@@ -268,53 +267,36 @@ end
 $t10b$;
 
 -- ---------------------------------------------------------------------------
--- 11. Registro histórico legado continua existente e intacto
+-- 11. O índice final não contém exceção por identidade ou chave histórica
 -- ---------------------------------------------------------------------------
+-- A regra deve depender somente de status. A leitura de catálogo comprova o
+-- objeto efetivamente instalado, sem depender de qualquer linha preexistente.
 do $t11$
-declare _b numeric; _s text; _inv uuid; _existe boolean;
+declare _predicate text;
 begin
-  select true, billed_amount, status::text, invoice_id
-    into _existe, _b, _s, _inv
-    from public.timesheet_entries
-   where id = 'a453c848-3478-4388-858a-12546103d10b';
+  select pg_get_expr(i.indpred, i.indrelid)
+    into _predicate
+    from pg_index i
+    join pg_class c on c.oid = i.indexrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = 'timesheet_entries_uma_diaria_por_operacao_dia';
 
-  insert into res values (13, 'lançamento legado preservado',
-                          'existe, 180.00, present, faturado',
-                          format('existe=%s billed=%s status=%s faturado=%s',
-                                 coalesce(_existe, false), _b, _s, _inv is not null),
-                          case when coalesce(_existe, false)
-                                and _b = 180.00 and _s = 'present' and _inv is not null
-                               then 'PASS' else 'FAIL' end);
-
-  -- e o par dele continua sob o índice, como diária canônica
-  insert into res
-  select 14, 'par do legado sob o índice', 'existe, 450.00',
-         format('billed=%s', billed_amount),
-         case when billed_amount = 450.00 then 'PASS' else 'FAIL' end
-    from public.timesheet_entries where id = '5ebf2a8b-cf39-4862-869f-030e7f49377d';
+  insert into res values (
+    13,
+    'índice sem exceção histórica',
+    'predicado usa apenas status',
+    coalesce(_predicate, 'índice ausente'),
+    case
+      when _predicate is not null
+       and _predicate !~ '\m(id|employee_id|operation_id|work_date)\M'
+       and _predicate ~ '\mstatus\M'
+      then 'PASS'
+      else 'FAIL'
+    end
+  );
 end
 $t11$;
-
--- ---------------------------------------------------------------------------
--- 12. A exceção é de um id só, e não uma porta aberta
--- ---------------------------------------------------------------------------
--- Uma diária NOVA para o mesmo colaborador/operação/data do caso legado tem de
--- ser recusada: a exclusão do índice vale para aquele id, não para a chave.
-do $t12$
-declare _err text := '-'; _ts uuid;
-begin
-  select id into _ts from public.timesheets
-   where operation_id = 'f2cb1dfc-620f-4262-817f-3379590052bb' and work_date = '2026-09-05'
-   limit 1;
-  begin
-    insert into public.timesheet_entries (timesheet_id, employee_id, status)
-    values (_ts, '7f1e83f7-97e2-499e-ab7f-d69684740526', 'present');
-  exception when others then _err := sqlstate;
-  end;
-  insert into res values (15, 'nova diária na chave do caso legado', '23505', 'sqlstate=' || _err,
-                          case when _err = '23505' then 'PASS' else 'FAIL' end);
-end
-$t12$;
 
 -- ---------------------------------------------------------------------------
 -- Concorrência
@@ -326,54 +308,19 @@ $t12$;
 -- Duas transações concorrentes inserindo a mesma chave terminam com uma delas
 -- recebendo 23505, porque nenhuma das duas precisa ter enxergado a outra.
 
-insert into res values (19, 'concorrência', 'garantida por índice único',
+insert into res values (14, 'concorrência', 'garantida por índice único',
                         'não exercitada nesta suíte — ver comentário', 'INFO');
 
--- ---------------------------------------------------------------------------
--- 17. A exceção histórica está amarrada à chave inteira, não só ao id
--- ---------------------------------------------------------------------------
--- Trocar o colaborador do lançamento legado faz a linha deixar de casar com a
--- tupla isenta, e ela passa a ser coberta pelo índice. O alvo escolhido já tem
--- diária faturável nessa operação e data, então a colisão é imediata.
---
--- O UPDATE roda dentro de um bloco com EXCEPTION: a subtransação é desfeita em
--- qualquer desfecho, então o lançamento legado volta ao estado original ainda
--- dentro deste bloco — e não só no rollback do final. O teste 18 confere.
-do $t17$
-declare _err text := '-';
-begin
-  begin
-    update public.timesheet_entries
-       set employee_id = '90adc471-8b06-40ba-8182-ef1abcddeca8'
-     where id = 'a453c848-3478-4388-858a-12546103d10b';
-    -- Chegar aqui significa que o índice não cobriu a linha alterada.
-    raise exception 'ROLLBACK_DO_TESTE' using errcode = 'P0001';
-  exception
-    when unique_violation then _err := '23505';
-    when others then _err := case when sqlerrm = 'ROLLBACK_DO_TESTE' then 'sem erro' else sqlstate end;
-  end;
-  insert into res values (17, 'trocar colaborador do legado deixa de ser exceção', '23505',
-                          'sqlstate=' || _err,
-                          case when _err = '23505' then 'PASS' else 'FAIL' end);
-end
-$t17$;
-
--- ---------------------------------------------------------------------------
--- 18. E o legado continua intacto depois da tentativa
--- ---------------------------------------------------------------------------
-do $t18$
-declare _emp uuid; _b numeric; _inv uuid;
-begin
-  select employee_id, billed_amount, invoice_id into _emp, _b, _inv
-    from public.timesheet_entries where id = 'a453c848-3478-4388-858a-12546103d10b';
-  insert into res values (18, 'legado intacto após a tentativa', 'colaborador e valor originais',
-                          format('emp=%s billed=%s faturado=%s', right(_emp::text, 4), _b, _inv is not null),
-                          case when _emp = '7f1e83f7-97e2-499e-ab7f-d69684740526'
-                                and _b = 180.00 and _inv is not null then 'PASS' else 'FAIL' end);
-end
-$t18$;
-
-
 select n, teste, esperado, obtido, status from res order by n;
+
+do $assert_all$
+declare _falhas integer;
+begin
+  select count(*) into _falhas from res where status = 'FAIL';
+  if _falhas > 0 then
+    raise exception '003_unicidade_diaria: % teste(s) falharam', _falhas;
+  end if;
+end
+$assert_all$;
 
 rollback;
