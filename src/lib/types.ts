@@ -83,6 +83,8 @@ export interface TimesheetEntry {
   id: string;
   timesheet_id: string;
   employee_id: string;
+  operation_id: string;
+  work_date: string;
   status: AttendanceStatus;
   check_in: string | null;
   check_out: string | null;

@@ -431,11 +431,13 @@ export type Database = {
           id: string;
           invoice_id: string | null;
           notes: string | null;
+          operation_id: string;
           ot_hour_rate_snapshot: number;
           overtime_minutes: number;
           status: Database["public"]["Enums"]["attendance_status"];
           timesheet_id: string;
           updated_at: string;
+          work_date: string;
           worked_minutes: number;
         };
         Insert: {
@@ -451,11 +453,13 @@ export type Database = {
           id?: string;
           invoice_id?: string | null;
           notes?: string | null;
+          operation_id: string;
           ot_hour_rate_snapshot?: number;
           overtime_minutes?: number;
           status?: Database["public"]["Enums"]["attendance_status"];
           timesheet_id: string;
           updated_at?: string;
+          work_date: string;
           worked_minutes?: number;
         };
         Update: {
@@ -471,11 +475,13 @@ export type Database = {
           id?: string;
           invoice_id?: string | null;
           notes?: string | null;
+          operation_id?: string;
           ot_hour_rate_snapshot?: number;
           overtime_minutes?: number;
           status?: Database["public"]["Enums"]["attendance_status"];
           timesheet_id?: string;
           updated_at?: string;
+          work_date?: string;
           worked_minutes?: number;
         };
         Relationships: [

@@ -386,6 +386,8 @@ export function PainelApontamentos() {
         ...(row.entryId ? { id: row.entryId } : {}),
         timesheet_id: timesheetId!,
         employee_id: row.employeeId,
+        operation_id: operationId,
+        work_date: date,
         status: row.status,
         check_in: row.status === "absent" ? null : row.checkIn ? `${row.checkIn}:00` : null,
         check_out: row.status === "absent" ? null : row.checkOut ? `${row.checkOut}:00` : null,
@@ -399,9 +401,7 @@ export function PainelApontamentos() {
         cost_amount: calc.costAmount,
         notes: row.notes || null,
       }));
-      const { error } = await criarClienteNavegador()
-        .from("timesheet_entries")
-        .upsert(payload as never);
+      const { error } = await criarClienteNavegador().from("timesheet_entries").upsert(payload);
       if (error) throw error;
       return { gravadas: payload.length };
     },
