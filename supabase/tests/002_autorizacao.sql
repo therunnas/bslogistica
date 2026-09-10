@@ -317,16 +317,11 @@ $anon$;
 -- ---------------------------------------------------------------------------
 -- 5. USER_ROLES — sem escrita, sem autoelevação.
 -- ---------------------------------------------------------------------------
--- O bloqueio aqui é da RLS, não do GRANT. Medido no banco em 06/09/2026:
--- `authenticated` tem INSERT, UPDATE e DELETE em user_roles, herdados do
--- `GRANT ALL` das default privileges do Supabase — o GRANT explícito da
--- 20260903173204 concede só `select`, mas soma-se ao default em vez de
--- substituí-lo. Quem barra é a policy: só existe `user_roles_select_own`.
---
--- Daí duas semânticas diferentes, e é por isso que os testes abaixo não são
--- simétricos: o INSERT viola o WITH CHECK e levanta 42501; o UPDATE e o DELETE
--- não têm policy, o USING não casa nenhuma linha, e o comando termina afetando
--- zero linhas **sem erro nenhum**.
+-- O schema atual concede somente SELECT em `user_roles` para `authenticated`,
+-- então INSERT/UPDATE/DELETE são normalmente recusados pelo GRANT com 42501.
+-- O teste também aceita o comportamento seguro de uma configuração futura em
+-- que exista o privilégio de tabela, mas a RLS filtre UPDATE/DELETE para zero
+-- linhas. Em ambos os casos, qualquer modificação efetiva é uma falha.
 
 do $papeis$
 declare
@@ -350,13 +345,35 @@ begin
   end;
   if not _bloqueou then raise exception 'AUTOELEVAÇÃO: conseguiu se conceder admin'; end if;
 
-  update public.user_roles set user_id = '22222222-2222-4222-8222-222222222222';
-  get diagnostics _afetadas = row_count;
-  if _afetadas <> 0 then raise exception 'USER_ROLES UPDATE: afetou % linhas', _afetadas; end if;
+  _bloqueou := false;
+  _afetadas := 0;
+  begin
+    update public.user_roles set user_id = '22222222-2222-4222-8222-222222222222';
+    get diagnostics _afetadas = row_count;
+  exception when insufficient_privilege then
+    _bloqueou := true;
+    raise notice 'USER_ROLES UPDATE: PASS (bloqueado por privilégio de tabela, SQLSTATE 42501)';
+  end;
+  if not _bloqueou and _afetadas <> 0 then
+    raise exception 'USER_ROLES UPDATE: modificou % linhas', _afetadas;
+  elsif not _bloqueou then
+    raise notice 'USER_ROLES UPDATE: PASS (RLS filtrou o comando para zero linhas)';
+  end if;
 
-  delete from public.user_roles;
-  get diagnostics _afetadas = row_count;
-  if _afetadas <> 0 then raise exception 'USER_ROLES DELETE: afetou % linhas', _afetadas; end if;
+  _bloqueou := false;
+  _afetadas := 0;
+  begin
+    delete from public.user_roles;
+    get diagnostics _afetadas = row_count;
+  exception when insufficient_privilege then
+    _bloqueou := true;
+    raise notice 'USER_ROLES DELETE: PASS (bloqueado por privilégio de tabela, SQLSTATE 42501)';
+  end;
+  if not _bloqueou and _afetadas <> 0 then
+    raise exception 'USER_ROLES DELETE: modificou % linhas', _afetadas;
+  elsif not _bloqueou then
+    raise notice 'USER_ROLES DELETE: PASS (RLS filtrou o comando para zero linhas)';
+  end if;
 
   raise notice 'USER_ROLES: PASS (sem insert, update, delete ou autoelevação)';
 end
