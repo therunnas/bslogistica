@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "@/lib/notificacoes";
@@ -51,12 +52,24 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-12">
+    <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/40 px-4 py-12">
+      {/* Marca fora do card, com espaço próprio.
+          Em telas largas ela sai do fluxo e ancora no canto superior esquerdo
+          da página; o card continua centralizado como sempre esteve.
+          Abaixo de lg volta ao fluxo, empilhada acima do card — absoluta em
+          tela estreita ela passaria por cima dele.
+          `self-start` alinha a marca pela borda esquerda do card no empilhado,
+          já que o container centraliza os filhos. */}
+      <Image
+        src="/branding/bs-logo-temp.png"
+        alt="BS Soluções Logísticas"
+        width={1000}
+        height={625}
+        priority
+        className="h-auto w-36 self-start object-contain lg:absolute lg:top-8 lg:left-10 lg:w-40"
+      />
       <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="mb-2 grid size-10 place-items-center rounded-md bg-primary font-display font-bold text-primary-foreground">
-            BS
-          </div>
           <CardTitle className="font-display text-xl">Entrar</CardTitle>
           <CardDescription>
             Painel interno de gestão de diárias, horas extras e faturamento.
