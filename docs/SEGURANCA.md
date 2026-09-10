@@ -1,7 +1,11 @@
 # Segurança
 
-Estado verificado em 04/09/2026, projeto Supabase **BSLOG**
-(`qaibhlucbpetxrtswulf`).
+Projeto Supabase **BSLOG** atual: `ehkduqokntemtmqzdrbd`, com banco reconstruído
+e controles de banco revalidados em 10/09/2026.
+
+As verificações de 04/09/2026 abaixo pertencem ao projeto anterior
+`qaibhlucbpetxrtswulf`. Afirmações datadas sobre configurações do Dashboard,
+contas e MFA permanecem como histórico até a revalidação no gate próprio.
 
 ## Acesso ao sistema
 

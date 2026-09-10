@@ -1,7 +1,5 @@
-# Projeto BSLOG (sa-east-1). O ref anterior aqui, "eosqwhjlytoawanhzmhz", era do
-# projeto anterior, já deletado — qualquer comando do CLI
-# que lesse este arquivo apontaria para um projeto inexistente.
-project_id = "qaibhlucbpetxrtswulf"
+# Projeto BSLOG atual (sa-east-1), reconfirmado na reconstrução de 10/09/2026.
+project_id = "ehkduqokntemtmqzdrbd"
 
 # Sem seção [auth] de propósito. "supabase config push" envia este arquivo
 # inteiro: com a seção ausente, o CLI aplicaria seus padrões a toda a
