@@ -1,7 +1,11 @@
 # Segurança
 
-Estado verificado em 04/09/2026, projeto Supabase **BSLOG**
-(`qaibhlucbpetxrtswulf`).
+Projeto Supabase **BSLOG** atual: `ehkduqokntemtmqzdrbd`, com banco reconstruído
+e controles de banco revalidados em 10/09/2026.
+
+As verificações de 04/09/2026 abaixo pertencem ao projeto anterior
+`qaibhlucbpetxrtswulf`. Afirmações datadas sobre configurações do Dashboard,
+contas e MFA permanecem como histórico até a revalidação no gate próprio.
 
 ## Acesso ao sistema
 
@@ -339,25 +343,49 @@ Ponto a observar quando houver ambiente publicado sem SSO:
 funcionalidade de comentários de preview da Vercel depender disso, avaliar
 `SAMEORIGIN` ou uma CSP com `frame-ancestors`.
 
-HSTS e CSP **não** fazem parte deste fechamento e seguem pendentes nos dois itens
-a seguir.
+CSP **não** faz parte deste fechamento e segue pendente. HSTS deixou de ser
+pendência: a plataforma passou a entregá-lo no domínio próprio — ver a seguir.
 
 ### SEC-003a — HSTS
 
-**Status:** PENDENTE POR DOMÍNIO
-**Severidade:** baixa no ambiente atual
-**Motivo:** o domínio definitivo ainda não foi adicionado à Vercel. Hoje a
-aplicação roda apenas em `*.vercel.app`, onde a própria Vercel já envia HSTS.
+**Status:** ATENDIDO NA PLATAFORMA — verificado em 10/09/2026
+**Severidade:** baixa
 
-**Risco atual:** baixo — todo o tráfego atual já é HTTPS pelo domínio da Vercel.
-**Mitigação atual:** o domínio da plataforma já entrega HSTS.
-**Condição para fechamento:** `bslogistica.com.br` e `admin.bslogistica.com.br`
-definidos, apontados e funcionando em HTTPS. Só então aplicar
-`Strict-Transport-Security`.
+**Domínios oficiais** (a grafia correta leva **s** em `logisticas`; versões sem
+o `s` que circulavam nesta documentação estavam erradas e foram corrigidas):
 
-Regras que valem quando chegar a hora: **não** usar `includeSubDomains` antes de
-mapear todos os subdomínios, e **não** usar `preload` sem decisão explícita — a
-entrada na lista dos navegadores é rápida e a saída leva meses.
+| Uso | Domínio |
+| --- | --- |
+| Site institucional | `https://bslogisticas.com.br` — outro projeto, outro repositório |
+| Painel interno | `https://admin.bslogisticas.com.br` |
+
+**O que mudou:** `admin.bslogisticas.com.br` foi criado na Vercel e está
+operacional. Verificado por consulta direta:
+
+- DNS — `CNAME` para `<hash>.vercel-dns-017.com`, resolvendo para IPs da Vercel;
+- TLS — TLSv1.3, certificado Let's Encrypt com `CN` e `SAN` cobrindo o host,
+  cadeia autorizada;
+- HTTP — `200 OK` servido pela Vercel, com `X-Frame-Options: DENY` e
+  `X-Content-Type-Options: nosniff` do SEC-003 já em produção.
+
+**HSTS vem da plataforma.** O domínio responde com:
+
+```
+Strict-Transport-Security: max-age=63072000
+```
+
+São dois anos, emitidos pela Vercel na borda, sem `includeSubDomains` e sem
+`preload` — exatamente a postura conservadora que este item pedia.
+
+**Não adicionar o header na aplicação.** Duplicá-lo em `next.config.ts` não
+acrescenta proteção e cria duas fontes de verdade para o mesmo cabeçalho, com o
+risco de divergirem numa mudança futura. O item fecha aqui.
+
+**Se um dia a origem mudar** — sair da Vercel, ou servir o painel por outra
+borda —, este item reabre: aí sim o header passa a ser responsabilidade da
+aplicação. As regras continuam valendo: **não** usar `includeSubDomains` antes
+de mapear todos os subdomínios, e **não** usar `preload` sem decisão explícita,
+porque entrar na lista dos navegadores é rápido e sair leva meses.
 
 ### SEC-003b — Content-Security-Policy
 

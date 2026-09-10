@@ -16,17 +16,19 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- Cenário: dois usuários e um mínimo de dados de negócio.
+-- Cenário: três usuários e um mínimo de dados de negócio.
 -- ---------------------------------------------------------------------------
 -- UUIDs fixos e reconhecíveis. `profiles` e `user_roles` não têm FK para
 -- auth.users, então não é preciso criar conta de verdade para o teste.
 
 insert into public.profiles (id, full_name, email) values
   ('11111111-1111-4111-8111-111111111111', 'Admin de Teste',  'admin@example.invalid'),
-  ('22222222-2222-4222-8222-222222222222', 'Sem Papel',       'sempapel@example.invalid');
+  ('22222222-2222-4222-8222-222222222222', 'Sem Papel',       'sempapel@example.invalid'),
+  ('88888888-8888-4888-8888-888888888888', 'Operacional',     'operacional@example.invalid');
 
 insert into public.user_roles (user_id, role) values
-  ('11111111-1111-4111-8111-111111111111', 'admin');
+  ('11111111-1111-4111-8111-111111111111', 'admin'),
+  ('88888888-8888-4888-8888-888888888888', 'operacional');
 
 insert into public.clients (id, name) values
   ('33333333-3333-4333-8333-333333333333', 'Cliente de Teste');
@@ -35,7 +37,12 @@ insert into public.operations (id, client_id, name) values
   ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333', 'Operação de Teste');
 
 insert into public.employees (id, name, daily_cost) values
-  ('55555555-5555-4555-8555-555555555555', 'Colaborador de Teste', 100);
+  ('55555555-5555-4555-8555-555555555555', 'Colaborador de Teste', 100),
+  ('55555555-5555-4555-8555-555555555556', 'Colaborador Dois',     100);
+
+insert into public.invoices (id, client_id, period_start, period_end) values
+  ('99999999-9999-4999-8999-999999999991', '33333333-3333-4333-8333-333333333333', current_date, current_date),
+  ('99999999-9999-4999-8999-999999999992', '33333333-3333-4333-8333-333333333333', current_date, current_date);
 
 insert into public.timesheets (id, operation_id, work_date) values
   ('66666666-6666-4666-8666-666666666666', '44444444-4444-4444-8444-444444444444', current_date);
@@ -75,7 +82,19 @@ begin
   get diagnostics _afetadas = row_count;
   if _afetadas <> 1 then raise exception 'ADMIN DELETE: afetou % linhas, esperado 1', _afetadas; end if;
 
-  raise notice 'ADMIN: PASS (select, insert, update, delete)';
+  update public.timesheet_entries
+     set invoice_id = '99999999-9999-4999-8999-999999999991'
+   where id = '77777777-7777-4777-8777-777777777777';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 1 then raise exception 'ADMIN FINANCEIRO: não vinculou apontamento à fatura'; end if;
+
+  update public.timesheet_entries
+     set invoice_id = null
+   where id = '77777777-7777-4777-8777-777777777777';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 1 then raise exception 'ADMIN FINANCEIRO: não removeu vínculo de teste'; end if;
+
+  raise notice 'ADMIN: PASS (CRUD administrativo e vínculo financeiro)';
 end
 $admin$;
 
@@ -129,7 +148,137 @@ $sempapel$;
 
 
 -- ---------------------------------------------------------------------------
--- 3. ANON — nenhum acesso a dado de negócio.
+-- 3. OPERACIONAL — opera apontamentos sem administrar cadastros ou financeiro.
+-- ---------------------------------------------------------------------------
+
+do $operacional$
+declare
+  _n bigint;
+  _afetadas integer;
+  _bloqueou boolean;
+  _invoice uuid;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+
+  if not public.is_staff() then raise exception 'OPERACIONAL: is_staff devolveu falso'; end if;
+  if public.has_role(auth.uid(), 'admin'::public.app_role) then
+    raise exception 'OPERACIONAL: has_role devolveu admin';
+  end if;
+
+  select count(*) into _n from public.clients;
+  if _n = 0 then raise exception 'OPERACIONAL SELECT: não enxerga clientes'; end if;
+  select count(*) into _n from public.operations;
+  if _n = 0 then raise exception 'OPERACIONAL SELECT: não enxerga operações'; end if;
+  select count(*) into _n from public.timesheet_entries;
+  if _n = 0 then raise exception 'OPERACIONAL SELECT: não enxerga apontamentos'; end if;
+
+  update public.operations
+     set notes = 'editado pelo operacional'
+   where id = '44444444-4444-4444-8444-444444444444';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 1 then raise exception 'OPERACIONAL UPDATE operação: afetou % linhas', _afetadas; end if;
+
+  update public.timesheet_entries
+     set notes = 'apontamento operacional'
+   where id = '77777777-7777-4777-8777-777777777777';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 1 then raise exception 'OPERACIONAL UPDATE apontamento: afetou % linhas', _afetadas; end if;
+
+  _bloqueou := false;
+  begin
+    insert into public.timesheet_entries (
+      id, timesheet_id, employee_id, invoice_id, notes
+    ) values (
+      '77777777-7777-4777-8777-777777777778',
+      '66666666-6666-4666-8666-666666666666',
+      '55555555-5555-4555-8555-555555555556',
+      '99999999-9999-4999-8999-999999999991',
+      'vínculo injetado'
+    );
+  exception when insufficient_privilege then _bloqueou := true;
+  end;
+  if not _bloqueou then raise exception 'OPERACIONAL INSERT: criou apontamento já faturado'; end if;
+
+  insert into public.timesheet_entries (id, timesheet_id, employee_id, notes)
+  values (
+    '77777777-7777-4777-8777-777777777778',
+    '66666666-6666-4666-8666-666666666666',
+    '55555555-5555-4555-8555-555555555556',
+    'criado pelo operacional'
+  );
+  delete from public.timesheet_entries
+   where id = '77777777-7777-4777-8777-777777777778';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 1 then raise exception 'OPERACIONAL CRUD: não criou/removeu apontamento permitido'; end if;
+
+  update public.clients
+     set name = 'cliente sequestrado'
+   where id = '33333333-3333-4333-8333-333333333333';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 0 then raise exception 'OPERACIONAL ADMIN: alterou cadastro de cliente'; end if;
+
+  update public.profiles
+     set full_name = 'admin sequestrado'
+   where id = '11111111-1111-4111-8111-111111111111';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 0 then raise exception 'OPERACIONAL USUÁRIOS: alterou perfil alheio'; end if;
+
+  if has_table_privilege('anon', 'public.clients', 'TRUNCATE') then
+    raise exception 'OPERACIONAL GRANTS: fixture começou com TRUNCATE indevido';
+  end if;
+  execute 'grant truncate on public.clients to anon';
+  if has_table_privilege('anon', 'public.clients', 'TRUNCATE') then
+    raise exception 'OPERACIONAL GRANTS: conseguiu conceder TRUNCATE';
+  end if;
+
+  update public.invoices
+     set total_amount = 999999
+   where id = '99999999-9999-4999-8999-999999999991';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 0 then raise exception 'OPERACIONAL FINANCEIRO: alterou fatura'; end if;
+
+  _bloqueou := false;
+  begin
+    insert into public.user_roles (user_id, role)
+    values ('88888888-8888-4888-8888-888888888888', 'admin');
+  exception when insufficient_privilege then _bloqueou := true;
+  end;
+  if not _bloqueou then raise exception 'OPERACIONAL AUTOELEVAÇÃO: concedeu admin a si'; end if;
+
+  _bloqueou := false;
+  begin
+    update public.timesheet_entries
+       set invoice_id = '99999999-9999-4999-8999-999999999991'
+     where id = '77777777-7777-4777-8777-777777777777';
+  exception when insufficient_privilege then _bloqueou := true;
+  end;
+  if not _bloqueou then raise exception 'OPERACIONAL FINANCEIRO: alterou invoice_id'; end if;
+
+  select invoice_id into _invoice
+    from public.timesheet_entries
+   where id = '77777777-7777-4777-8777-777777777777';
+  if _invoice is not null then raise exception 'OPERACIONAL FINANCEIRO: vínculo persistiu como %', _invoice; end if;
+
+  _bloqueou := false;
+  begin
+    perform public.gerar_fatura(
+      '33333333-3333-4333-8333-333333333333'::uuid,
+      current_date - 1,
+      current_date + 1
+    );
+  exception when insufficient_privilege then _bloqueou := true;
+  end;
+  if not _bloqueou then raise exception 'OPERACIONAL FINANCEIRO: conseguiu gerar fatura'; end if;
+
+  raise notice 'OPERACIONAL: PASS (opera dados, sem admin, elevação ou vínculo financeiro)';
+end
+$operacional$;
+
+
+-- ---------------------------------------------------------------------------
+-- 4. ANON — nenhum acesso a dado de negócio.
 -- ---------------------------------------------------------------------------
 -- Todas as policies são `to authenticated`; para `anon` não existe policy
 -- alguma, e sem policy a RLS nega por padrão.
@@ -166,18 +315,13 @@ $anon$;
 
 
 -- ---------------------------------------------------------------------------
--- 4. USER_ROLES — sem escrita, sem autoelevação.
+-- 5. USER_ROLES — sem escrita, sem autoelevação.
 -- ---------------------------------------------------------------------------
--- O bloqueio aqui é da RLS, não do GRANT. Medido no banco em 06/09/2026:
--- `authenticated` tem INSERT, UPDATE e DELETE em user_roles, herdados do
--- `GRANT ALL` das default privileges do Supabase — o GRANT explícito da
--- 20260903173204 concede só `select`, mas soma-se ao default em vez de
--- substituí-lo. Quem barra é a policy: só existe `user_roles_select_own`.
---
--- Daí duas semânticas diferentes, e é por isso que os testes abaixo não são
--- simétricos: o INSERT viola o WITH CHECK e levanta 42501; o UPDATE e o DELETE
--- não têm policy, o USING não casa nenhuma linha, e o comando termina afetando
--- zero linhas **sem erro nenhum**.
+-- O schema atual concede somente SELECT em `user_roles` para `authenticated`,
+-- então INSERT/UPDATE/DELETE são normalmente recusados pelo GRANT com 42501.
+-- O teste também aceita o comportamento seguro de uma configuração futura em
+-- que exista o privilégio de tabela, mas a RLS filtre UPDATE/DELETE para zero
+-- linhas. Em ambos os casos, qualquer modificação efetiva é uma falha.
 
 do $papeis$
 declare
@@ -201,13 +345,35 @@ begin
   end;
   if not _bloqueou then raise exception 'AUTOELEVAÇÃO: conseguiu se conceder admin'; end if;
 
-  update public.user_roles set user_id = '22222222-2222-4222-8222-222222222222';
-  get diagnostics _afetadas = row_count;
-  if _afetadas <> 0 then raise exception 'USER_ROLES UPDATE: afetou % linhas', _afetadas; end if;
+  _bloqueou := false;
+  _afetadas := 0;
+  begin
+    update public.user_roles set user_id = '22222222-2222-4222-8222-222222222222';
+    get diagnostics _afetadas = row_count;
+  exception when insufficient_privilege then
+    _bloqueou := true;
+    raise notice 'USER_ROLES UPDATE: PASS (bloqueado por privilégio de tabela, SQLSTATE 42501)';
+  end;
+  if not _bloqueou and _afetadas <> 0 then
+    raise exception 'USER_ROLES UPDATE: modificou % linhas', _afetadas;
+  elsif not _bloqueou then
+    raise notice 'USER_ROLES UPDATE: PASS (RLS filtrou o comando para zero linhas)';
+  end if;
 
-  delete from public.user_roles;
-  get diagnostics _afetadas = row_count;
-  if _afetadas <> 0 then raise exception 'USER_ROLES DELETE: afetou % linhas', _afetadas; end if;
+  _bloqueou := false;
+  _afetadas := 0;
+  begin
+    delete from public.user_roles;
+    get diagnostics _afetadas = row_count;
+  exception when insufficient_privilege then
+    _bloqueou := true;
+    raise notice 'USER_ROLES DELETE: PASS (bloqueado por privilégio de tabela, SQLSTATE 42501)';
+  end;
+  if not _bloqueou and _afetadas <> 0 then
+    raise exception 'USER_ROLES DELETE: modificou % linhas', _afetadas;
+  elsif not _bloqueou then
+    raise notice 'USER_ROLES DELETE: PASS (RLS filtrou o comando para zero linhas)';
+  end if;
 
   raise notice 'USER_ROLES: PASS (sem insert, update, delete ou autoelevação)';
 end
@@ -215,7 +381,7 @@ $papeis$;
 
 
 -- ---------------------------------------------------------------------------
--- 5. FINANCEIRO — quem não é autorizado não mexe em valor nem em vínculo.
+-- 6. FINANCEIRO — quem não é autorizado não mexe em valor nem em vínculo.
 -- ---------------------------------------------------------------------------
 
 do $financeiro$
@@ -251,7 +417,7 @@ $financeiro$;
 
 
 -- ---------------------------------------------------------------------------
--- 6. gerar_fatura — continua admin-only.
+-- 7. gerar_fatura — continua admin-only.
 -- ---------------------------------------------------------------------------
 -- A função é SECURITY DEFINER: roda acima da RLS, então a autorização tem de
 -- ser explícita dentro dela. O teste confere que ela recusa quem não é admin.
@@ -285,7 +451,7 @@ $fatura$;
 
 
 -- ---------------------------------------------------------------------------
--- 7. SEC-011 e SEC-009 — privilégios depois da migration 007.
+-- 8. Event trigger de RLS e privilégios endurecidos.
 -- ---------------------------------------------------------------------------
 -- Roda como `postgres`, porque é leitura de catálogo, não teste de RLS.
 
@@ -296,10 +462,27 @@ declare
 begin
   execute 'reset role';
 
+  execute 'create table public.rls_auto_enable_probe (id integer)';
+  if not (
+    select c.relrowsecurity
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relname = 'rls_auto_enable_probe'
+  ) then
+    raise exception 'RLS AUTO: tabela nova em public nasceu sem RLS';
+  end if;
+  execute 'drop table public.rls_auto_enable_probe';
+
   for _acl in
     select coalesce(array_to_string(p.proacl, ' ~ '), 'NULO')
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and p.proname in ('is_staff', 'update_updated_at_column')
+     where n.nspname = 'public'
+       and p.proname in (
+         'is_staff',
+         'update_updated_at_column',
+         'rls_auto_enable',
+         'protect_timesheet_invoice_link'
+       )
   loop
     if _acl = 'NULO' then
       raise exception 'SEC-011: ACL nula significa EXECUTE para PUBLIC';
@@ -321,7 +504,7 @@ begin
     raise exception 'SEC-009: ainda existem % grants de TRUNCATE para anon/authenticated', _n;
   end if;
 
-  raise notice 'SEC-011 e SEC-009: PASS (sem EXECUTE para PUBLIC/anon, sem TRUNCATE para anon/authenticated)';
+  raise notice 'RLS AUTO, SEC-011 e SEC-009: PASS';
 end
 $grants$;
 

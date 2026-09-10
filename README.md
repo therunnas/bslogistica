@@ -68,7 +68,8 @@ build usa o script `build`. As duas variáveis precisam existir no ambiente — 
 elas o build falha na pré-renderização, de propósito, em vez de publicar uma
 aplicação quebrada.
 
-O site institucional (`bslogistica.com.br`) é outro projeto e outro repositório.
+O site institucional (`bslogisticas.com.br`) é outro projeto e outro repositório.
+Este painel responde em `admin.bslogisticas.com.br`.
 
 ## Documentação
 
