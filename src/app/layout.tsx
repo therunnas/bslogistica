@@ -6,8 +6,8 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: {
-    default: "BS Logística",
-    template: "%s | BS Logística",
+    default: "BS Soluções Logísticas",
+    template: "%s | BS Soluções Logísticas",
   },
   description: "Painel interno de gestão operacional e financeira de mão de obra terceirizada.",
   // Sistema interno: fora do índice dos buscadores.

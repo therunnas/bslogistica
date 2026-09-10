@@ -58,5 +58,10 @@ export const config = {
   // Sem excluí-la, cada evento enviado ao Sentry dispararia uma validação de
   // token contra o Supabase — e uma futura guarda de rota aqui bloquearia o
   // relato de erros do cliente sem aviso.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|monitoring).*)"],
+  // branding guarda a logo pública. Ela é buscada por quem não tem sessão —
+  // a tela de login e o proxy de imagens do Gmail, a cada abertura do e-mail
+  // de autenticação — e cada busca gastaria uma validação de token à toa.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|monitoring|branding).*)",
+  ],
 };

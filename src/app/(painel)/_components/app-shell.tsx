@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,10 +55,20 @@ export function AppShell({ children, email }: { children: ReactNode; email: stri
         )}
       >
         <div className="flex h-16 items-center gap-2 border-b border-border px-5">
-          <div className="grid size-8 place-items-center rounded-md bg-primary font-display text-sm font-bold text-primary-foreground">
-            BS
-          </div>
-          <span className="font-display text-base font-semibold">BS Logística</span>
+          {/* Logo provisória do MVP. `alt` vazio de propósito: o nome já está
+              no texto ao lado, e repeti-lo faria o leitor de tela anunciar a
+              marca duas vezes. */}
+          <Image
+            src="/branding/bs-logo-temp.png"
+            alt=""
+            width={1000}
+            height={625}
+            priority
+            className="h-7 w-auto shrink-0"
+          />
+          <span className="truncate font-display text-sm font-semibold">
+            BS Soluções Logísticas
+          </span>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {nav.map(({ href, label, icon: Icon }) => (
@@ -98,7 +109,16 @@ export function AppShell({ children, email }: { children: ReactNode; email: stri
           <Button variant="outline" size="icon" onClick={() => setAberto((v) => !v)}>
             <Menu className="size-4" />
           </Button>
-          <span className="font-display font-semibold">BS Logística</span>
+          <Image
+            src="/branding/bs-logo-temp.png"
+            alt=""
+            width={1000}
+            height={625}
+            className="h-7 w-auto shrink-0"
+          />
+          <span className="truncate font-display text-sm font-semibold">
+            BS Soluções Logísticas
+          </span>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
       </div>
