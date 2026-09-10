@@ -1,11 +1,13 @@
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import type { Database } from "@/integrations/supabase/types";
+import { decidirSituacaoMfa } from "@/lib/mfa";
 
 export type Papel = Database["public"]["Enums"]["app_role"];
 
 export type Acesso =
   | { situacao: "sem-sessao" }
   | { situacao: "sem-papel"; email: string }
+  | { situacao: "mfa-indisponivel"; email: string; papeis: Papel[] }
   | { situacao: "mfa-ausente"; email: string; papeis: Papel[] }
   | { situacao: "mfa-pendente"; email: string; papeis: Papel[] }
   | { situacao: "liberado"; email: string; papeis: Papel[] };
@@ -48,24 +50,16 @@ export async function lerAcesso(): Promise<Acesso> {
    * filtrados por `status === 'verified'` — dado que vem do servidor, não do
    * cookie. `currentLevel` sai da claim `aal` do mesmo token já validado.
    *
-   * Três situações:
-   *
-   * - `nextLevel` diferente de aal2 -> a conta não tem nenhum fator verificado
-   *   e precisa cadastrar o primeiro;
-   * - `nextLevel` aal2 com `currentLevel` abaixo disso -> tem fator, mas a
-   *   sessão parou na senha e falta o código;
-   * - ambos em aal2 -> entrou com os dois fatores.
-   *
-   * Erro ao consultar cai no mesmo caminho de quem não tem fator: manda para
-   * /mfa em vez de liberar o painel. Falhar fechado, e sem trancar ninguém
-   * para fora — a tela de cadastro continua alcançável.
+   * A tradução do resultado está em `decidirSituacaoMfa`, testável à parte. As
+   * quatro saídas: falha na consulta, sem fator, com fator mas sessão em aal1,
+   * e tudo em aal2. Só a última abre o painel.
    */
   const { data: nivel, error: erroNivel } =
     await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
-  if (erroNivel || !nivel) return { situacao: "mfa-ausente", email, papeis };
-  if (nivel.nextLevel !== "aal2") return { situacao: "mfa-ausente", email, papeis };
-  if (nivel.currentLevel !== "aal2") return { situacao: "mfa-pendente", email, papeis };
+  const situacao = decidirSituacaoMfa(nivel, Boolean(erroNivel));
 
-  return { situacao: "liberado", email, papeis };
+  return situacao === "liberado"
+    ? { situacao: "liberado", email, papeis }
+    : { situacao, email, papeis };
 }

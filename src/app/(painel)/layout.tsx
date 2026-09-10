@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { lerAcesso } from "./_autorizacao";
 import { AppShell } from "./_components/app-shell";
 import { AcessoNaoLiberado } from "./_components/acesso-nao-liberado";
+import { VerificacaoIndisponivel } from "./_components/verificacao-indisponivel";
 
 /**
  * Layout das rotas protegidas.
@@ -21,6 +22,11 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
 
   if (acesso.situacao === "sem-sessao") redirect("/login");
   if (acesso.situacao === "sem-papel") return <AcessoNaoLiberado email={acesso.email} />;
+
+  // Falha ao consultar o nível não é ausência de fator: manda para a tela de
+  // "tente novamente", nunca para o cadastro. Fecha o painel de qualquer forma.
+  if (acesso.situacao === "mfa-indisponivel")
+    return <VerificacaoIndisponivel email={acesso.email} />;
 
   // Cadastrar o primeiro fator e responder ao desafio acontecem na mesma tela,
   // que fica fora deste layout justamente para não ser barrada por ele.

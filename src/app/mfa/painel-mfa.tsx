@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, ShieldCheck } from "lucide-react";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { decidirFluxoMfa } from "@/lib/mfa";
 import { toast } from "@/lib/notificacoes";
 import { sair } from "@/app/(painel)/_acoes";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,11 @@ export function PainelMfa({
   const [enviando, setEnviando] = useState(false);
   const [falha, setFalha] = useState("");
   const [copiado, setCopiado] = useState(false);
+  // A etapa vinda do guard é ponto de partida, não veredito: se a conta já tem
+  // fator verificado, o fluxo vira desafio mesmo que o guard tenha dito o
+  // contrário. Sem isto, um erro transitório na consulta de nível levava a um
+  // enroll sobre conta que já tem fator — recusado pelo GoTrue, tela travada.
+  const [modo, setModo] = useState<"mfa-ausente" | "mfa-pendente">(etapa);
 
   // enroll cria um fator a cada chamada. Sem esta trava, um segundo render em
   // desenvolvimento (StrictMode) deixaria fatores órfãos na conta.
@@ -80,22 +86,27 @@ export function PainelMfa({
       return;
     }
 
-    if (etapa === "mfa-pendente") {
-      // listFactors devolve em `totp` apenas os fatores já verificados.
-      const verificado = fatores.totp[0];
-      if (!verificado) {
-        setFalha("Nenhum fator verificado encontrado. Recarregue a página.");
-        setPreparando(false);
-        return;
-      }
-      setIdDoFator(verificado.id);
+    // listFactors devolve em `totp` apenas os fatores já verificados.
+    const verificado = fatores.totp[0];
+    const fluxo = decidirFluxoMfa(Boolean(verificado), etapa);
+
+    if (fluxo === "desafio") {
+      setIdDoFator(verificado!.id);
+      setModo("mfa-pendente");
+      setPreparando(false);
+      return;
+    }
+
+    if (fluxo === "sem-fator-esperado") {
+      setFalha("Nenhum fator verificado encontrado. Recarregue a página.");
       setPreparando(false);
       return;
     }
 
     // Cadastro. Tentativas anteriores que não chegaram a ser confirmadas ficam
     // como fatores não verificados e impedem reusar o mesmo nome — some com
-    // elas antes de criar o novo.
+    // elas antes de criar o novo. Fator verificado nunca é removido: o ramo
+    // acima já teria desviado para o desafio.
     const pendentes = fatores.all.filter(
       (fator) => fator.factor_type === "totp" && fator.status === "unverified",
     );
@@ -154,7 +165,7 @@ export function PainelMfa({
       return;
     }
 
-    toast.success(etapa === "mfa-ausente" ? "Segundo fator ativado." : "Acesso confirmado.");
+    toast.success(modo === "mfa-ausente" ? "Segundo fator ativado." : "Acesso confirmado.");
 
     // A sessão subiu para AAL2 e o servidor precisa reavaliá-la antes da
     // navegação, senão o layout do painel ainda enxergaria o estado anterior e
@@ -163,7 +174,7 @@ export function PainelMfa({
     router.replace("/dashboard");
   }
 
-  const cadastrando = etapa === "mfa-ausente";
+  const cadastrando = modo === "mfa-ausente";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-12">
