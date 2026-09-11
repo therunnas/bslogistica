@@ -62,6 +62,28 @@ export const BUSCA_SENHA_REDEFINIDA = "?senha-redefinida=1";
 export const ROTA_LOGIN_SENHA_REDEFINIDA = "/login?senha-redefinida=1";
 
 /**
+ * Nome do parâmetro que marca o desfecho parcial da redefinição.
+ *
+ * Lido em dois lugares do login: para escolher a mensagem do card e para
+ * suspender o redirecionamento automático de quem já tem sessão.
+ */
+export const PARAM_SESSOES_ATIVAS = "sessoes-ativas";
+
+/**
+ * Destino do desfecho parcial: senha trocada, sessões não encerradas.
+ *
+ * Separado do sucesso normal de propósito. Carrega `senha-redefinida=1`, porque
+ * a senha realmente mudou, e acrescenta `sessoes-ativas=1`, que é o que muda a
+ * mensagem e impede o auto-redirect para o painel — sem isso, a sessão residual
+ * que sobreviveu ao `signOut` mandaria o usuário direto ao /dashboard, e ele
+ * nunca leria o aviso nem entraria com a senha nova.
+ *
+ * Literal pelo mesmo motivo das outras rotas com query: concatenar perderia a
+ * checagem do `typedRoutes`.
+ */
+export const ROTA_LOGIN_SESSOES_ATIVAS = "/login?senha-redefinida=1&sessoes-ativas=1";
+
+/**
  * Retorno de link inválido, já montado.
  *
  * Literal pelo mesmo motivo de `ROTA_LOGIN_SENHA_REDEFINIDA`: concatenar
@@ -115,9 +137,12 @@ export const MENSAGEM_SENHA_REPETIDA = "A nova senha precisa ser diferente da se
  * a senha" seria mentira num caminho em que o `updateUser` já teve sucesso — e
  * mandaria o usuário tentar de novo com a mesma senha, recebendo
  * `same_password` sem entender por quê.
+ *
+ * Aparece no card do login, e não em toast: um toast some em segundos e deixava
+ * o usuário sem explicação nem saída, que foi o achado da rodada anterior.
  */
 export const MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS =
-  "Sua senha foi alterada. Não foi possível encerrar todas as sessões abertas agora — entre novamente com a nova senha.";
+  "Senha alterada com sucesso. Não foi possível encerrar todas as sessões abertas. Entre novamente com sua nova senha.";
 
 export const MENSAGEM_FALHA_AO_TROCAR =
   "Não foi possível redefinir a senha agora. Solicite um novo link e tente novamente.";

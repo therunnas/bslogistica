@@ -8,22 +8,23 @@ import { NOME_DO_COOKIE_DE_PROVA, validarProvaDeRecuperacao } from "@/lib/prova-
 import {
   MENSAGEM_FALHA_AO_TROCAR,
   MENSAGEM_RECUPERACAO_INVALIDA,
-  MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
   ROTA_LOGIN_SENHA_REDEFINIDA,
+  ROTA_LOGIN_SESSOES_ATIVAS,
   ROTA_REDEFINIR_SENHA,
   decidirTrocaDeSenha,
   traduzirErroDeSenha,
   validarNovaSenha,
 } from "@/lib/recuperacao-senha";
 
-export type EstadoDaTroca =
-  | { situacao: "erro"; mensagem: string }
-  /**
-   * A senha FOI alterada, mas a revogação global das sessões falhou. Situação
-   * própria porque não é erro: tratar como erro faria a tela mentir sobre o
-   * que aconteceu e convidaria a uma segunda tentativa inútil.
-   */
-  | { situacao: "senha-alterada-sessoes-ativas"; mensagem: string };
+/**
+ * Só o erro volta para o formulário.
+ *
+ * O desfecho parcial — senha trocada, sessões não encerradas — não é erro e
+ * também não volta: ele redireciona para o login com aviso próprio. Represente
+ * isso como estado faria o formulário continuar montado depois de a senha já
+ * ter mudado, que é o beco sem saída apontado em revisão.
+ */
+export type EstadoDaTroca = { situacao: "erro"; mensagem: string };
 
 /**
  * Troca de senha, no servidor.
@@ -150,10 +151,18 @@ export async function redefinirSenha(entrada: {
 
     apagarProva();
 
-    return {
-      situacao: "senha-alterada-sessoes-ativas",
-      mensagem: MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
-    };
+    /**
+     * Sai desta tela, em vez de devolver estado para o formulário.
+     *
+     * Devolver estado deixava o usuário preso: a senha já mudou, então o
+     * formulário não serve mais para nada, e um F5 aqui cairia em
+     * /esqueci-senha — porque a prova acabou de ser apagada — dizendo "link
+     * inválido" a quem tinha acabado de ter sucesso.
+     *
+     * O destino é próprio, e não o sucesso normal: `sessoes-ativas=1` troca a
+     * mensagem do login e impede o auto-redirect para o painel.
+     */
+    redirect(ROTA_LOGIN_SESSOES_ATIVAS);
   }
 
   apagarProva();

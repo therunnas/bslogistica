@@ -50,18 +50,12 @@ export function FormularioNovaSenha() {
     // devolve estado — só o caminho de erro chega de volta aqui.
     const estado = await redefinirSenha({ senha, confirmacao });
 
+    // Só o erro volta para cá. Os dois desfechos em que a senha muda — com ou
+    // sem as demais sessões encerradas — redirecionam para o login, então este
+    // formulário nunca fica montado depois de a senha já ter mudado.
     if (estado?.situacao === "erro") {
       toast.error(estado.mensagem);
       setEnviando(false);
-      return;
-    }
-
-    // A senha mudou, mas o servidor não conseguiu encerrar as demais sessões.
-    // Aviso, não erro — e o botão continua desabilitado de propósito: uma
-    // segunda tentativa com a mesma senha só traria `same_password`, e a senha
-    // que o usuário queria já está valendo.
-    if (estado?.situacao === "senha-alterada-sessoes-ativas") {
-      toast.warning(estado.mensagem);
     }
   }
 

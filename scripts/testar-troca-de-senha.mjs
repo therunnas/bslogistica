@@ -27,6 +27,8 @@ import {
 import {
   MENSAGEM_RECUPERACAO_INVALIDA,
   MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
+  ROTA_LOGIN_SENHA_REDEFINIDA,
+  ROTA_LOGIN_SESSOES_ATIVAS,
   decidirTrocaDeSenha,
   validarNovaSenha,
 } from "../src/lib/recuperacao-senha.ts";
@@ -343,24 +345,33 @@ verificar(
   "false",
 );
 
-// 5. A mensagem diz a verdade.
+// 4. O desfecho parcial tem destino próprio, separado do sucesso normal.
+//
+// Antes ele voltava como estado para o formulário. Isso prendia o usuário: a
+// senha já tinha mudado, o formulário não servia mais para nada e um F5 caía em
+// /esqueci-senha, porque a prova acabara de ser apagada. Agora sai da tela.
 verificar(
-  "L5. o desfecho parcial tem situação própria",
-  String(acaoSemComentarios.includes('situacao: "senha-alterada-sessoes-ativas"')),
-  "true",
-);
-verificar(
-  "L5b. não reusa a mensagem genérica de falha nesse ramo",
+  "L5. o ramo de falha redireciona para o destino de sessões ativas",
   String(
     acaoSemComentarios
       .slice(pRamoDeFalha, pRedirectFinal)
-      .includes("MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS"),
+      .includes("redirect(ROTA_LOGIN_SESSOES_ATIVAS)"),
   ),
   "true",
 );
 verificar(
+  "L5b. o destino parcial é diferente do sucesso normal",
+  String(ROTA_LOGIN_SESSOES_ATIVAS !== ROTA_LOGIN_SENHA_REDEFINIDA),
+  "true",
+);
+verificar(
+  "L5b2. o destino parcial carrega os dois parâmetros",
+  ROTA_LOGIN_SESSOES_ATIVAS,
+  "/login?senha-redefinida=1&sessoes-ativas=1",
+);
+verificar(
   "L5c. a mensagem afirma que a senha foi alterada",
-  String(/senha foi alterada/i.test(MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS)),
+  String(/senha alterada/i.test(MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS)),
   "true",
 );
 verificar(
@@ -370,28 +381,48 @@ verificar(
 );
 verificar(
   "L5e. a mensagem NÃO diz que a redefinição falhou",
-  String(/não foi possível redefinir/i.test(MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS)),
+  String(/não foi possível redefinir|falh/i.test(MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS)),
+  "false",
+);
+
+// 9 e 10. O formulário não sobrevive à troca de senha.
+const clienteSemComentarios = cliente.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+verificar(
+  "L5f. o cliente não tem mais ramo de desfecho parcial (o redirect resolve)",
+  String(/senha-alterada-sessoes-ativas/.test(clienteSemComentarios)),
   "false",
 );
 verificar(
-  "L5f. o cliente trata o desfecho parcial como aviso, não como erro",
-  String(
-    /senha-alterada-sessoes-ativas[\s\S]{0,200}?toast\.warning/.test(
-      cliente.replace(/\/\/.*$/gm, ""),
-    ),
-  ),
+  "L5g. o cliente só reabilita o botão no caminho de erro",
+  String((clienteSemComentarios.match(/setEnviando\(false\)/g) || []).length),
+  "1",
+);
+verificar(
+  "L5h. a reabilitação está no ramo de erro",
+  String(/situacao === "erro"[\s\S]{0,120}?setEnviando\(false\)/.test(clienteSemComentarios)),
+  "true",
+);
+verificar(
+  "L5i. o envio é bloqueado enquanto uma submissão está em curso",
+  String(/if \(enviando\) return/.test(clienteSemComentarios)),
   "true",
 );
 
-// 6. Falha na revogação global não redireciona como sucesso normal.
+// 6. Os dois desfechos de senha alterada saem da tela; nenhum deles volta
+//    estado para um formulário que não serve mais.
 verificar(
-  "L6. o ramo de falha retorna estado em vez de redirecionar",
+  "L6. o ramo de falha não devolve estado ao formulário",
   String(acaoSemComentarios.slice(pRamoDeFalha, pRedirectFinal).includes("return {")),
-  "true",
+  "false",
 );
 verificar(
-  "L6b. há apenas um redirect de sucesso na action",
+  "L6b. há apenas um redirect de sucesso normal na action",
   String((acaoSemComentarios.match(/redirect\(ROTA_LOGIN_SENHA_REDEFINIDA\)/g) || []).length),
+  "1",
+);
+verificar(
+  "L6c. há apenas um redirect de desfecho parcial na action",
+  String((acaoSemComentarios.match(/redirect\(ROTA_LOGIN_SESSOES_ATIVAS\)/g) || []).length),
   "1",
 );
 
@@ -413,6 +444,86 @@ verificar(
   "L7b. a falha do updateUser não apaga a prova nem encerra sessão",
   String(/apagarProva\(\);|signOut/.test(blocoErroUpdate)),
   "false",
+);
+
+console.log("\nM. Login no desfecho parcial\n");
+
+// O login redireciona para /dashboard quem já tem sessão. No desfecho parcial
+// isso seria o pior comportamento possível: a sessão que sobreviveu ao signOut
+// é justamente o problema, e mandar o usuário ao painel o faria pular o aviso e
+// seguir com a sessão antiga, sem nunca usar a senha nova.
+const login = readFileSync(new URL("../src/app/login/page.tsx", import.meta.url), "utf8");
+const loginSemComentarios = login
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+  .split("\n")
+  .filter((l) => !l.trimStart().startsWith("//"))
+  .join("\n");
+
+// 5 e 6. Mensagem persistente no card, não toast.
+verificar(
+  "M1. o login escolhe a mensagem pelo parâmetro de sessões ativas",
+  String(loginSemComentarios.includes("MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS")),
+  "true",
+);
+verificar(
+  "M2. a mensagem parcial é renderizada, não exibida por toast",
+  String(
+    /\{sessoesAtivas \? MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS : MENSAGEM_SENHA_REDEFINIDA\}/.test(
+      loginSemComentarios,
+    ),
+  ),
+  "true",
+);
+verificar(
+  "M2b. o aviso do login não usa toast",
+  String(/toast\.(warning|info|success)\(/.test(loginSemComentarios)),
+  "false",
+);
+verificar(
+  "M2c. o aviso é anunciado como status acessível",
+  String(/role="status"/.test(loginSemComentarios)),
+  "true",
+);
+
+// 7. Sem auto-redirect nesse status.
+verificar(
+  "M3. o efeito lê o parâmetro de sessões ativas",
+  String(loginSemComentarios.includes("PARAM_SESSOES_ATIVAS")),
+  "true",
+);
+verificar(
+  "M4. o efeito sai antes de consultar a sessão quando há sessões ativas",
+  String(
+    loginSemComentarios.indexOf("if (sessoesAtivas) return;") <
+      loginSemComentarios.indexOf("auth.getUser()"),
+  ),
+  "true",
+);
+verificar(
+  "M4b. a guarda vem antes de instanciar o cliente do navegador",
+  String(
+    loginSemComentarios.indexOf("if (sessoesAtivas) return;") <
+      loginSemComentarios.indexOf("criarClienteNavegador()"),
+  ),
+  "true",
+);
+
+// 8. O comportamento normal continua intacto.
+verificar(
+  "M5. fora desse status o login segue redirecionando quem tem sessão",
+  String(/if \(data\.user\) router\.replace\("\/dashboard"\)/.test(loginSemComentarios)),
+  "true",
+);
+verificar(
+  "M5b. o login continua com um único auto-redirect para o painel",
+  String((loginSemComentarios.match(/router\.replace\("\/dashboard"\)/g) || []).length),
+  "2", // o do efeito e o do submit bem-sucedido
+);
+verificar(
+  "M6. o parâmetro é lido do location, sem exigir Suspense no componente",
+  String(/new URLSearchParams\(window\.location\.search\)/.test(loginSemComentarios)),
+  "true",
 );
 
 console.log(`\n${passou} passaram, ${falhas.length} falharam\n`);
