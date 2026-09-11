@@ -4,21 +4,25 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 ## 1. Checkpoint
 
-| Item           | Valor                                                |
-| -------------- | ---------------------------------------------------- |
-| Data/hora      | 2026-09-11                                           |
-| Branch atual   | `security/enforce-aal2-rls`                          |
-| Base da branch | `main` em `a8ae03c9f51e925dcd6f79c7d55c3a0c384501b6` |
-| `origin/main`  | `a8ae03c` — idêntico ao `main` local                 |
+| Item          | Valor                                      |
+| ------------- | ------------------------------------------ |
+| Data/hora     | 2026-09-11                                 |
+| Branch atual  | `docs/progress-aal2-production`            |
+| `main`        | `359dd905bf47ad213968e0f50e0ea198db93866f` |
+| `origin/main` | `359dd90` — idêntico ao `main` local       |
 
-Há **duas frentes abertas ao mesmo tempo**, e a ordem entre elas importa:
+**O enforcement AAL2 está concluído: mergeado, aplicado em Production e
+validado ponta a ponta.** Detalhe na seção 5.
 
-| Frente            | Branch                      | Estado                                     |
-| ----------------- | --------------------------- | ------------------------------------------ |
-| Password recovery | `feat/password-recovery`    | PR #13 aberto, **congelado**, não mergeado |
-| Enforcement AAL2  | `security/enforce-aal2-rls` | validado local, **sem commit até agora**   |
+Resta uma frente aberta:
 
-**O AAL2 é mergeado primeiro.** Ver seção 8.
+| Frente            | Branch                    | Estado                          |
+| ----------------- | ------------------------- | ------------------------------- |
+| Password recovery | `feat/password-recovery`  | PR #13 aberto, **não mergeado** |
+| Enforcement AAL2  | — (mergeado em `359dd90`) | **CONCLUÍDO** — PR #14          |
+
+O PR #13 deixou de estar congelado: a condição que o bloqueava — AAL2 valendo
+no banco — foi cumprida. Ver seção 8.
 
 ## 2. Ambiente
 
@@ -101,17 +105,18 @@ apontando para
 `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
 Colar antes do deploy deixa o link em 404.
 
-## 5. AAL2 / RLS — trabalho atual
+## 5. AAL2 / RLS — CONCLUÍDO
 
-**Branch:** `security/enforce-aal2-rls`
-**Base:** `main` em `a8ae03c9f51e925dcd6f79c7d55c3a0c384501b6`
+**PR #14 mergeado** em 2026-09-11.
+**Merge commit:** `359dd905bf47ad213968e0f50e0ea198db93866f`
 
-**Migration:** `supabase/migrations/20260911140000_009_enforce_aal2.sql`
+**Migration:** `supabase/migrations/20260911140000_009_enforce_aal2.sql` —
+**aplicada em Production**.
 
-**Objetivo — P1:** MFA anteriormente aplicado somente na camada da aplicação.
+**Objetivo — P1 (resolvido):** MFA era aplicado somente na camada da aplicação.
 Sessão AAL1 com papel válido conseguia acessar dados diretamente via
 Supabase/PostgREST/RPC. O guard do Next exigia AAL2 para a tela; as policies
-olhavam só papel.
+olhavam só papel. Agora o banco também exige o segundo fator.
 
 **11 tabelas protegidas por policy RESTRICTIVE AAL2:**
 
@@ -211,6 +216,77 @@ de que acrescentar `aal2` aos claims não criou falso positivo.
 **App:** `test:mfa` 13/13 · lint 0 erros, apenas warning preexistente ·
 TypeScript PASS · build PASS · `git diff --check` PASS.
 
+### Aplicação em Production — 2026-09-11
+
+Aplicada com o procedimento oficial do projeto, CLI **2.117.0** (a mesma versão
+já validada), prefixada com `env -u SUPABASE_ACCESS_TOKEN` e precedida de
+`--dry-run` para conferir o anúncio antes de confirmar.
+
+O binário `supabase` **não existe no PATH deste ambiente** — nem no Bash, nem no
+PowerShell, nem em `node_modules`, nem instalado globalmente. Está no cache do
+`npx`, e foi usado por caminho absoluto, de propósito, para impedir que o `npx`
+resolvesse uma versão diferente durante operação em Production:
+
+```
+C:\Users\VINICIUS\AppData\Local\npm-cache\_npx\6f1b058a4d9555af\node_modules\@supabase\cli-windows-x64\bin\supabase.exe
+```
+
+A CLI anunciou e aplicou **somente** `20260911140000_009_enforce_aal2.sql`, com
+`seeds: []` e `roles: []`.
+
+| Verificação em Production         | Resultado                                                       |
+| --------------------------------- | --------------------------------------------------------------- |
+| Histórico de migrations           | **15 local / 15 remoto**, 0 pendentes, 0 inesperadas            |
+| Policies `*_exige_aal2`           | **11**, todas RESTRICTIVE / `ALL` / `authenticated`             |
+| `USING` e `WITH CHECK` com `aal2` | 11 e 11                                                         |
+| AAL2 em `user_roles`              | **0** — isenção deliberada preservada                           |
+| Policies permissivas antigas      | **19**, intactas (30 no total)                                  |
+| RLS                               | **12/12** tabelas                                               |
+| `md5` normalizado de `prosrc`     | `dba82abe905ee54e8cfe358cae2104cd` — idêntico ao arquivo da 009 |
+
+`gerar_fatura` instalada: `SECURITY DEFINER`, assinatura `(uuid, date, date)`,
+`RETURNS invoices`, `search_path = public, pg_temp`, owner `postgres`, checks na
+ordem `auth.uid` → `aal2` → papel, `EXECUTE` só para `authenticated` e negado
+para `anon`.
+
+Testes remotos não destrutivos, em `BEGIN … ROLLBACK`, só leitura, com claims
+simulados via `set_config` + `SET LOCAL ROLE authenticated`. Feitos sobre
+`profiles`, a única tabela protegida com dado real:
+
+| Cenário                     | Linhas | Veredito                |
+| --------------------------- | ------ | ----------------------- |
+| `aal=aal1`                  | 0      | bloqueado               |
+| claim `aal` ausente         | 0      | bloqueado (fail-closed) |
+| `aal=aal2`                  | 1      | acesso preservado       |
+| `user_roles` com `aal=aal1` | 1      | legível, sem deadlock   |
+
+`gerar_fatura` em AAL1 → **42501**, "Autenticação de dois fatores obrigatória",
+antes de qualquer efeito de negócio. Nada persistiu: as contagens das 12 tabelas
+ficaram idênticas depois dos testes.
+
+**Cuidado ao ler esses números:** testes equivalentes sobre `clients` e
+`timesheet_entries` passaram, mas são **inconclusivos** — essas tabelas estão
+vazias, e "0 linhas" não distingue bloqueio de ausência de dado. Ver seção 7.
+
+### Smoke test manual em Production — APROVADO
+
+Executado pelo usuário no navegador, em 2026-09-11:
+
+- login com senha funcionou;
+- **antes do TOTP o painel não foi liberado**;
+- TOTP funcionou;
+- após AAL2 o painel carregou normalmente;
+- módulos abriram sem erro de autorização;
+- F5 preservou a sessão;
+- nova aba preservou a sessão;
+- logout funcionou;
+- novo login voltou a exigir TOTP.
+
+`admin.bslogisticas.com.br` → HTTP 200. Vercel Production em `359dd90` →
+success.
+
+**Rollout AAL2 validado ponta a ponta.**
+
 ## 7. Achados menores registrados
 
 **P3 —** `sincronizar_chave_da_diaria` pode retornar `23503` "Folha não
@@ -223,6 +299,16 @@ encontrada" numa tentativa AAL1, antes do `WITH CHECK`. O trigger é
 no `.gitignore`. Reaparece a cada operação local. **Não alterar o
 `.gitignore` nesta etapa.**
 
+**Production está praticamente vazia de dados de negócio.** Conferido em
+2026-09-11, logo após o rollout: `profiles` = 1 e `user_roles` = 1 (o admin); as
+10 tabelas de negócio — `clients`, `contracts`, `employees`, `operations`,
+`shifts`, `operation_team`, `timesheets`, `timesheet_entries`, `invoices`,
+`invoice_items` — têm **0 linhas**. Não é defeito do AAL2 e não bloqueia nada,
+mas **limita o que qualquer teste em Production consegue provar**: num banco
+vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência de dado. Foi por
+isso que a prova do enforcement se apoiou em `profiles`. Confirmar se o estado é
+esperado antes de tirar qualquer conclusão a partir de contagens.
+
 **Pendências antigas que seguem abertas:**
 
 - mensagens cruas do SDK em `src/app/mfa/painel-mfa.tsx` (P3);
@@ -234,32 +320,25 @@ no `.gitignore`. Reaparece a cada operação local. **Não alterar o
 
 ## 8. PRÓXIMO PASSO
 
-O próximo passo após `/clear` é SOMENTE:
+O enforcement AAL2 está encerrado. O próximo passo é **atualizar o PR #13
+(password recovery) com `main`**:
 
-1. confirmar branch `security/enforce-aal2-rls`;
-2. confirmar HEAD/base;
-3. confirmar `git status`;
-4. revisar o diff final dos 3 arquivos;
-5. executar checks finais se necessário;
-6. commit: `security: enforce aal2 in database authorization`;
-7. push da branch;
-8. abrir PR para `main`;
-9. solicitar `@codex review`;
-10. aguardar CodeRabbit;
-11. **NÃO mergear**;
-12. **NÃO aplicar no Supabase Production.**
+1. atualizar `feat/password-recovery` (hoje em `7ce1a1d`) com `main` em
+   `359dd90`;
+2. resolver conflitos, se houver;
+3. reexecutar as suítes do PR #13 — `test:recuperacao`, `test:prova`,
+   `test:troca`, `test:mfa`;
+4. `npm run lint`, `npx tsc --noEmit`, `npm run build`;
+5. aguardar revisão;
+6. mergear o PR #13;
+7. **só depois do deploy das rotas**, colar o HTML do Reset Password em
+   **Authentication → Emails → Templates → Reset Password**, com o botão
+   apontando para
+   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
+   Colar antes do deploy deixa o link em 404.
 
-Depois que esse PR for revisado e aprovado:
-
-- mergear AAL2 primeiro;
-- aplicar/validar migration Production de forma controlada;
-- atualizar PR #13 com `main`;
-- checks finais;
-- só depois merge do password recovery.
-
-> Observação: os passos 6 e 7 divergem do que já aconteceu. O commit do item 6
-> **já foi criado** neste checkpoint, com essa mensagem exata. Retomar,
-> portanto, a partir do item 7 (push), depois de reconferir 1 a 5.
+Sem bloquear nada, pendente de decisão: popular Production com os dados reais de
+negócio (ver seção 7).
 
 ## 9. Não fazer
 
@@ -270,8 +349,8 @@ Depois que esse PR for revisado e aprovado:
 - Não expor `service_role`, nem colocar segredo em `NEXT_PUBLIC_*`.
 - Não conectar Preview ao banco de produção só para passar o check.
 - Não modificar DNS sem confirmação.
-- Não mergear o PR #13 antes do PR de AAL2.
-- Não aplicar a migration 009 em Production sem janela controlada.
+- Não mergear o PR #13 sem antes atualizá-lo com `main` e refazer os checks.
+- Não reaplicar a migration 009 — já está aplicada em Production (15/15).
 - Não adicionar enforcement AAL2 em `user_roles`.
 - Não tocar no site institucional.
 
