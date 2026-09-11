@@ -35,9 +35,14 @@ src/app/(painel)/          área protegida — 7 telas
   layout.tsx               guard de acesso (sessão → papel → MFA)
   _autorizacao.ts          decisão de acesso, no servidor
 src/app/login/ mfa/        fora do guard, de propósito
+src/app/esqueci-senha/     recuperação de senha — também fora do guard
+  auth/confirm/            GET do link: valida e NÃO consome o token
+  auth/confirmar-recuperacao/  confirmação deliberada; consome o token
+  redefinir-senha/         troca da senha, com a prova revalidada
 src/lib/billing.ts         cálculo de diária, hora extra, custo
 src/lib/ledger.ts          consolidação apontamento → cliente
 src/lib/mfa.ts             decisões de segundo fator, funções puras
+src/lib/prova-recuperacao.ts  prova HMAC da recuperação, funções puras
 src/integrations/supabase/ clientes (browser/server), tipos do banco
 src/proxy.ts               renovação de sessão a cada requisição
 supabase/migrations/       15 arquivos (o que já foi aplicado: PROGRESS.md)
@@ -75,6 +80,14 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 - **Falha ao consultar o nível de garantia não é ausência de fator.** Erro
   transitório vai para a tela "não foi possível verificar", nunca para o
   cadastro de fator — cadastrar sobre conta que já tem fator trava a conta.
+- **Token de recuperação não se consome em GET.** O `GET /auth/confirm` valida
+  e guarda o token num cookie `httpOnly`; quem chama `verifyOtp` é a Server
+  Action disparada por um clique. Gateways de segurança de e-mail visitam cada
+  link da mensagem sozinhos, e a varredura queimava a recuperação antes do
+  usuário. Vale para qualquer link de uso único que venha a existir.
+- **Depois que a senha muda, a prova morre** — em qualquer desfecho, inclusive
+  quando o `signOut` global falha. E a tela nunca diz que a redefinição falhou
+  num caminho em que o `updateUser` teve sucesso.
 - O guard governa **o que a interface mostra**. Quem protege os dados é a RLS.
 
 ## RLS e banco

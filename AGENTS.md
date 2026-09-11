@@ -31,6 +31,12 @@ tem relação com o TanStack Router.
   repositório e outro projeto na Vercel.
 - **`proxy.ts`, não `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
   um `middleware.ts` é ignorado em silêncio e a sessão deixa de ser renovada.
+- **Token de uso único não se consome em GET.** Gateways de segurança de e-mail
+  visitam cada link da mensagem sozinhos; um GET que muda estado queima o token
+  antes do usuário. Validar no GET, consumir em ação deliberada.
+- **MFA é exigido também no banco.** 11 tabelas de negócio têm policy
+  RESTRICTIVE pedindo `aal2`; `user_roles` fica de fora de propósito, porque é
+  lida antes do MFA. Não adicionar AAL2 nela.
 
 ## Antes de entregar
 
