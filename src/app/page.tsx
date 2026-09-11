@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { BarChart3, CalendarCheck, FileText, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "BS Logística | Gestão de diárias, horas extras e faturamento",
+  title: "BS Soluções Logísticas | Gestão de diárias, horas extras e faturamento",
   description:
     "Controle operações fixas e avulsas de mão de obra terceirizada: apontamento de diárias, horas extras, custos e faturamento por cliente.",
   openGraph: {
@@ -44,12 +45,16 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div className="grid size-8 place-items-center rounded-md bg-primary font-display text-sm font-bold text-primary-foreground">
-            BS
-          </div>
-          <span className="font-display text-lg font-semibold">BS Logística</span>
-        </div>
+        {/* Logo provisória do MVP. A própria arte já traz "BS" e
+            "SOLUÇÕES LOGÍSTICAS", então não há texto ao lado. */}
+        <Image
+          src="/branding/bs-logo-temp.png"
+          alt="BS Soluções Logísticas"
+          width={1000}
+          height={625}
+          priority
+          className="h-auto w-32 shrink-0 object-contain sm:w-40"
+        />
         <Button asChild>
           <Link href="/login">Entrar</Link>
         </Button>
