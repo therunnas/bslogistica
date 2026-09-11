@@ -197,10 +197,35 @@ verificar(
   decidirRespostaDaSolicitacao({ status: 422 }),
   "generica",
 );
+// E4 foi invertido depois da revisão do PR #13 (Codex, P2). Erro sem status
+// HTTP significa que não houve resposta: offline, DNS, CORS, transporte
+// interrompido. A requisição pode nem ter chegado ao Supabase, e mostrar a
+// mensagem de "você receberá as instruções" seria mentira. Como o servidor não
+// respondeu, também não há o que vazar sobre a conta.
 verificar(
-  "E4. erro sem status -> mesma mensagem genérica",
+  "E4. erro sem status -> falha temporária (não houve resposta HTTP)",
   decidirRespostaDaSolicitacao({}),
-  "generica",
+  "falha-temporaria",
+);
+verificar(
+  "E4b. status undefined -> falha temporária",
+  decidirRespostaDaSolicitacao({ status: undefined }),
+  "falha-temporaria",
+);
+verificar(
+  "E4c. status 0 -> falha temporária (AuthRetryableFetchError)",
+  decidirRespostaDaSolicitacao({ status: 0 }),
+  "falha-temporaria",
+);
+verificar(
+  "E4d. status negativo -> falha temporária",
+  decidirRespostaDaSolicitacao({ status: -1 }),
+  "falha-temporaria",
+);
+verificar(
+  "E4e. status não-numérico -> falha temporária",
+  decidirRespostaDaSolicitacao({ status: "400" }),
+  "falha-temporaria",
 );
 verificar(
   "E5. 429 (limite de envio) -> falha temporária",
@@ -216,6 +241,17 @@ verificar(
   "E7. 503 -> falha temporária",
   decidirRespostaDaSolicitacao({ status: 503 }),
   "falha-temporaria",
+);
+// A fronteira do mascaramento: 4xx com resposta real continua genérico.
+verificar(
+  "E7b. 401 -> genérica (4xx real segue mascarado)",
+  decidirRespostaDaSolicitacao({ status: 401 }),
+  "generica",
+);
+verificar(
+  "E7c. 404 -> genérica (4xx real segue mascarado)",
+  decidirRespostaDaSolicitacao({ status: 404 }),
+  "generica",
 );
 
 // A mensagem pública não pode conter termo que denuncie a conta.

@@ -130,13 +130,27 @@ export type RespostaDaSolicitacao = "generica" | "falha-temporaria";
  * Um 400 do GoTrue (e-mail malformado, por exemplo) cai no genérico de
  * propósito: é melhor o usuário reenviar do que a tela confirmar, por
  * diferença de mensagem, que aquele endereço não serve.
+ *
+ * Erro sem status HTTP é caso à parte e NÃO entra no genérico — ver o
+ * comentário no corpo da função.
  */
 export function decidirRespostaDaSolicitacao(
   erro: { status?: number | undefined } | null | undefined,
 ): RespostaDaSolicitacao {
   if (!erro) return "generica";
+
   const status = erro.status;
-  if (typeof status === "number" && (status === 429 || status >= 500)) return "falha-temporaria";
+
+  // Sem status positivo não houve resposta HTTP: navegador offline, DNS, CORS,
+  // transporte interrompido. A requisição pode nem ter chegado ao Supabase, e
+  // dizer "você receberá as instruções" seria mentira. Como o servidor não
+  // respondeu, também não há nada a vazar sobre a conta — esta classificação
+  // não enfraquece a anti-enumeração.
+  if (typeof status !== "number" || status <= 0) return "falha-temporaria";
+
+  if (status === 429 || status >= 500) return "falha-temporaria";
+
+  // Os 4xx com resposta real continuam mascarados.
   return "generica";
 }
 
