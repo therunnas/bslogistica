@@ -31,22 +31,28 @@ Wrangler, Lovable. Foram removidos de propósito. `@tanstack/react-query`
 ## Arquitetura
 
 ```
-src/app/(painel)/          área protegida — 7 telas
-  layout.tsx               guard de acesso (sessão → papel → MFA)
-  _autorizacao.ts          decisão de acesso, no servidor
-src/app/login/ mfa/        fora do guard, de propósito
-src/app/esqueci-senha/     recuperação de senha — também fora do guard
-  auth/confirm/            GET do link: valida e NÃO consome o token
-  auth/confirmar-recuperacao/  confirmação deliberada; consome o token
-  redefinir-senha/         troca da senha, com a prova revalidada
-src/lib/billing.ts         cálculo de diária, hora extra, custo
-src/lib/ledger.ts          consolidação apontamento → cliente
-src/lib/mfa.ts             decisões de segundo fator, funções puras
-src/lib/prova-recuperacao.ts  prova HMAC da recuperação, funções puras
-src/integrations/supabase/ clientes (browser/server), tipos do banco
-src/proxy.ts               renovação de sessão a cada requisição
-supabase/migrations/       15 arquivos (o que já foi aplicado: PROGRESS.md)
-supabase/tests/            5 testes SQL de RLS e invariáveis
+src/app/(painel)/            área protegida — 7 telas
+  layout.tsx                 guard de acesso (sessão → papel → MFA)
+  _autorizacao.ts            decisão de acesso, no servidor
+
+as rotas abaixo são irmãs de (painel)/ e ficam fora do guard, de propósito:
+
+src/app/login/               entrada
+src/app/mfa/                 segundo fator
+src/app/esqueci-senha/       solicitação de recuperação
+src/app/auth/confirm/        GET do link: valida e NÃO consome o token
+src/app/auth/confirmar-recuperacao/
+                             confirmação deliberada; consome o token
+src/app/redefinir-senha/     troca da senha, com a prova revalidada
+
+src/lib/billing.ts           cálculo de diária, hora extra, custo
+src/lib/ledger.ts            consolidação apontamento → cliente
+src/lib/mfa.ts               decisões de segundo fator, funções puras
+src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
+src/integrations/supabase/   clientes (browser/server), tipos do banco
+src/proxy.ts                 renovação de sessão a cada requisição
+supabase/migrations/         15 arquivos (o que já foi aplicado: PROGRESS.md)
+supabase/tests/              5 testes SQL de RLS e invariáveis
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
