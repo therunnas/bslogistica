@@ -21,7 +21,12 @@ import {
   verificarProva,
 } from "../src/lib/prova-recuperacao.ts";
 
-import { ROTA_REDEFINIR_SENHA, decidirAcessoRedefinicao } from "../src/lib/recuperacao-senha.ts";
+import {
+  ROTA_CONFIRMAR_RECUPERACAO,
+  ROTA_REDEFINIR_SENHA,
+  VALIDADE_DO_PENDENTE_EM_SEGUNDOS,
+  decidirAcessoRedefinicao,
+} from "../src/lib/recuperacao-senha.ts";
 
 let passou = 0;
 const falhas = [];
@@ -244,56 +249,99 @@ for (const motivo of [
 console.log("\nG. Garantias estruturais\n");
 
 const { readFileSync } = await import("node:fs");
-const rota = readFileSync(new URL("../src/app/auth/confirm/route.ts", import.meta.url), "utf8");
+// O consumo do token saiu do GET e foi para a Server Action — um GET não pode
+// gastar token de uso único, porque scanners de e-mail o visitam sozinhos. As
+// garantias estruturais abaixo acompanharam o código para onde ele foi.
+const acao = readFileSync(
+  new URL("../src/app/auth/confirmar-recuperacao/actions.ts", import.meta.url),
+  "utf8",
+);
+const guardaDoLink = readFileSync(
+  new URL("../src/app/auth/confirm/route.ts", import.meta.url),
+  "utf8",
+);
+const paginaDeConfirmacao = readFileSync(
+  new URL("../src/app/auth/confirmar-recuperacao/page.tsx", import.meta.url),
+  "utf8",
+);
+
+/**
+ * Estes testes falam sobre o que o código FAZ, então precisam ler só código.
+ * Os comentários destes arquivos explicam justamente o que eles deixaram de
+ * fazer — o GET descreve por que não chama mais `verifyOtp`, a página explica
+ * que não recebe `token_hash` — e casar com esse texto reprovaria o código
+ * correto pelo motivo errado.
+ */
+function soCodigo(fonte) {
+  return fonte
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((l) => !l.trimStart().startsWith("//"))
+    .join("\n");
+}
+
+const semComentariosGuarda = soCodigo(guardaDoLink);
+const semComentariosPagina = soCodigo(paginaDeConfirmacao);
 
 // A prova só pode nascer depois do verifyOtp dar certo.
-const posVerify = rota.indexOf("verifyOtp(");
-const posFalha = rota.indexOf('if (error || !data.session) return responder("falha")');
-const posCriar = rota.indexOf("criarProvaDeRecuperacao(");
-const posCookie = rota.indexOf("resposta.cookies.set(");
+const posVerify = acao.indexOf("verifyOtp(");
+const posFalha = acao.indexOf("if (error || !data.session) falharSemSessao()");
+const posCriar = acao.indexOf("criarProvaDeRecuperacao(");
+const posCookie = acao.indexOf("armazemDeCookies.set(NOME_DO_COOKIE_DE_PROVA");
 
-verificar("G1. a rota chama verifyOtp", String(posVerify !== -1), "true");
+verificar("G1. a action chama verifyOtp", String(posVerify !== -1), "true");
 verificar(
   "G2. falha do verifyOtp corta antes de criar a prova",
   String(posFalha < posCriar),
   "true",
 );
 verificar("G3. a prova é criada depois do verifyOtp", String(posVerify < posCriar), "true");
+// Regressão que motivou a mudança: o GET não pode consumir o token.
+verificar(
+  "G3b. o GET do link NÃO chama verifyOtp",
+  String(/verifyOtp/.test(semComentariosGuarda)),
+  "false",
+);
 verificar("G4. o cookie é gravado depois da prova", String(posCriar < posCookie), "true");
-verificar("G5. cookie httpOnly", String(/httpOnly:\s*true/.test(rota)), "true");
+verificar("G5. cookie httpOnly", String(/httpOnly:\s*true/.test(acao)), "true");
 // `lax` e não `strict`: o fluxo chega de um link de e-mail, e `strict` pode
 // impedir o envio do cookie na requisição seguinte ao redirect.
-verificar("G6. cookie sameSite lax", String(/sameSite:\s*"lax"/.test(rota)), "true");
+verificar("G6. cookie sameSite lax", String(/sameSite:\s*"lax"/.test(acao)), "true");
 verificar(
   "G6b. cookie NÃO usa sameSite strict",
-  String(/sameSite:\s*"strict"/.test(rota)),
+  String(/sameSite:\s*"strict"/.test(acao)),
   "false",
 );
 // Path restrito: só a rota que lê a prova recebe o cookie.
 verificar(
   "G6c. cookie com Path da rota de redefinição",
-  String(/path:\s*ROTA_REDEFINIR_SENHA/.test(rota)),
+  String(/path:\s*ROTA_REDEFINIR_SENHA/.test(acao)),
   "true",
 );
-verificar("G6d. cookie NÃO usa path raiz", String(/path:\s*"\/"/.test(rota)), "false");
+verificar("G6d. cookie NÃO usa path raiz", String(/path:\s*"\/"/.test(acao)), "false");
 verificar("G6e. ROTA_REDEFINIR_SENHA é /redefinir-senha", ROTA_REDEFINIR_SENHA, "/redefinir-senha");
 verificar(
   "G7. cookie secure em produção",
-  String(/secure:\s*process\.env\.NODE_ENV === "production"/.test(rota)),
+  String(/secure:\s*process\.env\.NODE_ENV === "production"/.test(acao)),
   "true",
 );
 verificar(
   "G8. maxAge de 10 minutos",
-  String(/maxAge:\s*VALIDADE_DA_PROVA_EM_SEGUNDOS/.test(rota)),
+  String(/maxAge:\s*VALIDADE_DA_PROVA_EM_SEGUNDOS/.test(acao)),
   "true",
 );
 verificar("G8b. VALIDADE_DA_PROVA_EM_SEGUNDOS é 600", VALIDADE_DA_PROVA_EM_SEGUNDOS, 600);
 verificar(
   "G9. o token_hash não entra no cookie",
-  String(/cookies\.set\([^)]*token_hash/.test(rota)),
+  String(/cookies\.set\([^)]*token_hash/.test(acao)),
   "false",
 );
-verificar("G10. sem service_role na rota", String(/service_role/i.test(rota)), "false");
+verificar("G10. sem service_role na action", String(/service_role/i.test(acao)), "false");
+verificar(
+  "G10b. sem service_role no GET do link",
+  String(/service_role/i.test(semComentariosGuarda)),
+  "false",
+);
 
 const helper = readFileSync(new URL("../src/lib/prova-recuperacao.ts", import.meta.url), "utf8");
 verificar(
@@ -323,16 +371,16 @@ console.log("\nH. Limpeza de sessão nas falhas pós-verifyOtp\n");
 // O achado: depois do verifyOtp dar certo a sessão de recuperação já existe.
 // Qualquer falha posterior tem de derrubá-la antes de redirecionar, senão a
 // rota diz "link inválido" e deixa o navegador autenticado.
-const semComentariosRota = rota
+const semComentariosAcao = acao
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .split("\n")
   .filter((l) => !l.trimStart().startsWith("//"))
   .join("\n");
 
-const posVerifyOtp = semComentariosRota.indexOf("verifyOtp(");
-const posFalhaVerify = semComentariosRota.indexOf("if (error || !data.session) return responder(");
-const posHelper = semComentariosRota.indexOf("async function falharDepoisDeVerificar()");
-const posSignOutRota = semComentariosRota.indexOf("auth.signOut(");
+const posVerifyOtp = semComentariosAcao.indexOf("verifyOtp(");
+const posFalhaVerify = semComentariosAcao.indexOf("if (error || !data.session) falharSemSessao()");
+const posHelper = semComentariosAcao.indexOf("async function falharDepoisDeVerificar()");
+const posSignOutRota = semComentariosAcao.indexOf("auth.signOut(");
 
 // 1. verifyOtp falha -> sai sem limpar (não houve sessão nova confirmada).
 verificar(
@@ -342,41 +390,43 @@ verificar(
 );
 verificar(
   "H1b. o retorno dessa falha não passa pelo helper",
-  String(semComentariosRota.slice(posVerifyOtp, posHelper).includes("falharDepoisDeVerificar")),
+  String(semComentariosAcao.slice(posVerifyOtp, posHelper).includes("falharDepoisDeVerificar")),
   "false",
 );
 
 // 2 a 6. Todas as saídas posteriores passam pela limpeza.
-const chamadasDoHelper = (semComentariosRota.match(/return falharDepoisDeVerificar\(\)/g) || [])
+const chamadasDoHelper = (semComentariosAcao.match(/return falharDepoisDeVerificar\(\)/g) || [])
   .length;
 verificar("H2. há 3 saídas de falha pós-verifyOtp centralizadas", String(chamadasDoHelper), "3");
 verificar(
   "H3. claims com erro / sem usuário / sub ou sessão ausentes -> helper",
   String(
     /if \(erroClaims \|\| !user[\s\S]{0,120}?return falharDepoisDeVerificar\(\)/.test(
-      semComentariosRota,
+      semComentariosAcao,
     ),
   ),
   "true",
 );
 verificar(
   "H4. sub divergente -> helper",
-  String(/if \(sub !== user\.id\) return falharDepoisDeVerificar\(\)/.test(semComentariosRota)),
+  String(/if \(sub !== user\.id\) return falharDepoisDeVerificar\(\)/.test(semComentariosAcao)),
   "true",
 );
 verificar(
   "H5. prova não emitida (secret ausente) -> helper",
-  String(/if \(!prova\) return falharDepoisDeVerificar\(\)/.test(semComentariosRota)),
+  String(/if \(!prova\) return falharDepoisDeVerificar\(\)/.test(semComentariosAcao)),
   "true",
 );
 verificar(
   "H6. nenhuma saída de falha pós-verifyOtp escapou do helper",
-  String((semComentariosRota.slice(posHelper).match(/return responder\("falha"\)/g) || []).length),
-  "1", // apenas o `return responder("falha")` de dentro do próprio helper
+  String((semComentariosAcao.slice(posHelper).match(/falharSemSessao\(\)/g) || []).length),
+  "1", // apenas o `falharSemSessao()` de dentro do próprio helper
 );
 
 // 7. Caminho de sucesso não limpa sessão.
-const trechoSucesso = semComentariosRota.slice(semComentariosRota.indexOf("const resposta ="));
+const trechoSucesso = semComentariosAcao.slice(
+  semComentariosAcao.indexOf("armazemDeCookies.set(NOME_DO_COOKIE_DE_PROVA"),
+);
 verificar(
   "H7. caminho de sucesso não chama signOut",
   String(/signOut/.test(trechoSucesso)),
@@ -384,24 +434,27 @@ verificar(
 );
 verificar(
   "H7b. caminho de sucesso grava o cookie e redireciona",
-  String(/resposta\.cookies\.set\(/.test(trechoSucesso) && /return resposta/.test(trechoSucesso)),
+  String(
+    /armazemDeCookies\.set\(NOME_DO_COOKIE_DE_PROVA/.test(trechoSucesso) &&
+      /redirect\(ROTA_REDEFINIR_SENHA\)/.test(trechoSucesso),
+  ),
   "true",
 );
 
 // 8. Escopo local nas limpezas pós-verifyOtp.
 verificar(
   "H8. a limpeza usa scope local",
-  String(/signOut\(\{\s*scope:\s*"local"\s*\}\)/.test(semComentariosRota)),
+  String(/signOut\(\{\s*scope:\s*"local"\s*\}\)/.test(semComentariosAcao)),
   "true",
 );
 verificar(
   "H8b. há exatamente um signOut na rota",
-  String((semComentariosRota.match(/auth\.signOut\(/g) || []).length),
+  String((semComentariosAcao.match(/auth\.signOut\(/g) || []).length),
   "1",
 );
 verificar(
   "H8c. a rota não usa signOut global",
-  String(/auth\.signOut\(\)/.test(semComentariosRota)),
+  String(/auth\.signOut\(\)/.test(semComentariosAcao)),
   "false",
 );
 verificar("H8d. o signOut fica dentro do helper", String(posHelper < posSignOutRota), "true");
@@ -424,6 +477,156 @@ verificar(
 verificar(
   "H9b. a troca de senha não usa scope local",
   String(/signOut\(\{\s*scope:\s*"local"/.test(acaoTroca)),
+  "false",
+);
+
+console.log("\nI. GET não consome token (achado do scanner de e-mail)\n");
+
+// O achado: gateways de segurança de e-mail — Safe Links, Proofpoint, Mimecast
+// — fazem GET automático em cada link da mensagem. Como o token de uso único
+// era consumido nesse GET, o scanner gastava a recuperação e o clique real do
+// usuário encontrava um link inválido. Pela semântica HTTP, GET é seguro e
+// idempotente: quem estava errado era a rota.
+
+// 1 e 2. O GET não consome nem autentica.
+verificar("I1. o GET não chama verifyOtp", String(/verifyOtp/.test(semComentariosGuarda)), "false");
+verificar(
+  "I2. o GET não cria sessão nem instancia cliente do Supabase",
+  String(/criarClienteServidor|auth\./.test(semComentariosGuarda)),
+  "false",
+);
+verificar(
+  "I2b. o GET não emite prova",
+  String(/criarProvaDeRecuperacao/.test(semComentariosGuarda)),
+  "false",
+);
+
+// 3 a 8. O cookie intermediário que carrega o token até o POST.
+verificar(
+  "I3. o GET grava o cookie pendente",
+  String(/cookies\.set\(NOME_DO_COOKIE_PENDENTE/.test(semComentariosGuarda)),
+  "true",
+);
+verificar("I4. pending é httpOnly", String(/httpOnly:\s*true/.test(semComentariosGuarda)), "true");
+verificar(
+  "I5. pending é secure em produção",
+  String(/secure:\s*process\.env\.NODE_ENV === "production"/.test(semComentariosGuarda)),
+  "true",
+);
+verificar(
+  "I6. pending usa sameSite lax",
+  String(/sameSite:\s*"lax"/.test(semComentariosGuarda)),
+  "true",
+);
+verificar(
+  "I7. pending tem validade curta",
+  String(/maxAge:\s*VALIDADE_DO_PENDENTE_EM_SEGUNDOS/.test(semComentariosGuarda)),
+  "true",
+);
+verificar("I7b. VALIDADE_DO_PENDENTE_EM_SEGUNDOS é 300", VALIDADE_DO_PENDENTE_EM_SEGUNDOS, 300);
+// Path da tela de confirmação, não desta rota: pela RFC 6265 §5.1.4 um
+// `Path=/auth/confirm` NÃO seria enviado para `/auth/confirmar-recuperacao`.
+verificar(
+  "I8. pending com Path da tela de confirmação",
+  String(/path:\s*ROTA_CONFIRMAR_RECUPERACAO/.test(semComentariosGuarda)),
+  "true",
+);
+verificar(
+  "I8b. pending NÃO usa path raiz",
+  String(/path:\s*"\/"/.test(semComentariosGuarda)),
+  "false",
+);
+verificar(
+  "I8c. ROTA_CONFIRMAR_RECUPERACAO é /auth/confirmar-recuperacao",
+  ROTA_CONFIRMAR_RECUPERACAO,
+  "/auth/confirmar-recuperacao",
+);
+
+// 9. O token sai da URL já no primeiro salto.
+verificar(
+  "I9. o GET redireciona para a tela de confirmação sem query",
+  String(/redirecionar\(ROTA_CONFIRMAR_RECUPERACAO,\s*""\)/.test(semComentariosGuarda)),
+  "true",
+);
+verificar(
+  "I9b. o redirect é 303",
+  String(/NextResponse\.redirect\([^)]*,\s*303\)/.test(semComentariosGuarda)),
+  "true",
+);
+verificar(
+  "I9c. a resposta do GET não entra em cache",
+  String(/Cache-Control[\s\S]{0,20}no-store/.test(semComentariosGuarda)),
+  "true",
+);
+
+// 10. A página intermediária não vê o token.
+verificar(
+  "I10. a página de confirmação não menciona token_hash",
+  String(/token_hash/.test(semComentariosPagina)),
+  "false",
+);
+verificar(
+  "I10b. a página é Server Component (sem 'use client')",
+  String(/^\s*"use client"/m.test(paginaDeConfirmacao)),
+  "false",
+);
+verificar(
+  "I10c. a página posta para a Server Action",
+  String(/<form action=\{confirmarRecuperacao\}>/.test(paginaDeConfirmacao)),
+  "true",
+);
+
+// 11 a 14. A action lê o token só do cookie, e fixa o type.
+verificar(
+  "I11. a action lê o token do cookie pendente",
+  String(/armazemDeCookies\.get\(NOME_DO_COOKIE_PENDENTE\)/.test(semComentariosAcao)),
+  "true",
+);
+verificar(
+  "I12. a action não recebe token por FormData",
+  String(/FormData|formData|\.get\("token_hash"\)/.test(semComentariosAcao)),
+  "false",
+);
+verificar(
+  "I13. verifyOtp existe somente no passo deliberado",
+  String((semComentariosAcao.match(/verifyOtp\(/g) || []).length),
+  "1",
+);
+verificar(
+  "I14. o type é fixo no código como recovery",
+  String(/type:\s*"recovery"/.test(semComentariosAcao)),
+  "true",
+);
+
+// 15. O cookie pendente morre em qualquer desfecho.
+verificar(
+  "I15. a action apaga o cookie pendente",
+  String(/maxAge:\s*0/.test(semComentariosAcao)),
+  "true",
+);
+verificar(
+  "I15b. a limpeza do pendente acontece no sucesso e na falha",
+  String((semComentariosAcao.match(/apagarPendente\(\)/g) || []).length >= 3),
+  "true",
+);
+
+// 16. A prova continua nascendo só depois do consumo.
+verificar(
+  "I16. a prova é emitida depois do verifyOtp",
+  String(
+    semComentariosAcao.indexOf("verifyOtp(") <
+      semComentariosAcao.indexOf("criarProvaDeRecuperacao("),
+  ),
+  "true",
+);
+
+// 17. Simulação do scanner: percorrer o GET inteiro não consome nada.
+const guardaTemEfeitoDeConsumo = /verifyOtp|signOut|updateUser|criarProvaDeRecuperacao/.test(
+  semComentariosGuarda,
+);
+verificar(
+  "I17. scanner que só faz GET não consome o token",
+  String(guardaTemEfeitoDeConsumo),
   "false",
 );
 

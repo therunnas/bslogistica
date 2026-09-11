@@ -18,6 +18,35 @@ export const ROTA_REDEFINIR_SENHA = "/redefinir-senha";
 /** Rota de entrada. */
 export const ROTA_LOGIN = "/login";
 
+/**
+ * Tela intermediária que pede a confirmação deliberada antes de consumir o
+ * token de recuperação.
+ *
+ * Existe por causa de um achado de revisão: o token de uso único era consumido
+ * no próprio GET do link, então um scanner de gateway de e-mail — Safe Links,
+ * Proofpoint, Mimecast — gastava o token na varredura automática e o clique
+ * real do usuário chegava a um link já inválido. GET não pode mutar estado.
+ */
+export const ROTA_CONFIRMAR_RECUPERACAO = "/auth/confirmar-recuperacao";
+
+/**
+ * Cookie que carrega o `token_hash` entre o GET do link e a confirmação.
+ *
+ * Cookie, e não campo escondido do formulário: assim o token nunca entra no
+ * HTML da página, não fica alcançável por extensão de navegador e não aparece
+ * no `FormData`. `httpOnly` mantém o JavaScript da página fora disso.
+ */
+export const NOME_DO_COOKIE_PENDENTE = "bs_recovery_pending";
+
+/**
+ * Validade do cookie intermediário: 5 minutos.
+ *
+ * Menor que a da prova (10 min) de propósito — é só o tempo de ler uma frase e
+ * clicar em um botão. Se expirar, o link do e-mail continua válido, porque
+ * ainda não foi consumido; basta abri-lo de novo.
+ */
+export const VALIDADE_DO_PENDENTE_EM_SEGUNDOS = 300;
+
 /** Marca o retorno de um link já consumido, expirado ou adulterado. */
 export const BUSCA_LINK_INVALIDO = "?status=link-invalido";
 
@@ -31,6 +60,15 @@ export const BUSCA_SENHA_REDEFINIDA = "?senha-redefinida=1";
  * tempo de compilação, e um template string vira `string` e perde a checagem.
  */
 export const ROTA_LOGIN_SENHA_REDEFINIDA = "/login?senha-redefinida=1";
+
+/**
+ * Retorno de link inválido, já montado.
+ *
+ * Literal pelo mesmo motivo de `ROTA_LOGIN_SENHA_REDEFINIDA`: concatenar
+ * `ROTA_ESQUECI_SENHA` com `BUSCA_LINK_INVALIDO` produziria `string` e perderia
+ * a checagem de rota do `typedRoutes`.
+ */
+export const ROTA_ESQUECI_SENHA_LINK_INVALIDO = "/esqueci-senha?status=link-invalido";
 
 /**
  * Resposta pública da solicitação.
@@ -47,6 +85,16 @@ export const MENSAGEM_FALHA_GENERICA =
 
 export const MENSAGEM_LINK_INVALIDO =
   "Este link de recuperação é inválido ou expirou. Solicite um novo link.";
+
+/** Título da tela intermediária de confirmação. */
+export const TITULO_CONFIRMAR_RECUPERACAO = "Redefinir sua senha";
+
+/** Texto da tela intermediária. Não menciona conta, e-mail nem token. */
+export const MENSAGEM_CONFIRMAR_RECUPERACAO =
+  "Para continuar com a redefinição da senha, confirme abaixo.";
+
+/** Rótulo do único botão da tela intermediária. */
+export const ROTULO_CONFIRMAR_RECUPERACAO = "Continuar";
 
 export const MENSAGEM_SENHA_REDEFINIDA =
   "Senha redefinida com sucesso. Entre novamente para continuar.";

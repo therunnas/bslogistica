@@ -1,133 +1,95 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { criarClienteServidor } from "@/integrations/supabase/server";
 import {
-  NOME_DO_COOKIE_DE_PROVA,
-  VALIDADE_DA_PROVA_EM_SEGUNDOS,
-  criarProvaDeRecuperacao,
-} from "@/lib/prova-recuperacao";
-import {
-  ROTA_REDEFINIR_SENHA,
+  NOME_DO_COOKIE_PENDENTE,
+  ROTA_CONFIRMAR_RECUPERACAO,
+  VALIDADE_DO_PENDENTE_EM_SEGUNDOS,
   decidirConfirmacao,
   montarDestinoConfirmacao,
 } from "@/lib/recuperacao-senha";
 
 /**
- * Consumo do link de recuperação de senha, no servidor.
+ * Entrada do link de recuperação de senha. NÃO consome o token.
  *
- * O e-mail aponta para cá com `token_hash` e `type`. A troca do token por
- * sessão acontece aqui, e não no navegador, para que o token nunca precise
- * existir no JavaScript da página nem no fragmento da URL.
+ * POR QUE ESTA ROTA NÃO VERIFICA MAIS O TOKEN
+ *
+ * Antes, o `verifyOtp` acontecia aqui mesmo, no GET. O problema apontado em
+ * revisão: gateways de segurança de e-mail — Defender Safe Links, Proofpoint,
+ * Mimecast — fazem um GET automático em cada link da mensagem, na entrega ou
+ * na abertura. Esse GET gastava o token de uso único, e o clique real do
+ * usuário chegava a um link já consumido. A suposição dos scanners é razoável:
+ * pela semântica HTTP, GET é seguro e idempotente. Quem estava errado era a
+ * rota, ao mudar estado num GET.
+ *
+ * Agora o consumo exige ação deliberada, na Server Action de
+ * `/auth/confirmar-recuperacao`. Um scanner que só faça GET percorre esta rota
+ * inteira sem gastar nada.
+ *
+ * O QUE ESTA ROTA FAZ
+ *
+ * Valida o formato, guarda o `token_hash` num cookie `httpOnly` e manda o
+ * navegador para a tela de confirmação — por 303, e para uma URL sem query.
+ *
+ * COOKIE EM VEZ DE CAMPO ESCONDIDO
+ *
+ * O token precisa sobreviver do GET até o POST. Num `<input type="hidden">`
+ * ele entraria no HTML da página, ao alcance de extensão de navegador e de
+ * cache indevido, e voltaria no `FormData`. No cookie `httpOnly` ele fica
+ * apenas em cabeçalhos: nunca no DOM, nunca no JavaScript, nunca no corpo do
+ * formulário.
+ *
+ * O `path` do cookie é o da tela de confirmação, não o desta rota. Pela
+ * RFC 6265 §5.1.4 um `Path=/auth/confirm` NÃO seria enviado para
+ * `/auth/confirmar-recuperacao` — o prefixo só casa quando o caractere
+ * seguinte é `/`. Emitir com o path do destino é o que faz o cookie chegar à
+ * Server Action, e é o mesmo padrão já usado pelo cookie de prova.
  *
  * O que esta rota deliberadamente NÃO faz:
  *
- * - não aceita `next`, `redirect_to` nem qualquer destino vindo da query. Os
- *   dois destinos possíveis são constantes em `lib/recuperacao-senha.ts`, o
- *   que fecha a porta para open redirect;
- * - não aceita `type` diferente de `recovery`. Convite, magic link e troca de
- *   e-mail criariam sessão pelo mesmo `verifyOtp` sem que nada disso tenha
- *   sido revisado nesta etapa;
- * - não escreve o token em resposta, mensagem ou log. Nem no caminho de erro:
- *   o motivo real fica com o Supabase, e o usuário recebe sempre o mesmo texto;
- * - não coloca o `token_hash` dentro do cookie de prova.
- *
- * Este é o ÚNICO ponto do sistema onde a recuperação fica comprovada, então é
- * aqui que a prova assinada é emitida — depois do `verifyOtp` dar certo, e
- * amarrada ao `sub` e ao `session_id` lidos de claims verificados.
+ * - não chama `verifyOtp` nem cria sessão;
+ * - não cria prova HMAC — sem token consumido, não há o que provar;
+ * - não aceita `next`, `redirect_to` nem destino vindo da query. Os destinos
+ *   são constantes de `lib/recuperacao-senha.ts`, o que fecha open redirect;
+ * - não aceita `type` diferente de `recovery`;
+ * - não escreve o token em resposta, mensagem ou log.
  */
 export async function GET(request: NextRequest) {
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type");
 
-  function responder(resultado: "ok" | "falha") {
+  function redirecionar(pathname: string, search: string) {
     const destino = request.nextUrl.clone();
-    const { pathname, search } = montarDestinoConfirmacao(resultado);
     destino.pathname = pathname;
     destino.search = search;
-    return NextResponse.redirect(destino);
+
+    // 303 See Other: o destino é sempre buscado por GET, e a resposta não entra
+    // em cache intermediário.
+    const resposta = NextResponse.redirect(destino, 303);
+
+    // O redirect carrega o Set-Cookie do token pendente. Guardar isso em
+    // qualquer cache — do navegador, de proxy corporativo — entregaria o token
+    // a quem pedisse a mesma URL depois.
+    resposta.headers.set("Cache-Control", "no-store");
+
+    return resposta;
   }
 
-  if (decidirConfirmacao({ tokenHash, type }) === "recusar") return responder("falha");
-
-  const supabase = await criarClienteServidor();
-
-  // O `decidirConfirmacao` acima já garantiu que é string não vazia.
-  const { data, error } = await supabase.auth.verifyOtp({
-    type: "recovery",
-    token_hash: tokenHash as string,
-  });
-
-  // O `verifyOtp` em si falhou: nenhuma sessão nova foi criada, então não há o
-  // que limpar. Sai direto.
-  if (error || !data.session) return responder("falha");
-
-  /**
-   * Daqui para baixo a sessão de recuperação JÁ EXISTE: o `verifyOtp` gravou
-   * os cookies dela. Toda saída de falha precisa derrubá-la antes de
-   * redirecionar — senão a rota diz "link inválido" e deixa o navegador
-   * autenticado, que era o defeito apontado na revisão.
-   *
-   * Escopo `local`, não global: isto limpa a sessão de recuperação recém-criada
-   * cujo processamento falhou. Derrubar as sessões legítimas do usuário em
-   * outros dispositivos porque um segredo de servidor está ausente seria
-   * castigar quem não tem culpa. O `signOut` global continua existindo, mas
-   * pertence ao outro momento — depois da TROCA de senha bem-sucedida, em
-   * `redefinir-senha/actions.ts`.
-   */
-  async function falharDepoisDeVerificar() {
-    await supabase.auth.signOut({ scope: "local" });
-    return responder("falha");
+  if (decidirConfirmacao({ tokenHash, type }) === "recusar") {
+    const { pathname, search } = montarDestinoConfirmacao("falha");
+    return redirecionar(pathname, search);
   }
 
-  // Claims verificados do access token recém-emitido. `getClaims` valida a
-  // assinatura do JWT; ler o corpo sem verificar seria confiar no que veio da
-  // rede. Daqui saem o `sub` e o `session_id` que amarram a prova.
-  const { data: claims, error: erroClaims } = await supabase.auth.getClaims(
-    data.session.access_token,
-  );
+  // Destino sem query: é o que tira `token_hash` e `type` da barra de
+  // endereços, do histórico e do cabeçalho Referer já no primeiro salto.
+  const resposta = redirecionar(ROTA_CONFIRMAR_RECUPERACAO, "");
 
-  // Confirmação independente de que há usuário autenticado de fato.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const sub = claims?.claims?.sub;
-  const sessionId = claims?.claims?.session_id;
-
-  if (erroClaims || !user || typeof sub !== "string" || typeof sessionId !== "string") {
-    return falharDepoisDeVerificar();
-  }
-
-  // Coerência entre as duas leituras: o token verificado tem de descrever o
-  // mesmo usuário que o servidor confirmou.
-  if (sub !== user.id) return falharDepoisDeVerificar();
-
-  const prova = await criarProvaDeRecuperacao({ sub, sessionId });
-
-  // Sem segredo configurado não há prova possível. Falha fechada: é melhor o
-  // fluxo parar aqui do que seguir para um formulário que não conseguiria
-  // provar nada.
-  if (!prova) return falharDepoisDeVerificar();
-
-  const resposta = responder("ok");
-
-  // `lax`, não `strict`: o fluxo nasce num link de e-mail, então a chegada a
-  // /auth/confirm é uma navegação cross-site e os navegadores propagam essa
-  // classificação pela cadeia de redirect. Com `strict` o cookie seria gravado
-  // mas poderia não ser enviado na requisição seguinte a /redefinir-senha, e o
-  // guard negaria um link legítimo. `lax` envia em navegação top-level GET —
-  // exatamente este caso — e segue bloqueando subrequisição cross-site. Não
-  // enfraquece nada: quem impede a forja é o HMAC, não o SameSite.
-  //
-  // O Path restringe o envio à única rota que lê a prova. O atributo Path do
-  // Set-Cookie não precisa casar com a rota que o emite, então emitir daqui
-  // com destino /redefinir-senha é legítimo.
-  resposta.cookies.set(NOME_DO_COOKIE_DE_PROVA, prova, {
+  // O `decidirConfirmacao` acima já garantiu string não vazia.
+  resposta.cookies.set(NOME_DO_COOKIE_PENDENTE, tokenHash as string, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: ROTA_REDEFINIR_SENHA,
-    maxAge: VALIDADE_DA_PROVA_EM_SEGUNDOS,
+    path: ROTA_CONFIRMAR_RECUPERACAO,
+    maxAge: VALIDADE_DO_PENDENTE_EM_SEGUNDOS,
   });
 
   return resposta;
