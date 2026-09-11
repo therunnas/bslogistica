@@ -1,39 +1,35 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/lib/notificacoes";
-import {
-  MENSAGEM_FALHA_AO_TROCAR,
-  ROTA_LOGIN_SENHA_REDEFINIDA,
-  traduzirErroDeSenha,
-  validarNovaSenha,
-} from "@/lib/recuperacao-senha";
+import { validarNovaSenha } from "@/lib/recuperacao-senha";
+
+import { redefinirSenha } from "./actions";
 
 /**
  * Formulário da nova senha.
  *
- * Três pontos de segurança, nesta ordem obrigatória:
+ * Ele não fala mais com o Supabase. Coleta os campos, faz a validação de UX e
+ * entrega para a Server Action, que é quem revalida a prova de recuperação e
+ * troca a senha.
  *
- * 1. a troca é feita com `updateUser`, que age sobre a sessão de recuperação.
- *    Nada de MFA é tocado: nenhum `unenroll`, nenhum fator novo, nenhum
- *    rebaixamento de AAL. O fator TOTP continua exatamente como estava;
- * 2. logo após o sucesso vem `signOut`, ainda antes de qualquer navegação. A
- *    sessão de recuperação não pode sobreviver à troca — ela nasceu de um link
- *    de e-mail e não passou por segundo fator;
- * 3. só então o usuário volta para o login, onde entra com a senha nova e
- *    responde ao TOTP pelo fluxo normal.
+ * A mudança veio de um achado de revisão: enquanto o `updateUser` era chamado
+ * daqui, a prova só era conferida na renderização da página. Uma aba deixada
+ * aberta continuava trocando a senha depois que a prova expirava, porque a
+ * chamada ia direto ao Supabase com a sessão ainda válida.
+ *
+ * A validação daqui é conveniência, não garantia: a action revalida tudo por
+ * conta própria. Nada de token, segredo ou conteúdo da prova é enviado por
+ * este componente — o cookie httpOnly viaja sozinho, pelo navegador.
  *
  * A senha vive apenas no estado do componente e some com ele: não vai para
  * log, URL, armazenamento local nem para o toast de erro.
  */
 export function FormularioNovaSenha() {
-  const router = useRouter();
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -49,41 +45,15 @@ export function FormularioNovaSenha() {
     }
 
     setEnviando(true);
-    const supabase = criarClienteNavegador();
 
-    const { error } = await supabase.auth.updateUser({ password: senha });
+    // No sucesso a action redireciona para o login e esta promessa não
+    // devolve estado — só o caminho de erro chega de volta aqui.
+    const estado = await redefinirSenha({ senha, confirmacao });
 
-    if (error) {
-      // Nunca `error.message`: o texto do GoTrue é livre, em inglês, e pode
-      // carregar detalhe de implementação. Traduzimos pelo código estável.
-      toast.error(traduzirErroDeSenha(error.code));
+    if (estado?.situacao === "erro") {
+      toast.error(estado.mensagem);
       setEnviando(false);
-      return;
     }
-
-    // Encerra a sessão de recuperação antes de sair desta tela. O escopo
-    // padrão é global, então as demais sessões da conta também caem — que é o
-    // comportamento desejado depois de uma troca de senha.
-    //
-    // O cookie `bs_recovery_proof` não é apagado aqui de propósito: é httpOnly
-    // e o cliente não alcança. Criar uma rota só para limpá-lo seria
-    // complexidade sem ganho — a prova está amarrada ao `session_id`, e este
-    // signOut global revoga justamente essa sessão. Sem a sessão a prova não
-    // valida mais, e em 10 minutos ela expira sozinha.
-    const { error: erroAoSair } = await supabase.auth.signOut();
-
-    if (erroAoSair) {
-      // A senha já mudou, mas a sessão de recuperação continua de pé. Não dá
-      // para deixar o usuário seguir com ela: avisa e mantém nesta tela, sem
-      // navegar para lugar nenhum autenticado.
-      toast.error(MENSAGEM_FALHA_AO_TROCAR);
-      setEnviando(false);
-      return;
-    }
-
-    // refresh antes de navegar para o servidor reavaliar a ausência de sessão.
-    router.refresh();
-    router.replace(ROTA_LOGIN_SENHA_REDEFINIDA);
   }
 
   return (

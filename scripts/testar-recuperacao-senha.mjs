@@ -317,13 +317,20 @@ const solicitacao = readFileSync(
   "utf8",
 );
 
-const posSignOut = formulario.indexOf("auth.signOut()");
-const posUpdate = formulario.indexOf("auth.updateUser(");
-const posReplace = formulario.indexOf("router.replace(");
-
-verificar("G1. o formulário chama signOut", String(posSignOut !== -1), "true");
-verificar("G2. signOut vem depois do updateUser", String(posUpdate < posSignOut), "true");
-verificar("G3. signOut vem antes de voltar ao login", String(posSignOut < posReplace), "true");
+// A ordem updateUser -> signOut -> login migrou para a Server Action e é
+// verificada em `testar-troca-de-senha.mjs` (blocos I e J). O que se cobra do
+// formulário agora é o oposto: que ele NÃO troque a senha por conta própria.
+verificar(
+  "G1. o formulário não chama updateUser",
+  String(/auth\.updateUser/.test(formulario)),
+  "false",
+);
+verificar("G2. o formulário não chama signOut", String(/auth\.signOut/.test(formulario)), "false");
+verificar(
+  "G3. o formulário delega para a Server Action",
+  String(/redefinirSenha\(/.test(formulario)),
+  "true",
+);
 
 /**
  * Remove comentários antes de procurar por padrões proibidos.

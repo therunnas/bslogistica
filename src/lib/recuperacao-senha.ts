@@ -63,6 +63,9 @@ export const MENSAGEM_SENHA_REPETIDA = "A nova senha precisa ser diferente da se
 export const MENSAGEM_FALHA_AO_TROCAR =
   "Não foi possível redefinir a senha agora. Solicite um novo link e tente novamente.";
 
+export const MENSAGEM_RECUPERACAO_INVALIDA =
+  "Seu link de recuperação expirou ou não é mais válido. Solicite um novo link.";
+
 /* ------------------------------------------------------------------ */
 /* Confirmação do link                                                 */
 /* ------------------------------------------------------------------ */
@@ -199,6 +202,38 @@ export function decidirAcessoRedefinicao({
   if (!temUsuario) return "negar";
   if (!temClaims) return "negar";
   return resultadoDaProva === "valida" ? "permitir" : "negar";
+}
+
+export type DecisaoDeTroca = "prosseguir" | "recuperacao-invalida" | "senha-invalida";
+
+/**
+ * Se a troca de senha pode acontecer, decidida no instante do envio.
+ *
+ * Por que existe separado do `decidirAcessoRedefinicao`: aquele responde se a
+ * página pode ser RENDERIZADA; este responde se a senha pode ser TROCADA. São
+ * dois momentos, e tratá-los como um só era o defeito apontado na revisão —
+ * a prova vale 10 minutos, mas se a única checagem fosse na renderização, o
+ * formulário aberto continuaria trocando a senha depois de a prova expirar.
+ *
+ * A autorização vem antes da validação de formato: enquanto a recuperação não
+ * estiver provada, nem se olha para o que foi digitado.
+ */
+export function decidirTrocaDeSenha({
+  temUsuario,
+  temClaims,
+  resultadoDaProva,
+  senhaValida,
+}: {
+  temUsuario: boolean;
+  temClaims: boolean;
+  resultadoDaProva: string;
+  senhaValida: boolean;
+}): DecisaoDeTroca {
+  if (!temUsuario) return "recuperacao-invalida";
+  if (!temClaims) return "recuperacao-invalida";
+  if (resultadoDaProva !== "valida") return "recuperacao-invalida";
+  if (!senhaValida) return "senha-invalida";
+  return "prosseguir";
 }
 
 /* ------------------------------------------------------------------ */
