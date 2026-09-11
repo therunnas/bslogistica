@@ -10,7 +10,10 @@
     "start": "next start",
     "lint": "eslint .",
     "test:mfa": "node --experimental-strip-types scripts/testar-mfa.mjs",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:recuperacao": "node --experimental-strip-types scripts/testar-recuperacao-senha.mjs",
+    "test:prova": "node --experimental-strip-types scripts/testar-prova-recuperacao.mjs",
+    "test:troca": "node --experimental-strip-types scripts/testar-troca-de-senha.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
