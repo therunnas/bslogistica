@@ -108,6 +108,17 @@ export const MENSAGEM_SENHA_FRACA =
 
 export const MENSAGEM_SENHA_REPETIDA = "A nova senha precisa ser diferente da senha atual.";
 
+/**
+ * Desfecho parcial: a senha mudou, mas o `signOut` global não respondeu.
+ *
+ * Não pode reusar `MENSAGEM_FALHA_AO_TROCAR`. Dizer "não foi possível redefinir
+ * a senha" seria mentira num caminho em que o `updateUser` já teve sucesso — e
+ * mandaria o usuário tentar de novo com a mesma senha, recebendo
+ * `same_password` sem entender por quê.
+ */
+export const MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS =
+  "Sua senha foi alterada. Não foi possível encerrar todas as sessões abertas agora — entre novamente com a nova senha.";
+
 export const MENSAGEM_FALHA_AO_TROCAR =
   "Não foi possível redefinir a senha agora. Solicite um novo link e tente novamente.";
 

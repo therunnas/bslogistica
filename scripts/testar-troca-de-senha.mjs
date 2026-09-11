@@ -26,6 +26,7 @@ import {
 
 import {
   MENSAGEM_RECUPERACAO_INVALIDA,
+  MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
   decidirTrocaDeSenha,
   validarNovaSenha,
 } from "../src/lib/recuperacao-senha.ts";
@@ -202,7 +203,20 @@ verificar("I3. revalidação antes do updateUser", String(pValida < pUpdate), "t
 verificar("I4. decisão antes do updateUser", String(pDecide < pUpdate), "true");
 verificar("I5. signOut depois do updateUser", String(pUpdate < pSignOut), "true");
 verificar("I6. redirect por último", String(pSignOut < pRedirect), "true");
-verificar("J1. limpeza do cookie depois do signOut", String(pSignOut < pLimpa), "true");
+// A limpeza virou a função `apagarProva()`, declarada antes do `signOut` e
+// chamada depois dele nos dois desfechos. O que esta asserção sempre quis dizer
+// é que a prova só morre depois da tentativa de encerrar a sessão — então o que
+// se mede é a CHAMADA, não a declaração.
+verificar(
+  "J1. limpeza do cookie depois do signOut",
+  String(action.indexOf("apagarProva();", pSignOut) > pSignOut),
+  "true",
+);
+verificar(
+  "J1b. a limpeza está declarada como função reutilizada nos dois desfechos",
+  String(pLimpa !== -1 && (action.match(/apagarProva\(\);/g) || []).length),
+  "2",
+);
 verificar("J2. limpeza com maxAge 0", String(/maxAge:\s*0/.test(action)), "true");
 verificar(
   "J3. limpeza com o mesmo Path do Set-Cookie original",
@@ -253,6 +267,153 @@ verificar(
   "false",
 );
 verificar("K9. sem service_role na action", String(/service_role/i.test(action)), "false");
+
+console.log("\nL. Estado da recuperação quando o signOut global falha\n");
+
+// O achado: com o `updateUser` já bem-sucedido e o `signOut` global falhando, a
+// action saía antes de apagar a prova. A senha tinha mudado, mas a sessão de
+// recuperação e o `bs_recovery_proof` continuavam de pé por até 10 minutos — e
+// a tela ainda dizia que a redefinição havia falhado, o que mandava o usuário
+// repetir a mesma senha e colher `same_password`.
+const acaoSemComentarios = action
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .split("\n")
+  .filter((l) => !l.trimStart().startsWith("//"))
+  .join("\n");
+
+const pUpdateUser = acaoSemComentarios.indexOf("auth.updateUser(");
+const pErroUpdate = acaoSemComentarios.indexOf("traduzirErroDeSenha(error.code)");
+const pSignOutGlobal = acaoSemComentarios.indexOf("auth.signOut()");
+const pRamoDeFalha = acaoSemComentarios.indexOf("if (erroAoSair)");
+const pSignOutLocal = acaoSemComentarios.indexOf('signOut({ scope: "local" })');
+const pRedirectFinal = acaoSemComentarios.indexOf("redirect(ROTA_LOGIN_SENHA_REDEFINIDA)");
+
+// 1. Caminho feliz preservado: signOut global, limpeza da prova e redirect.
+verificar(
+  "L1. sucesso total continua apagando a prova e redirecionando",
+  String(pSignOutGlobal !== -1 && pSignOutGlobal < pRedirectFinal && pRedirectFinal !== -1),
+  "true",
+);
+verificar(
+  "L1b. o redirect de sucesso vem depois de apagar a prova",
+  String(acaoSemComentarios.lastIndexOf("apagarProva()") < pRedirectFinal),
+  "true",
+);
+
+// 2. Falha do signOut global tenta ao menos a limpeza local.
+verificar(
+  "L2. o ramo de falha tenta signOut local",
+  String(pRamoDeFalha !== -1 && pSignOutLocal > pRamoDeFalha),
+  "true",
+);
+verificar(
+  "L2b. o signOut local fica dentro do ramo de falha do global",
+  String(pSignOutGlobal < pSignOutLocal),
+  "true",
+);
+
+// 3 e 4. A prova morre nos dois desfechos, mesmo se o signOut local falhar.
+verificar(
+  "L3. a prova é apagada também no ramo de falha",
+  String(acaoSemComentarios.slice(pRamoDeFalha, pRedirectFinal).includes("apagarProva()")),
+  "true",
+);
+verificar(
+  "L4. o signOut local está em try/catch, para não impedir a limpeza",
+  String(
+    /try \{\s*await supabase\.auth\.signOut\(\{ scope: "local" \}\);\s*\} catch/.test(
+      acaoSemComentarios,
+    ),
+  ),
+  "true",
+);
+verificar(
+  "L4b. apagarProva é chamada depois do try/catch, não dentro",
+  String(acaoSemComentarios.indexOf("apagarProva()", pSignOutLocal) > pSignOutLocal),
+  "true",
+);
+verificar(
+  "L4c. a limpeza da prova acontece nos dois caminhos",
+  String((acaoSemComentarios.match(/apagarProva\(\)/g) || []).length),
+  "3", // a declaração da função e as duas chamadas
+);
+verificar(
+  "L4d. cookies internos sb-* não são manipulados à mão",
+  String(/["'`]sb-/.test(acaoSemComentarios)),
+  "false",
+);
+
+// 5. A mensagem diz a verdade.
+verificar(
+  "L5. o desfecho parcial tem situação própria",
+  String(acaoSemComentarios.includes('situacao: "senha-alterada-sessoes-ativas"')),
+  "true",
+);
+verificar(
+  "L5b. não reusa a mensagem genérica de falha nesse ramo",
+  String(
+    acaoSemComentarios
+      .slice(pRamoDeFalha, pRedirectFinal)
+      .includes("MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS"),
+  ),
+  "true",
+);
+verificar(
+  "L5c. a mensagem afirma que a senha foi alterada",
+  String(/senha foi alterada/i.test(MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS)),
+  "true",
+);
+verificar(
+  "L5d. a mensagem fala do encerramento de sessões",
+  String(/sess(õ|o)es/i.test(MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS)),
+  "true",
+);
+verificar(
+  "L5e. a mensagem NÃO diz que a redefinição falhou",
+  String(/não foi possível redefinir/i.test(MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS)),
+  "false",
+);
+verificar(
+  "L5f. o cliente trata o desfecho parcial como aviso, não como erro",
+  String(
+    /senha-alterada-sessoes-ativas[\s\S]{0,200}?toast\.warning/.test(
+      cliente.replace(/\/\/.*$/gm, ""),
+    ),
+  ),
+  "true",
+);
+
+// 6. Falha na revogação global não redireciona como sucesso normal.
+verificar(
+  "L6. o ramo de falha retorna estado em vez de redirecionar",
+  String(acaoSemComentarios.slice(pRamoDeFalha, pRedirectFinal).includes("return {")),
+  "true",
+);
+verificar(
+  "L6b. há apenas um redirect de sucesso na action",
+  String((acaoSemComentarios.match(/redirect\(ROTA_LOGIN_SENHA_REDEFINIDA\)/g) || []).length),
+  "1",
+);
+
+// 7. updateUser falhando não passa por nada disso.
+verificar(
+  "L7. a falha do updateUser retorna antes do signOut",
+  String(pUpdateUser < pErroUpdate && pErroUpdate < pSignOutGlobal),
+  "true",
+);
+// A declaração de `apagarProva()` fica entre o tratamento do erro e o
+// `signOut`, então medir o intervalo inteiro acusaria a declaração como se
+// fosse uma chamada. O que importa é o bloco do `if (error)`: dele tem de sair
+// um return puro, sem limpar prova nem encerrar sessão — a senha não mudou.
+const blocoErroUpdate = acaoSemComentarios.slice(
+  acaoSemComentarios.indexOf("if (error) {", pUpdateUser),
+  pErroUpdate,
+);
+verificar(
+  "L7b. a falha do updateUser não apaga a prova nem encerra sessão",
+  String(/apagarProva\(\);|signOut/.test(blocoErroUpdate)),
+  "false",
+);
 
 console.log(`\n${passou} passaram, ${falhas.length} falharam\n`);
 

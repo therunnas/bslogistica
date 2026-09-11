@@ -8,6 +8,7 @@ import { NOME_DO_COOKIE_DE_PROVA, validarProvaDeRecuperacao } from "@/lib/prova-
 import {
   MENSAGEM_FALHA_AO_TROCAR,
   MENSAGEM_RECUPERACAO_INVALIDA,
+  MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
   ROTA_LOGIN_SENHA_REDEFINIDA,
   ROTA_REDEFINIR_SENHA,
   decidirTrocaDeSenha,
@@ -15,7 +16,14 @@ import {
   validarNovaSenha,
 } from "@/lib/recuperacao-senha";
 
-export type EstadoDaTroca = { situacao: "erro"; mensagem: string };
+export type EstadoDaTroca =
+  | { situacao: "erro"; mensagem: string }
+  /**
+   * A senha FOI alterada, mas a revogação global das sessões falhou. Situação
+   * própria porque não é erro: tratar como erro faria a tela mentir sobre o
+   * que aconteceu e convidaria a uma segunda tentativa inútil.
+   */
+  | { situacao: "senha-alterada-sessoes-ativas"; mensagem: string };
 
 /**
  * Troca de senha, no servidor.
@@ -96,26 +104,59 @@ export async function redefinirSenha(entrada: {
     return { situacao: "erro", mensagem: traduzirErroDeSenha(error.code) };
   }
 
+  /**
+   * A prova morre em todo caminho a partir daqui, com ou sem sucesso do
+   * `signOut`. Depois que a senha muda, a prova não autoriza mais nada que o
+   * usuário deva querer — e deixá-la viva foi o achado desta rodada: o
+   * caminho de falha do `signOut` saía antes desta limpeza, deixando prova e
+   * sessão de recuperação de pé por até 10 minutos.
+   *
+   * Mesmo Path do `Set-Cookie` original, senão o navegador não casa o cookie a
+   * remover.
+   */
+  function apagarProva() {
+    armazemDeCookies.set(NOME_DO_COOKIE_DE_PROVA, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: ROTA_REDEFINIR_SENHA,
+      maxAge: 0,
+    });
+  }
+
   // Ordem obrigatória: a senha já mudou, então agora a sessão de recuperação
   // cai. Escopo global, que derruba também as demais sessões da conta — o
   // comportamento desejado depois de uma troca de senha.
   const { error: erroAoSair } = await supabase.auth.signOut();
 
   if (erroAoSair) {
-    // A senha mudou, mas a sessão continua de pé. Não dá para seguir como se
-    // tivesse dado tudo certo: avisa e não redireciona para o login.
-    return { situacao: "erro", mensagem: MENSAGEM_FALHA_AO_TROCAR };
+    /**
+     * A revogação global não respondeu — rede, indisponibilidade do Auth. A
+     * senha, porém, JÁ mudou: este não é um caminho de erro, é um sucesso
+     * parcial, e o usuário precisa ouvir isso.
+     *
+     * Resta fazer o que não depende da rede remota: derrubar a sessão local.
+     * `try` porque nem esse passo pode impedir a limpeza da prova — se o
+     * `signOut` local também falhar, o cookie tem de morrer do mesmo jeito.
+     * Cookies internos `sb-*` seguem intocados: manipulá-los à mão acoplaria a
+     * aplicação a detalhe de implementação do SDK.
+     */
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      // Ignorado de propósito: a limpeza da prova, abaixo, é o que não pode
+      // deixar de acontecer.
+    }
+
+    apagarProva();
+
+    return {
+      situacao: "senha-alterada-sessoes-ativas",
+      mensagem: MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
+    };
   }
 
-  // Agora que a operação é server-side, apagar a prova é trivial — mesmo Path
-  // do `Set-Cookie` original, senão o navegador não casa o cookie a remover.
-  armazemDeCookies.set(NOME_DO_COOKIE_DE_PROVA, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: ROTA_REDEFINIR_SENHA,
-    maxAge: 0,
-  });
+  apagarProva();
 
   redirect(ROTA_LOGIN_SENHA_REDEFINIDA);
 }

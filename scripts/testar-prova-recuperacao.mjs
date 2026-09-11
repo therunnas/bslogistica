@@ -474,10 +474,22 @@ verificar(
   String(/auth\.signOut\(\)/.test(acaoTroca)),
   "true",
 );
+// A troca de senha passou a usar `scope: "local"` — mas só como último recurso,
+// depois de o `signOut` global falhar. O que esta asserção protege continua
+// sendo o essencial: a revogação PRINCIPAL é global, porque depois de trocar a
+// senha todas as sessões da conta têm de cair. O local não pode substituí-la.
 verificar(
-  "H9b. a troca de senha não usa scope local",
-  String(/signOut\(\{\s*scope:\s*"local"/.test(acaoTroca)),
-  "false",
+  "H9b. o scope local na troca de senha só aparece depois do signOut global",
+  String(acaoTroca.indexOf("auth.signOut()") < acaoTroca.indexOf('signOut({ scope: "local" })')),
+  "true",
+);
+verificar(
+  "H9c. o scope local está no ramo de falha do global, não no caminho normal",
+  String(
+    acaoTroca.indexOf("if (erroAoSair)") < acaoTroca.indexOf('signOut({ scope: "local" })') &&
+      acaoTroca.indexOf("if (erroAoSair)") !== -1,
+  ),
+  "true",
 );
 
 console.log("\nI. GET não consome token (achado do scanner de e-mail)\n");
