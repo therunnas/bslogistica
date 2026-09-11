@@ -4,18 +4,25 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 ## 1. Checkpoint
 
-| Item                      | Valor                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------ |
-| Data/hora                 | 2026-09-10 19:04                                                                           |
-| Branch                    | `main`                                                                                     |
-| HEAD                      | `1f72eb740b1835e794a213ac37b02c2dc3416ff6`                                                 |
-| `origin/main`             | `1f72eb740b1835e794a213ac37b02c2dc3416ff6` — idêntico, 0 à frente / 0 atrás                |
-| Working tree              | limpa antes deste checkpoint                                                               |
-| Alterações não commitadas | **apenas `CLAUDE.md` e `PROGRESS.md`**, criados por este checkpoint e ainda não commitados |
-| Último commit             | `1f72eb7` Merge pull request #10 from therunnas/fix/mfa-aal-error-handling                 |
+| Item          | Valor                                      |
+| ------------- | ------------------------------------------ |
+| Data/hora     | 2026-09-11                                 |
+| Branch atual  | `docs/progress-aal2-production`            |
+| `main`        | `359dd905bf47ad213968e0f50e0ea198db93866f` |
+| `origin/main` | `359dd90` — idêntico ao `main` local       |
 
-Nenhum código de aplicação, migration, configuração de infraestrutura ou dado
-foi alterado por este checkpoint.
+**O enforcement AAL2 está concluído: mergeado, aplicado em Production e
+validado ponta a ponta.** Detalhe na seção 5.
+
+Resta uma frente aberta:
+
+| Frente            | Branch                    | Estado                          |
+| ----------------- | ------------------------- | ------------------------------- |
+| Password recovery | `feat/password-recovery`  | PR #13 aberto, **não mergeado** |
+| Enforcement AAL2  | — (mergeado em `359dd90`) | **CONCLUÍDO** — PR #14          |
+
+O PR #13 deixou de estar congelado: a condição que o bloqueava — AAL2 valendo
+no banco — foi cumprida. Ver seção 8.
 
 ## 2. Ambiente
 
@@ -31,191 +38,309 @@ foi alterado por este checkpoint.
 repositório `therunnas/PROJETO-BS-LOGISTICA`, pasta
 `C:\Users\VINICIUS\Documents\GitHub\PROJETOS\BS Logistica`. Nunca tocar.
 
-O domínio tem **"s"** em "logisticas". Documentação antiga já foi corrigida.
+O domínio tem **"s"** em "logisticas".
 
-O projeto Supabase original foi **excluído acidentalmente**. O banco foi
-reconstruído a partir das migrations versionadas em um projeto novo. **A
-reconstrução está concluída e validada** — não refazer.
+A reconstrução do Supabase está **concluída e validada** — não refazer.
 
-## 3. Recuperação do Supabase — CONCLUÍDA
+## 3. Auth, MFA e branding — estado consolidado
 
-| Verificação                       | Resultado                                       |
-| --------------------------------- | ----------------------------------------------- |
-| Migrations                        | 14 local / 14 remoto / 0 divergências           |
-| RLS                               | 12/12 tabelas                                   |
-| Policies                          | 19                                              |
-| Órfãos e FKs                      | 14 verificações, todas em 0                     |
-| Smoke test funcional pela UI real | **PASS**                                        |
-| Fixtures `ZZ-SMOKE`               | removidas; banco de negócio em 0 nas 10 tabelas |
+|                  |                                        |
+| ---------------- | -------------------------------------- |
+| Admin            | `contato@bslogisticas.com.br`          |
+| UUID             | `61d892b4-abb3-4e55-b5e1-9795a3476d96` |
+| Papel            | `admin`                                |
+| MFA              | TOTP `verified`                        |
+| `disable_signup` | `true`                                 |
+| Site URL         | `https://admin.bslogisticas.com.br`    |
 
-Teste financeiro ponta a ponta, conferido no banco (não só na tela):
+Branding provisório do MVP em produção (PRs #11 e #12): logo em
+`/branding/bs-logo-temp.png`, login, sidebar, home e favicon derivado da
+própria marca. O favicon residual da Lovable foi removido.
 
-|            |               |
-| ---------- | ------------- |
-| Trabalhado | 600 min       |
-| Hora extra | 120 min       |
-| Diária     | R$ 200,00     |
-| Hora extra | R$ 37,50/h    |
-| Receita    | **R$ 275,00** |
-| Custo      | **R$ 125,00** |
-| Margem     | **R$ 150,00** |
+**E-mail/SMTP já funciona:** Supabase → Resend → Gmail, com SPF, DKIM e DMARC
+PASS. Remetente `BS Soluções Logísticas <nao-responda@envio.bslogisticas.com.br>`.
 
-**Segunda diária:** bloqueada corretamente — faixa de conflito na UI, botão
-Salvar desabilitado, e o índice único
-`timesheet_entries_uma_diaria_por_operacao_dia` presente, `unique` e `valid`
-no banco. **Faturamento:** PASS — fatura fechada, itens somando exatamente o
-total, `invoice_id` vinculado, lançamento não reelegível.
+## 4. PR #13 — PASSWORD RECOVERY
 
-## 4. Auth e segurança — estado confirmado
+**Branch:** `feat/password-recovery`
+**HEAD congelado:** `7ce1a1d85a0ec291e4d8221f2e0ff1000afc9c10`
 
-|                                                               |                                        |
-| ------------------------------------------------------------- | -------------------------------------- |
-| Admin                                                         | `contato@bslogisticas.com.br`          |
-| UUID                                                          | `61d892b4-abb3-4e55-b5e1-9795a3476d96` |
-| Papel                                                         | `admin`                                |
-| MFA                                                           | TOTP `verified`                        |
-| `auth.users` / `profiles` / `user_roles` / `auth.mfa_factors` | 1 / 1 / 1 / 1                          |
-| `disable_signup`                                              | `true`                                 |
-| `external.email`                                              | `true`                                 |
-| `external.phone`                                              | `false`                                |
-| Site URL                                                      | `https://admin.bslogisticas.com.br`    |
-| `additional_redirect_urls`                                    | `[]`                                   |
+**Estado:**
 
-Preservado e a preservar: sem self-signup; papéis explícitos e nunca
-automáticos; nenhuma `service_role` no client; nenhuma chave privilegiada no
-frontend; MFA obrigatório; guard por papel no servidor; **`supabase config
-push` só com auditoria explícita** (o `config.toml` não descreve o Auth real e
-um push desligaria MFA e a Site URL).
+- PR #13 aberto;
+- **NÃO mergeado**;
+- password recovery implementado;
+- prova HMAC server-side;
+- revalidação da prova no submit;
+- `updateUser` server-side;
+- `signOut` global após troca bem-sucedida;
+- limpeza **local** da sessão quando `verifyOtp` já criou sessão e etapa
+  posterior falha;
+- `PASSWORD_RECOVERY_PROOF_SECRET` necessário em Production — **já criado
+  manualmente na Vercel, somente no escopo Production**;
+- template Reset Password do Supabase **AINDA NÃO foi alterado**;
+- **PR #13 NÃO pode ser mergeado antes do enforcement AAL2 no banco.**
 
-## 5. Migrations arquiteturalmente relevantes
+Cinco commits: `702d353`, `ce29689`, `6ac3471`, `313481f`, `7ce1a1d`.
 
-Não há SQL reproduzido aqui — abrir o arquivo quando precisar.
+Suítes do PR #13: `test:recuperacao` 63/63, `test:prova` 71/71,
+`test:troca` 48/48, `test:mfa` 13/13. CodeRabbit: `Review completed`, sem
+achados. Vercel Preview vermelho pelo motivo de sempre — ausência proposital
+das `NEXT_PUBLIC_SUPABASE_*` no ambiente Preview.
 
-| Arquivo                                               | Por que importa                                                           |
-| ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| `20260903200000_create_rls_auto_enable.sql`           | RLS ativada automaticamente em tabela nova de `public`                    |
-| `20260905163000_005_gerar_fatura_transacional.sql`    | faturamento numa única transação, totais somados no servidor              |
-| `20260906180000_008_unicidade_diaria.sql`             | índice único: uma diária faturável por colaborador/operação/data          |
-| `20260909175432_remove_automatic_admin_bootstrap.sql` | onboarding cria só o profile; papel virou ato administrativo              |
-| `20260909175435_protect_timesheet_invoice_link.sql`   | só admin altera `timesheet_entries.invoice_id`                            |
-| `20260909175439_remove_legacy_daily_exception.sql`    | removeu a exceção histórica do índice de diária — hoje o índice é estrito |
-| `20260910111219_restringir_trigger_chave_diaria.sql`  | trigger da chave de diária restringido                                    |
+### Achado residual aceito
 
-Testes SQL em `supabase/tests/` (4 arquivos, todos PASS quando executados por
-último). `004_exclusao_cliente_faturado.sql` cobre exclusão/cascade de cliente
-com fatura.
+**P2 residual no signOut local:** `@supabase/auth-js` 2.115.0 já remove a
+sessão local em falhas remotas comuns (verificado no fonte instalado,
+`GoTrueClient.js:3425-3436`); há caminho residual estreito de falha de leitura
+de sessão. **Não vamos manipular cookies internos `sb-*` manualmente** — isso
+acoplaria a aplicação a detalhe de implementação do SDK. O risco relevante
+será mitigado pelo enforcement AAL2 no banco.
 
-## 6. MFA
+### Passo manual pendente do PR #13
 
-- Fluxo AAL2 validado ponta a ponta em produção.
-- **Refresh de token mantém AAL2** — o nível vive em `auth.sessions.aal`, não
-  só no token. Navegação, F5 e nova aba **não** devem pedir TOTP de novo
-  enquanto a sessão for válida.
-- Logout, sessão nova ou outro navegador **devem** exigir o TOTP.
-- Erro transitório ao consultar o nível **não** é tratado como ausência de
-  fator: vai para a tela "não foi possível verificar", nunca para o cadastro.
-  Decisões isoladas em `src/lib/mfa.ts`; `npm run test:mfa` (13 testes) cobre.
+Depois do deploy das rotas, colar o HTML do Reset Password em
+**Authentication → Emails → Templates → Reset Password**, com o botão
+apontando para
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
+Colar antes do deploy deixa o link em 404.
 
-**Pendência, não corrigir agora:** `src/app/mfa/painel-mfa.tsx` ainda exibe
-`error.message` cru do GoTrue em dois pontos (`listFactors` e `enroll`).
-Pré-existente, não introduzido pelo PR #10.
+## 5. AAL2 / RLS — CONCLUÍDO
 
-## 7. Vercel
+**PR #14 mergeado** em 2026-09-11.
+**Merge commit:** `359dd905bf47ad213968e0f50e0ea198db93866f`
 
-Production usa o Supabase novo e está saudável.
+**Migration:** `supabase/migrations/20260911140000_009_enforce_aal2.sql` —
+**aplicada em Production**.
 
-**Preview não tem as variáveis `NEXT_PUBLIC_SUPABASE_*`, de propósito** — por
-isso o build de Preview falha na pré-renderização. Isso é ambiental, não um
-defeito do código: `main` falha igual sem as variáveis. **Não conectar Preview
-ao banco de produção só para deixar o check verde.**
+**Objetivo — P1 (resolvido):** MFA era aplicado somente na camada da aplicação.
+Sessão AAL1 com papel válido conseguia acessar dados diretamente via
+Supabase/PostgREST/RPC. O guard do Next exigia AAL2 para a tela; as policies
+olhavam só papel. Agora o banco também exige o segundo fator.
 
-Pendência: decidir se Preview Deployments será desabilitado neste repositório.
+**11 tabelas protegidas por policy RESTRICTIVE AAL2:**
 
-## 8. Etapa atual — e-mail / SMTP
+`profiles` · `clients` · `contracts` · `employees` · `operations` · `shifts` ·
+`operation_team` · `timesheets` · `timesheet_entries` · `invoices` ·
+`invoice_items`
 
-A recuperação do Supabase **terminou**. A etapa atual é
-**infraestrutura de e-mail do Supabase Auth**.
+Forma da policy, idêntica nas 11:
 
-Estado auditado em 10/09/2026:
+```sql
+AS RESTRICTIVE FOR ALL TO authenticated
+USING      ((SELECT auth.jwt() ->> 'aal') = 'aal2')
+WITH CHECK ((SELECT auth.jwt() ->> 'aal') = 'aal2');
+```
 
-| Item                                      | Estado                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------- |
-| Google Workspace em `bslogisticas.com.br` | ativo                                                                     |
-| MX                                        | `SMTP.GOOGLE.COM`                                                         |
-| DKIM Google (`google._domainkey`)         | **publicado e ativo**                                                     |
-| SPF (TXT do ápice)                        | **ausente**                                                               |
-| DMARC (`_dmarc`)                          | **ausente**                                                               |
-| Custom SMTP no Supabase                   | **não configurado** (usando o serviço embutido, ~2 e-mails/hora, sem log) |
-| Resend                                    | **não configurado**                                                       |
-| Nameservers                               | `cosmos.dns-parking.com` / `nova.dns-parking.com` → DNS na **Hostinger**  |
-| `envio.bslogisticas.com.br`               | NXDOMAIN, zona limpa                                                      |
+Fail-closed sem `COALESCE`: `->>` devolve `NULL` com o claim ausente,
+`NULL = 'aal2'` é `NULL`, e a RLS trata `NULL` como não-permitido.
 
-Fluxos ausentes no código (só existe `signInWithPassword` em
-`src/app/login/page.tsx`): recuperação de senha, convite de usuário, definição
-inicial de senha, `/auth/confirm`, reset de MFA.
+**`user_roles` fica deliberadamente SEM enforcement AAL2** porque é consultada
+antes do MFA (`src/app/(painel)/_autorizacao.ts`) e bloqueá-la causaria
+deadlock login → MFA.
 
-**Decisão arquitetural tomada:** Resend como provedor transacional, no
-subdomínio `envio.bslogisticas.com.br`. Google Workspace continua responsável
-pelo e-mail humano; o MX do ápice não é tocado. Remetente recomendado:
-`nao-responda@envio.bslogisticas.com.br` — o Resend só aceita enviar de dentro
-do domínio verificado, e o subdomínio dá alinhamento estrito de DKIM e
-isolamento de reputação. Consequência aceita: o subdomínio não recebe e-mail.
+**`gerar_fatura`:**
 
-## 9. Próximo passo exato
+- continua `SECURITY DEFINER`;
+- mesma assinatura;
+- mesmo `search_path`;
+- mesmos grants/revokes;
+- recebeu check explícito de `aal2`, antes da verificação de papel.
 
-**Etapa DNS — manual, ainda não executada.**
+Policy RESTRICTIVE não protege função `SECURITY DEFINER`, que roda acima da
+RLS — daí a verificação dentro da própria função.
 
-1. Criar `dmarc@bslogisticas.com.br` como **alias** de
-   `contato@bslogisticas.com.br` no Google Workspace (alias não consome
-   licença).
-2. Na Hostinger (hPanel → Domínios → `bslogisticas.com.br` → DNS):
+## 6. Validação local real
 
-| Tipo  | Nome/Host | Valor                                                    | TTL    |
-| ----- | --------- | -------------------------------------------------------- | ------ |
-| `TXT` | `@`       | `v=spf1 include:_spf.google.com ~all`                    | `3600` |
-| `TXT` | `_dmarc`  | `v=DMARC1; p=none; rua=mailto:dmarc@bslogisticas.com.br` | `3600` |
+Docker + WSL2 configurados e funcionando.
 
-**Antes de criar o SPF: confirmar que não existe outro registro `v=spf1` no
-`@`.** Dois SPF no mesmo host geram `permerror` e derrubam a autenticação
-inteira. No último diagnóstico não havia nenhum.
+**Versões validadas:** Docker **29.7.2** · Supabase CLI **2.117.0** ·
+PostgreSQL local **17.6.1.166**.
 
-**Não alterar** o MX do Google, o TXT `google-site-verification` nem o
-`google._domainkey`.
+**Stack usada SOMENTE LOCAL:**
 
-3. **Parar e validar o DNS** pelos resolvers públicos antes de seguir.
+| Serviço  | Endereço          |
+| -------- | ----------------- |
+| API      | `127.0.0.1:54321` |
+| Postgres | `127.0.0.1:54322` |
+| Studio   | `127.0.0.1:54323` |
+| Mailpit  | `127.0.0.1:54324` |
 
-Só depois da validação começa a configuração do Resend.
+Nenhum comando remoto. Nenhum `db push`. Nenhum `--linked`. **Production não
+foi tocada.** O `db reset` reportou `{"target":"local"}`.
 
-## 10. Sequência futura
+### Baseline antes da 009
 
-DNS SPF/DMARC → validar → Resend → verificar `envio.bslogisticas.com.br` →
-Custom SMTP no Supabase → testar entrega real → `/auth/confirm` → definir senha
-→ recuperação de senha → convite server-side → estratégia segura de reset de
-MFA → endurecimento do DMARC.
+`005` antes da migration: **22 FAIL / 16 PASS.** A vulnerabilidade foi
+reproduzida de verdade, em PostgreSQL real:
 
-Referência para a etapa do Resend, já apurada na documentação oficial: domínio
-verificado exige `MX` em `send` (bounce/feedback), `TXT` SPF em `send` e `TXT`
-DKIM em `resend._domainkey`; SMTP é `smtp.resend.com`, porta `587`, username
-literal `resend`, password = API Key. **Os valores concretos saem do painel do
-Resend — não inventar.** Na Hostinger os nomes são relativos (`send.envio`,
-`resend._domainkey.envio`), porque o painel acrescenta o domínio sozinho.
+- admin AAL1 lia `clients` (2 linhas);
+- admin AAL1 lia `employees` (4 linhas);
+- admin AAL1 lia `invoices`;
+- admin AAL1 lia `profiles`;
+- admin AAL1 podia INSERT/UPDATE/DELETE em `clients`;
+- operacional AAL1 conseguia ler, inserir, editar e apagar `timesheet_entries`;
+- sem claim `aal` tudo passava;
+- `gerar_fatura` funcionava em AAL1.
 
-## 11. Pendências
+Isso provou que o teste detecta o problema real — não passa por expectativa
+invertida.
 
-| Prioridade         | Pendência                                                                                                                        |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| **P1 operacional** | SMTP / e-mails de Auth — bloqueia convite, recuperação de senha e onboarding                                                     |
-| P2                 | Fluxo administrativo de usuários (convite server-side com chave secreta e guarda de papel)                                       |
-| P2                 | Recuperação/reset seguro de MFA — hoje um usuário que perde o TOTP fica travado; com um único admin, não há saída pela aplicação |
-| P3                 | Mensagens cruas do SDK em `painel-mfa.tsx`                                                                                       |
-| P3                 | Decidir sobre Vercel Preview Deployments                                                                                         |
+### Depois da 009
 
-Observação menor registrada e não investigada: `config diff` mostra
-`auth.sms.twilio.enabled = true` no remoto enquanto `external.phone` é `false`.
-Provedor de telefone está desligado; vale conferir a origem da flag numa
-próxima passagem pelo Dashboard.
+| Suíte | Resultado      |
+| ----- | -------------- |
+| `005` | **38/38 PASS** |
+| `001` | PASS           |
+| `002` | PASS           |
+| `003` | PASS           |
+| `004` | PASS           |
 
-## 12. Não fazer
+Também confirmado:
+
+- `user_roles` AAL1 continua legível para a própria role (1 linha própria,
+  0 alheias);
+- `profiles` AAL1 bloqueado;
+- `profiles` AAL2 preservado;
+- `gerar_fatura` admin AAL1 → **42501**;
+- `gerar_fatura` admin AAL2 → funciona;
+- **11 policies RESTRICTIVE confirmadas em `pg_policies`**, todas
+  `{authenticated}`, `cmd=ALL`, com `aal` em `USING` e em `WITH CHECK`;
+- RLS **12/12** tabelas;
+- policies de papel existentes preservadas.
+
+O `002` recusou `gerar_fatura` com "Apenas administradores podem gerar
+faturas" — prova de que a barreira foi a **regra de papel**, não a de AAL, e
+de que acrescentar `aal2` aos claims não criou falso positivo.
+
+**App:** `test:mfa` 13/13 · lint 0 erros, apenas warning preexistente ·
+TypeScript PASS · build PASS · `git diff --check` PASS.
+
+### Aplicação em Production — 2026-09-11
+
+Aplicada com o procedimento oficial do projeto, CLI **2.117.0** (a mesma versão
+já validada), prefixada com `env -u SUPABASE_ACCESS_TOKEN` e precedida de
+`--dry-run` para conferir o anúncio antes de confirmar.
+
+O binário `supabase` **não existe no PATH deste ambiente** — nem no Bash, nem no
+PowerShell, nem em `node_modules`, nem instalado globalmente. Está no cache do
+`npx`, e foi usado por caminho absoluto, de propósito, para impedir que o `npx`
+resolvesse uma versão diferente durante operação em Production:
+
+```
+C:\Users\VINICIUS\AppData\Local\npm-cache\_npx\6f1b058a4d9555af\node_modules\@supabase\cli-windows-x64\bin\supabase.exe
+```
+
+A CLI anunciou e aplicou **somente** `20260911140000_009_enforce_aal2.sql`, com
+`seeds: []` e `roles: []`.
+
+| Verificação em Production         | Resultado                                                       |
+| --------------------------------- | --------------------------------------------------------------- |
+| Histórico de migrations           | **15 local / 15 remoto**, 0 pendentes, 0 inesperadas            |
+| Policies `*_exige_aal2`           | **11**, todas RESTRICTIVE / `ALL` / `authenticated`             |
+| `USING` e `WITH CHECK` com `aal2` | 11 e 11                                                         |
+| AAL2 em `user_roles`              | **0** — isenção deliberada preservada                           |
+| Policies permissivas antigas      | **19**, intactas (30 no total)                                  |
+| RLS                               | **12/12** tabelas                                               |
+| `md5` normalizado de `prosrc`     | `dba82abe905ee54e8cfe358cae2104cd` — idêntico ao arquivo da 009 |
+
+`gerar_fatura` instalada: `SECURITY DEFINER`, assinatura `(uuid, date, date)`,
+`RETURNS invoices`, `search_path = public, pg_temp`, owner `postgres`, checks na
+ordem `auth.uid` → `aal2` → papel, `EXECUTE` só para `authenticated` e negado
+para `anon`.
+
+Testes remotos não destrutivos, em `BEGIN … ROLLBACK`, só leitura, com claims
+simulados via `set_config` + `SET LOCAL ROLE authenticated`. Feitos sobre
+`profiles`, a única tabela protegida com dado real:
+
+| Cenário                     | Linhas | Veredito                |
+| --------------------------- | ------ | ----------------------- |
+| `aal=aal1`                  | 0      | bloqueado               |
+| claim `aal` ausente         | 0      | bloqueado (fail-closed) |
+| `aal=aal2`                  | 1      | acesso preservado       |
+| `user_roles` com `aal=aal1` | 1      | legível, sem deadlock   |
+
+`gerar_fatura` em AAL1 → **42501**, "Autenticação de dois fatores obrigatória",
+antes de qualquer efeito de negócio. Nada persistiu: as contagens das 12 tabelas
+ficaram idênticas depois dos testes.
+
+**Cuidado ao ler esses números:** testes equivalentes sobre `clients` e
+`timesheet_entries` passaram, mas são **inconclusivos** — essas tabelas estão
+vazias, e "0 linhas" não distingue bloqueio de ausência de dado. Ver seção 7.
+
+### Smoke test manual em Production — APROVADO
+
+Executado pelo usuário no navegador, em 2026-09-11:
+
+- login com senha funcionou;
+- **antes do TOTP o painel não foi liberado**;
+- TOTP funcionou;
+- após AAL2 o painel carregou normalmente;
+- módulos abriram sem erro de autorização;
+- F5 preservou a sessão;
+- nova aba preservou a sessão;
+- logout funcionou;
+- novo login voltou a exigir TOTP.
+
+`admin.bslogisticas.com.br` → HTTP 200. Vercel Production em `359dd90` →
+success.
+
+**Rollout AAL2 validado ponta a ponta.**
+
+## 7. Achados menores registrados
+
+**P3 —** `sincronizar_chave_da_diaria` pode retornar `23503` "Folha não
+encontrada" numa tentativa AAL1, antes do `WITH CHECK`. O trigger é
+`SECURITY INVOKER` e lê `timesheets`, que a policy nova esconde em AAL1.
+**A operação continua bloqueada.** É problema de diagnóstico/mensagem,
+**NÃO bypass**. Não corrigir no PR AAL2.
+
+**Resíduo de CLI —** `supabase/.branches/` é resíduo local da CLI e não está
+no `.gitignore`. Reaparece a cada operação local. **Não alterar o
+`.gitignore` nesta etapa.**
+
+**Production está praticamente vazia de dados de negócio.** Conferido em
+2026-09-11, logo após o rollout: `profiles` = 1 e `user_roles` = 1 (o admin); as
+10 tabelas de negócio — `clients`, `contracts`, `employees`, `operations`,
+`shifts`, `operation_team`, `timesheets`, `timesheet_entries`, `invoices`,
+`invoice_items` — têm **0 linhas**. Não é defeito do AAL2 e não bloqueia nada,
+mas **limita o que qualquer teste em Production consegue provar**: num banco
+vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência de dado. Foi por
+isso que a prova do enforcement se apoiou em `profiles`. Confirmar se o estado é
+esperado antes de tirar qualquer conclusão a partir de contagens.
+
+**Pendências antigas que seguem abertas:**
+
+- mensagens cruas do SDK em `src/app/mfa/painel-mfa.tsx` (P3);
+- decidir sobre Vercel Preview Deployments (P3);
+- `auth.sms.twilio.enabled = true` no remoto com `external.phone = false` —
+  conferir origem numa passagem pelo Dashboard;
+- `docs/ESTADO_DO_PROJETO.md` e
+  `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` estão obsoletos.
+
+## 8. PRÓXIMO PASSO
+
+O enforcement AAL2 está encerrado. O próximo passo é **atualizar o PR #13
+(password recovery) com `main`**:
+
+1. atualizar `feat/password-recovery` (hoje em `7ce1a1d`) com `main` em
+   `359dd90`;
+2. resolver conflitos, se houver;
+3. reexecutar as suítes do PR #13 — `test:recuperacao`, `test:prova`,
+   `test:troca`, `test:mfa`;
+4. `npm run lint`, `npx tsc --noEmit`, `npm run build`;
+5. aguardar revisão;
+6. mergear o PR #13;
+7. **só depois do deploy das rotas**, colar o HTML do Reset Password em
+   **Authentication → Emails → Templates → Reset Password**, com o botão
+   apontando para
+   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
+   Colar antes do deploy deixa o link em 404.
+
+Sem bloquear nada, pendente de decisão: popular Production com os dados reais de
+negócio (ver seção 7).
+
+## 9. Não fazer
 
 - Não reconstruir o Supabase de novo.
 - Não reaplicar migrations já aplicadas.
@@ -224,27 +349,16 @@ próxima passagem pelo Dashboard.
 - Não expor `service_role`, nem colocar segredo em `NEXT_PUBLIC_*`.
 - Não conectar Preview ao banco de produção só para passar o check.
 - Não modificar DNS sem confirmação.
-- Não configurar o Resend antes de validar SPF/DMARC.
-- Não implementar telas de Auth antes de provar a entrega pelo SMTP.
+- Não mergear o PR #13 sem antes atualizá-lo com `main` e refazer os checks.
+- Não reaplicar a migration 009 — já está aplicada em Production (15/15).
+- Não adicionar enforcement AAL2 em `user_roles`.
 - Não tocar no site institucional.
 
-## 13. Como retomar após `/clear`
-
-Para retomar em uma sessão limpa:
+## 10. Como retomar após `/clear`
 
 1. leia `CLAUDE.md`;
-2. leia `PROGRESS.md`;
+2. leia este arquivo;
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
-5. continue somente da seção **Próximo passo**;
-6. se o estado real divergir do checkpoint, pare e reporte a divergência.
-
-**Documentos com conteúdo obsoleto — não confie neles sem verificar:**
-
-- `docs/ESTADO_DO_PROJETO.md` — fotografia de 04/09/2026: fala em 7 migrations,
-  PR #1 aberto, produção não publicada e nenhum domínio. Tudo isso mudou.
-- `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` — marcado como "não
-  corrigida", mas a migration `20260909175435_protect_timesheet_invoice_link`
-  resolveu o caso.
-
-Atualizar esses dois é trabalho pendente e fora do escopo deste checkpoint.
+5. continue somente da seção **PRÓXIMO PASSO**;
+6. se o estado real divergir deste checkpoint, **pare e reporte**.

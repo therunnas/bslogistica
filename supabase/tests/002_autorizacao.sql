@@ -12,6 +12,15 @@
 -- abaixo troca para o papel `authenticated` e injeta `request.jwt.claims`, que
 -- é de onde `auth.uid()` lê o usuário. `set local` dentro de um bloco `do` é
 -- revertido quando o bloco termina, então os cenários não vazam um para o outro.
+--
+-- POR QUE O CLAIM `aal: aal2`: desde a migration 009 as tabelas de negócio têm
+-- uma policy RESTRICTIVE que exige segundo fator. Cada cenário aqui representa
+-- um usuário que já concluiu o login completo, então o claim é acrescentado
+-- para que os testes continuem medindo o que sempre mediram — papel e
+-- privilégio. Sem ele, tudo seria negado pelo AAL e as asserções passariam
+-- pelo motivo errado, mascarando regressão de papel. O enforcement de AAL2 em
+-- si é verificado em 005_enforcement_aal2.sql. O bloco `anon` não recebe o
+-- claim: para `anon` não existe policy alguma.
 
 begin;
 
@@ -62,7 +71,7 @@ declare
   _afetadas integer;
 begin
   perform set_config('request.jwt.claims',
-    json_build_object('sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated')::text, true);
+    json_build_object('sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   if not public.has_role(auth.uid(), 'admin'::public.app_role) then
@@ -113,7 +122,7 @@ declare
   _bloqueou boolean;
 begin
   perform set_config('request.jwt.claims',
-    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated')::text, true);
+    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   if public.is_staff() then raise exception 'SEM PAPEL: is_staff devolveu verdadeiro'; end if;
@@ -159,7 +168,7 @@ declare
   _invoice uuid;
 begin
   perform set_config('request.jwt.claims',
-    json_build_object('sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated')::text, true);
+    json_build_object('sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   if not public.is_staff() then raise exception 'OPERACIONAL: is_staff devolveu falso'; end if;
@@ -330,7 +339,7 @@ declare
   _afetadas integer;
 begin
   perform set_config('request.jwt.claims',
-    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated')::text, true);
+    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- só enxerga as próprias linhas: o usuário sem papel não tem nenhuma
@@ -392,7 +401,7 @@ declare
   _invoice uuid;
 begin
   perform set_config('request.jwt.claims',
-    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated')::text, true);
+    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   update public.timesheet_entries
@@ -428,7 +437,7 @@ declare
   _msg text;
 begin
   perform set_config('request.jwt.claims',
-    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated')::text, true);
+    json_build_object('sub', '22222222-2222-4222-8222-222222222222', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   _bloqueou := false;

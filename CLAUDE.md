@@ -40,8 +40,8 @@ src/lib/ledger.ts          consolidação apontamento → cliente
 src/lib/mfa.ts             decisões de segundo fator, funções puras
 src/integrations/supabase/ clientes (browser/server), tipos do banco
 src/proxy.ts               renovação de sessão a cada requisição
-supabase/migrations/       14 arquivos, todos aplicados
-supabase/tests/            4 testes SQL de RLS e invariáveis
+supabase/migrations/       15 arquivos (o que já foi aplicado: PROGRESS.md)
+supabase/tests/            5 testes SQL de RLS e invariáveis
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
@@ -82,6 +82,16 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 - **A RLS é a proteção real.** Nunca tratar o guard do layout como substituto.
 - 12 tabelas em `public`, todas com RLS ativa.
 - Autorização em SQL usa `public.has_role()` e `public.is_staff()`.
+- **O MFA também é exigido no banco.** 11 tabelas de negócio têm policy
+  RESTRICTIVE pedindo `aal2`, porque papel sozinho não distinguia uma sessão
+  AAL1 — quem tivesse só a senha alcançava os dados pelo PostgREST.
+- **`user_roles` fica fora desse enforcement, de propósito.** O guard lê o
+  papel ainda em AAL1, antes de mandar para o MFA; bloquear a tabela cria
+  deadlock — seria preciso AAL2 para chegar à tela que concede AAL2. Não
+  adicionar policy de AAL2 nela.
+- **Função `SECURITY DEFINER` roda acima da RLS**, então policy não a protege:
+  a exigência de `aal2` precisa estar escrita dentro da própria função, como
+  em `gerar_fatura`. Vale para toda RPC nova com `SECURITY DEFINER`.
 - **Nunca editar migration já aplicada.** Criar nova com
   `supabase migration new <nome>`.
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse
