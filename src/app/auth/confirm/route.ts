@@ -57,7 +57,27 @@ export async function GET(request: NextRequest) {
     token_hash: tokenHash as string,
   });
 
+  // O `verifyOtp` em si falhou: nenhuma sessão nova foi criada, então não há o
+  // que limpar. Sai direto.
   if (error || !data.session) return responder("falha");
+
+  /**
+   * Daqui para baixo a sessão de recuperação JÁ EXISTE: o `verifyOtp` gravou
+   * os cookies dela. Toda saída de falha precisa derrubá-la antes de
+   * redirecionar — senão a rota diz "link inválido" e deixa o navegador
+   * autenticado, que era o defeito apontado na revisão.
+   *
+   * Escopo `local`, não global: isto limpa a sessão de recuperação recém-criada
+   * cujo processamento falhou. Derrubar as sessões legítimas do usuário em
+   * outros dispositivos porque um segredo de servidor está ausente seria
+   * castigar quem não tem culpa. O `signOut` global continua existindo, mas
+   * pertence ao outro momento — depois da TROCA de senha bem-sucedida, em
+   * `redefinir-senha/actions.ts`.
+   */
+  async function falharDepoisDeVerificar() {
+    await supabase.auth.signOut({ scope: "local" });
+    return responder("falha");
+  }
 
   // Claims verificados do access token recém-emitido. `getClaims` valida a
   // assinatura do JWT; ler o corpo sem verificar seria confiar no que veio da
@@ -75,19 +95,19 @@ export async function GET(request: NextRequest) {
   const sessionId = claims?.claims?.session_id;
 
   if (erroClaims || !user || typeof sub !== "string" || typeof sessionId !== "string") {
-    return responder("falha");
+    return falharDepoisDeVerificar();
   }
 
   // Coerência entre as duas leituras: o token verificado tem de descrever o
   // mesmo usuário que o servidor confirmou.
-  if (sub !== user.id) return responder("falha");
+  if (sub !== user.id) return falharDepoisDeVerificar();
 
   const prova = await criarProvaDeRecuperacao({ sub, sessionId });
 
   // Sem segredo configurado não há prova possível. Falha fechada: é melhor o
   // fluxo parar aqui do que seguir para um formulário que não conseguiria
   // provar nada.
-  if (!prova) return responder("falha");
+  if (!prova) return falharDepoisDeVerificar();
 
   const resposta = responder("ok");
 

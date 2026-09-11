@@ -318,6 +318,115 @@ verificar(
   "true",
 );
 
+console.log("\nH. Limpeza de sessão nas falhas pós-verifyOtp\n");
+
+// O achado: depois do verifyOtp dar certo a sessão de recuperação já existe.
+// Qualquer falha posterior tem de derrubá-la antes de redirecionar, senão a
+// rota diz "link inválido" e deixa o navegador autenticado.
+const semComentariosRota = rota
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .split("\n")
+  .filter((l) => !l.trimStart().startsWith("//"))
+  .join("\n");
+
+const posVerifyOtp = semComentariosRota.indexOf("verifyOtp(");
+const posFalhaVerify = semComentariosRota.indexOf("if (error || !data.session) return responder(");
+const posHelper = semComentariosRota.indexOf("async function falharDepoisDeVerificar()");
+const posSignOutRota = semComentariosRota.indexOf("auth.signOut(");
+
+// 1. verifyOtp falha -> sai sem limpar (não houve sessão nova confirmada).
+verificar(
+  "H1. falha do próprio verifyOtp retorna sem signOut",
+  String(posFalhaVerify !== -1 && posFalhaVerify < posHelper),
+  "true",
+);
+verificar(
+  "H1b. o retorno dessa falha não passa pelo helper",
+  String(semComentariosRota.slice(posVerifyOtp, posHelper).includes("falharDepoisDeVerificar")),
+  "false",
+);
+
+// 2 a 6. Todas as saídas posteriores passam pela limpeza.
+const chamadasDoHelper = (semComentariosRota.match(/return falharDepoisDeVerificar\(\)/g) || [])
+  .length;
+verificar("H2. há 3 saídas de falha pós-verifyOtp centralizadas", String(chamadasDoHelper), "3");
+verificar(
+  "H3. claims com erro / sem usuário / sub ou sessão ausentes -> helper",
+  String(
+    /if \(erroClaims \|\| !user[\s\S]{0,120}?return falharDepoisDeVerificar\(\)/.test(
+      semComentariosRota,
+    ),
+  ),
+  "true",
+);
+verificar(
+  "H4. sub divergente -> helper",
+  String(/if \(sub !== user\.id\) return falharDepoisDeVerificar\(\)/.test(semComentariosRota)),
+  "true",
+);
+verificar(
+  "H5. prova não emitida (secret ausente) -> helper",
+  String(/if \(!prova\) return falharDepoisDeVerificar\(\)/.test(semComentariosRota)),
+  "true",
+);
+verificar(
+  "H6. nenhuma saída de falha pós-verifyOtp escapou do helper",
+  String((semComentariosRota.slice(posHelper).match(/return responder\("falha"\)/g) || []).length),
+  "1", // apenas o `return responder("falha")` de dentro do próprio helper
+);
+
+// 7. Caminho de sucesso não limpa sessão.
+const trechoSucesso = semComentariosRota.slice(semComentariosRota.indexOf("const resposta ="));
+verificar(
+  "H7. caminho de sucesso não chama signOut",
+  String(/signOut/.test(trechoSucesso)),
+  "false",
+);
+verificar(
+  "H7b. caminho de sucesso grava o cookie e redireciona",
+  String(/resposta\.cookies\.set\(/.test(trechoSucesso) && /return resposta/.test(trechoSucesso)),
+  "true",
+);
+
+// 8. Escopo local nas limpezas pós-verifyOtp.
+verificar(
+  "H8. a limpeza usa scope local",
+  String(/signOut\(\{\s*scope:\s*"local"\s*\}\)/.test(semComentariosRota)),
+  "true",
+);
+verificar(
+  "H8b. há exatamente um signOut na rota",
+  String((semComentariosRota.match(/auth\.signOut\(/g) || []).length),
+  "1",
+);
+verificar(
+  "H8c. a rota não usa signOut global",
+  String(/auth\.signOut\(\)/.test(semComentariosRota)),
+  "false",
+);
+verificar("H8d. o signOut fica dentro do helper", String(posHelper < posSignOutRota), "true");
+
+// 9. O signOut após a troca de senha continua GLOBAL.
+const acaoTroca = readFileSync(
+  new URL("../src/app/redefinir-senha/actions.ts", import.meta.url),
+  "utf8",
+)
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .split("\n")
+  .filter((l) => !l.trimStart().startsWith("//"))
+  .join("\n");
+
+verificar(
+  "H9. signOut da troca de senha continua global (sem scope)",
+  String(/auth\.signOut\(\)/.test(acaoTroca)),
+  "true",
+);
+verificar(
+  "H9b. a troca de senha não usa scope local",
+  String(/signOut\(\{\s*scope:\s*"local"/.test(acaoTroca)),
+  "false",
+);
+
 console.log(`\n${passou} passaram, ${falhas.length} falharam\n`);
 
 if (falhas.length > 0) {
