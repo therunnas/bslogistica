@@ -380,11 +380,33 @@ passo manual, no Dashboard do Supabase, e o teste real do fluxo**:
    `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
    As rotas já estão publicadas e validadas em Production, então o link não cai
    mais em 404 — a condição que impedia essa troca foi cumprida;
-2. executar o **E2E real de recuperação**: pedir o link em `/esqueci-senha`,
-   abrir o e-mail, clicar, confirmar na tela intermediária, trocar a senha e
-   entrar de novo com ela;
-3. conferir no E2E que o clique do usuário é o que consome o token — e que
-   abrir o link uma segunda vez encontra um token já usado.
+2. executar o **E2E real de recuperação**, na ordem abaixo.
+
+### Roteiro do E2E
+
+| #   | Passo                              | PASS esperado                                                    |
+| --- | ---------------------------------- | ---------------------------------------------------------------- |
+| 1   | pedir o link em `/esqueci-senha`   | mensagem genérica; e-mail chega                                  |
+| 2   | abrir o link do e-mail             | tela intermediária aparece                                       |
+| 3   | clicar **Continuar**               | **é aqui que o token é consumido**; vai a `/redefinir-senha`     |
+| 4   | trocar a senha                     | vai a `/login?senha-redefinida=1`                                |
+| 5   | entrar com a senha nova            | login normal, com TOTP                                           |
+| 6   | abrir **o mesmo link** outra vez   | **a tela intermediária aparece de novo — isso é PASS**           |
+| 7   | clicar **Continuar** a segunda vez | token recusado; termina em `/esqueci-senha?status=link-invalido` |
+
+**Os passos 6 e 7 medem coisas diferentes e é fácil confundi-los:**
+
+- **(A) segunda abertura do link — passo 6.** A tela de confirmação aparecer é
+  o resultado **correto**, não um defeito. O `GET /auth/confirm` não consome nem
+  verifica o token: ele só confere formato e `type`, grava o cookie pendente e
+  renderiza. Nada ali sabe se o token já foi usado — e é exatamente por isso que
+  um scanner de e-mail não queima mais a recuperação;
+- **(B) segunda confirmação — passo 7.** Só aqui o `verifyOtp` roda, encontra o
+  token já consumido e recusa.
+
+Esperar que o passo 6 falhe é ler o comportamento correto como quebra — foi o
+engano que esta instrução continha antes, herdado da arquitetura antiga, em que
+o GET consumia o token.
 
 Nada além disso está pendente no código.
 
