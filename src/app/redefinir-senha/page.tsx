@@ -1,7 +1,9 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import { MolduraAuth } from "@/components/moldura-auth";
+import { NOME_DO_COOKIE_DE_PROVA, validarProvaDeRecuperacao } from "@/lib/prova-recuperacao";
 import { ROTA_ESQUECI_SENHA, decidirAcessoRedefinicao } from "@/lib/recuperacao-senha";
 
 import { FormularioNovaSenha } from "./formulario-nova-senha";
@@ -18,21 +20,23 @@ import { FormularioNovaSenha } from "./formulario-nova-senha";
  * `auth.updateUser`. O painel continua atrás do guard completo, e a RLS segue
  * valendo para tudo que for dado.
  *
- * "Existe usuário autenticado" NÃO basta como porteiro. Uma sessão comum de
+ * O PORTEIRO
+ *
+ * "Existe usuário autenticado" não basta: uma sessão comum de
  * `signInWithPassword`, mesmo em aal1, também é autenticada, e o
- * `updateUser({ password })` aceitaria a troca — alguém já logado poderia abrir
- * esta rota direto e trocar a própria senha sem nunca ter passado por um link
- * de recuperação. Por isso o método de autenticação da sessão é verificado,
- * além da existência dela.
+ * `updateUser({ password })` aceitaria a troca. Por isso são três exigências
+ * simultâneas, todas no servidor:
  *
- * As duas leituras são de servidor e validadas: `getUser` confere o token
- * contra o Supabase em vez de confiar no cookie, e `getClaims` devolve os
- * claims já verificados do JWT — nada aqui vem de dado não verificado do
- * cliente.
+ * 1. `getUser()` — valida o token contra o Supabase, não confia no cookie;
+ * 2. `getClaims()` — claims verificados do JWT, de onde sai o `session_id`;
+ * 3. a prova assinada em `bs_recovery_proof` — íntegra, no prazo, com
+ *    `purpose` correto e amarrada a este `sub` e a este `session_id`.
  *
- * A regra de decisão fica em `decidirAcessoRedefinicao`, testável à parte: o
- * AMR precisa conter explicitamente `recovery`. Qualquer outro método, claim
- * ausente ou malformado nega o acesso.
+ * A origem da sessão NÃO é mais deduzida do AMR. O `verifyOtp({ type:
+ * "recovery" })` cria a sessão como `models.OTP`, então `recovery` nunca
+ * aparece ali; quem prova a origem é a assinatura emitida em /auth/confirm.
+ *
+ * Sem o segredo do servidor ninguém fabrica a prova mandando um Cookie.
  *
  * ALCANCE DESTE GUARD — limite conhecido e aceito
  *
@@ -50,12 +54,25 @@ export default async function RedefinirSenha() {
   } = await supabase.auth.getUser();
 
   const { data: claims } = await supabase.auth.getClaims();
+  const sessionId = claims?.claims?.session_id;
 
-  // Sem sessão de recuperação não há o que redefinir. Volta para o começo do
-  // fluxo em vez de mostrar um formulário que falharia no envio — ou, pior,
-  // que aceitaria a troca vinda de uma sessão comum.
-  if (decidirAcessoRedefinicao({ temUsuario: Boolean(user), amr: claims?.claims?.amr }) === "negar")
-    redirect(ROTA_ESQUECI_SENHA);
+  const armazemDeCookies = await cookies();
+  const provaBruta = armazemDeCookies.get(NOME_DO_COOKIE_DE_PROVA)?.value;
+
+  // A validação recebe o que o servidor confirmou, não o que o cookie afirma:
+  // a prova só vale se apontar para ESTE usuário e ESTA sessão.
+  const resultadoDaProva =
+    user && typeof sessionId === "string"
+      ? await validarProvaDeRecuperacao(provaBruta, { sub: user.id, sessionId })
+      : "ausente";
+
+  const acesso = decidirAcessoRedefinicao({
+    temUsuario: Boolean(user),
+    temClaims: typeof sessionId === "string",
+    resultadoDaProva,
+  });
+
+  if (acesso === "negar") redirect(ROTA_ESQUECI_SENHA);
 
   return (
     <MolduraAuth

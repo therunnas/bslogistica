@@ -143,67 +143,25 @@ export function decidirRespostaDaSolicitacao(
 
   // Sem status positivo não houve resposta HTTP: navegador offline, DNS, CORS,
   // transporte interrompido. A requisição pode nem ter chegado ao Supabase, e
-  // dizer "você receberá as instruções" seria mentira. Como o servidor não
-  // respondeu, também não há nada a vazar sobre a conta — esta classificação
-  // não enfraquece a anti-enumeração.
+  // dizer "você receberá as instruções" seria mentira. Falha de transporte não
+  // depende da existência da conta, então este é o único caso que pode ter
+  // mensagem própria sem virar oráculo.
   if (typeof status !== "number" || status <= 0) return "falha-temporaria";
 
-  if (status === 429 || status >= 500) return "falha-temporaria";
-
-  // Os 4xx com resposta real continuam mascarados.
+  // QUALQUER resposta HTTP vira a mensagem genérica — 429 e 5xx inclusive.
+  //
+  // O motivo é sutil e custou um achado de revisão: o /recover mascara conta
+  // inexistente com resposta de sucesso, mas conta EXISTENTE entra no caminho
+  // de envio e é lá que aparecem o cooldown por usuário (429) e a falha de
+  // SMTP (5xx). Ou seja, esses status só ocorrem para quem tem conta. Dar a
+  // eles um texto diferente transformaria o formulário num oráculo: bastaria
+  // reenviar o mesmo endereço e observar se a mensagem muda.
   return "generica";
 }
 
 /* ------------------------------------------------------------------ */
 /* Acesso ao formulário de nova senha                                  */
 /* ------------------------------------------------------------------ */
-
-/**
- * O único método de autenticação que abre o formulário de nova senha.
- *
- * Allowlist, não denylist. Uma regra por exclusão ("nega password, permite o
- * resto") deixaria passar qualquer método futuro ou desconhecido, o que não é
- * o requisito: só sessão nascida de recuperação de senha pode entrar aqui.
- *
- * `recovery` não aparece no array literal `AMRMethods` de @supabase/auth-js,
- * mas isso não o torna inválido — o tipo é `(typeof AMRMethods)[number] |
- * (string & {})`, aberto de propósito, e o Supabase Auth reconhece `recovery`
- * como authentication method. A ausência na lista do TypeScript não é
- * argumento para afrouxar a regra.
- */
-export const METODO_DE_RECUPERACAO = "recovery";
-
-/**
- * Achata o claim `amr` para uma lista simples de métodos.
- *
- * O claim vem em dois formatos: `AMREntry[]` (`{ method, timestamp }`) ou
- * `string[]` no formato RFC-8176. O tipo do SDK declara os dois, então tratar
- * só um deles deixaria a verificação cega metade das vezes.
- *
- * A normalização apara espaços e baixa a caixa. Isso tolera variação de
- * formatação sem criar permissividade: o `amr` vem dentro de um JWT assinado e
- * já verificado, então ninguém de fora escolhe esse valor — e como a comparação
- * é por igualdade com um único literal, aparar `" recovery "` ou baixar
- * `"RECOVERY"` não tem como deixar `password` passar.
- *
- * Entrada inesperada vira lista vazia, que o `decidirAcessoRedefinicao` nega.
- */
-export function normalizarAmr(amr: unknown): string[] {
-  if (!Array.isArray(amr)) return [];
-
-  return amr
-    .map((entrada) => {
-      if (typeof entrada === "string") return entrada;
-      if (entrada && typeof entrada === "object" && "method" in entrada) {
-        const metodo = (entrada as { method: unknown }).method;
-        return typeof metodo === "string" ? metodo : null;
-      }
-      return null;
-    })
-    .filter((metodo): metodo is string => metodo !== null)
-    .map((metodo) => metodo.trim().toLowerCase())
-    .filter((metodo) => metodo !== "");
-}
 
 export type AcessoARedefinicao = "permitir" | "negar";
 
@@ -212,25 +170,18 @@ export type AcessoARedefinicao = "permitir" | "negar";
  *
  * O problema que isto resolve: exigir apenas "existe usuário autenticado" é
  * fraco demais. Uma sessão comum de `signInWithPassword`, mesmo em aal1,
- * também é autenticada — e `updateUser({ password })` aceitaria a troca. A
- * página precisa aceitar SOMENTE sessão nascida do link de recuperação.
+ * também é autenticada — e `updateUser({ password })` aceitaria a troca.
  *
- * A regra é uma allowlist de um item só: o AMR precisa conter, explicitamente,
- * `recovery`. Tudo o mais nega — `password`, `password`+`totp`, `otp`,
- * `magiclink`, `email`, `invite`, `signup`, `oauth`, `sso`, `anonymous`,
- * `token_refresh` e qualquer método desconhecido ou futuro. Claim ausente,
- * vazio ou malformado também nega.
+ * A identificação NÃO usa o AMR. A regra anterior exigia `recovery` ali e
+ * estava errada: o `verifyOtp({ type: "recovery" })` cria a sessão como
+ * `models.OTP`, então `recovery` nunca aparece no AMR. Aceitar `otp` no lugar
+ * também não serve, porque `otp` não identifica recuperação de senha com
+ * exclusividade. Quem prova a origem agora é a prova assinada emitida em
+ * /auth/confirm — ver `lib/prova-recuperacao.ts`.
  *
- * A exigência é de PRESENÇA, não de exclusividade: `recovery` acompanhado de
- * outro método ainda passa. Só entra `recovery` no AMR quem consumiu um token
- * válido enviado ao e-mail da conta, e essa prova de posse não é anulada pelo
- * que mais estiver na lista. O ataque que este guard fecha é a sessão comum
- * SEM recovery — essa é negada em qualquer combinação.
- *
- * Isso vale inclusive depois de um refresh de token: o guard continua
- * procurando a mesma evidência. Se um refresh real remover essa evidência, o
- * acesso fecha — e o teste ponta a ponta expõe o problema, em vez de a regra
- * ser afrouxada para "qualquer coisa que não seja password".
+ * As três condições valem juntas: usuário validado contra o servidor, claims
+ * verificados do JWT e prova íntegra, no prazo e amarrada a essa sessão.
+ * Qualquer falha nega.
  *
  * NÃO se exige aal2 aqui de propósito. Sessão de recuperação é naturalmente
  * aal1, e pedir segundo fator travaria justamente quem precisa recuperar. O
@@ -238,17 +189,16 @@ export type AcessoARedefinicao = "permitir" | "negar";
  */
 export function decidirAcessoRedefinicao({
   temUsuario,
-  amr,
+  temClaims,
+  resultadoDaProva,
 }: {
   temUsuario: boolean;
-  amr: unknown;
+  temClaims: boolean;
+  resultadoDaProva: string;
 }): AcessoARedefinicao {
   if (!temUsuario) return "negar";
-
-  const metodos = normalizarAmr(amr);
-  const possuiRecovery = metodos.some((metodo) => metodo === METODO_DE_RECUPERACAO);
-
-  return possuiRecovery ? "permitir" : "negar";
+  if (!temClaims) return "negar";
+  return resultadoDaProva === "valida" ? "permitir" : "negar";
 }
 
 /* ------------------------------------------------------------------ */

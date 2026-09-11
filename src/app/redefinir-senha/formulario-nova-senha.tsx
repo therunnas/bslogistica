@@ -64,6 +64,12 @@ export function FormularioNovaSenha() {
     // Encerra a sessão de recuperação antes de sair desta tela. O escopo
     // padrão é global, então as demais sessões da conta também caem — que é o
     // comportamento desejado depois de uma troca de senha.
+    //
+    // O cookie `bs_recovery_proof` não é apagado aqui de propósito: é httpOnly
+    // e o cliente não alcança. Criar uma rota só para limpá-lo seria
+    // complexidade sem ganho — a prova está amarrada ao `session_id`, e este
+    // signOut global revoga justamente essa sessão. Sem a sessão a prova não
+    // valida mais, e em 10 minutos ela expira sozinha.
     const { error: erroAoSair } = await supabase.auth.signOut();
 
     if (erroAoSair) {

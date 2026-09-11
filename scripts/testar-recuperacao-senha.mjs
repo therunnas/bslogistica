@@ -27,11 +27,9 @@ import {
   MENSAGEM_SOLICITACAO_ENVIADA,
   ROTA_ESQUECI_SENHA,
   ROTA_REDEFINIR_SENHA,
-  decidirAcessoRedefinicao,
   decidirConfirmacao,
   decidirRespostaDaSolicitacao,
   montarDestinoConfirmacao,
-  normalizarAmr,
   traduzirErroDeSenha,
   validarNovaSenha,
 } from "../src/lib/recuperacao-senha.ts";
@@ -227,31 +225,34 @@ verificar(
   decidirRespostaDaSolicitacao({ status: "400" }),
   "falha-temporaria",
 );
+// E5, E6 e E7 foram invertidos depois do segundo achado do Codex no PR #13.
+//
+// O /recover mascara conta inexistente com sucesso, mas conta EXISTENTE entra
+// no caminho de envio — e é lá que surgem o cooldown por usuário (429) e a
+// falha de SMTP (5xx). Esses status só acontecem para quem tem conta, então
+// dar a eles um texto diferente transformaria a tela num oráculo: bastaria
+// reenviar o mesmo endereço e observar se a mensagem muda.
 verificar(
-  "E5. 429 (limite de envio) -> falha temporária",
+  "E5. 429 (cooldown por usuário) -> genérica, senão vira oráculo",
   decidirRespostaDaSolicitacao({ status: 429 }),
-  "falha-temporaria",
+  "generica",
 );
 verificar(
-  "E6. 500 -> falha temporária",
+  "E6. 500 (falha de SMTP só ocorre com conta existente) -> genérica",
   decidirRespostaDaSolicitacao({ status: 500 }),
-  "falha-temporaria",
-);
-verificar(
-  "E7. 503 -> falha temporária",
-  decidirRespostaDaSolicitacao({ status: 503 }),
-  "falha-temporaria",
-);
-// A fronteira do mascaramento: 4xx com resposta real continua genérico.
-verificar(
-  "E7b. 401 -> genérica (4xx real segue mascarado)",
-  decidirRespostaDaSolicitacao({ status: 401 }),
   "generica",
 );
+verificar("E7. 503 -> genérica", decidirRespostaDaSolicitacao({ status: 503 }), "generica");
+verificar("E7b. 401 -> genérica", decidirRespostaDaSolicitacao({ status: 401 }), "generica");
+verificar("E7c. 404 -> genérica", decidirRespostaDaSolicitacao({ status: 404 }), "generica");
+// A fronteira única: só ausência de resposta HTTP escapa do genérico.
 verificar(
-  "E7c. 404 -> genérica (4xx real segue mascarado)",
-  decidirRespostaDaSolicitacao({ status: 404 }),
-  "generica",
+  "E7d. qualquer status positivo -> genérica",
+  [200, 301, 400, 418, 429, 500, 502, 503, 599]
+    .map((s) => decidirRespostaDaSolicitacao({ status: s }))
+    .every((r) => r === "generica")
+    .toString(),
+  "true",
 );
 
 // A mensagem pública não pode conter termo que denuncie a conta.
@@ -299,175 +300,6 @@ verificar(
   MENSAGEM_FALHA_AO_TROCAR,
 );
 verificar("F5. código null -> genérico", traduzirErroDeSenha(null), MENSAGEM_FALHA_AO_TROCAR);
-
-console.log("\nH. decidirAcessoRedefinicao — só sessão de recuperação abre o formulário\n");
-
-// O caso que motivou esta verificação existir: sessão comum de login.
-verificar(
-  "H1. sessão de signInWithPassword (amr=password) -> NEGA",
-  decidirAcessoRedefinicao({
-    temUsuario: true,
-    amr: [{ method: "password", timestamp: 1715766000 }],
-  }),
-  "negar",
-);
-verificar(
-  "H2. sessão de login com MFA (amr=password+totp) -> NEGA",
-  decidirAcessoRedefinicao({
-    temUsuario: true,
-    amr: [
-      { method: "password", timestamp: 1715766000 },
-      { method: "totp", timestamp: 1715766100 },
-    ],
-  }),
-  "negar",
-);
-verificar(
-  "H3. sessão de recuperação (amr=recovery) -> PERMITE",
-  decidirAcessoRedefinicao({
-    temUsuario: true,
-    amr: [{ method: "recovery", timestamp: 1715766000 }],
-  }),
-  "permitir",
-);
-verificar(
-  "H4. sem sessão -> NEGA",
-  decidirAcessoRedefinicao({ temUsuario: false, amr: [{ method: "recovery", timestamp: 1 }] }),
-  "negar",
-);
-verificar(
-  "H5. sem AMR -> NEGA (falha fechada)",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: undefined }),
-  "negar",
-);
-verificar(
-  "H6. AMR vazio -> NEGA",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: [] }),
-  "negar",
-);
-
-// Allowlist de um item: nenhum outro método é tratado como equivalente a
-// recovery, nem os que "parecem" vir de link de e-mail.
-for (const metodo of [
-  "otp",
-  "magiclink",
-  "email",
-  "invite",
-  "signup",
-  "oauth",
-  "sso/saml",
-  "anonymous",
-  "web3",
-  "token_refresh",
-  "metodo_que_ainda_nao_existe",
-]) {
-  verificar(
-    `H7.${metodo} sozinho -> NEGA`,
-    decidirAcessoRedefinicao({ temUsuario: true, amr: [{ method: metodo, timestamp: 1 }] }),
-    "negar",
-  );
-}
-
-verificar(
-  "H8. token_refresh sem recovery -> NEGA",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["token_refresh"] }),
-  "negar",
-);
-verificar(
-  "H9. recovery acompanhado de outro método -> PERMITE (exigência é presença)",
-  decidirAcessoRedefinicao({
-    temUsuario: true,
-    amr: [
-      { method: "recovery", timestamp: 1 },
-      { method: "otp", timestamp: 2 },
-    ],
-  }),
-  "permitir",
-);
-
-// Formato RFC-8176 (string[]) precisa valer tanto quanto AMREntry[].
-verificar(
-  "H10. formato string[] com password -> NEGA",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["password"] }),
-  "negar",
-);
-verificar(
-  "H11. formato string[] com recovery -> PERMITE",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["recovery"] }),
-  "permitir",
-);
-// Caso analisado, não acidental: recovery presente junto de password.
-//
-// Só se põe `recovery` no AMR quem consumiu um token válido enviado ao e-mail
-// da conta. Quem fez isso provou posse da caixa de entrada, que é exatamente a
-// credencial que o fluxo exige — a presença adicional de `password` não retira
-// essa prova. O ataque que o guard fecha é a sessão comum SEM recovery, e essa
-// continua negada (H1, H2, H10).
-verificar(
-  "H12. formato misto com recovery + password -> PERMITE (recovery foi provado)",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["recovery", { method: "password" }] }),
-  "permitir",
-);
-verificar(
-  "H12b. formato misto SEM recovery -> NEGA",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["otp", { method: "password" }] }),
-  "negar",
-);
-
-// Caixa e espaço: a normalização tolera variação de formatação do claim
-// assinado, e não pode virar brecha. Comportamento definido e travado aqui.
-verificar(
-  "H13. ' recovery ' com espaços -> PERMITE (normalização apara)",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: [" recovery "] }),
-  "permitir",
-);
-verificar(
-  "H14. 'RECOVERY' em caixa alta -> PERMITE (normalização baixa a caixa)",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["RECOVERY"] }),
-  "permitir",
-);
-verificar(
-  "H14b. 'PASSWORD' em caixa alta -> NEGA (caixa não cria permissividade)",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["PASSWORD"] }),
-  "negar",
-);
-verificar(
-  "H14c. 'recovery_extra' não é recovery -> NEGA (igualdade, não prefixo)",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["recovery_extra"] }),
-  "negar",
-);
-verificar(
-  "H14d. 'xrecovery' não é recovery -> NEGA (igualdade, não substring)",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: ["xrecovery"] }),
-  "negar",
-);
-verificar(
-  "H15. amr não-array (objeto solto) -> NEGA",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: { method: "recovery" } }),
-  "negar",
-);
-verificar(
-  "H16. amr com entradas inúteis -> NEGA",
-  decidirAcessoRedefinicao({ temUsuario: true, amr: [null, 42, {}] }),
-  "negar",
-);
-
-console.log("\nH-b. normalizarAmr — os dois formatos do claim\n");
-
-verificar(
-  "H17. AMREntry[] vira lista de métodos",
-  normalizarAmr([
-    { method: "password", timestamp: 1 },
-    { method: "totp", timestamp: 2 },
-  ]).join(","),
-  "password,totp",
-);
-verificar(
-  "H18. string[] passa direto",
-  normalizarAmr(["password", "totp"]).join(","),
-  "password,totp",
-);
-verificar("H19. entrada inválida vira lista vazia", normalizarAmr("password").length, 0);
 
 console.log("\nG. Garantias estruturais — lidas do próprio código-fonte\n");
 
