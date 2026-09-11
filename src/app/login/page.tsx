@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "@/lib/notificacoes";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
@@ -10,6 +11,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MENSAGEM_SENHA_REDEFINIDA, ROTA_ESQUECI_SENHA } from "@/lib/recuperacao-senha";
+
+/**
+ * Confirmação de senha redefinida, vinda de /redefinir-senha.
+ *
+ * Em componente próprio porque `useSearchParams` obriga um limite de Suspense
+ * — sem ele o build falha ao pré-renderizar esta rota estática.
+ */
+function AvisoSenhaRedefinida() {
+  const parametros = useSearchParams();
+  if (parametros.get("senha-redefinida") !== "1") return null;
+
+  return (
+    <p
+      role="status"
+      className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground"
+    >
+      {MENSAGEM_SENHA_REDEFINIDA}
+    </p>
+  );
+}
 
 /**
  * Tela de entrada do painel.
@@ -76,6 +98,9 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Suspense fallback={null}>
+            <AvisoSenhaRedefinida />
+          </Suspense>
           <form onSubmit={entrar} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
@@ -103,6 +128,14 @@ export default function Login() {
               {enviando ? "Aguarde..." : "Entrar"}
             </Button>
           </form>
+          <p className="text-center text-sm">
+            <Link
+              href={ROTA_ESQUECI_SENHA}
+              className="text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Esqueci minha senha
+            </Link>
+          </p>
           <p className="text-center text-sm text-muted-foreground">
             Precisa de acesso? Fale com o administrador do sistema.
           </p>
