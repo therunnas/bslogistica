@@ -7,22 +7,20 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Item          | Valor                                      |
 | ------------- | ------------------------------------------ |
 | Data/hora     | 2026-09-11                                 |
-| Branch atual  | `docs/progress-aal2-production`            |
-| `main`        | `359dd905bf47ad213968e0f50e0ea198db93866f` |
-| `origin/main` | `359dd90` — idêntico ao `main` local       |
+| Branch atual  | `docs/checkpoint-password-recovery`        |
+| `main`        | `9822fc3539f79e1e21880d975ce5d2cb0f3f5cdb` |
+| `origin/main` | `9822fc3` — idêntico ao `main` local       |
 
-**O enforcement AAL2 está concluído: mergeado, aplicado em Production e
-validado ponta a ponta.** Detalhe na seção 5.
+**As duas frentes estão fechadas no código.** Ambas mergeadas, deployadas e
+validadas:
 
-Resta uma frente aberta:
+| Frente            | Merge     | Estado                                |
+| ----------------- | --------- | ------------------------------------- |
+| Enforcement AAL2  | `359dd90` | **CONCLUÍDO** — PR #14, em Production |
+| Password recovery | `9822fc3` | **MERGEADO** — PR #13, deploy verde   |
 
-| Frente            | Branch                    | Estado                          |
-| ----------------- | ------------------------- | ------------------------------- |
-| Password recovery | `feat/password-recovery`  | PR #13 aberto, **não mergeado** |
-| Enforcement AAL2  | — (mergeado em `359dd90`) | **CONCLUÍDO** — PR #14          |
-
-O PR #13 deixou de estar congelado: a condição que o bloqueava — AAL2 valendo
-no banco — foi cumprida. Ver seção 8.
+Resta **um passo manual**: trocar o template Reset Password do Supabase e rodar
+o E2E real de recuperação. Ver seção 8.
 
 ## 2. Ambiente
 
@@ -62,48 +60,108 @@ PASS. Remetente `BS Soluções Logísticas <nao-responda@envio.bslogisticas.com.
 
 ## 4. PR #13 — PASSWORD RECOVERY
 
-**Branch:** `feat/password-recovery`
-**HEAD congelado:** `7ce1a1d85a0ec291e4d8221f2e0ff1000afc9c10`
+**PR #13 MERGEADO** em 2026-09-11.
+**Merge commit:** `9822fc3539f79e1e21880d975ce5d2cb0f3f5cdb`
+**Deploy de Production:** **verde**.
 
-**Estado:**
+### Arquitetura final do fluxo
 
-- PR #13 aberto;
-- **NÃO mergeado**;
-- password recovery implementado;
-- prova HMAC server-side;
-- revalidação da prova no submit;
-- `updateUser` server-side;
-- `signOut` global após troca bem-sucedida;
-- limpeza **local** da sessão quando `verifyOtp` já criou sessão e etapa
-  posterior falha;
-- `PASSWORD_RECOVERY_PROOF_SECRET` necessário em Production — **já criado
-  manualmente na Vercel, somente no escopo Production**;
-- template Reset Password do Supabase **AINDA NÃO foi alterado**;
-- **PR #13 NÃO pode ser mergeado antes do enforcement AAL2 no banco.**
+1. **`/esqueci-senha`** — solicitação, com anti-enumeração: toda resposta HTTP
+   vira a mesma mensagem genérica (429 e 5xx inclusive, porque esses só ocorrem
+   para quem tem conta). Erro sem status HTTP é o único com mensagem própria.
+2. **`GET /auth/confirm`** — valida `token_hash` e `type=recovery`, **não chama
+   `verifyOtp`**, não cria sessão, não emite prova; grava `bs_recovery_pending`
+   (`httpOnly`, `Secure`, `lax`, 300s, `Path=/auth/confirmar-recuperacao`),
+   responde `Cache-Control: no-store` e redireciona por **303** para URL limpa.
+3. **`/auth/confirmar-recuperacao`** — Server Component; exige clique
+   deliberado. O token não aparece no HTML nem no JavaScript.
+4. **Server Action de confirmação** — lê o token só do cookie, `type` fixo em
+   `recovery`, `verifyOtp` server-side, `getClaims` + `getUser`, exige
+   `sub === user.id`, cria a prova HMAC, apaga o pendente, grava
+   `bs_recovery_proof` e redireciona.
+5. **`/redefinir-senha`** — revalida a prova imediatamente antes do
+   `updateUser` server-side; `signOut` global; se ele falhar, fallback
+   `signOut({ scope: "local" })` em `try/catch`; a prova é apagada nos dois
+   desfechos. Sucesso normal vai ao login; sucesso parcial vai para
+   `/login?senha-redefinida=1&sessoes-ativas=1`.
+6. **`/login`** — mensagem persistente no card para o desfecho parcial e, só
+   nesse estado, **sem** auto-redirect para `/dashboard`. Fora dele, o
+   comportamento é o de sempre.
+7. **MFA, AAL2 e RLS preservados** — o fluxo não contém um único `.from()`:
+   opera apenas sobre `auth`, então as 11 policies RESTRICTIVE não o alcançam.
 
-Cinco commits: `702d353`, `ce29689`, `6ac3471`, `313481f`, `7ce1a1d`.
+### Três correções de revisão, já no merge
 
-Suítes do PR #13: `test:recuperacao` 63/63, `test:prova` 71/71,
-`test:troca` 48/48, `test:mfa` 13/13. CodeRabbit: `Review completed`, sem
-achados. Vercel Preview vermelho pelo motivo de sempre — ausência proposital
-das `NEXT_PUBLIC_SUPABASE_*` no ambiente Preview.
+- **`8023e6e`** — o GET consumia o token de uso único, e scanners de gateway de
+  e-mail queimavam a recuperação antes do clique do usuário;
+- **`1ea9bd0`** — com o `updateUser` bem-sucedido e o `signOut` global falhando,
+  a prova e a sessão sobreviviam, e a tela ainda dizia que a redefinição falhou;
+- **`5da679d`** — o desfecho parcial prendia o usuário num formulário travado;
+  passou a redirecionar para o login com aviso próprio.
+
+### Resultado final
+
+| Suíte              | Resultado   |
+| ------------------ | ----------- |
+| `test:recuperacao` | **63/63**   |
+| `test:prova`       | **100/100** |
+| `test:troca`       | **83/83**   |
+| `test:mfa`         | **13/13**   |
+
+Lint 0 erros (1 warning preexistente) · TypeScript PASS · build PASS ·
+`git diff --check` PASS. Codex no HEAD `5da679df4e`: "Didn't find any major
+issues."
+
+Smoke manual com sessão autenticada: `/login?senha-redefinida=1&sessoes-ativas=1`
+permaneceu no login com a mensagem correta (**PASS**); `/login` redirecionou
+para `/dashboard` (**PASS**).
+
+`PASSWORD_RECOVERY_PROOF_SECRET` **já está configurado** no ambiente Production
+da Vercel, projeto `contato-8135 / bs-logistica-sistema`. Preview segue vermelho
+pelo motivo de sempre — ausência proposital das `NEXT_PUBLIC_SUPABASE_*`.
+
+### Validação das rotas em Production — 2026-09-11
+
+| Rota                          | Resultado                                             |
+| ----------------------------- | ----------------------------------------------------- |
+| `/login`                      | **200**                                               |
+| `/esqueci-senha`              | **200**                                               |
+| `/auth/confirmar-recuperacao` | **200** — sem cookie, oferece "Solicitar novo link"   |
+| `/redefinir-senha`            | **307** para `/esqueci-senha` — por design, sem prova |
+
+Nenhum 404 ou 500. Também confirmado no ar, sem consumir token nenhum:
+`GET /auth/confirm` sem parâmetros devolve 303 para
+`/esqueci-senha?status=link-invalido`; com um token qualquer devolve **303** com
+`Cache-Control: no-store` e `Set-Cookie: bs_recovery_pending=…; Secure; HttpOnly;
+SameSite=lax; Max-Age=300; Path=/auth/confirmar-recuperacao`. O atributo `Secure`
+só aparece porque `NODE_ENV === "production"`. Com o cookie, a tela mostra
+"Continuar"; **o token não aparece no HTML** (0 ocorrências). Nenhum e-mail foi
+enviado e nenhum token real foi consumido.
 
 ### Achado residual aceito
 
-**P2 residual no signOut local:** `@supabase/auth-js` 2.115.0 já remove a
-sessão local em falhas remotas comuns (verificado no fonte instalado,
-`GoTrueClient.js:3425-3436`); há caminho residual estreito de falha de leitura
-de sessão. **Não vamos manipular cookies internos `sb-*` manualmente** — isso
-acoplaria a aplicação a detalhe de implementação do SDK. O risco relevante
-será mitigado pelo enforcement AAL2 no banco.
+**P2 residual no cleanup local da confirmação**, em
+`src/app/auth/confirmar-recuperacao/actions.ts`: nas falhas **posteriores a um
+`verifyOtp` bem-sucedido**, o resultado do `signOut({ scope: "local" })` não é
+verificado. O `@supabase/auth-js` 2.115.0 já remove a sessão local em falhas
+remotas comuns (verificado no fonte instalado, `GoTrueClient.js:3425-3436`);
+resta um caminho estreito de falha de leitura de sessão. **Não vamos manipular
+cookies internos `sb-*` manualmente** — isso acoplaria a aplicação a detalhe de
+implementação do SDK. A mitigação prometida foi cumprida: com o AAL2 valendo no
+banco, a sessão residual é AAL1 e não alcança nenhuma das 11 tabelas de negócio.
 
-### Passo manual pendente do PR #13
+O `GET /auth/confirm` **não** tem parte nisso: não instancia o cliente do
+Supabase e não chama `signOut`. Quem cria a sessão de recuperação — e portanto
+quem precisa limpá-la — é a Server Action que consome o token.
 
-Depois do deploy das rotas, colar o HTML do Reset Password em
-**Authentication → Emails → Templates → Reset Password**, com o botão
-apontando para
+### Passo manual pendente — o único que resta
+
+O template Reset Password do Supabase **ainda usa `{{ .ConfirmationURL }}`**.
+
+Colar o HTML em **Authentication → Emails → Templates → Reset Password**, com o
+botão apontando para
 `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
-Colar antes do deploy deixa o link em 404.
+As rotas já estão publicadas, então o link não cai mais em 404.
 
 ## 5. AAL2 / RLS — CONCLUÍDO
 
@@ -320,22 +378,43 @@ esperado antes de tirar qualquer conclusão a partir de contagens.
 
 ## 8. PRÓXIMO PASSO
 
-O enforcement AAL2 está encerrado. O próximo passo é **atualizar o PR #13
-(password recovery) com `main`**:
+O código das duas frentes está mergeado e em Production. O que resta é **um
+passo manual, no Dashboard do Supabase, e o teste real do fluxo**:
 
-1. atualizar `feat/password-recovery` (hoje em `7ce1a1d`) com `main` em
-   `359dd90`;
-2. resolver conflitos, se houver;
-3. reexecutar as suítes do PR #13 — `test:recuperacao`, `test:prova`,
-   `test:troca`, `test:mfa`;
-4. `npm run lint`, `npx tsc --noEmit`, `npm run build`;
-5. aguardar revisão;
-6. mergear o PR #13;
-7. **só depois do deploy das rotas**, colar o HTML do Reset Password em
-   **Authentication → Emails → Templates → Reset Password**, com o botão
-   apontando para
+1. em **Authentication → Emails → Templates → Reset Password**, trocar
+   `{{ .ConfirmationURL }}` pelo botão apontando para
    `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
-   Colar antes do deploy deixa o link em 404.
+   As rotas já estão publicadas e validadas em Production, então o link não cai
+   mais em 404 — a condição que impedia essa troca foi cumprida;
+2. executar o **E2E real de recuperação**, na ordem abaixo.
+
+### Roteiro do E2E
+
+| #   | Passo                              | PASS esperado                                                    |
+| --- | ---------------------------------- | ---------------------------------------------------------------- |
+| 1   | pedir o link em `/esqueci-senha`   | mensagem genérica; e-mail chega                                  |
+| 2   | abrir o link do e-mail             | tela intermediária aparece                                       |
+| 3   | clicar **Continuar**               | **é aqui que o token é consumido**; vai a `/redefinir-senha`     |
+| 4   | trocar a senha                     | vai a `/login?senha-redefinida=1`                                |
+| 5   | entrar com a senha nova            | login normal, com TOTP                                           |
+| 6   | abrir **o mesmo link** outra vez   | **a tela intermediária aparece de novo — isso é PASS**           |
+| 7   | clicar **Continuar** a segunda vez | token recusado; termina em `/esqueci-senha?status=link-invalido` |
+
+**Os passos 6 e 7 medem coisas diferentes e é fácil confundi-los:**
+
+- **(A) segunda abertura do link — passo 6.** A tela de confirmação aparecer é
+  o resultado **correto**, não um defeito. O `GET /auth/confirm` não consome nem
+  verifica o token: ele só confere formato e `type`, grava o cookie pendente e
+  renderiza. Nada ali sabe se o token já foi usado — e é exatamente por isso que
+  um scanner de e-mail não queima mais a recuperação;
+- **(B) segunda confirmação — passo 7.** Só aqui o `verifyOtp` roda, encontra o
+  token já consumido e recusa.
+
+Esperar que o passo 6 falhe é ler o comportamento correto como quebra — foi o
+engano que esta instrução continha antes, herdado da arquitetura antiga, em que
+o GET consumia o token.
+
+Nada além disso está pendente no código.
 
 Sem bloquear nada, pendente de decisão: popular Production com os dados reais de
 negócio (ver seção 7).
@@ -349,8 +428,9 @@ negócio (ver seção 7).
 - Não expor `service_role`, nem colocar segredo em `NEXT_PUBLIC_*`.
 - Não conectar Preview ao banco de produção só para passar o check.
 - Não modificar DNS sem confirmação.
-- Não mergear o PR #13 sem antes atualizá-lo com `main` e refazer os checks.
 - Não reaplicar a migration 009 — já está aplicada em Production (15/15).
+- Não alterar o template Reset Password antes de confirmar as rotas em
+  Production — hoje já confirmadas, então a troca está liberada.
 - Não adicionar enforcement AAL2 em `user_roles`.
 - Não tocar no site institucional.
 

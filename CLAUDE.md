@@ -31,17 +31,28 @@ Wrangler, Lovable. Foram removidos de propósito. `@tanstack/react-query`
 ## Arquitetura
 
 ```
-src/app/(painel)/          área protegida — 7 telas
-  layout.tsx               guard de acesso (sessão → papel → MFA)
-  _autorizacao.ts          decisão de acesso, no servidor
-src/app/login/ mfa/        fora do guard, de propósito
-src/lib/billing.ts         cálculo de diária, hora extra, custo
-src/lib/ledger.ts          consolidação apontamento → cliente
-src/lib/mfa.ts             decisões de segundo fator, funções puras
-src/integrations/supabase/ clientes (browser/server), tipos do banco
-src/proxy.ts               renovação de sessão a cada requisição
-supabase/migrations/       15 arquivos (o que já foi aplicado: PROGRESS.md)
-supabase/tests/            5 testes SQL de RLS e invariáveis
+src/app/(painel)/            área protegida — 7 telas
+  layout.tsx                 guard de acesso (sessão → papel → MFA)
+  _autorizacao.ts            decisão de acesso, no servidor
+
+as rotas abaixo são irmãs de (painel)/ e ficam fora do guard, de propósito:
+
+src/app/login/               entrada
+src/app/mfa/                 segundo fator
+src/app/esqueci-senha/       solicitação de recuperação
+src/app/auth/confirm/        GET do link: valida e NÃO consome o token
+src/app/auth/confirmar-recuperacao/
+                             confirmação deliberada; consome o token
+src/app/redefinir-senha/     troca da senha, com a prova revalidada
+
+src/lib/billing.ts           cálculo de diária, hora extra, custo
+src/lib/ledger.ts            consolidação apontamento → cliente
+src/lib/mfa.ts               decisões de segundo fator, funções puras
+src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
+src/integrations/supabase/   clientes (browser/server), tipos do banco
+src/proxy.ts                 renovação de sessão a cada requisição
+supabase/migrations/         15 arquivos (o que já foi aplicado: PROGRESS.md)
+supabase/tests/              5 testes SQL de RLS e invariáveis
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
@@ -75,6 +86,17 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 - **Falha ao consultar o nível de garantia não é ausência de fator.** Erro
   transitório vai para a tela "não foi possível verificar", nunca para o
   cadastro de fator — cadastrar sobre conta que já tem fator trava a conta.
+- **Token de recuperação não se consome em GET.** O `GET /auth/confirm` confere
+  **apenas formato e `type`** — não verifica se o token é válido — e o guarda
+  num cookie `httpOnly`. Quem chama `verifyOtp`, e portanto cria a sessão de
+  recuperação, é a Server Action de `src/app/auth/confirmar-recuperacao/`,
+  disparada por um clique. Gateways de segurança de e-mail visitam cada link da
+  mensagem sozinhos, e a varredura queimava a recuperação antes do usuário.
+  Conferir a validade do token **é** consumi-lo: não existe "só verificar" num
+  token de uso único. Vale para qualquer link desse tipo que venha a existir.
+- **Depois que a senha muda, a prova morre** — em qualquer desfecho, inclusive
+  quando o `signOut` global falha. E a tela nunca diz que a redefinição falhou
+  num caminho em que o `updateUser` teve sucesso.
 - O guard governa **o que a interface mostra**. Quem protege os dados é a RLS.
 
 ## RLS e banco
