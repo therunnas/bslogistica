@@ -9,11 +9,13 @@ import {
   VALIDADE_DA_PROVA_EM_SEGUNDOS,
   criarProvaDeRecuperacao,
 } from "@/lib/prova-recuperacao";
+import { decidirMfaNaRecuperacao, decidirSituacaoMfa } from "@/lib/mfa";
 import {
   NOME_DO_COOKIE_PENDENTE,
   ROTA_CONFIRMAR_RECUPERACAO,
   ROTA_ESQUECI_SENHA_LINK_INVALIDO,
   ROTA_REDEFINIR_SENHA,
+  ROTA_REDEFINIR_SENHA_MFA,
 } from "@/lib/recuperacao-senha";
 
 /**
@@ -121,6 +123,24 @@ export async function confirmarRecuperacao() {
   // mesmo usuário que o servidor confirmou.
   if (sub !== user.id) return falharDepoisDeVerificar();
 
+  /**
+   * Situação do segundo fator, decidida ANTES de emitir a prova.
+   *
+   * A sessão que o `verifyOtp` acabou de criar é aal1. Se a conta tem TOTP
+   * verificado, o Supabase recusa a troca de senha nela — `PUT /user` devolve
+   * 401 "AAL2 session is required…". Descobrir isso aqui é o que permite mandar
+   * o usuário ao desafio em vez de deixá-lo esbarrar no erro lá na frente.
+   *
+   * Falha na consulta não vira "não tem fator": `decidirSituacaoMfa` separa as
+   * duas coisas, e `decidirMfaNaRecuperacao` fecha o caminho no erro.
+   */
+  const { data: nivel, error: erroNivel } =
+    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  const decisaoMfa = decidirMfaNaRecuperacao(decidirSituacaoMfa(nivel ?? null, Boolean(erroNivel)));
+
+  if (decisaoMfa === "falhar") return falharDepoisDeVerificar();
+
   const prova = await criarProvaDeRecuperacao({ sub, sessionId });
 
   // Sem segredo configurado não há prova possível. Falha fechada: é melhor o
@@ -146,6 +166,13 @@ export async function confirmarRecuperacao() {
     path: ROTA_REDEFINIR_SENHA,
     maxAge: VALIDADE_DA_PROVA_EM_SEGUNDOS,
   });
+
+  // Conta com TOTP verificado passa pelo desafio antes do formulário de senha;
+  // conta sem fator vai direto, porque para ela o 401 do GoTrue não existe.
+  //
+  // Dois `redirect` em vez de um ternário: o `typedRoutes` valida cada rota
+  // como literal, e uma união de literais não casa com o tipo esperado.
+  if (decisaoMfa === "desafiar-mfa") redirect(ROTA_REDEFINIR_SENHA_MFA);
 
   redirect(ROTA_REDEFINIR_SENHA);
 }

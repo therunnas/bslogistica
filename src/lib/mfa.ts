@@ -38,6 +38,35 @@ export function decidirSituacaoMfa(nivel: NivelMfa | null, houveErro: boolean): 
   return "liberado";
 }
 
+export type DecisaoMfaNaRecuperacao = "desafiar-mfa" | "prosseguir" | "falhar";
+
+/**
+ * O que a recuperação de senha deve fazer, dada a situação do segundo fator.
+ *
+ * POR QUE ISTO EXISTE
+ *
+ * O `verifyOtp({ type: "recovery" })` cria a sessão em aal1. Quando a conta tem
+ * TOTP verificado, o próprio Supabase recusa a troca de senha nessa sessão:
+ * `PUT /user` devolve 401 "AAL2 session is required to update email or password
+ * when MFA is enabled". Não é regra nossa, é do GoTrue — e a resposta certa é
+ * satisfazer o segundo fator, nunca contorná-lo.
+ *
+ * A exigência é CONDICIONAL, e é por isso que esta função existe separada de
+ * um simples `aal === "aal2"`:
+ *
+ * - `mfa-pendente` (aal1, mas a conta tem fator) -> desafiar, e só então trocar;
+ * - `liberado` (já aal2) -> o fator já foi satisfeito, segue;
+ * - `mfa-ausente` (a conta não tem fator) -> o 401 não acontece, segue em aal1.
+ *   Exigir aal2 aqui travaria a recuperação de quem nunca cadastrou MFA;
+ * - `mfa-indisponivel` -> falha fechada. Não saber se há fator não é o mesmo que
+ *   não haver: seguir levaria ao mesmo 401, agora sem diagnóstico.
+ */
+export function decidirMfaNaRecuperacao(situacao: SituacaoMfa): DecisaoMfaNaRecuperacao {
+  if (situacao === "mfa-pendente") return "desafiar-mfa";
+  if (situacao === "mfa-indisponivel") return "falhar";
+  return "prosseguir";
+}
+
 export type FluxoMfa = "desafio" | "cadastro" | "sem-fator-esperado";
 
 /**

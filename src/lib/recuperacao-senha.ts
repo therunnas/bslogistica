@@ -15,6 +15,17 @@ export const ROTA_ESQUECI_SENHA = "/esqueci-senha";
 /** Rota do formulário de nova senha, fora do layout protegido do painel. */
 export const ROTA_REDEFINIR_SENHA = "/redefinir-senha";
 
+/**
+ * Segundo fator dentro da recuperação, quando a conta tem TOTP verificado.
+ *
+ * Fica **sob** `/redefinir-senha` de propósito: o cookie `bs_recovery_proof` é
+ * emitido com `Path=/redefinir-senha`, e pela RFC 6265 §5.1.4 esse path cobre a
+ * subárvore. Uma rota irmã como `/auth/mfa-recuperacao` não receberia a prova —
+ * e a alternativa, ampliar o cookie para `Path=/`, entregaria a prova a toda a
+ * aplicação para resolver um problema de roteamento.
+ */
+export const ROTA_REDEFINIR_SENHA_MFA = "/redefinir-senha/mfa";
+
 /** Rota de entrada. */
 export const ROTA_LOGIN = "/login";
 
@@ -107,6 +118,35 @@ export const MENSAGEM_FALHA_GENERICA =
 
 export const MENSAGEM_LINK_INVALIDO =
   "Este link de recuperação é inválido ou expirou. Solicite um novo link.";
+
+/** Título da tela de segundo fator dentro da recuperação. */
+export const TITULO_MFA_RECUPERACAO = "Confirme o segundo fator";
+
+/** Texto da tela de segundo fator. Não menciona conta, e-mail nem fator. */
+export const MENSAGEM_MFA_RECUPERACAO =
+  "Sua conta tem verificação em duas etapas. Informe o código do aplicativo autenticador para definir a nova senha.";
+
+/** Falha do código informado. Não distingue código errado de código expirado. */
+export const MENSAGEM_MFA_RECUPERACAO_INVALIDA =
+  "Código inválido. Confira o aplicativo autenticador e tente novamente.";
+
+/**
+ * Falha ao consultar o segundo fator.
+ *
+ * Mensagem própria porque não saber se há fator não é o mesmo que não haver —
+ * e prosseguir levaria o usuário a um erro sem explicação na troca da senha.
+ */
+export const MENSAGEM_MFA_INDISPONIVEL =
+  "Não foi possível verificar a segunda etapa agora. Tente novamente em alguns instantes.";
+
+/**
+ * O envio chegou sem o segundo fator satisfeito.
+ *
+ * Acontece quando a sessão perde o aal2 entre abrir o formulário e enviá-lo.
+ * A tela manda o usuário de volta ao desafio em vez de deixá-lo colher o 401.
+ */
+export const MENSAGEM_MFA_EXIGIDO =
+  "Confirme a verificação em duas etapas antes de definir a nova senha.";
 
 /** Título da tela intermediária de confirmação. */
 export const TITULO_CONFIRMAR_RECUPERACAO = "Redefinir sua senha";

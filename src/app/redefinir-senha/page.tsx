@@ -3,8 +3,14 @@ import { redirect } from "next/navigation";
 
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import { MolduraAuth } from "@/components/moldura-auth";
+import { decidirMfaNaRecuperacao, decidirSituacaoMfa } from "@/lib/mfa";
 import { NOME_DO_COOKIE_DE_PROVA, validarProvaDeRecuperacao } from "@/lib/prova-recuperacao";
-import { ROTA_ESQUECI_SENHA, decidirAcessoRedefinicao } from "@/lib/recuperacao-senha";
+import {
+  MENSAGEM_MFA_INDISPONIVEL,
+  ROTA_ESQUECI_SENHA,
+  ROTA_REDEFINIR_SENHA_MFA,
+  decidirAcessoRedefinicao,
+} from "@/lib/recuperacao-senha";
 
 import { FormularioNovaSenha } from "./formulario-nova-senha";
 
@@ -73,6 +79,33 @@ export default async function RedefinirSenha() {
   });
 
   if (acesso === "negar") redirect(ROTA_ESQUECI_SENHA);
+
+  /**
+   * Segundo fator, quando a conta tem um.
+   *
+   * A exigência é CONDICIONAL. O `verifyOtp` cria a sessão em aal1, e o
+   * Supabase recusa a troca de senha nela **apenas** se a conta tiver MFA
+   * verificado — `PUT /user` devolve 401 "AAL2 session is required…". Exigir
+   * aal2 de todo mundo travaria a recuperação de quem nunca cadastrou fator.
+   */
+  const { data: nivel, error: erroNivel } =
+    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  const decisao = decidirMfaNaRecuperacao(decidirSituacaoMfa(nivel ?? null, Boolean(erroNivel)));
+
+  if (decisao === "desafiar-mfa") redirect(ROTA_REDEFINIR_SENHA_MFA);
+
+  // Falha fechada: sem saber se há fator, trocar a senha esbarraria no 401.
+  if (decisao === "falhar") {
+    return (
+      <MolduraAuth titulo="Definir nova senha" descricao={MENSAGEM_MFA_INDISPONIVEL}>
+        <p className="text-sm text-muted-foreground">
+          Recarregue a página em instantes. Se o problema continuar, solicite um novo link de
+          recuperação.
+        </p>
+      </MolduraAuth>
+    );
+  }
 
   return (
     <MolduraAuth

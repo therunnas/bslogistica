@@ -18,6 +18,8 @@ import {
   VALIDADE_DA_PROVA_EM_SEGUNDOS,
   VERSAO_DA_PROVA,
   assinarProva,
+  lerExpAutenticadoCom,
+  reemitirProvaCom,
   verificarProva,
 } from "../src/lib/prova-recuperacao.ts";
 
@@ -397,7 +399,16 @@ verificar(
 // 2 a 6. Todas as saídas posteriores passam pela limpeza.
 const chamadasDoHelper = (semComentariosAcao.match(/return falharDepoisDeVerificar\(\)/g) || [])
   .length;
-verificar("H2. há 3 saídas de falha pós-verifyOtp centralizadas", String(chamadasDoHelper), "3");
+// Quatro desde que a consulta do nível de MFA entrou no fluxo: claims/usuário,
+// sub divergente, prova não emitida e agora nível de garantia indisponível.
+verificar("H2. há 4 saídas de falha pós-verifyOtp centralizadas", String(chamadasDoHelper), "4");
+verificar(
+  "H2b. o nível de MFA indisponível também passa pelo helper",
+  String(
+    /if \(decisaoMfa === "falhar"\) return falharDepoisDeVerificar\(\)/.test(semComentariosAcao),
+  ),
+  "true",
+);
 verificar(
   "H3. claims com erro / sem usuário / sub ou sessão ausentes -> helper",
   String(
@@ -641,6 +652,289 @@ verificar(
   String(guardaTemEfeitoDeConsumo),
   "false",
 );
+
+console.log("\nJ. Reemissão da prova depois do segundo fator\n");
+
+// O segundo fator troca o access token. Se o session_id mudar nessa troca, a
+// prova antiga — amarrada ao session_id anterior — deixaria de validar e o
+// usuário seria barrado logo depois de acertar o TOTP. A reemissão cobre os
+// dois cenários; o exp é herdado para a janela de 10 minutos não reiniciar.
+
+const SESSAO_POS_MFA = "55555555-5555-5555-5555-555555555555";
+const EXP_ORIGINAL = AGORA + 600;
+
+// Cenário 1: o session_id MUDOU depois do MFA.
+const reemitidaOutraSessao = await reemitirProvaCom(
+  {
+    sub: SUB,
+    sessionId: SESSAO_POS_MFA,
+    expOriginal: EXP_ORIGINAL,
+    agoraEmSegundos: AGORA + 120,
+  },
+  SEGREDO,
+);
+verificar("J1. reemite quando há tempo restante", reemitidaOutraSessao.situacao, "reemitida");
+verificar(
+  "J2. a prova reemitida vale para a sessão NOVA",
+  await verificarProva(reemitidaOutraSessao.prova, SEGREDO, {
+    sub: SUB,
+    sessionId: SESSAO_POS_MFA,
+    agoraEmSegundos: AGORA + 121,
+  }),
+  "valida",
+);
+verificar(
+  "J3. a prova reemitida NÃO vale para a sessão antiga",
+  await verificarProva(reemitidaOutraSessao.prova, SEGREDO, {
+    sub: SUB,
+    sessionId: SESSAO,
+    agoraEmSegundos: AGORA + 121,
+  }),
+  "sessao-divergente",
+);
+verificar(
+  "J4. o maxAge usa o TTL restante, não 600",
+  String(reemitidaOutraSessao.segundosRestantes),
+  "480",
+);
+verificar(
+  "J4b. o TTL restante é menor que a validade cheia",
+  String(reemitidaOutraSessao.segundosRestantes < VALIDADE_DA_PROVA_EM_SEGUNDOS),
+  "true",
+);
+
+// Cenário 2: o session_id NÃO mudou. A reemissão tem de ser inócua.
+const reemitidaMesmaSessao = await reemitirProvaCom(
+  {
+    sub: SUB,
+    sessionId: SESSAO,
+    expOriginal: EXP_ORIGINAL,
+    agoraEmSegundos: AGORA + 60,
+  },
+  SEGREDO,
+);
+verificar(
+  "J5. session_id inalterado -> prova continua válida",
+  await verificarProva(reemitidaMesmaSessao.prova, SEGREDO, {
+    sub: SUB,
+    sessionId: SESSAO,
+    agoraEmSegundos: AGORA + 61,
+  }),
+  "valida",
+);
+
+// O exp é herdado: a prova reemitida expira no mesmo instante da original.
+verificar(
+  "J6. a reemissão expira no mesmo instante da original",
+  await verificarProva(reemitidaOutraSessao.prova, SEGREDO, {
+    sub: SUB,
+    sessionId: SESSAO_POS_MFA,
+    agoraEmSegundos: EXP_ORIGINAL,
+  }),
+  "expirada",
+);
+verificar(
+  "J6b. a reemissão NÃO ganha 600s novos",
+  await verificarProva(reemitidaOutraSessao.prova, SEGREDO, {
+    sub: SUB,
+    sessionId: SESSAO_POS_MFA,
+    agoraEmSegundos: AGORA + 120 + VALIDADE_DA_PROVA_EM_SEGUNDOS - 1,
+  }),
+  "expirada",
+);
+
+// Sem tempo restante não se reemite: prova expirada não se renova.
+verificar(
+  "J7. sem tempo restante -> sem-tempo",
+  (
+    await reemitirProvaCom(
+      {
+        sub: SUB,
+        sessionId: SESSAO_POS_MFA,
+        expOriginal: EXP_ORIGINAL,
+        agoraEmSegundos: EXP_ORIGINAL,
+      },
+      SEGREDO,
+    )
+  ).situacao,
+  "sem-tempo",
+);
+verificar(
+  "J7b. já expirada -> sem-tempo",
+  (
+    await reemitirProvaCom(
+      {
+        sub: SUB,
+        sessionId: SESSAO_POS_MFA,
+        expOriginal: EXP_ORIGINAL,
+        agoraEmSegundos: EXP_ORIGINAL + 1,
+      },
+      SEGREDO,
+    )
+  ).situacao,
+  "sem-tempo",
+);
+
+// lerExpAutenticado não é decodificador: só entrega o exp depois de verificar.
+const provaParaExp = await assinarProva(carga({ exp: EXP_ORIGINAL }), SEGREDO);
+const expLido = await lerExpAutenticadoCom(provaParaExp, SEGREDO, {
+  sub: SUB,
+  sessionId: SESSAO,
+  agoraEmSegundos: AGORA + 10,
+});
+verificar(
+  "J8. exp autenticado é extraído da prova válida",
+  String(expLido.exp),
+  String(EXP_ORIGINAL),
+);
+verificar(
+  "J9. assinatura inválida NÃO entrega exp",
+  (
+    await lerExpAutenticadoCom(provaParaExp.slice(0, -2) + "ZZ", SEGREDO, {
+      sub: SUB,
+      sessionId: SESSAO,
+      agoraEmSegundos: AGORA + 10,
+    })
+  ).situacao,
+  "invalida",
+);
+verificar(
+  "J9b. sessão divergente NÃO entrega exp",
+  (
+    await lerExpAutenticadoCom(provaParaExp, SEGREDO, {
+      sub: SUB,
+      sessionId: SESSAO_POS_MFA,
+      agoraEmSegundos: AGORA + 10,
+    })
+  ).situacao,
+  "invalida",
+);
+verificar(
+  "J9c. prova expirada NÃO entrega exp",
+  (
+    await lerExpAutenticadoCom(provaParaExp, SEGREDO, {
+      sub: SUB,
+      sessionId: SESSAO,
+      agoraEmSegundos: EXP_ORIGINAL + 1,
+    })
+  ).situacao,
+  "invalida",
+);
+
+console.log("\nK. Server Action do segundo fator na recuperação\n");
+
+const acaoMfa = soCodigo(
+  readFileSync(new URL("../src/app/redefinir-senha/mfa/actions.ts", import.meta.url), "utf8"),
+);
+const paginaMfa = soCodigo(
+  readFileSync(new URL("../src/app/redefinir-senha/mfa/page.tsx", import.meta.url), "utf8"),
+);
+const formularioMfa = soCodigo(
+  readFileSync(
+    new URL("../src/app/redefinir-senha/mfa/formulario-mfa.tsx", import.meta.url),
+    "utf8",
+  ),
+);
+
+verificar("K1. a action declara 'use server'", String(acaoMfa.startsWith('"use server"')), "true");
+
+// A trava central: sem revalidar a prova, esta action seria um elevador de
+// aal1 para aal2 aberto a qualquer sessão autenticada.
+verificar(
+  "K2. a action revalida a prova, não confia na página",
+  String(/lerExpAutenticado\(/.test(acaoMfa)),
+  "true",
+);
+verificar(
+  "K2b. a prova é revalidada ANTES do challengeAndVerify",
+  String(acaoMfa.indexOf("lerExpAutenticado(") < acaoMfa.indexOf("challengeAndVerify(")),
+  "true",
+);
+verificar(
+  "K2c. a página também valida a prova",
+  String(/validarProvaDeRecuperacao\(/.test(paginaMfa)),
+  "true",
+);
+
+// Nunca cadastra nem remove fator, nunca mostra segredo, nunca vai ao painel.
+for (const [nome, proibido] of [
+  ["K3. sem enroll na action", /mfa\.enroll\(/],
+  ["K3b. sem unenroll na action", /mfa\.unenroll\(/],
+  ["K3c. sem QR na action", /qr_code/],
+  ["K3d. sem segredo de fator na action", /totp\.secret/],
+  ["K3e. a action não leva ao painel", /dashboard/],
+]) {
+  verificar(nome, String(proibido.test(acaoMfa)), "false");
+}
+for (const [nome, proibido] of [
+  ["K4. sem enroll na página", /mfa\.enroll\(/],
+  ["K4b. sem unenroll na página", /mfa\.unenroll\(/],
+  ["K4c. sem QR na página", /qr_code/],
+  ["K4d. a página não leva ao painel", /dashboard/],
+]) {
+  verificar(nome, String(proibido.test(paginaMfa)), "false");
+}
+
+// O fator é escolhido no servidor, entre os verificados.
+verificar(
+  "K5. a action lista os fatores no servidor",
+  String(/mfa\.listFactors\(\)/.test(acaoMfa)),
+  "true",
+);
+verificar(
+  "K5b. um factorId recebido é confirmado contra a lista",
+  String(/verificados\.find\(\(f\) => f\.id === factorIdInformado\)/.test(acaoMfa)),
+  "true",
+);
+
+// Ordem obrigatória depois do desafio.
+const pDesafio = acaoMfa.indexOf("challengeAndVerify(");
+const pNivelDepois = acaoMfa.lastIndexOf("getAuthenticatorAssuranceLevel()");
+const pReemissao = acaoMfa.indexOf("reemitirProvaDeRecuperacao(");
+const pRedirect = acaoMfa.lastIndexOf("redirect(ROTA_REDEFINIR_SENHA)");
+
+verificar("K6. confere o nível DEPOIS do desafio", String(pDesafio < pNivelDepois), "true");
+verificar(
+  "K6b. exige currentLevel aal2 após o desafio",
+  String(/nivelDepois\?\.currentLevel !== "aal2"/.test(acaoMfa)),
+  "true",
+);
+verificar("K7. reemite a prova depois do desafio", String(pDesafio < pReemissao), "true");
+verificar("K7b. reemite antes de redirecionar", String(pReemissao < pRedirect), "true");
+verificar(
+  "K7c. o cookie reemitido usa o TTL restante, não a validade cheia",
+  String(/maxAge: reemissao\.segundosRestantes/.test(acaoMfa)),
+  "true",
+);
+verificar(
+  "K7d. o cookie reemitido NÃO usa VALIDADE_DA_PROVA_EM_SEGUNDOS",
+  String(/maxAge: VALIDADE_DA_PROVA_EM_SEGUNDOS/.test(acaoMfa)),
+  "false",
+);
+verificar(
+  "K7e. o Path da prova continua o mesmo",
+  String(/path: ROTA_REDEFINIR_SENHA/.test(acaoMfa)),
+  "true",
+);
+
+// Nada sensível sai do servidor nem entra no cliente.
+verificar(
+  "K8. o formulário não instancia cliente do Supabase",
+  String(/integrations\/supabase/.test(formularioMfa)),
+  "false",
+);
+verificar(
+  "K8b. o formulário não chama challengeAndVerify",
+  String(/challengeAndVerify/.test(formularioMfa)),
+  "false",
+);
+verificar(
+  "K8c. o formulário não manipula factorId",
+  String(/factorId/.test(formularioMfa)),
+  "false",
+);
+verificar("K8d. sem console na action", String(/console\./.test(acaoMfa)), "false");
+verificar("K8e. sem service_role na action", String(/service_role/i.test(acaoMfa)), "false");
 
 console.log(`\n${passou} passaram, ${falhas.length} falharam\n`);
 
