@@ -2,7 +2,7 @@
 
 Documentação do projeto: [README](README.md) ·
 [Arquitetura](docs/ARQUITETURA.md) · [Segurança](docs/SEGURANCA.md) ·
-[Estado](docs/ESTADO_DO_PROJETO.md)
+[Progresso](PROGRESS.md)
 
 ## Stack definitiva
 
@@ -40,6 +40,21 @@ tem relação com o TanStack Router.
 - **MFA é exigido também no banco.** 11 tabelas de negócio têm policy
   RESTRICTIVE pedindo `aal2`; `user_roles` fica de fora de propósito, porque é
   lida antes do MFA. Não adicionar AAL2 nela.
+- **Não remover a policy AAL2 global sem substituição segura.** Existe uma
+  decisão aprovada de tornar o MFA opcional para o papel `operacional`, mas ela
+  **ainda não foi implementada**: hoje o guard e as 11 tabelas exigem AAL2 para
+  qualquer papel. A mudança é coordenada — guard + papel + RLS no mesmo desenho.
+  Derrubar a policy sozinha reabre uma vulnerabilidade já corrigida. Enquanto
+  isso, **não criar usuário `operacional` real**. Ver `CLAUDE.md`, seção
+  "AAL por papel", e `PROGRESS.md`, seções 6 e 7.
+- **MFA optativo precisa valer no banco.** Se a conta `operacional` tiver fator
+  verificado, a futura exceção de AAL1 não pode deixar bypass direto por
+  PostgREST/RPC — papel + `aal` sozinhos não distinguem quem nunca ativou MFA de
+  quem ativou e ainda não fez o TOTP. A decisão precisa ser enforceable no
+  banco, não só no guard.
+- **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
+  Operação administrativa privilegiada é server-side, o último admin é
+  protegido, e alteração de usuário ou papel é auditada.
 
 ## Antes de entregar
 

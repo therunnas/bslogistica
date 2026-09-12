@@ -120,11 +120,25 @@ if (nivel.nextLevel !== "aal2")    return { situacao: "mfa-ausente", ... };
 if (nivel.currentLevel !== "aal2") return { situacao: "mfa-pendente", ... };
 ```
 
-Essa função é confiável como verificação de servidor, e não como enfeite de
-interface: por dentro ela chama `getUser(jwt)`, que valida o token contra o
-Supabase, e calcula `nextLevel` a partir de `user.factors` filtrados por
-`status === 'verified'` — dado que vem do servidor, não do cookie.
-`currentLevel` sai da claim `aal` do mesmo token já validado.
+**Correção de 12/09/2026 — como essa verificação realmente funciona.** Este
+texto afirmava que `getAuthenticatorAssuranceLevel()` chama `getUser(jwt)` por
+dentro. Lido o fonte de `@supabase/auth-js` 2.115.0, a função tem **dois
+ramos**, e a afirmação descrevia o outro:
+
+- **com** argumento `jwt` — ela chama `getUser(jwt)`, que valida contra o
+  Supabase;
+- **sem** argumento — que é como o projeto sempre a chama — ela usa
+  `getSession()` e `decodeJWT`, **sem chamada de rede**. `currentLevel` sai da
+  claim `aal` do token armazenado e `nextLevel` sai de `session.user.factors`.
+
+A exigência **continua sendo de servidor**, mas por outro motivo: `lerAcesso()`
+chama `getUser()` logo antes, e é essa chamada que valida o token contra o
+Supabase. O que muda é a premissa — não é a consulta de AAL que faz a validação.
+Registrado aqui porque o desenho da próxima etapa de autorização depende de
+saber exatamente onde a validação acontece. Ver `PROGRESS.md`, ETAPA 1.
+
+O comentário em `src/app/(painel)/_autorizacao.ts:47-49` repete a afirmação
+antiga e ainda não foi ajustado — é código, e fica para a etapa que mexer nele.
 
 O layout de `(painel)` é Server Component: sem AAL2 ele redireciona antes de
 qualquer HTML ser enviado. Não há caminho de "esconder no cliente" a ser burlado
@@ -140,6 +154,18 @@ duas situações.
 fator pendente e nenhum admin sem segundo fator. Conferido por leitura direta de
 `auth.mfa_factors`, sem tocar na coluna de segredo — evidência independente do
 relato do teste manual.
+
+> **Nota de 12/09/2026.** Os números acima são do projeto anterior. No projeto
+> atual `ehkduqokntemtmqzdrbd` existe **um** usuário, admin, com **um** fator
+> TOTP `verified` — conferido por leitura direta em 12/09/2026.
+
+**MFA obrigatório é o estado de hoje, não uma regra eterna.** Existe uma decisão
+arquitetural **aprovada e ainda não implementada** de tornar o MFA **opcional
+para o papel `operacional`**, mantendo-o obrigatório para `admin`. Nada disso
+está no código nem no banco: o guard e as 11 tabelas continuam exigindo AAL2
+para qualquer papel. A mudança é coordenada — guard + papel + RLS — e a policy
+AAL2 global **não pode ser removida sem substituição segura**. Ver
+`PROGRESS.md`, seções 6 e 7.
 
 **Como foi verificado.** Por tipos, lint e build; pela API conferida na versão
 instalada (`@supabase/auth-js`, via supabase-js 2.115.0) em vez de presumida; e

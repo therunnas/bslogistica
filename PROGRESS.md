@@ -6,21 +6,23 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 | Item          | Valor                                      |
 | ------------- | ------------------------------------------ |
-| Data/hora     | 2026-09-11                                 |
-| Branch atual  | `docs/checkpoint-password-recovery`        |
-| `main`        | `9822fc3539f79e1e21880d975ce5d2cb0f3f5cdb` |
-| `origin/main` | `9822fc3` — idêntico ao `main` local       |
+| Data          | 2026-09-12                                 |
+| Branch atual  | `docs/checkpoint-auth-users-policy`        |
+| `main`        | `8149a4de60240af115bd3e9cc29160af230c7755` |
+| `origin/main` | `8149a4d` — idêntico ao `main` local       |
+| Production    | **verde** no commit `8149a4d`              |
 
-**As duas frentes estão fechadas no código.** Ambas mergeadas, deployadas e
-validadas:
+**A frente de recuperação de senha está CONCLUÍDA**, em Production, validada por
+E2E real e sem resíduo de diagnóstico no código.
 
 | Frente            | Merge     | Estado                                |
 | ----------------- | --------- | ------------------------------------- |
 | Enforcement AAL2  | `359dd90` | **CONCLUÍDO** — PR #14, em Production |
-| Password recovery | `9822fc3` | **MERGEADO** — PR #13, deploy verde   |
+| Password recovery | `8149a4d` | **CONCLUÍDO** — PRs #13, #17 a #20    |
 
-Resta **um passo manual**: trocar o template Reset Password do Supabase e rodar
-o E2E real de recuperação. Ver seção 8.
+O próximo trabalho é a **nova política de autorização** (seção 7). Ela está
+**aprovada e ainda não implementada** — leia a seção 6 antes de tocar em guard,
+policy ou usuário.
 
 ## 2. Ambiente
 
@@ -31,6 +33,7 @@ o E2E real de recuperação. Ver seção 8.
 | Produção        | `https://admin.bslogisticas.com.br`                   |
 | Supabase atual  | `ehkduqokntemtmqzdrbd`                                |
 | Supabase antigo | `qaibhlucbpetxrtswulf` — **apagado**, não existe mais |
+| GoTrue          | `v2.196.0` — lido de `/auth/v1/health` em 12/09/2026  |
 
 **Site institucional é outro projeto:** `https://bslogisticas.com.br`,
 repositório `therunnas/PROJETO-BS-LOGISTICA`, pasta
@@ -51,136 +54,343 @@ A reconstrução do Supabase está **concluída e validada** — não refazer.
 | `disable_signup` | `true`                                 |
 | Site URL         | `https://admin.bslogisticas.com.br`    |
 
+**Hoje existe UM único usuário real**, o admin acima. Não há conta
+`operacional` — e não deve haver antes da refatoração da seção 7.
+
 Branding provisório do MVP em produção (PRs #11 e #12): logo em
 `/branding/bs-logo-temp.png`, login, sidebar, home e favicon derivado da
-própria marca. O favicon residual da Lovable foi removido.
+própria marca.
 
-**E-mail/SMTP já funciona:** Supabase → Resend → Gmail, com SPF, DKIM e DMARC
+**E-mail/SMTP funciona:** Supabase → Resend → Gmail, com SPF, DKIM e DMARC
 PASS. Remetente `BS Soluções Logísticas <nao-responda@envio.bslogisticas.com.br>`.
 
-## 4. PR #13 — PASSWORD RECOVERY
+**Template Reset Password já está no formato novo.** Aponta para
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`, e isso
+foi comprovado em Production pelo E2E real. **O passo manual que este arquivo
+listava como pendente está cumprido.**
 
-**PR #13 MERGEADO** em 2026-09-11.
-**Merge commit:** `9822fc3539f79e1e21880d975ce5d2cb0f3f5cdb`
-**Deploy de Production:** **verde**.
+## 4. Password recovery — ESTADO FINAL
 
-### Arquitetura final do fluxo
+Fluxo real, como está em Production hoje.
 
-1. **`/esqueci-senha`** — solicitação, com anti-enumeração: toda resposta HTTP
-   vira a mesma mensagem genérica (429 e 5xx inclusive, porque esses só ocorrem
-   para quem tem conta). Erro sem status HTTP é o único com mensagem própria.
-2. **`GET /auth/confirm`** — valida `token_hash` e `type=recovery`, **não chama
-   `verifyOtp`**, não cria sessão, não emite prova; grava `bs_recovery_pending`
-   (`httpOnly`, `Secure`, `lax`, 300s, `Path=/auth/confirmar-recuperacao`),
-   responde `Cache-Control: no-store` e redireciona por **303** para URL limpa.
-3. **`/auth/confirmar-recuperacao`** — Server Component; exige clique
-   deliberado. O token não aparece no HTML nem no JavaScript.
-4. **Server Action de confirmação** — lê o token só do cookie, `type` fixo em
-   `recovery`, `verifyOtp` server-side, `getClaims` + `getUser`, exige
-   `sub === user.id`, cria a prova HMAC, apaga o pendente, grava
-   `bs_recovery_proof` e redireciona.
-5. **`/redefinir-senha`** — revalida a prova imediatamente antes do
-   `updateUser` server-side; `signOut` global; se ele falhar, fallback
-   `signOut({ scope: "local" })` em `try/catch`; a prova é apagada nos dois
-   desfechos. Sucesso normal vai ao login; sucesso parcial vai para
-   `/login?senha-redefinida=1&sessoes-ativas=1`.
-6. **`/login`** — mensagem persistente no card para o desfecho parcial e, só
-   nesse estado, **sem** auto-redirect para `/dashboard`. Fora dele, o
-   comportamento é o de sempre.
-7. **MFA, AAL2 e RLS preservados** — o fluxo não contém um único `.from()`:
-   opera apenas sobre `auth`, então as 11 policies RESTRICTIVE não o alcançam.
+### 4.1 `GET /auth/confirm`
 
-### Três correções de revisão, já no merge
+- **não consome o token** e não chama `verifyOtp`;
+- não instancia cliente do Supabase e não cria sessão nem prova;
+- confere **apenas formato e `type=recovery`**;
+- grava `bs_recovery_pending` (`httpOnly`, `Secure`, `SameSite=lax`, 300s,
+  `Path=/auth/confirmar-recuperacao`);
+- responde `Cache-Control: no-store` e redireciona por **303** para URL limpa;
+- não aceita `next`/`redirect_to` — os destinos são constantes do código.
 
-- **`8023e6e`** — o GET consumia o token de uso único, e scanners de gateway de
-  e-mail queimavam a recuperação antes do clique do usuário;
-- **`1ea9bd0`** — com o `updateUser` bem-sucedido e o `signOut` global falhando,
-  a prova e a sessão sobreviviam, e a tela ainda dizia que a redefinição falhou;
-- **`5da679d`** — o desfecho parcial prendia o usuário num formulário travado;
-  passou a redirecionar para o login com aviso próprio.
+É isso que impede um gateway de segurança de e-mail de queimar a recuperação:
+o scanner percorre a rota inteira sem gastar nada.
 
-### Resultado final
+### 4.2 Server Action de `/auth/confirmar-recuperacao`
 
-| Suíte              | Resultado   |
-| ------------------ | ----------- |
-| `test:recuperacao` | **63/63**   |
-| `test:prova`       | **100/100** |
-| `test:troca`       | **83/83**   |
-| `test:mfa`         | **13/13**   |
+Só se chega por POST, disparado por um clique deliberado.
 
-Lint 0 erros (1 warning preexistente) · TypeScript PASS · build PASS ·
-`git diff --check` PASS. Codex no HEAD `5da679df4e`: "Didn't find any major
-issues."
+1. lê o `token_hash` **exclusivamente do cookie** — nunca do `FormData`;
+2. `verifyOtp({ type: "recovery", token_hash })`, com o `type` fixo no código;
+3. valida os claims com `getClaims` e confirma o usuário com `getUser`, exigindo
+   `sub === user.id`;
+4. consulta a situação do segundo fator;
+5. emite a **prova HMAC** amarrada ao `sub` e ao `session_id`;
+6. apaga o cookie pendente e grava `bs_recovery_proof`.
 
-Smoke manual com sessão autenticada: `/login?senha-redefinida=1&sessoes-ativas=1`
-permaneceu no login com a mensagem correta (**PASS**); `/login` redirecionou
-para `/dashboard` (**PASS**).
+Toda falha **posterior** ao `verifyOtp` passa por `falharDepoisDeVerificar()`,
+que **tenta** derrubar a sessão recém-criada com `signOut({ scope: "local" })`
+antes de redirecionar. Essa forma literal, `if (…) return
+falharDepoisDeVerificar()`, é **asseverada por regex** em `test:prova` e
+`test:recuperacao`: é o guardrail que impede uma tela dizer "link inválido"
+deixando o navegador autenticado. **Não alterar essas quatro linhas sem entender
+o que elas garantem.**
 
-`PASSWORD_RECOVERY_PROOF_SECRET` **já está configurado** no ambiente Production
-da Vercel, projeto `contato-8135 / bs-logistica-sistema`. Preview segue vermelho
-pelo motivo de sempre — ausência proposital das `NEXT_PUBLIC_SUPABASE_*`.
+**Risco residual conhecido — não afirmar que a sessão é sempre derrubada.** O
+helper chama o `signOut` e **descarta o retorno**, sem `try/catch`
+(`src/app/auth/confirmar-recuperacao/actions.ts:98-100`). O `signOut` do SDK não
+lança em falha de API ou de rede — resolve com `{ error }` —, então uma limpeza
+fracassada passa por bem-sucedida. A limpeza é **tentada**, não confirmada.
 
-### Validação das rotas em Production — 2026-09-11
+Isto já era rastreado no checkpoint anterior e **não é defeito novo**. Mitigação
+que continua valendo: com o AAL2 exigido no banco, uma sessão residual é AAL1 e
+não alcança nenhuma das 11 tabelas de negócio. **Não manipular cookies internos
+`sb-*` manualmente** — isso acoplaria a aplicação a detalhe de implementação do
+SDK. Investigar e endurecer na **ETAPA 1**.
 
-| Rota                          | Resultado                                             |
-| ----------------------------- | ----------------------------------------------------- |
-| `/login`                      | **200**                                               |
-| `/esqueci-senha`              | **200**                                               |
-| `/auth/confirmar-recuperacao` | **200** — sem cookie, oferece "Solicitar novo link"   |
-| `/redefinir-senha`            | **307** para `/esqueci-senha` — por design, sem prova |
+Para contraste: o mesmo cuidado **já foi aplicado** do outro lado do fluxo. Em
+`src/app/redefinir-senha/actions.ts`, `derrubarSessaoLocal()` devolve `boolean` e
+o resultado é conferido — foi o que o PR #18 corrigiu. A confirmação não recebeu
+o mesmo tratamento.
 
-Nenhum 404 ou 500. Também confirmado no ar, sem consumir token nenhum:
-`GET /auth/confirm` sem parâmetros devolve 303 para
-`/esqueci-senha?status=link-invalido`; com um token qualquer devolve **303** com
-`Cache-Control: no-store` e `Set-Cookie: bs_recovery_pending=…; Secure; HttpOnly;
-SameSite=lax; Max-Age=300; Path=/auth/confirmar-recuperacao`. O atributo `Secure`
-só aparece porque `NODE_ENV === "production"`. Com o cookie, a tela mostra
-"Continuar"; **o token não aparece no HTML** (0 ocorrências). Nenhum e-mail foi
-enviado e nenhum token real foi consumido.
+### 4.3 Desfechos por tipo de conta
 
-### Achado residual aceito
+**Conta COM MFA** — comprovado em Production:
 
-**P2 residual no cleanup local da confirmação**, em
-`src/app/auth/confirmar-recuperacao/actions.ts`: nas falhas **posteriores a um
-`verifyOtp` bem-sucedido**, o resultado do `signOut({ scope: "local" })` não é
-verificado. O `@supabase/auth-js` 2.115.0 já remove a sessão local em falhas
-remotas comuns (verificado no fonte instalado, `GoTrueClient.js:3425-3436`);
-resta um caminho estreito de falha de leitura de sessão. **Não vamos manipular
-cookies internos `sb-*` manualmente** — isso acoplaria a aplicação a detalhe de
-implementação do SDK. A mitigação prometida foi cumprida: com o AAL2 valendo no
-banco, a sessão residual é AAL1 e não alcança nenhuma das 11 tabelas de negócio.
+```
+e-mail → link → Continuar → TOTP (uma vez) → nova senha → dashboard DIRETO
+```
 
-O `GET /auth/confirm` **não** tem parte nisso: não instancia o cliente do
-Supabase e não chama `signOut`. Quem cria a sessão de recuperação — e portanto
-quem precisa limpá-la — é a Server Action que consome o token.
+**Sem segundo login e sem segundo TOTP.**
 
-### Passo manual pendente — o único que resta
+**Conta SEM MFA:** a arquitetura suporta seguir sem desafio — `decidirMfaNaRecuperacao`
+devolve `prosseguir` para `mfa-ausente`. **O E2E dessa variante NÃO foi feito**,
+porque hoje só existe o admin real, e ele tem TOTP verificado. Fica para a
+matriz da ETAPA 6.
 
-O template Reset Password do Supabase **ainda usa `{{ .ConfirmationURL }}`**.
+### 4.4 Depois da troca de senha
 
-Colar o HTML em **Authentication → Emails → Templates → Reset Password**, com o
-botão apontando para
-`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
-As rotas já estão publicadas, então o link não cai mais em 404.
+- a **prova é apagada após uma troca de senha bem-sucedida** — e a partir daí
+  nenhum desfecho posterior mantém prova reutilizável, então ela não serve para
+  uma segunda troca. **Falhas ANTERIORES ao `updateUser` podem preservá-la**, de
+  propósito: entrada inválida, segundo fator recusado ou erro do próprio
+  `updateUser` retornam mantendo a prova, o que deixa o usuário corrigir a senha
+  e tentar de novo dentro da validade, sem reiniciar a recuperação inteira.
+  `apagarProva()` só é chamada depois que o `updateUser` deu certo;
+- `signOut({ scope: "others" })` revoga as **outras** refresh sessions;
+- a sessão atual só é preservada se, revalidado, continuar sendo **o mesmo
+  usuário** e **ainda em AAL2**;
+- qualquer incerteza cai em **fallback seguro para o login** — nunca se
+  reconstrói sessão;
+- **limite conhecido, que já existia antes:** access tokens JWT já emitidos em
+  outros dispositivos sobrevivem até expirar. Nenhum escopo de `signOut`
+  invalida um JWT emitido. Não é regressão.
 
-## 5. AAL2 / RLS — CONCLUÍDO
+A troca de `signOut()` global por `scope: "others"` foi o objeto do PR #18: o
+global derrubava a própria sessão que acabara de provar link, prova, TOTP e
+AAL2, e cobrava o mesmo TOTP de novo no mesmo processo.
 
-**PR #14 mergeado** em 2026-09-11.
-**Merge commit:** `359dd905bf47ad213968e0f50e0ea198db93866f`
+### 4.5 Testes
 
-**Migration:** `supabase/migrations/20260911140000_009_enforce_aal2.sql` —
-**aplicada em Production**.
+| Suíte              | Asserções |
+| ------------------ | --------- |
+| `test:recuperacao` | **72**    |
+| `test:prova`       | **143**   |
+| `test:troca`       | **119**   |
+| `test:mfa`         | **23**    |
+| **TOTAL**          | **357**   |
 
-**Objetivo — P1 (resolvido):** MFA era aplicado somente na camada da aplicação.
-Sessão AAL1 com papel válido conseguia acessar dados diretamente via
-Supabase/PostgREST/RPC. O guard do Next exigia AAL2 para a tela; as policies
-olhavam só papel. Agora o banco também exige o segundo fator.
+**357 asserções, 0 falhas.** Lint 0 erros (1 warning preexistente em
+`painel-apontamentos.tsx:141`) · `tsc --noEmit` PASS · `build` PASS ·
+`git diff --check` PASS.
 
-**11 tabelas protegidas por policy RESTRICTIVE AAL2:**
+### 4.6 PRs da frente
 
-`profiles` · `clients` · `contracts` · `employees` · `operations` · `shifts` ·
-`operation_team` · `timesheets` · `timesheet_entries` · `invoices` ·
-`invoice_items`
+| PR  | Merge     | O que fez                                       |
+| --- | --------- | ----------------------------------------------- |
+| #13 | `9822fc3` | arquitetura do fluxo, com o GET que não consome |
+| #17 | `e9255c6` | exigir o fator existente antes da troca         |
+| #18 | `3b7e0fc` | preservar a sessão AAL2 após a troca            |
+| #19 | `3c46b46` | instrumentação temporária de diagnóstico        |
+| #20 | `8149a4d` | **remoção completa** da instrumentação          |
+
+`RECOVERY_DIAG_`: **zero ocorrências** na `main` final. O arquivo
+`src/app/auth/confirmar-recuperacao/actions.ts` voltou a ser **byte a byte
+idêntico** ao estado anterior ao PR #19.
+
+## 5. Incidente não reproduzido — 12/09/2026
+
+Durante o **primeiro** E2E houve uma falha **posterior ao `verifyOtp`** que
+redirecionou para `/esqueci-senha?status=link-invalido`. Repetiu com um segundo
+link. O PR #19 adicionou instrumentação temporária para separar os quatro ramos
+de falha; a tentativa seguinte, em Production, emitiu **`RECOVERY_DIAG_OK`** e o
+fluxo completo passou.
+
+**A causa da falha anterior NÃO foi comprovada.**
+
+Ficaram como **pistas, não como causa**:
+
+- falha transitória em alguma etapa posterior ao `verifyOtp`;
+- dependência do estado de sessão anterior do navegador — nas tentativas que
+  falharam havia uma sessão AAL1 antiga ativa.
+
+O que **ficou provado** no diagnóstico, e vale guardar:
+
+- o `verifyOtp` **conclui**: consome o token e cria sessão. `last_sign_in_at` só
+  é escrito dentro da criação do refresh token (GoTrue
+  `internal/models/refresh_token.go:205`);
+- depois da falha, `falharDepoisDeVerificar()` **chamou**
+  `signOut({ scope: "local" })`, e a sessão deixou de aparecer nas consultas
+  seguintes. Isso é **consistente** com a limpeza local ter funcionado — mas o
+  helper não verifica o `{ error }` retornado (seção 4.2), então **não se pode
+  afirmar** que a limpeza foi confirmada em todos os cenários. Consistente não é
+  o mesmo que comprovado;
+- **não existe incompatibilidade PKCE.** `verifyPost` não tem ramo PKCE —
+  `issueAuthCode` vive só em `verifyGet` —, e `{{ .TokenHash }}` renderiza de
+  propósito o valor com prefixo `pkce_`, que é exatamente o que
+  `FindUserByRecoveryToken` casa. Hipótese levantada e **refutada pelo fonte**;
+  não reabri-la.
+
+**Não é bug aberto e não bloqueia nada.** Registrado como incidente não
+reproduzido. Só investigar se voltar a acontecer — e, se voltar, o caminho é
+reinstrumentar como no PR #19, não adivinhar.
+
+## 6. Nova política de autorização — APROVADA, NÃO IMPLEMENTADA
+
+> **Leia esta seção inteira antes de tocar em guard, policy, RLS ou usuário.**
+
+### 6.1 Política aprovada
+
+**ADMIN**
+
+- MFA **obrigatório**;
+- login exige **AAL2**;
+- recovery exige TOTP **uma vez**;
+- **não** permitir admin operando em AAL1.
+
+**OPERACIONAL**
+
+- MFA **opcional**;
+- poderá ativar em **Configurações → Segurança**;
+- se ativado, os próximos logins exigem TOTP;
+- sem MFA, poderá operar em AAL1 **somente depois** da refatoração explícita das
+  policies/RLS e dos guards.
+
+### 6.2 ESTADO ATUAL — o que vale hoje, no código e no banco
+
+**A divisão por papel descrita na seção 6.1 ainda NÃO está implementada.**
+
+As proteções atuais do admin **já existem e permanecem ativas** — MFA
+obrigatório, painel exigindo AAL2, um TOTP no recovery e nenhum admin operando
+em AAL1. O painel e as 11 tabelas continuam exigindo AAL2.
+
+O que falta implementar é a **exceção segura para o papel `operacional`** e a
+**autorização coordenada por papel + AAL**: `operacional` com MFA opcional,
+`operacional` em AAL1 nas permissões expressamente autorizadas, o guard e a RLS
+cientes de papel, e a tela Configurações → Segurança.
+
+- o guard de `(painel)` **ainda exige AAL2** para qualquer papel;
+- **11 tabelas de negócio ainda têm policy RESTRICTIVE global exigindo `aal2`**;
+- portanto **um usuário `operacional` em AAL1 ainda NÃO consegue usar o
+  sistema** — ele seria barrado pelo guard e, mesmo contornando o guard, pela
+  RLS.
+
+### 6.3 Proibições enquanto a refatoração não acontecer
+
+- **NÃO remover o AAL2 parcialmente.** Derrubar a policy global sem substituição
+  segura abre as 11 tabelas para sessões AAL1 — exatamente o P1 que o PR #14
+  fechou, e que foi **reproduzido de verdade** em PostgreSQL (22 FAIL / 16 PASS
+  antes da migration 009);
+- **NÃO criar usuário `operacional` real** antes dessa mudança. Além do AAL2,
+  há dívida técnica aberta que só se manifesta quando existir uma conta não-admin
+  — ver seção 9 e `docs/SEGURANCA.md`, que registra "condição para reabertura:
+  criação da primeira conta não-admin";
+- **NÃO confiar no frontend** para nenhuma parte dessa decisão.
+
+## 7. Próximas etapas oficiais
+
+### ETAPA 1 — próxima
+
+**Auditoria e desenho da autorização** por **papel + AAL + RLS + guards**.
+
+Objetivo: permitir `operacional` em AAL1 **apenas onde for expressamente
+autorizado**, mantendo admin e ações administrativas em AAL2.
+
+Entrar nesta etapa com estes pontos já mapeados:
+
+- a policy RESTRICTIVE hoje é idêntica nas 11 tabelas e não distingue papel;
+- `user_roles` está **de propósito** fora do enforcement AAL2 — bloqueá-la cria
+  deadlock login → MFA. Não adicionar;
+- função `SECURITY DEFINER` roda **acima** da RLS: a exigência de AAL precisa
+  estar escrita dentro da própria função, como em `gerar_fatura`;
+- **achado a confirmar:** `getAuthenticatorAssuranceLevel()` do
+  `@supabase/auth-js` 2.115.0 tem **dois ramos**. O projeto sempre chama **sem
+  argumento**, e esse ramo é **local** — `getSession()` + `decodeJWT`, sem
+  chamada de rede. O `nextLevel` sai de `session.user.factors`, que vem do
+  armazenamento de sessão. O comentário em
+  `src/app/(painel)/_autorizacao.ts:47-49` e o texto de `docs/SEGURANCA.md`
+  afirmavam que ela chama `getUser(jwt)` por dentro; isso descreve o **outro**
+  ramo. O guard continua validando a sessão, porque chama `getUser()` logo
+  antes — mas essa premissa precisa ser reexaminada ao redesenhar a decisão de
+  AAL.
+
+#### Requisito de segurança obrigatório — MFA optativo precisa existir na RLS
+
+Levantado em revisão do Codex no PR #21. **É restrição da ETAPA 1, não
+sugestão.**
+
+Uma conta que tem **fator verificado** recebe sessão **AAL1** logo após o login
+por senha — antes do TOTP. Então, se a futura policy autorizar
+`papel = operacional AND aal = aal1`, ela **não consegue distinguir**:
+
+|         |                                                                            |
+| ------- | -------------------------------------------------------------------------- |
+| **(A)** | `operacional` que **nunca ativou** MFA                                     |
+| **(B)** | `operacional` **com MFA verificado** que ainda não fez o TOTP nesta sessão |
+
+O guard mandaria **(B)** para `/mfa`, mas o token AAL1 dele continuaria podendo
+tentar **PostgREST/RPC direto**. A obrigação de MFA viraria **guard-only** — o
+que a arquitetura deste projeto proíbe.
+
+**O que a ETAPA 1 precisa garantir:**
+
+- `operacional` **sem** MFA pode futuramente receber os acessos AAL1
+  expressamente autorizados;
+- `operacional` **com MFA verificado NÃO** pode usar esses mesmos acessos apenas
+  com AAL1 depois de um login por senha;
+- a decisão precisa ser **enforceable no banco**, não só no guard;
+- **papel + claim `aal` sozinhos NÃO bastam** para separar (A) de (B);
+- é preciso definir uma **fonte de verdade da inscrição em MFA verificável pelo
+  banco**, ou mecanismo de segurança equivalente;
+- essa fonte **não pode ser controlável pelo próprio usuário** por `UPDATE`
+  comum.
+
+**A solução NÃO está escolhida.** Tabela própria sincronizada, consulta segura
+ao estado de fatores, claim confiável, função `SECURITY DEFINER` ou outro
+mecanismo — tudo isso fica para a auditoria da ETAPA 1, depois de avaliar
+segurança, sincronização, revogação e impossibilidade de spoofing. **Este
+checkpoint registra o REQUISITO, não inventa a solução.**
+
+### ETAPA 2
+
+Implementar **migrations / policies / guards** da nova política.
+
+**Testes reais de RLS obrigatórios**, exercitados no banco — não no guard:
+
+| Cenário                                     | Esperado                                                       |
+| ------------------------------------------- | -------------------------------------------------------------- |
+| `operacional` **sem** MFA + AAL1            | permite **somente** os acessos explicitamente autorizados      |
+| `operacional` **com MFA verificado** + AAL1 | **bloqueia** os dados que exigem o segundo fator daquela conta |
+| `operacional` **com MFA verificado** + AAL2 | permite conforme o papel                                       |
+| `admin` + AAL1                              | **bloqueia**                                                   |
+| `admin` + AAL2                              | permite conforme o papel                                       |
+
+A segunda linha é a que prova o requisito da ETAPA 1. Sem ela, a exigência de
+MFA para quem optou por ele fica só no guard.
+
+### ETAPA 3
+
+**Backend administrativo de usuários:** listar · convidar por e-mail · atribuir
+papel · alterar papel · remover acesso · **impedir remoção ou rebaixamento do
+último admin** · auditoria.
+
+Operações privilegiadas **exclusivamente server-side**.
+
+### ETAPA 4
+
+Tela **`/usuarios`**, somente para admin.
+
+### ETAPA 5
+
+**Configurações → Segurança:** estado do MFA · `operacional` pode ativar · admin
+permanece obrigatório · política de desativação protegida **no backend**.
+
+### ETAPA 6
+
+**Matriz E2E completa** antes do segundo usuário real — incluindo a variante de
+recovery **sem MFA**, que ainda não foi exercitada (seção 4.3).
+
+## 8. AAL2 / RLS — estado em vigor
+
+**PR #14 mergeado** em 2026-09-11, merge `359dd905bf47ad213968e0f50e0ea198db93866f`.
+**Migration `20260911140000_009_enforce_aal2.sql` aplicada em Production.**
+
+**Problema que resolveu (P1):** MFA era aplicado só na aplicação. Sessão AAL1 com
+papel válido alcançava os dados por PostgREST/RPC.
+
+**11 tabelas protegidas:** `profiles` · `clients` · `contracts` · `employees` ·
+`operations` · `shifts` · `operation_team` · `timesheets` · `timesheet_entries` ·
+`invoices` · `invoice_items`.
 
 Forma da policy, idêntica nas 11:
 
@@ -193,252 +403,104 @@ WITH CHECK ((SELECT auth.jwt() ->> 'aal') = 'aal2');
 Fail-closed sem `COALESCE`: `->>` devolve `NULL` com o claim ausente,
 `NULL = 'aal2'` é `NULL`, e a RLS trata `NULL` como não-permitido.
 
-**`user_roles` fica deliberadamente SEM enforcement AAL2** porque é consultada
-antes do MFA (`src/app/(painel)/_autorizacao.ts`) e bloqueá-la causaria
-deadlock login → MFA.
+`user_roles` fica **deliberadamente sem** enforcement AAL2 — é consultada antes
+do MFA em `src/app/(painel)/_autorizacao.ts`, e bloqueá-la causaria deadlock.
 
-**`gerar_fatura`:**
+`gerar_fatura` continua `SECURITY DEFINER`, mesma assinatura, mesmo
+`search_path`, mesmos grants, com check explícito de `aal2` **antes** da
+verificação de papel — porque policy RESTRICTIVE não protege função que roda
+acima da RLS.
 
-- continua `SECURITY DEFINER`;
-- mesma assinatura;
-- mesmo `search_path`;
-- mesmos grants/revokes;
-- recebeu check explícito de `aal2`, antes da verificação de papel.
+### Validação local, com a vulnerabilidade reproduzida
 
-Policy RESTRICTIVE não protege função `SECURITY DEFINER`, que roda acima da
-RLS — daí a verificação dentro da própria função.
+Docker + WSL2 · Supabase CLI **2.117.0** · PostgreSQL local **17.6.1.166**.
+Nenhum comando remoto, nenhum `db push`, nenhum `--linked`. **Production não foi
+tocada** — o `db reset` reportou `{"target":"local"}`.
 
-## 6. Validação local real
+Antes da 009, o teste `005` dava **22 FAIL / 16 PASS**: admin AAL1 lia `clients`,
+`employees`, `invoices` e `profiles`, escrevia em `clients`; `operacional` AAL1
+lia e escrevia `timesheet_entries`; sem claim `aal` tudo passava; `gerar_fatura`
+funcionava em AAL1. Depois da 009: **`005` 38/38 PASS**, e `001` a `004` PASS.
 
-Docker + WSL2 configurados e funcionando.
+### Verificação em Production — 2026-09-11
 
-**Versões validadas:** Docker **29.7.2** · Supabase CLI **2.117.0** ·
-PostgreSQL local **17.6.1.166**.
+15 migrations local / 15 remoto, 0 pendentes · 11 policies `*_exige_aal2`, todas
+RESTRICTIVE/`ALL`/`authenticated` · `USING` e `WITH CHECK` com `aal2` nas 11 ·
+**0** em `user_roles` · 19 policies permissivas antigas intactas (30 no total) ·
+RLS **12/12** tabelas · `md5` normalizado de `prosrc` de `gerar_fatura` idêntico
+ao arquivo da 009.
 
-**Stack usada SOMENTE LOCAL:**
+Testes remotos não destrutivos em `BEGIN … ROLLBACK`, só leitura, com claims
+simulados: sobre `profiles`, `aal1` → 0 linhas, claim ausente → 0 linhas,
+`aal2` → 1 linha, `user_roles` com `aal1` → 1 linha (sem deadlock).
+`gerar_fatura` em AAL1 → **42501** antes de qualquer efeito de negócio.
 
-| Serviço  | Endereço          |
-| -------- | ----------------- |
-| API      | `127.0.0.1:54321` |
-| Postgres | `127.0.0.1:54322` |
-| Studio   | `127.0.0.1:54323` |
-| Mailpit  | `127.0.0.1:54324` |
+### Smoke manual em Production — APROVADO
 
-Nenhum comando remoto. Nenhum `db push`. Nenhum `--linked`. **Production não
-foi tocada.** O `db reset` reportou `{"target":"local"}`.
+Login com senha funcionou; **antes do TOTP o painel não foi liberado**; TOTP
+funcionou; o painel carregou; F5 e nova aba preservaram a sessão; logout
+funcionou; novo login voltou a exigir TOTP.
 
-### Baseline antes da 009
-
-`005` antes da migration: **22 FAIL / 16 PASS.** A vulnerabilidade foi
-reproduzida de verdade, em PostgreSQL real:
-
-- admin AAL1 lia `clients` (2 linhas);
-- admin AAL1 lia `employees` (4 linhas);
-- admin AAL1 lia `invoices`;
-- admin AAL1 lia `profiles`;
-- admin AAL1 podia INSERT/UPDATE/DELETE em `clients`;
-- operacional AAL1 conseguia ler, inserir, editar e apagar `timesheet_entries`;
-- sem claim `aal` tudo passava;
-- `gerar_fatura` funcionava em AAL1.
-
-Isso provou que o teste detecta o problema real — não passa por expectativa
-invertida.
-
-### Depois da 009
-
-| Suíte | Resultado      |
-| ----- | -------------- |
-| `005` | **38/38 PASS** |
-| `001` | PASS           |
-| `002` | PASS           |
-| `003` | PASS           |
-| `004` | PASS           |
-
-Também confirmado:
-
-- `user_roles` AAL1 continua legível para a própria role (1 linha própria,
-  0 alheias);
-- `profiles` AAL1 bloqueado;
-- `profiles` AAL2 preservado;
-- `gerar_fatura` admin AAL1 → **42501**;
-- `gerar_fatura` admin AAL2 → funciona;
-- **11 policies RESTRICTIVE confirmadas em `pg_policies`**, todas
-  `{authenticated}`, `cmd=ALL`, com `aal` em `USING` e em `WITH CHECK`;
-- RLS **12/12** tabelas;
-- policies de papel existentes preservadas.
-
-O `002` recusou `gerar_fatura` com "Apenas administradores podem gerar
-faturas" — prova de que a barreira foi a **regra de papel**, não a de AAL, e
-de que acrescentar `aal2` aos claims não criou falso positivo.
-
-**App:** `test:mfa` 13/13 · lint 0 erros, apenas warning preexistente ·
-TypeScript PASS · build PASS · `git diff --check` PASS.
-
-### Aplicação em Production — 2026-09-11
-
-Aplicada com o procedimento oficial do projeto, CLI **2.117.0** (a mesma versão
-já validada), prefixada com `env -u SUPABASE_ACCESS_TOKEN` e precedida de
-`--dry-run` para conferir o anúncio antes de confirmar.
-
-O binário `supabase` **não existe no PATH deste ambiente** — nem no Bash, nem no
-PowerShell, nem em `node_modules`, nem instalado globalmente. Está no cache do
-`npx`, e foi usado por caminho absoluto, de propósito, para impedir que o `npx`
-resolvesse uma versão diferente durante operação em Production:
-
-```
-C:\Users\VINICIUS\AppData\Local\npm-cache\_npx\6f1b058a4d9555af\node_modules\@supabase\cli-windows-x64\bin\supabase.exe
-```
-
-A CLI anunciou e aplicou **somente** `20260911140000_009_enforce_aal2.sql`, com
-`seeds: []` e `roles: []`.
-
-| Verificação em Production         | Resultado                                                       |
-| --------------------------------- | --------------------------------------------------------------- |
-| Histórico de migrations           | **15 local / 15 remoto**, 0 pendentes, 0 inesperadas            |
-| Policies `*_exige_aal2`           | **11**, todas RESTRICTIVE / `ALL` / `authenticated`             |
-| `USING` e `WITH CHECK` com `aal2` | 11 e 11                                                         |
-| AAL2 em `user_roles`              | **0** — isenção deliberada preservada                           |
-| Policies permissivas antigas      | **19**, intactas (30 no total)                                  |
-| RLS                               | **12/12** tabelas                                               |
-| `md5` normalizado de `prosrc`     | `dba82abe905ee54e8cfe358cae2104cd` — idêntico ao arquivo da 009 |
-
-`gerar_fatura` instalada: `SECURITY DEFINER`, assinatura `(uuid, date, date)`,
-`RETURNS invoices`, `search_path = public, pg_temp`, owner `postgres`, checks na
-ordem `auth.uid` → `aal2` → papel, `EXECUTE` só para `authenticated` e negado
-para `anon`.
-
-Testes remotos não destrutivos, em `BEGIN … ROLLBACK`, só leitura, com claims
-simulados via `set_config` + `SET LOCAL ROLE authenticated`. Feitos sobre
-`profiles`, a única tabela protegida com dado real:
-
-| Cenário                     | Linhas | Veredito                |
-| --------------------------- | ------ | ----------------------- |
-| `aal=aal1`                  | 0      | bloqueado               |
-| claim `aal` ausente         | 0      | bloqueado (fail-closed) |
-| `aal=aal2`                  | 1      | acesso preservado       |
-| `user_roles` com `aal=aal1` | 1      | legível, sem deadlock   |
-
-`gerar_fatura` em AAL1 → **42501**, "Autenticação de dois fatores obrigatória",
-antes de qualquer efeito de negócio. Nada persistiu: as contagens das 12 tabelas
-ficaram idênticas depois dos testes.
-
-**Cuidado ao ler esses números:** testes equivalentes sobre `clients` e
-`timesheet_entries` passaram, mas são **inconclusivos** — essas tabelas estão
-vazias, e "0 linhas" não distingue bloqueio de ausência de dado. Ver seção 7.
-
-### Smoke test manual em Production — APROVADO
-
-Executado pelo usuário no navegador, em 2026-09-11:
-
-- login com senha funcionou;
-- **antes do TOTP o painel não foi liberado**;
-- TOTP funcionou;
-- após AAL2 o painel carregou normalmente;
-- módulos abriram sem erro de autorização;
-- F5 preservou a sessão;
-- nova aba preservou a sessão;
-- logout funcionou;
-- novo login voltou a exigir TOTP.
-
-`admin.bslogisticas.com.br` → HTTP 200. Vercel Production em `359dd90` →
-success.
-
-**Rollout AAL2 validado ponta a ponta.**
-
-## 7. Achados menores registrados
+## 9. Achados menores registrados
 
 **P3 —** `sincronizar_chave_da_diaria` pode retornar `23503` "Folha não
 encontrada" numa tentativa AAL1, antes do `WITH CHECK`. O trigger é
 `SECURITY INVOKER` e lê `timesheets`, que a policy nova esconde em AAL1.
-**A operação continua bloqueada.** É problema de diagnóstico/mensagem,
-**NÃO bypass**. Não corrigir no PR AAL2.
+**A operação continua bloqueada** — é problema de diagnóstico, **não bypass**.
 
-**Resíduo de CLI —** `supabase/.branches/` é resíduo local da CLI e não está
-no `.gitignore`. Reaparece a cada operação local. **Não alterar o
-`.gitignore` nesta etapa.**
+**P3 —** mensagens cruas do SDK em `src/app/mfa/painel-mfa.tsx`.
 
-**Production está praticamente vazia de dados de negócio.** Conferido em
-2026-09-11, logo após o rollout: `profiles` = 1 e `user_roles` = 1 (o admin); as
-10 tabelas de negócio — `clients`, `contracts`, `employees`, `operations`,
-`shifts`, `operation_team`, `timesheets`, `timesheet_entries`, `invoices`,
-`invoice_items` — têm **0 linhas**. Não é defeito do AAL2 e não bloqueia nada,
-mas **limita o que qualquer teste em Production consegue provar**: num banco
-vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência de dado. Foi por
-isso que a prova do enforcement se apoiou em `profiles`. Confirmar se o estado é
-esperado antes de tirar qualquer conclusão a partir de contagens.
+**P3 —** diagnosticabilidade da confirmação de recuperação: sete desfechos
+distintos colapsam na mesma mensagem `link-invalido`. Foi isso que escondeu a
+causa no incidente da seção 5. Separá-los exigiria mudar mensagens e destinos —
+tarefa própria, com escopo próprio.
 
-**Pendências antigas que seguem abertas:**
+**Dívida técnica que só se manifesta com conta não-admin:**
+`docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` e
+`docs/divida-tecnica/escrita-em-operation-team.md`. As tabelas operacionais
+aceitam qualquer coluna do payload — incluindo `billed_amount`, `cost_amount` e
+`invoice_id` em `timesheet_entries`. **Fechar antes da ETAPA 3.**
 
-- mensagens cruas do SDK em `src/app/mfa/painel-mfa.tsx` (P3);
+**Resíduo de CLI —** `supabase/.branches/` reaparece a cada operação local e não
+está no `.gitignore`.
+
+**Production praticamente vazia de dados de negócio.** Conferido em 12/09/2026:
+`auth.users` = 1, `profiles` = 1, `user_roles` = 1; as 10 tabelas de negócio com
+**0 linhas**. Não é defeito, mas **limita o que qualquer teste em Production
+prova**: num banco vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência
+de dado. Foi por isso que a prova do enforcement se apoiou em `profiles`.
+
+**Pendências antigas ainda abertas:**
+
 - decidir sobre Vercel Preview Deployments (P3);
 - `auth.sms.twilio.enabled = true` no remoto com `external.phone = false` —
   conferir origem numa passagem pelo Dashboard;
 - `docs/ESTADO_DO_PROJETO.md` e
   `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` estão obsoletos.
 
-## 8. PRÓXIMO PASSO
-
-O código das duas frentes está mergeado e em Production. O que resta é **um
-passo manual, no Dashboard do Supabase, e o teste real do fluxo**:
-
-1. em **Authentication → Emails → Templates → Reset Password**, trocar
-   `{{ .ConfirmationURL }}` pelo botão apontando para
-   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
-   As rotas já estão publicadas e validadas em Production, então o link não cai
-   mais em 404 — a condição que impedia essa troca foi cumprida;
-2. executar o **E2E real de recuperação**, na ordem abaixo.
-
-### Roteiro do E2E
-
-| #   | Passo                              | PASS esperado                                                    |
-| --- | ---------------------------------- | ---------------------------------------------------------------- |
-| 1   | pedir o link em `/esqueci-senha`   | mensagem genérica; e-mail chega                                  |
-| 2   | abrir o link do e-mail             | tela intermediária aparece                                       |
-| 3   | clicar **Continuar**               | **é aqui que o token é consumido**; vai a `/redefinir-senha`     |
-| 4   | trocar a senha                     | vai a `/login?senha-redefinida=1`                                |
-| 5   | entrar com a senha nova            | login normal, com TOTP                                           |
-| 6   | abrir **o mesmo link** outra vez   | **a tela intermediária aparece de novo — isso é PASS**           |
-| 7   | clicar **Continuar** a segunda vez | token recusado; termina em `/esqueci-senha?status=link-invalido` |
-
-**Os passos 6 e 7 medem coisas diferentes e é fácil confundi-los:**
-
-- **(A) segunda abertura do link — passo 6.** A tela de confirmação aparecer é
-  o resultado **correto**, não um defeito. O `GET /auth/confirm` não consome nem
-  verifica o token: ele só confere formato e `type`, grava o cookie pendente e
-  renderiza. Nada ali sabe se o token já foi usado — e é exatamente por isso que
-  um scanner de e-mail não queima mais a recuperação;
-- **(B) segunda confirmação — passo 7.** Só aqui o `verifyOtp` roda, encontra o
-  token já consumido e recusa.
-
-Esperar que o passo 6 falhe é ler o comportamento correto como quebra — foi o
-engano que esta instrução continha antes, herdado da arquitetura antiga, em que
-o GET consumia o token.
-
-Nada além disso está pendente no código.
-
-Sem bloquear nada, pendente de decisão: popular Production com os dados reais de
-negócio (ver seção 7).
-
-## 9. Não fazer
+## 10. Não fazer
 
 - Não reconstruir o Supabase de novo.
-- Não reaplicar migrations já aplicadas.
+- Não reaplicar migrations já aplicadas, nem a 009 — já está em Production (15/15).
 - Não usar `supabase config push`.
 - Não ativar signup público.
 - Não expor `service_role`, nem colocar segredo em `NEXT_PUBLIC_*`.
 - Não conectar Preview ao banco de produção só para passar o check.
 - Não modificar DNS sem confirmação.
-- Não reaplicar a migration 009 — já está aplicada em Production (15/15).
-- Não alterar o template Reset Password antes de confirmar as rotas em
-  Production — hoje já confirmadas, então a troca está liberada.
 - Não adicionar enforcement AAL2 em `user_roles`.
+- **Não remover a policy AAL2 global sem substituição segura** (seção 6.3).
+- **Não criar usuário `operacional` real** antes da ETAPA 2 (seção 6.3).
+- Não alterar as quatro linhas `if (…) return falharDepoisDeVerificar()` sem
+  entender o guardrail que elas sustentam (seção 4.2).
+- Não reabrir a hipótese PKCE do recovery — foi refutada pelo fonte (seção 5).
 - Não tocar no site institucional.
 
-## 10. Como retomar após `/clear`
+## 11. Como retomar após `/clear`
 
 1. leia `CLAUDE.md`;
-2. leia este arquivo;
+2. leia este arquivo — em especial a **seção 6**, antes de qualquer mudança de
+   autorização;
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
-5. continue somente da seção **PRÓXIMO PASSO**;
+5. continue da seção **7 — Próximas etapas oficiais**, pela ETAPA 1;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.
