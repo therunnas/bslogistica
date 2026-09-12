@@ -151,13 +151,24 @@ export async function redefinirSenha(entrada: {
 
   apagarProva();
 
-  /** Limpeza local best-effort. Nunca impede o que vem depois. */
-  async function derrubarSessaoLocal() {
+  /**
+   * Limpeza local. Devolve se ela foi de fato CONFIRMADA.
+   *
+   * O `signOut` do SDK não lança em falha de API ou de rede: ele resolve com
+   * `{ error }`. Um `try/catch` sozinho, portanto, trataria uma limpeza
+   * fracassada como bem-sucedida — foi um achado de revisão, e importa porque
+   * o destino do fallback depende dessa resposta.
+   *
+   * Três desfechos: resolveu sem erro devolve `true`; resolveu com erro devolve
+   * `false`; lançou exceção devolve `false`. Cookies internos `sb-*` seguem
+   * intocados — manipulá-los à mão acoplaria a aplicação a detalhe do SDK.
+   */
+  async function derrubarSessaoLocal(): Promise<boolean> {
     try {
-      await supabase.auth.signOut({ scope: "local" });
+      const { error: erroLocal } = await supabase.auth.signOut({ scope: "local" });
+      return !erroLocal;
     } catch {
-      // Ignorado de propósito: cookies internos `sb-*` seguem intocados —
-      // manipulá-los à mão acoplaria a aplicação a detalhe do SDK.
+      return false;
     }
   }
 
@@ -239,9 +250,20 @@ export async function redefinirSenha(entrada: {
   const continuaEmAal2 = !erroNivelDepois && nivelDepois?.currentLevel === "aal2";
 
   if (!mesmoUsuario || !continuaEmAal2) {
-    // Fallback seguro, idêntico ao comportamento anterior a esta mudança: não
-    // se tenta reconstruir sessão nenhuma, o usuário entra pelo login.
-    await derrubarSessaoLocal();
+    /**
+     * Fallback seguro: não se reconstrói sessão nenhuma, o usuário entra pelo
+     * login. Mas o destino depende de a limpeza local ter sido CONFIRMADA.
+     *
+     * `/login?senha-redefinida=1` não suprime o auto-redirect da tela de login:
+     * se sobrou sessão viva, o efeito de `login/page.tsx` a detecta e manda
+     * direto ao painel — justamente o que este ramo existe para impedir.
+     * Sem confirmação, o destino passa a ser o que carrega `sessoes-ativas=1`,
+     * que desliga esse auto-redirect.
+     */
+    const sessaoLocalEncerrada = await derrubarSessaoLocal();
+
+    if (!sessaoLocalEncerrada) redirect(ROTA_LOGIN_SESSOES_ATIVAS);
+
     redirect(ROTA_LOGIN_SENHA_REDEFINIDA);
   }
 
