@@ -99,11 +99,29 @@ Só se chega por POST, disparado por um clique deliberado.
 6. apaga o cookie pendente e grava `bs_recovery_proof`.
 
 Toda falha **posterior** ao `verifyOtp` passa por `falharDepoisDeVerificar()`,
-que derruba a sessão recém-criada com `signOut({ scope: "local" })` antes de
-redirecionar. Essa forma literal, `if (…) return falharDepoisDeVerificar()`, é
-**asseverada por regex** em `test:prova` e `test:recuperacao`: é o guardrail que
-impede uma tela dizer "link inválido" deixando o navegador autenticado. **Não
-alterar essas quatro linhas sem entender o que elas garantem.**
+que **tenta** derrubar a sessão recém-criada com `signOut({ scope: "local" })`
+antes de redirecionar. Essa forma literal, `if (…) return
+falharDepoisDeVerificar()`, é **asseverada por regex** em `test:prova` e
+`test:recuperacao`: é o guardrail que impede uma tela dizer "link inválido"
+deixando o navegador autenticado. **Não alterar essas quatro linhas sem entender
+o que elas garantem.**
+
+**Risco residual conhecido — não afirmar que a sessão é sempre derrubada.** O
+helper chama o `signOut` e **descarta o retorno**, sem `try/catch`
+(`src/app/auth/confirmar-recuperacao/actions.ts:98-100`). O `signOut` do SDK não
+lança em falha de API ou de rede — resolve com `{ error }` —, então uma limpeza
+fracassada passa por bem-sucedida. A limpeza é **tentada**, não confirmada.
+
+Isto já era rastreado no checkpoint anterior e **não é defeito novo**. Mitigação
+que continua valendo: com o AAL2 exigido no banco, uma sessão residual é AAL1 e
+não alcança nenhuma das 11 tabelas de negócio. **Não manipular cookies internos
+`sb-*` manualmente** — isso acoplaria a aplicação a detalhe de implementação do
+SDK. Investigar e endurecer na **ETAPA 1**.
+
+Para contraste: o mesmo cuidado **já foi aplicado** do outro lado do fluxo. Em
+`src/app/redefinir-senha/actions.ts`, `derrubarSessaoLocal()` devolve `boolean` e
+o resultado é conferido — foi o que o PR #18 corrigiu. A confirmação não recebeu
+o mesmo tratamento.
 
 ### 4.3 Desfechos por tipo de conta
 
@@ -122,7 +140,13 @@ matriz da ETAPA 6.
 
 ### 4.4 Depois da troca de senha
 
-- a **prova morre** em qualquer desfecho;
+- a **prova é apagada após uma troca de senha bem-sucedida** — e a partir daí
+  nenhum desfecho posterior mantém prova reutilizável, então ela não serve para
+  uma segunda troca. **Falhas ANTERIORES ao `updateUser` podem preservá-la**, de
+  propósito: entrada inválida, segundo fator recusado ou erro do próprio
+  `updateUser` retornam mantendo a prova, o que deixa o usuário corrigir a senha
+  e tentar de novo dentro da validade, sem reiniciar a recuperação inteira.
+  `apagarProva()` só é chamada depois que o `updateUser` deu certo;
 - `signOut({ scope: "others" })` revoga as **outras** refresh sessions;
 - a sessão atual só é preservada se, revalidado, continuar sendo **o mesmo
   usuário** e **ainda em AAL2**;
