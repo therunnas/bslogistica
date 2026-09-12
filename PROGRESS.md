@@ -209,8 +209,12 @@ O que **ficou provado** no diagnóstico, e vale guardar:
 - o `verifyOtp` **conclui**: consome o token e cria sessão. `last_sign_in_at` só
   é escrito dentro da criação do refresh token (GoTrue
   `internal/models/refresh_token.go:205`);
-- a sessão some depois porque `falharDepoisDeVerificar()` chama
-  `signOut({ scope: "local" })`, que **apaga a sessão no servidor**;
+- depois da falha, `falharDepoisDeVerificar()` **chamou**
+  `signOut({ scope: "local" })`, e a sessão deixou de aparecer nas consultas
+  seguintes. Isso é **consistente** com a limpeza local ter funcionado — mas o
+  helper não verifica o `{ error }` retornado (seção 4.2), então **não se pode
+  afirmar** que a limpeza foi confirmada em todos os cenários. Consistente não é
+  o mesmo que comprovado;
 - **não existe incompatibilidade PKCE.** `verifyPost` não tem ramo PKCE —
   `issueAuthCode` vive só em `verifyGet` —, e `{{ .TokenHash }}` renderiza de
   propósito o valor com prefixo `pkce_`, que é exatamente o que
@@ -300,9 +304,59 @@ Entrar nesta etapa com estes pontos já mapeados:
   antes — mas essa premissa precisa ser reexaminada ao redesenhar a decisão de
   AAL.
 
+#### Requisito de segurança obrigatório — MFA optativo precisa existir na RLS
+
+Levantado em revisão do Codex no PR #21. **É restrição da ETAPA 1, não
+sugestão.**
+
+Uma conta que tem **fator verificado** recebe sessão **AAL1** logo após o login
+por senha — antes do TOTP. Então, se a futura policy autorizar
+`papel = operacional AND aal = aal1`, ela **não consegue distinguir**:
+
+|         |                                                                            |
+| ------- | -------------------------------------------------------------------------- |
+| **(A)** | `operacional` que **nunca ativou** MFA                                     |
+| **(B)** | `operacional` **com MFA verificado** que ainda não fez o TOTP nesta sessão |
+
+O guard mandaria **(B)** para `/mfa`, mas o token AAL1 dele continuaria podendo
+tentar **PostgREST/RPC direto**. A obrigação de MFA viraria **guard-only** — o
+que a arquitetura deste projeto proíbe.
+
+**O que a ETAPA 1 precisa garantir:**
+
+- `operacional` **sem** MFA pode futuramente receber os acessos AAL1
+  expressamente autorizados;
+- `operacional` **com MFA verificado NÃO** pode usar esses mesmos acessos apenas
+  com AAL1 depois de um login por senha;
+- a decisão precisa ser **enforceable no banco**, não só no guard;
+- **papel + claim `aal` sozinhos NÃO bastam** para separar (A) de (B);
+- é preciso definir uma **fonte de verdade da inscrição em MFA verificável pelo
+  banco**, ou mecanismo de segurança equivalente;
+- essa fonte **não pode ser controlável pelo próprio usuário** por `UPDATE`
+  comum.
+
+**A solução NÃO está escolhida.** Tabela própria sincronizada, consulta segura
+ao estado de fatores, claim confiável, função `SECURITY DEFINER` ou outro
+mecanismo — tudo isso fica para a auditoria da ETAPA 1, depois de avaliar
+segurança, sincronização, revogação e impossibilidade de spoofing. **Este
+checkpoint registra o REQUISITO, não inventa a solução.**
+
 ### ETAPA 2
 
 Implementar **migrations / policies / guards** da nova política.
+
+**Testes reais de RLS obrigatórios**, exercitados no banco — não no guard:
+
+| Cenário                                     | Esperado                                                       |
+| ------------------------------------------- | -------------------------------------------------------------- |
+| `operacional` **sem** MFA + AAL1            | permite **somente** os acessos explicitamente autorizados      |
+| `operacional` **com MFA verificado** + AAL1 | **bloqueia** os dados que exigem o segundo fator daquela conta |
+| `operacional` **com MFA verificado** + AAL2 | permite conforme o papel                                       |
+| `admin` + AAL1                              | **bloqueia**                                                   |
+| `admin` + AAL2                              | permite conforme o papel                                       |
+
+A segunda linha é a que prova o requisito da ETAPA 1. Sem ela, a exigência de
+MFA para quem optou por ele fica só no guard.
 
 ### ETAPA 3
 

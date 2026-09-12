@@ -47,6 +47,11 @@ tem relação com o TanStack Router.
   Derrubar a policy sozinha reabre uma vulnerabilidade já corrigida. Enquanto
   isso, **não criar usuário `operacional` real**. Ver `CLAUDE.md`, seção
   "AAL por papel", e `PROGRESS.md`, seções 6 e 7.
+- **MFA optativo precisa valer no banco.** Se a conta `operacional` tiver fator
+  verificado, a futura exceção de AAL1 não pode deixar bypass direto por
+  PostgREST/RPC — papel + `aal` sozinhos não distinguem quem nunca ativou MFA de
+  quem ativou e ainda não fez o TOTP. A decisão precisa ser enforceable no
+  banco, não só no guard.
 - **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
   Operação administrativa privilegiada é server-side, o último admin é
   protegido, e alteração de usuário ou papel é auditada.

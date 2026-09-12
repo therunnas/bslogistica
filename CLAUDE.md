@@ -114,9 +114,11 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   mensagem sozinhos, e a varredura queimava a recuperação antes do usuário.
   Conferir a validade do token **é** consumi-lo: não existe "só verificar" num
   token de uso único. Vale para qualquer link desse tipo que venha a existir.
-- **Depois que a senha muda, a prova morre** — em qualquer desfecho, inclusive
-  quando o `signOut` global falha. E a tela nunca diz que a redefinição falhou
-  num caminho em que o `updateUser` teve sucesso.
+- **Depois que a senha muda com sucesso, a prova é apagada** e não permanece
+  reutilizável em nenhum desfecho posterior. Falhas **anteriores** ao
+  `updateUser` podem preservá-la, de propósito, para nova tentativa dentro da
+  validade. E a tela nunca diz que a redefinição falhou num caminho em que o
+  `updateUser` teve sucesso.
 - O guard governa **o que a interface mostra**. Quem protege os dados é a RLS.
 
 ## RLS e banco
@@ -151,6 +153,16 @@ arquivo. Leia as duas metades antes de agir.
 - **operacional:** MFA opcional, ativável pelo próprio usuário;
 - a implementação é **mudança coordenada de guard + papel + RLS**, num mesmo
   desenho — nunca em pedaços soltos.
+
+**MFA opcional NÃO é MFA dispensável.** Uma conta `operacional` que **já optou
+por MFA** não pode continuar acessando dados em AAL1. Uma conta com fator
+verificado recebe sessão AAL1 logo após o login por senha, então **papel + `aal`
+isoladamente não distinguem** quem nunca ativou MFA de quem ativou e ainda não
+fez o TOTP. A futura autorização precisa exigir o segundo fator **também no
+enforcement do banco** para os acessos protegidos, com um indicador confiável e
+**não manipulável pelo usuário** do estado de MFA, ou mecanismo equivalente.
+**Nunca implementar isso só no guard ou no frontend.** Também **não está
+implementado** — é requisito da ETAPA 1.
 
 **Enquanto isso não acontecer:**
 
