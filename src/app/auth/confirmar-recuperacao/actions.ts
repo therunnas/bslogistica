@@ -35,27 +35,6 @@ import {
  * Este é o ÚNICO ponto do sistema onde a recuperação fica comprovada, então é
  * aqui que a prova assinada é emitida — depois do `verifyOtp` dar certo, e
  * amarrada ao `sub` e ao `session_id` lidos de claims verificados.
- *
- * INSTRUMENTAÇÃO TEMPORÁRIA — REMOVER DEPOIS DO DIAGNÓSTICO
- *
- * Os `console.error("RECOVERY_DIAG_*")` abaixo existem só para identificar QUAL
- * ramo posterior ao `verifyOtp` está recusando a recuperação em Production. Os
- * quatro ramos de falha terminam no mesmo redirect para
- * `/esqueci-senha?status=link-invalido`, e de fora são indistinguíveis.
- *
- * Eles não decidem nada: nenhuma condição, redirect, cookie ou retorno mudou.
- * São apenas marcas de caminho.
- *
- * POR QUE A CONDIÇÃO APARECE DUAS VEZES em cada ramo: as quatro saídas têm a
- * forma exata `if (…) return falharDepoisDeVerificar()` e essa forma é
- * asseverada literalmente pelas suítes `test:prova` e `test:recuperacao` — o
- * guardrail que garante que nenhuma falha pós-`verifyOtp` escape da limpeza da
- * sessão. Inserir qualquer coisa dentro desses blocos quebraria a garantia. O
- * log fica então num `if` gêmeo imediatamente anterior, e some junto com ele.
- *
- * Só são registrados CÓDIGOS FIXOS e BOOLEANOS derivados. Nenhum token, JWT,
- * cookie, claim, e-mail, id de usuário, id de sessão, segredo, cabeçalho ou URL
- * é gravado — nem direta, nem indiretamente.
  */
 export async function confirmarRecuperacao() {
   const armazemDeCookies = await cookies();
@@ -136,26 +115,12 @@ export async function confirmarRecuperacao() {
   const sub = claims?.claims?.sub;
   const sessionId = claims?.claims?.session_id;
 
-  // DIAGNÓSTICO TEMPORÁRIO — `if` gêmeo, ver nota no topo do arquivo.
-  if (erroClaims || !user || typeof sub !== "string" || typeof sessionId !== "string") {
-    console.error("RECOVERY_DIAG_A", {
-      erroClaims: Boolean(erroClaims),
-      temUser: Boolean(user),
-      subString: typeof sub === "string",
-      sessionIdString: typeof sessionId === "string",
-    });
-  }
-
   if (erroClaims || !user || typeof sub !== "string" || typeof sessionId !== "string") {
     return falharDepoisDeVerificar();
   }
 
   // Coerência entre as duas leituras: o token verificado tem de descrever o
   // mesmo usuário que o servidor confirmou.
-
-  // DIAGNÓSTICO TEMPORÁRIO — `if` gêmeo, ver nota no topo do arquivo.
-  if (sub !== user.id) console.error("RECOVERY_DIAG_B");
-
   if (sub !== user.id) return falharDepoisDeVerificar();
 
   /**
@@ -174,14 +139,6 @@ export async function confirmarRecuperacao() {
 
   const decisaoMfa = decidirMfaNaRecuperacao(decidirSituacaoMfa(nivel ?? null, Boolean(erroNivel)));
 
-  // DIAGNÓSTICO TEMPORÁRIO — `if` gêmeo, ver nota no topo do arquivo.
-  if (decisaoMfa === "falhar") {
-    console.error("RECOVERY_DIAG_C", {
-      erroNivel: Boolean(erroNivel),
-      temNivel: Boolean(nivel),
-    });
-  }
-
   if (decisaoMfa === "falhar") return falharDepoisDeVerificar();
 
   const prova = await criarProvaDeRecuperacao({ sub, sessionId });
@@ -189,10 +146,6 @@ export async function confirmarRecuperacao() {
   // Sem segredo configurado não há prova possível. Falha fechada: é melhor o
   // fluxo parar aqui do que seguir para um formulário que não conseguiria
   // provar nada.
-
-  // DIAGNÓSTICO TEMPORÁRIO — `if` gêmeo, ver nota no topo do arquivo.
-  if (!prova) console.error("RECOVERY_DIAG_D");
-
   if (!prova) return falharDepoisDeVerificar();
 
   apagarPendente();
@@ -219,11 +172,6 @@ export async function confirmarRecuperacao() {
   //
   // Dois `redirect` em vez de um ternário: o `typedRoutes` valida cada rota
   // como literal, e uma união de literais não casa com o tipo esperado.
-
-  // DIAGNÓSTICO TEMPORÁRIO — ver nota no topo do arquivo. Antes dos dois
-  // `redirect` porque `redirect` lança: depois dele nada mais executa.
-  console.error("RECOVERY_DIAG_OK");
-
   if (decisaoMfa === "desafiar-mfa") redirect(ROTA_REDEFINIR_SENHA_MFA);
 
   redirect(ROTA_REDEFINIR_SENHA);
