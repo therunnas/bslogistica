@@ -11,6 +11,7 @@ import {
   MENSAGEM_MFA_EXIGIDO,
   MENSAGEM_MFA_INDISPONIVEL,
   MENSAGEM_RECUPERACAO_INVALIDA,
+  ROTA_DASHBOARD,
   ROTA_LOGIN_SENHA_REDEFINIDA,
   ROTA_LOGIN_SESSOES_ATIVAS,
   ROTA_REDEFINIR_SENHA,
@@ -130,11 +131,10 @@ export async function redefinirSenha(entrada: {
   }
 
   /**
-   * A prova morre em todo caminho a partir daqui, com ou sem sucesso do
-   * `signOut`. Depois que a senha muda, a prova não autoriza mais nada que o
-   * usuário deva querer — e deixá-la viva foi o achado desta rodada: o
-   * caminho de falha do `signOut` saía antes desta limpeza, deixando prova e
-   * sessão de recuperação de pé por até 10 minutos.
+   * A prova morre assim que a senha muda, antes de qualquer chamada remota que
+   * possa falhar. Depois da troca ela não autoriza mais nada que o usuário deva
+   * querer, e um caminho de falha que saísse antes desta limpeza a deixaria
+   * viva por até 10 minutos — foi um achado de revisão.
    *
    * Mesmo Path do `Set-Cookie` original, senão o navegador não casa o cookie a
    * remover.
@@ -149,31 +149,51 @@ export async function redefinirSenha(entrada: {
     });
   }
 
-  // Ordem obrigatória: a senha já mudou, então agora a sessão de recuperação
-  // cai. Escopo global, que derruba também as demais sessões da conta — o
-  // comportamento desejado depois de uma troca de senha.
-  const { error: erroAoSair } = await supabase.auth.signOut();
+  apagarProva();
 
-  if (erroAoSair) {
-    /**
-     * A revogação global não respondeu — rede, indisponibilidade do Auth. A
-     * senha, porém, JÁ mudou: este não é um caminho de erro, é um sucesso
-     * parcial, e o usuário precisa ouvir isso.
-     *
-     * Resta fazer o que não depende da rede remota: derrubar a sessão local.
-     * `try` porque nem esse passo pode impedir a limpeza da prova — se o
-     * `signOut` local também falhar, o cookie tem de morrer do mesmo jeito.
-     * Cookies internos `sb-*` seguem intocados: manipulá-los à mão acoplaria a
-     * aplicação a detalhe de implementação do SDK.
-     */
+  /** Limpeza local best-effort. Nunca impede o que vem depois. */
+  async function derrubarSessaoLocal() {
     try {
       await supabase.auth.signOut({ scope: "local" });
     } catch {
-      // Ignorado de propósito: a limpeza da prova, abaixo, é o que não pode
-      // deixar de acontecer.
+      // Ignorado de propósito: cookies internos `sb-*` seguem intocados —
+      // manipulá-los à mão acoplaria a aplicação a detalhe do SDK.
     }
+  }
 
-    apagarProva();
+  /**
+   * Revoga as OUTRAS sessões e preserva esta.
+   *
+   * POR QUE NÃO É MAIS `signOut()` GLOBAL
+   *
+   * O global derrubava também a sessão atual, que a esta altura já provou
+   * posse do link, prova HMAC, TOTP e está em aal2. O usuário caía no login e
+   * era obrigado a informar o mesmo TOTP de novo, no mesmo processo. Com
+   * `scope: "others"` o objetivo real da troca de senha — expulsar sessões
+   * antigas — é cumprido sem essa segunda cobrança.
+   *
+   * `others` está declarado em `@supabase/auth-js` 2.115.0
+   * (`SIGN_OUT_SCOPES = ['global','local','others']`) e a implementação só
+   * remove a sessão local quando o escopo NÃO é `others`.
+   *
+   * LIMITE CONHECIDO, e que já existia antes
+   *
+   * Isto revoga as refresh sessions das outras. Access tokens JWT já emitidos
+   * em outros dispositivos continuam válidos até expirarem — são stateless.
+   * O `signOut` global tinha exatamente a mesma limitação: nenhum escopo
+   * invalida um JWT já emitido. Não é regressão desta mudança e não é escopo
+   * desta etapa.
+   */
+  const { error: erroAoSair } = await supabase.auth.signOut({ scope: "others" });
+
+  if (erroAoSair) {
+    /**
+     * A revogação não respondeu — rede, indisponibilidade do Auth. A senha JÁ
+     * mudou: não é caminho de erro, é sucesso parcial. Com outras sessões
+     * possivelmente vivas, não se entra no painel; cai no comportamento
+     * anterior, que avisa o usuário.
+     */
+    await derrubarSessaoLocal();
 
     /**
      * Sai desta tela, em vez de devolver estado para o formulário.
@@ -189,7 +209,49 @@ export async function redefinirSenha(entrada: {
     redirect(ROTA_LOGIN_SESSOES_ATIVAS);
   }
 
-  apagarProva();
+  /**
+   * Revalidação antes de entrar no painel.
+   *
+   * Nada aqui aposta em como o GoTrue trata a sessão atual depois de uma troca
+   * de senha. O SDK não substitui os tokens no `updateUser` — a mesma sessão é
+   * regravada com o usuário novo —, mas o servidor é livre para invalidá-la, e
+   * isso não é verificável sem tráfego real. Então o estado é CONFERIDO, não
+   * presumido: se qualquer peça não confirmar, o fluxo cai no comportamento
+   * anterior e o usuário entra pelo login.
+   *
+   * `getUser` valida o token contra o Supabase; ler o cookie não provaria nada.
+   */
+  const {
+    data: { user: usuarioDepois },
+  } = await supabase.auth.getUser();
 
-  redirect(ROTA_LOGIN_SENHA_REDEFINIDA);
+  const { data: nivelDepois, error: erroNivelDepois } =
+    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  /**
+   * O usuário precisa ser o MESMO de antes da troca.
+   *
+   * Uma sessão que sobrevive apontando para outro `sub` seria estado absurdo,
+   * e entrar no painel com ela daria acesso à conta errada. Comparar é barato;
+   * confiar, não.
+   */
+  const mesmoUsuario = Boolean(usuarioDepois) && usuarioDepois?.id === user!.id;
+  const continuaEmAal2 = !erroNivelDepois && nivelDepois?.currentLevel === "aal2";
+
+  if (!mesmoUsuario || !continuaEmAal2) {
+    // Fallback seguro, idêntico ao comportamento anterior a esta mudança: não
+    // se tenta reconstruir sessão nenhuma, o usuário entra pelo login.
+    await derrubarSessaoLocal();
+    redirect(ROTA_LOGIN_SENHA_REDEFINIDA);
+  }
+
+  /**
+   * Senha trocada, prova morta, outras sessões revogadas, mesmo usuário e
+   * sessão ainda em aal2. O segundo fator já foi cobrado neste mesmo fluxo, em
+   * `/redefinir-senha/mfa` — pedir de novo agora seria fricção sem ganho.
+   *
+   * Nenhum bypass: o guard do painel continua decidindo sessão, papel e AAL2, e
+   * a RLS continua protegendo os dados.
+   */
+  redirect(ROTA_DASHBOARD);
 }
