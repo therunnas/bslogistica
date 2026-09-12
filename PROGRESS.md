@@ -140,13 +140,19 @@ enviado e nenhum token real foi consumido.
 
 ### Achado residual aceito
 
-**P2 residual no signOut local de `/auth/confirm`:** `@supabase/auth-js` 2.115.0
-já remove a sessão local em falhas remotas comuns (verificado no fonte
-instalado, `GoTrueClient.js:3425-3436`); há caminho residual estreito de falha
-de leitura de sessão. **Não vamos manipular cookies internos `sb-*`
-manualmente** — isso acoplaria a aplicação a detalhe de implementação do SDK.
-A mitigação prometida foi cumprida: com o AAL2 valendo no banco, a sessão
-residual é AAL1 e não alcança nenhuma das 11 tabelas de negócio.
+**P2 residual no cleanup local da confirmação**, em
+`src/app/auth/confirmar-recuperacao/actions.ts`: nas falhas **posteriores a um
+`verifyOtp` bem-sucedido**, o resultado do `signOut({ scope: "local" })` não é
+verificado. O `@supabase/auth-js` 2.115.0 já remove a sessão local em falhas
+remotas comuns (verificado no fonte instalado, `GoTrueClient.js:3425-3436`);
+resta um caminho estreito de falha de leitura de sessão. **Não vamos manipular
+cookies internos `sb-*` manualmente** — isso acoplaria a aplicação a detalhe de
+implementação do SDK. A mitigação prometida foi cumprida: com o AAL2 valendo no
+banco, a sessão residual é AAL1 e não alcança nenhuma das 11 tabelas de negócio.
+
+O `GET /auth/confirm` **não** tem parte nisso: não instancia o cliente do
+Supabase e não chama `signOut`. Quem cria a sessão de recuperação — e portanto
+quem precisa limpá-la — é a Server Action que consome o token.
 
 ### Passo manual pendente — o único que resta
 
