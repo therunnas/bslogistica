@@ -34,6 +34,19 @@
 --   PASSAM ANTES E DEPOIS:   J50, J51, J53, J55, J58, J58b — a prova de que
 --                            reenvio legítimo, decisão administrativa, fluxo
 --                            diário e `gerar_fatura` não foram atingidos
+--
+-- TERCEIRA RODADA. Os casos J59..J82 vieram da revisão seguinte, que mostrou
+-- que proteger o vínculo e o DELETE deixava a LINHA faturada editável — e
+-- editá-la reescrevia os valores. Contra o schema anterior:
+--
+--   MEDEM O BURACO e falham: J59..J68, J71, J73..J76, J78, J80, J81
+--   COLATERAL e falham:      J70, J82 — no baseline as edições acontecem de
+--                            verdade, então não há estado posterior íntegro
+--                            para conferir. J70 chega a 5000.00 no baseline:
+--                            J64 move a entry para a folha do Contrato Caro e
+--                            a derivação recalcula em cima dele
+--   PASSAM ANTES E DEPOIS:   J69, J72, J77, J79 — reenvio sem alteração, folha
+--                            sem faturamento e turno sem folha
 
 begin;
 
@@ -803,6 +816,293 @@ begin
   perform pg_temp.registrar('J57. UPDATE que produziria par inválido', 'recusou 23514', _e);
 end;
 $par$;
+
+
+-- ---------------------------------------------------------------------------
+-- J59..J71. APONTAMENTO FATURADO — a LINHA inteira é imutável
+--
+-- Proteger o vínculo e o DELETE não bastava: a linha seguia editável, e editar
+-- REESCREVIA os valores. O alvo é sempre o apontamento faturado da OP-A, que
+-- vale 200.00 e está dentro de uma fatura de 250.00.
+--
+-- J71 é o caso que separa "lista de seis colunas" de "invariante sobre a
+-- linha": `created_at` não aparece em nenhuma lista de campos de negócio, e
+-- mesmo assim não pode ser reescrito numa linha faturada.
+-- ---------------------------------------------------------------------------
+
+do $entry_faturada$
+declare
+  _e text;
+  _n integer;
+  _b numeric;
+  _c numeric;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  begin
+    update public.timesheet_entries set status = 'absent'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J59. operacional muda status de entry faturada', 'recusou 42501', _e);
+
+  begin
+    update public.timesheet_entries set check_in = '04:00:00'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J60. operacional muda check_in de entry faturada', 'recusou 42501', _e);
+
+  begin
+    update public.timesheet_entries set check_out = '23:00:00'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J61. operacional muda check_out de entry faturada', 'recusou 42501', _e);
+
+  begin
+    update public.timesheet_entries set break_minutes = 0
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J62. operacional muda break_minutes de entry faturada', 'recusou 42501', _e);
+
+  begin
+    update public.timesheet_entries set employee_id = '55555555-5555-4555-8555-5555555555d1'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J63. operacional muda employee_id de entry faturada', 'recusou 42501', _e);
+
+  begin
+    update public.timesheet_entries set timesheet_id = '66666666-6666-4666-8666-6666666666b1'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J64. operacional muda timesheet_id de entry faturada', 'recusou 42501', _e);
+
+  -- Descritivo também: um histórico faturado não muda de narrativa em silêncio.
+  begin
+    update public.timesheet_entries set notes = 'reescrito depois da fatura'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J65. operacional muda notes de entry faturada', 'recusou 42501', _e);
+
+  -- J66..J68. E não é questão de papel.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  begin
+    update public.timesheet_entries set status = 'absent'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J66. ADMIN muda status de entry faturada', 'recusou 42501', _e);
+
+  execute 'reset role';
+  execute 'set local role service_role';
+  begin
+    update public.timesheet_entries set notes = 'service_role'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J67. service_role muda notes de entry faturada', 'recusou 42501', _e);
+
+  execute 'reset role';
+  begin
+    update public.timesheet_entries set notes = 'postgres'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J68. postgres muda notes de entry faturada', 'recusou 42501', _e);
+
+  -- J71. A guarda compara a LINHA, não uma lista: `created_at` não é campo de
+  -- negócio e mesmo assim não pode ser reescrito depois da fatura.
+  begin
+    update public.timesheet_entries set created_at = now() - interval '1 year'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J71. até created_at de entry faturada é recusado', 'recusou 42501', _e);
+
+  -- J69. Falso positivo: a tela reenvia o objeto inteiro. Reenviar os MESMOS
+  -- valores não pode virar 42501, nem em linha faturada.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update public.timesheet_entries
+       set status = 'present', check_in = '06:00:00', check_out = '15:00:00', break_minutes = 60
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J69. reenvio SEM alteração material é aceito', '1 linhas', _e);
+
+  -- J70. E depois de tudo isso, incluindo o reenvio, nada foi recalculado.
+  execute 'reset role';
+  select billed_amount, cost_amount into _b, _c
+    from public.timesheet_entries where id = '77777777-7777-4777-8777-7777777777a1';
+  perform pg_temp.registrar('J70. valores da entry faturada sem recálculo',
+    '200.00 / 120.00',
+    to_char(_b, 'FM999999990.00') || ' / ' || to_char(_c, 'FM999999990.00'));
+end;
+$entry_faturada$;
+
+
+-- ---------------------------------------------------------------------------
+-- J72..J78. FOLHA FATURADA — data, operação e turno congelados
+--
+-- `gerar_fatura` escolhe o período por `t.work_date`. Mover a data depois de
+-- faturar joga o lastro para outro período sem tocar na fatura.
+-- ---------------------------------------------------------------------------
+
+do $folha_faturada$
+declare
+  _e text;
+  _n integer;
+begin
+  -- J72. Folha SEM apontamento faturado continua editável. `...e001` foi criada
+  -- em J53 e não tem apontamento nenhum.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update public.timesheets set work_date = current_date - 10
+     where id = '66666666-6666-4666-8666-66666666e001';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J72. folha SEM faturamento muda work_date', '1 linhas', _e);
+
+  -- J74. Folha COM apontamento faturado: nem admin.
+  begin
+    update public.timesheets set work_date = current_date - 40
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J74. ADMIN muda work_date de folha faturada', 'recusou 42501', _e);
+
+  -- J77. Reenviar a MESMA data não pode virar 42501.
+  begin
+    update public.timesheets set work_date = current_date, status = 'closed'
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J77. reenvio do MESMO work_date é aceito', '1 linhas', _e);
+
+  -- J73. operacional
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  begin
+    update public.timesheets set work_date = current_date - 41
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J73. operacional muda work_date de folha faturada', 'recusou 42501', _e);
+
+  -- J75, J76. service_role e postgres
+  execute 'reset role';
+  execute 'set local role service_role';
+  begin
+    update public.timesheets set work_date = current_date - 42
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J75. service_role muda work_date de folha faturada', 'recusou 42501', _e);
+
+  execute 'reset role';
+  begin
+    update public.timesheets set work_date = current_date - 43
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J76. postgres muda work_date de folha faturada', 'recusou 42501', _e);
+
+  -- J78. A corrida com `gerar_fatura` é fechada pelo mesmo advisory lock por
+  -- cliente. Se alguém remover o lock, este caso acusa — como o J40.
+  select count(*) into _n
+    from pg_proc p
+    join pg_namespace ns on ns.oid = p.pronamespace
+   where ns.nspname = 'public'
+     and p.proname = 'bloquear_alteracao_folha_faturada'
+     and p.prosrc like '%pg_advisory_xact_lock(hashtextextended(%';
+  perform pg_temp.registrar('J78. guarda da folha usa o mesmo advisory lock', '1', _n::text);
+end;
+$folha_faturada$;
+
+
+-- ---------------------------------------------------------------------------
+-- J79..J82. TURNO REFERENCIADO — o par visto do outro lado
+--
+-- `validar_par_operacao_turno` guarda a folha. Sem esta guarda o par podia ser
+-- quebrado movendo o TURNO, sem tocar em folha nenhuma.
+-- ---------------------------------------------------------------------------
+
+do $turno$
+declare
+  _e text;
+  _n integer;
+  _incoerentes integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- J79. Turno C não é referenciado por folha nenhuma: mover é legítimo.
+  begin
+    update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444b1'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J79. admin move turno SEM folha', '1 linhas', _e);
+
+  -- J80. Turno B é referenciado pela folha criada em J53, que não tem
+  -- faturamento. Basta ser referenciado.
+  begin
+    update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444a1'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    _e := 'MOVEU';
+  exception when check_violation then _e := 'recusou 23514';
+            when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J80. admin move turno referenciado por folha SEM fatura', 'recusou 23514', _e);
+
+  -- J81. Turno A é referenciado pela folha do apontamento faturado.
+  begin
+    update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444b1'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+    _e := 'MOVEU';
+  exception when check_violation then _e := 'recusou 23514';
+            when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J81. admin move turno referenciado por folha FATURADA', 'recusou 23514', _e);
+
+  -- J82. Depois de tudo, nenhuma folha do banco tem turno de outra operação.
+  execute 'reset role';
+  select count(*) into _incoerentes
+    from public.timesheets t
+    join public.shifts s on s.id = t.shift_id
+   where s.operation_id is distinct from t.operation_id;
+  perform pg_temp.registrar('J82. nenhum par operação/turno incoerente no banco',
+    '0', _incoerentes::text);
+end;
+$turno$;
 
 
 -- ---------------------------------------------------------------------------

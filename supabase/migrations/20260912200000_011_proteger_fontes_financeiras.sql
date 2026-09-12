@@ -78,6 +78,24 @@
 --
 -- Os três têm a mesma assinatura dos ataques originais: a configuração volta
 -- ao normal e o valor inflado, ou o cliente errado, fica congelado.
+--
+-- TERCEIRA RODADA DE REVISÃO
+--
+-- Mais três, também reproduzidos antes de fechar, e os dois primeiros mostram
+-- que proteger o VÍNCULO e o DELETE não bastava — faltava proteger a LINHA:
+--
+--   4. a linha faturada continuava editável, e editá-la REESCREVIA os valores:
+--      `status = 'absent'` levou `billed_amount` de 200.00 a 0.00, e
+--      `check_out = '23:00'` levou a 500.00, com a fatura parada nos 250.00
+--      originais — seção 1c;
+--   5. `timesheets.work_date` mudava depois do faturamento, movendo o lastro
+--      para outro período — seção 3c;
+--   6. o par operação/turno podia ser quebrado pelo LADO DO TURNO, movendo um
+--      turno já referenciado — seção 3d.
+--
+-- A lição das seções 1c e 3c está escrita nelas: onde havia lista de colunas,
+-- passou a haver invariante sobre a linha. Uma lista protege o que alguém
+-- lembrou; a comparação protege também o que ainda não existe.
 
 -- ---------------------------------------------------------------------------
 -- 1. Lastro faturado — absoluto, sem exceção de papel
@@ -188,6 +206,99 @@ DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_desvinculo
 CREATE TRIGGER trg_timesheet_entries_bloqueia_desvinculo
   BEFORE UPDATE OF invoice_id ON public.timesheet_entries
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_desvinculo_faturado();
+
+-- ---------------------------------------------------------------------------
+-- 1c. A LINHA faturada inteira é imutável, não só o vínculo
+--
+-- Levantado em revisão e reproduzido em banco local. Proteger o vínculo e o
+-- DELETE ainda deixava a linha editável, e a edição REESCREVIA os valores:
+--
+--   operacional, entry dentro de fatura fechada, billed_amount = 200.00
+--     UPDATE ... SET status    = 'absent'     -> billed_amount = 0.00
+--     UPDATE ... SET check_out = '23:00:00'   -> billed_amount = 500.00
+--
+-- A fatura não muda: `invoices.total_amount` e `invoice_items` continuam nos
+-- 250.00 originais, e o lastro que os justifica passa a dizer outra coisa.
+--
+-- POR QUE COMPARAR A LINHA INTEIRA, E NÃO UMA LISTA DE COLUNAS
+--
+-- Uma lista é frágil pelo lado errado: ela protege o que alguém lembrou de
+-- escrever, e deixa passar toda coluna futura. A comparação é sobre
+-- `to_jsonb(NEW)` contra `to_jsonb(OLD)`, então qualquer coluna que venha a
+-- existir nesta tabela nasce protegida, sem ninguém precisar lembrar.
+--
+-- A única exclusão é `updated_at`, metadado técnico reescrito pelo próprio
+-- `update_updated_at_column`. Sem excluí-la, um UPDATE inócuo viraria falso
+-- positivo. `created_at` e `id` NÃO são excluídos, de propósito: mudar
+-- qualquer um dos dois numa linha faturada é falsificação de histórico, não
+-- manutenção técnica.
+--
+-- A mensagem nomeia as colunas que divergiram — quem for corrigir um
+-- apontamento faturado precisa saber o que exatamente o sistema recusou.
+--
+-- ORDEM DOS TRIGGERS: a correção NÃO depende dela
+--
+-- Alfabeticamente esta guarda roda antes de `calculo_financeiro`, então ela vê
+-- o payload cru. Mas a propriedade vale mesmo se a ordem mudar, e vale por
+-- construção: `derivar_valores_financeiros` só recalcula quando uma coluna
+-- MOTRIZ mudou (`status`, `check_in`, `check_out`, `break_minutes`,
+-- `employee_id`, `timesheet_id`), e toda coluna motriz é também uma coluna de
+-- negócio — logo já recusada aqui. Quando nenhuma motriz muda, aquela função
+-- copia os valores de OLD e não recalcula nada. Não existe caminho em que uma
+-- linha faturada seja recalculada, independente de quem roda primeiro.
+--
+-- A direção do vínculo continua valendo: com `OLD.invoice_id IS NULL` esta
+-- guarda nem olha a linha, que é como `gerar_fatura` segue vinculando.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_edicao_faturada()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  _antes  jsonb;
+  _depois jsonb;
+  _campos text;
+BEGIN
+  -- Ainda não faturado: nada a fazer, e é por aqui que `gerar_fatura` passa.
+  IF OLD.invoice_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  _antes  := to_jsonb(OLD) - 'updated_at';
+  _depois := to_jsonb(NEW) - 'updated_at';
+
+  IF _depois IS DISTINCT FROM _antes THEN
+    SELECT string_agg(k, ', ' ORDER BY k)
+      INTO _campos
+      FROM jsonb_object_keys(_antes) AS k
+     WHERE _antes -> k IS DISTINCT FROM _depois -> k;
+
+    RAISE EXCEPTION
+      'Apontamento faturado é imutável. Alterações recusadas em: %. Fatura: %.',
+      _campos, OLD.invoice_id
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_edicao_faturada() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_edicao_faturada() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_edicao_faturada() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_edicao_faturada() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_edicao_faturada() IS
+  'Congela a linha inteira de um apontamento já faturado, comparando to_jsonb(NEW) com to_jsonb(OLD) e ignorando apenas updated_at. Colunas futuras nascem protegidas. Sem exceção de papel.';
+
+DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_edicao_faturada
+  ON public.timesheet_entries;
+CREATE TRIGGER trg_timesheet_entries_bloqueia_edicao_faturada
+  BEFORE UPDATE ON public.timesheet_entries
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_edicao_faturada();
 
 -- ---------------------------------------------------------------------------
 -- 2. Turno com histórico faturado — o caminho que a cascata não alcança
@@ -502,6 +613,148 @@ DROP TRIGGER IF EXISTS trg_timesheets_valida_par ON public.timesheets;
 CREATE TRIGGER trg_timesheets_valida_par
   BEFORE INSERT OR UPDATE OF operation_id, shift_id ON public.timesheets
   FOR EACH ROW EXECUTE FUNCTION public.validar_par_operacao_turno();
+
+-- ---------------------------------------------------------------------------
+-- 3c. A folha que já tem apontamento faturado também congela
+--
+-- Levantado em revisão e reproduzido em banco local: com um apontamento já
+-- dentro de fatura fechada, tanto `operacional` quanto ADMIN ALTERARAM o
+-- `work_date` da folha. `gerar_fatura` usa `t.work_date` para escolher o
+-- período (`t.work_date BETWEEN _period_start AND _period_end`), e o extrato
+-- exibe a mesma data: mover a data depois de faturar joga o lastro para outro
+-- período sem tocar na fatura nem nos totais.
+--
+-- `operation_id` e `shift_id` entram na mesma guarda pelo mesmo motivo, e não
+-- porque a revisão os tenha citado. Os três respondem à mesma pergunta — a
+-- que trabalho esta fatura se refere. Deixar dois de fora repetiria o erro da
+-- lista frágil que a seção 1c existe para não cometer.
+--
+-- ADVISORY LOCK, e por que ele vem antes da verificação
+--
+-- Mesma convenção de `gerar_fatura`, do DELETE de `clients` e do DELETE de
+-- `shifts`: `hashtextextended(client_id::text, 0)`. Sem ele existe janela
+-- real — a fatura pode nascer entre o EXISTS e o commit, e a data teria sido
+-- movida assim mesmo. Travar pelo mesmo hash serializa as duas operações.
+--
+-- O cliente sai de OLD.operation_id, não de NEW: a pergunta é sobre o lastro
+-- que a folha JÁ tem, e ele pertence ao cliente de hoje. Se a folha estiver
+-- mudando de operação, travar pelo cliente de destino deixaria a corrida
+-- aberta exatamente do lado que importa.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_alteracao_folha_faturada()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  _client_id uuid;
+BEGIN
+  -- Reenvio sem mudança não pode virar 42501: a tela manda o objeto inteiro.
+  IF NEW.work_date    IS NOT DISTINCT FROM OLD.work_date
+     AND NEW.operation_id IS NOT DISTINCT FROM OLD.operation_id
+     AND NEW.shift_id     IS NOT DISTINCT FROM OLD.shift_id THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT o.client_id INTO _client_id
+    FROM public.operations o
+   WHERE o.id = OLD.operation_id;
+
+  IF _client_id IS NOT NULL THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended(_client_id::text, 0));
+  END IF;
+
+  -- Verificação DEPOIS do lock, de propósito.
+  IF EXISTS (
+    SELECT 1
+      FROM public.timesheet_entries te
+     WHERE te.timesheet_id = OLD.id
+       AND te.invoice_id IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION
+      'Folha com apontamento faturado não pode ter data, operação ou turno alterados.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_alteracao_folha_faturada() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_alteracao_folha_faturada() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_alteracao_folha_faturada() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_alteracao_folha_faturada() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_alteracao_folha_faturada() IS
+  'Congela work_date, operation_id e shift_id de folha que já tenha apontamento faturado. Toma o mesmo advisory lock por cliente que gerar_fatura. Sem exceção de papel.';
+
+-- `bloqueia_faturada` < `bloqueia_fontes`: a recusa por lastro vem antes da
+-- recusa por papel, que é a mensagem certa quando as duas se aplicam.
+DROP TRIGGER IF EXISTS trg_timesheets_bloqueia_faturada ON public.timesheets;
+CREATE TRIGGER trg_timesheets_bloqueia_faturada
+  BEFORE UPDATE OF work_date, operation_id, shift_id ON public.timesheets
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_alteracao_folha_faturada();
+
+-- ---------------------------------------------------------------------------
+-- 3d. O outro lado da relação: turno já usado não muda de operação
+--
+-- `validar_par_operacao_turno` guarda a folha. Levantado em revisão e
+-- reproduzido em banco local, o par podia ser quebrado pelo turno:
+--
+--   turno S pertence à operação A, folha T = operação A + turno S
+--   ADMIN: UPDATE shifts SET operation_id = B  ->  MOVEU
+--   par resultante: folha.operation_id = A, turno.operation_id = B
+--
+-- A folha não é tocada, e o par proibido passa a existir sem que ninguém o
+-- tenha inserido. O recálculo seguinte volta a combinar a taxa de A com a
+-- jornada do turno de B.
+--
+-- DECISÃO: mover só é possível enquanto NENHUMA folha referenciar o turno.
+-- Basta uma, faturada ou não, para recusar — vale inclusive para admin.
+--
+-- Deliberadamente NÃO propaga `operation_id` para as folhas existentes nem
+-- reescreve histórico: isso mudaria silenciosamente a que operação pertence
+-- trabalho já registrado. Para mover um turno já usado, o caminho seguro é
+-- criar um turno novo na operação de destino.
+--
+-- ERRCODE 23514 pelo mesmo motivo da seção 3b: é a mesma invariante, vista do
+-- outro lado, e nenhum papel pode violá-la.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_mover_turno_referenciado()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF NEW.operation_id IS DISTINCT FROM OLD.operation_id
+     AND EXISTS (
+       SELECT 1 FROM public.timesheets t WHERE t.shift_id = OLD.id
+     ) THEN
+    RAISE EXCEPTION
+      'Turno já usado em folha não pode mudar de operação. Crie um turno novo na operação de destino.'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_mover_turno_referenciado() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_mover_turno_referenciado() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_mover_turno_referenciado() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_mover_turno_referenciado() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_mover_turno_referenciado() IS
+  'Impede mudar shifts.operation_id enquanto alguma folha referenciar o turno. Fecha o par operação/turno pelo lado do turno, que validar_par_operacao_turno não alcança. Invariante estrutural: vale para todos os papéis.';
+
+DROP TRIGGER IF EXISTS trg_shifts_bloqueia_mover_referenciado ON public.shifts;
+CREATE TRIGGER trg_shifts_bloqueia_mover_referenciado
+  BEFORE UPDATE OF operation_id ON public.shifts
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_mover_turno_referenciado();
 
 -- ---------------------------------------------------------------------------
 -- 4. Policies por comando em operations e shifts
