@@ -27,6 +27,7 @@ import {
 import {
   MENSAGEM_RECUPERACAO_INVALIDA,
   MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
+  ROTA_DASHBOARD,
   ROTA_LOGIN_SENHA_REDEFINIDA,
   ROTA_LOGIN_SESSOES_ATIVAS,
   decidirTrocaDeSenha,
@@ -196,28 +197,34 @@ verificar("I1. a action declara 'use server'", String(action.startsWith('"use se
 const pValida = action.indexOf("validarProvaDeRecuperacao(");
 const pDecide = action.indexOf("decidirTrocaDeSenha(");
 const pUpdate = action.indexOf("auth.updateUser(");
-const pSignOut = action.indexOf("auth.signOut()");
+const pSignOut = action.indexOf('signOut({ scope: "others" })');
 const pRedirect = action.indexOf("redirect(ROTA_LOGIN_SENHA_REDEFINIDA)");
 const pLimpa = action.indexOf("armazemDeCookies.set(NOME_DO_COOKIE_DE_PROVA");
 
 verificar("I2. a prova é revalidada na action", String(pValida !== -1), "true");
 verificar("I3. revalidação antes do updateUser", String(pValida < pUpdate), "true");
 verificar("I4. decisão antes do updateUser", String(pDecide < pUpdate), "true");
-verificar("I5. signOut depois do updateUser", String(pUpdate < pSignOut), "true");
+verificar(
+  "I5. revogação das outras sessões depois do updateUser",
+  String(pUpdate < pSignOut),
+  "true",
+);
 verificar("I6. redirect por último", String(pSignOut < pRedirect), "true");
 // A limpeza virou a função `apagarProva()`, declarada antes do `signOut` e
 // chamada depois dele nos dois desfechos. O que esta asserção sempre quis dizer
 // é que a prova só morre depois da tentativa de encerrar a sessão — então o que
 // se mede é a CHAMADA, não a declaração.
+// A ordem inverteu de proposito: a prova morre ANTES da revogacao remota, para
+// que nenhuma falha de rede a deixe viva.
 verificar(
-  "J1. limpeza do cookie depois do signOut",
-  String(action.indexOf("apagarProva();", pSignOut) > pSignOut),
+  "J1. limpeza do cookie antes da revogação remota",
+  String(action.indexOf("apagarProva();") < pSignOut),
   "true",
 );
 verificar(
-  "J1b. a limpeza está declarada como função reutilizada nos dois desfechos",
+  "J1b. a limpeza continua declarada como função própria, chamada uma vez",
   String(pLimpa !== -1 && (action.match(/apagarProva\(\);/g) || []).length),
-  "2",
+  "1",
 );
 verificar("J2. limpeza com maxAge 0", String(/maxAge:\s*0/.test(action)), "true");
 verificar(
@@ -285,65 +292,124 @@ const acaoSemComentarios = action
 
 const pUpdateUser = acaoSemComentarios.indexOf("auth.updateUser(");
 const pErroUpdate = acaoSemComentarios.indexOf("traduzirErroDeSenha(error.code)");
-const pSignOutGlobal = acaoSemComentarios.indexOf("auth.signOut()");
+const pSignOutOutras = acaoSemComentarios.indexOf('signOut({ scope: "others" })');
 const pRamoDeFalha = acaoSemComentarios.indexOf("if (erroAoSair)");
 const pSignOutLocal = acaoSemComentarios.indexOf('signOut({ scope: "local" })');
+const pApagaProva = acaoSemComentarios.indexOf("apagarProva();");
 const pRedirectFinal = acaoSemComentarios.indexOf("redirect(ROTA_LOGIN_SENHA_REDEFINIDA)");
+const pDashboard = acaoSemComentarios.indexOf("redirect(ROTA_DASHBOARD)");
 
-// 1. Caminho feliz preservado: signOut global, limpeza da prova e redirect.
+// 1 a 3. A NOVA ordem obrigatória depois do updateUser:
+//   updateUser -> apagarProva -> signOut({ scope: "others" })
+//
+// A prova morre antes de qualquer chamada remota que possa falhar. Deixá-la
+// viva num caminho de falha foi um achado de revisão.
+verificar("L1. a prova é apagada depois do updateUser", String(pUpdateUser < pApagaProva), "true");
 verificar(
-  "L1. sucesso total continua apagando a prova e redirecionando",
-  String(pSignOutGlobal !== -1 && pSignOutGlobal < pRedirectFinal && pRedirectFinal !== -1),
+  "L1b. a prova é apagada ANTES de revogar as outras sessões",
+  String(pApagaProva < pSignOutOutras),
   "true",
 );
 verificar(
-  "L1b. o redirect de sucesso vem depois de apagar a prova",
-  String(acaoSemComentarios.lastIndexOf("apagarProva()") < pRedirectFinal),
-  "true",
-);
-
-// 2. Falha do signOut global tenta ao menos a limpeza local.
-verificar(
-  "L2. o ramo de falha tenta signOut local",
-  String(pRamoDeFalha !== -1 && pSignOutLocal > pRamoDeFalha),
-  "true",
-);
-verificar(
-  "L2b. o signOut local fica dentro do ramo de falha do global",
-  String(pSignOutGlobal < pSignOutLocal),
-  "true",
+  "L1c. a prova é apagada uma única vez, no caminho comum",
+  String((acaoSemComentarios.match(/apagarProva\(\);/g) || []).length),
+  "1",
 );
 
-// 3 e 4. A prova morre nos dois desfechos, mesmo se o signOut local falhar.
+// 4 e 5. O caminho feliz revoga só as OUTRAS sessões.
+verificar("L2. o caminho feliz usa scope others", String(pSignOutOutras !== -1), "true");
 verificar(
-  "L3. a prova é apagada também no ramo de falha",
-  String(acaoSemComentarios.slice(pRamoDeFalha, pRedirectFinal).includes("apagarProva()")),
+  "L2b. o caminho feliz NÃO usa signOut global",
+  String(/auth\.signOut\(\)/.test(acaoSemComentarios)),
+  "false",
+);
+
+// 6. Falha ao revogar as outras: tenta limpeza local e avisa o usuário.
+verificar(
+  "L3. o ramo de falha tenta signOut local",
+  String(pRamoDeFalha !== -1 && pSignOutLocal !== -1),
   "true",
 );
 verificar(
-  "L4. o signOut local está em try/catch, para não impedir a limpeza",
+  "L3b. o ramo de falha vai para sessoes-ativas, não ao painel",
   String(
-    /try \{\s*await supabase\.auth\.signOut\(\{ scope: "local" \}\);\s*\} catch/.test(
+    acaoSemComentarios
+      .slice(pRamoDeFalha, pRamoDeFalha + 400)
+      .includes("redirect(ROTA_LOGIN_SESSOES_ATIVAS)"),
+  ),
+  "true",
+);
+verificar(
+  "L4. o signOut local está em try/catch, para nunca impedir o que vem depois",
+  String(
+    /try \{[\s\S]{0,120}?await supabase\.auth\.signOut\(\{ scope: "local" \}\);[\s\S]{0,60}?\} catch/.test(
       acaoSemComentarios,
     ),
   ),
   "true",
 );
 verificar(
-  "L4b. apagarProva é chamada depois do try/catch, não dentro",
-  String(acaoSemComentarios.indexOf("apagarProva()", pSignOutLocal) > pSignOutLocal),
-  "true",
-);
-verificar(
-  "L4c. a limpeza da prova acontece nos dois caminhos",
-  String((acaoSemComentarios.match(/apagarProva\(\)/g) || []).length),
-  "3", // a declaração da função e as duas chamadas
-);
-verificar(
   "L4d. cookies internos sb-* não são manipulados à mão",
   String(/["'`]sb-/.test(acaoSemComentarios)),
   "false",
 );
+
+// 7 a 13. Revalidação antes do painel: nada é presumido sobre a sessão.
+const trechoPosRevogacao = acaoSemComentarios.slice(pSignOutOutras);
+verificar(
+  "L5. getUser é chamado depois de revogar as outras",
+  String(/getUser\(\)/.test(trechoPosRevogacao)),
+  "true",
+);
+verificar(
+  "L5b. o AAL é consultado depois de revogar as outras",
+  String(/getAuthenticatorAssuranceLevel\(\)/.test(trechoPosRevogacao)),
+  "true",
+);
+verificar(
+  "L5c. exige o MESMO user.id de antes da troca",
+  String(/usuarioDepois\?\.id === user!\.id/.test(trechoPosRevogacao)),
+  "true",
+);
+verificar(
+  "L5d. exige currentLevel aal2 para preservar a sessão",
+  String(/nivelDepois\?\.currentLevel === "aal2"/.test(trechoPosRevogacao)),
+  "true",
+);
+verificar(
+  "L5e. erro ao consultar o AAL impede a preservação",
+  String(/!erroNivelDepois/.test(trechoPosRevogacao)),
+  "true",
+);
+verificar(
+  "L5f. qualquer divergência cai no login, nunca no painel",
+  String(
+    /if \(!mesmoUsuario \|\| !continuaEmAal2\)[\s\S]{0,200}?redirect\(ROTA_LOGIN_SENHA_REDEFINIDA\)/.test(
+      acaoSemComentarios,
+    ),
+  ),
+  "true",
+);
+verificar(
+  "L5g. o fallback também derruba a sessão local antes de mandar ao login",
+  String(
+    /if \(!mesmoUsuario \|\| !continuaEmAal2\)[\s\S]{0,160}?derrubarSessaoLocal\(\)/.test(
+      acaoSemComentarios,
+    ),
+  ),
+  "true",
+);
+verificar(
+  "L6. o dashboard é o ÚLTIMO passo, depois de todas as validações",
+  String(pDashboard > pSignOutOutras && pDashboard > pRedirectFinal),
+  "true",
+);
+verificar(
+  "L6b. há um único redirect ao painel na action",
+  String((acaoSemComentarios.match(/redirect\(ROTA_DASHBOARD\)/g) || []).length),
+  "1",
+);
+verificar("L6c. ROTA_DASHBOARD é /dashboard", ROTA_DASHBOARD, "/dashboard");
 
 // 4. O desfecho parcial tem destino próprio, separado do sucesso normal.
 //
@@ -420,16 +486,20 @@ verificar(
   String((acaoSemComentarios.match(/redirect\(ROTA_LOGIN_SENHA_REDEFINIDA\)/g) || []).length),
   "1",
 );
+// Dois desfechos usam o destino que suprime o auto-redirect do login: a falha
+// ao revogar as outras sessões, e a revalidação que falha sem que a limpeza
+// local tenha sido confirmada. Ambos precisam impedir que a tela de login
+// detecte uma sessão residual e salte para o painel.
 verificar(
-  "L6c. há apenas um redirect de desfecho parcial na action",
+  "L6c. os dois desfechos que podem deixar sessão viva usam o destino seguro",
   String((acaoSemComentarios.match(/redirect\(ROTA_LOGIN_SESSOES_ATIVAS\)/g) || []).length),
-  "1",
+  "2",
 );
 
 // 7. updateUser falhando não passa por nada disso.
 verificar(
   "L7. a falha do updateUser retorna antes do signOut",
-  String(pUpdateUser < pErroUpdate && pErroUpdate < pSignOutGlobal),
+  String(pUpdateUser < pErroUpdate && pErroUpdate < pSignOutOutras),
   "true",
 );
 // A declaração de `apagarProva()` fica entre o tratamento do erro e o
@@ -500,10 +570,154 @@ verificar(
   String(/decisao === "falhar"/.test(paginaTroca)),
   "true",
 );
+/**
+ * N8 dizia "nenhuma rota da recuperação leva ao painel". Isso deixou de ser
+ * verdade de propósito: a action leva, depois das revalidações. A asserção
+ * continuava passando só porque procurava `dashboard` em minúsculas enquanto o
+ * código usa `ROTA_DASHBOARD` — duas invariantes contraditórias, ambas verdes,
+ * dando falsa confiança numa rota sensível. Foi um achado de revisão.
+ *
+ * A garantia que AINDA é verdadeira, e que vale proteger: o painel é destino de
+ * um único ponto, a action final. Nenhuma tela do caminho chega lá sozinha.
+ * Busca case-insensitive, para não repetir a fragilidade que criou o problema.
+ */
+const rotasQueNuncaLevamAoPainel = [
+  ["N8. a página de nova senha não leva ao painel", paginaTroca],
+  [
+    "N8b. o GET do link não leva ao painel",
+    readFileSync(new URL("../src/app/auth/confirm/route.ts", import.meta.url), "utf8"),
+  ],
+  [
+    "N8c. a confirmação do link não leva ao painel",
+    readFileSync(
+      new URL("../src/app/auth/confirmar-recuperacao/actions.ts", import.meta.url),
+      "utf8",
+    ),
+  ],
+  [
+    "N8d. a página do segundo fator não leva ao painel",
+    readFileSync(new URL("../src/app/redefinir-senha/mfa/page.tsx", import.meta.url), "utf8"),
+  ],
+  [
+    "N8e. a action do segundo fator não leva ao painel",
+    readFileSync(new URL("../src/app/redefinir-senha/mfa/actions.ts", import.meta.url), "utf8"),
+  ],
+];
+
+for (const [nome, fonte] of rotasQueNuncaLevamAoPainel) {
+  verificar(nome, String(/dashboard/i.test(fonte)), "false");
+}
+
+// E o painel é destino de um lugar só: a action da troca, no fim de tudo.
 verificar(
-  "N8. nenhuma rota da recuperação leva ao painel",
-  String(/dashboard/.test(paginaTroca) || /dashboard/.test(acaoSemComentarios)),
+  "N8f. só a action da troca de senha leva ao painel",
+  String((acaoSemComentarios.match(/ROTA_DASHBOARD/gi) || []).length),
+  "2", // o import e o redirect final
+);
+
+console.log("\nO. Limpeza local confirmada, não presumida\n");
+
+// O achado: `signOut` não lança em falha de API ou rede — resolve com
+// `{ error }`. Um try/catch sozinho trata a limpeza fracassada como bem
+// sucedida, e o destino do fallback depende justamente dessa resposta.
+
+/**
+ * Reproduz a semântica de `derrubarSessaoLocal` com um `signOut` falso, para
+ * exercitar os três desfechos sem rede. A função real é estrutural demais para
+ * ser importada aqui; o que se verifica abaixo é o contrato, e as asserções
+ * O4–O8 conferem que a action segue esse mesmo contrato.
+ */
+async function derrubarSessaoLocalSimulada(signOutFalso) {
+  try {
+    const { error: erroLocal } = await signOutFalso();
+    return !erroLocal;
+  } catch {
+    return false;
+  }
+}
+
+// 1 a 3. Os três desfechos possíveis.
+verificar(
+  "O1. resolveu sem error -> limpeza confirmada",
+  String(await derrubarSessaoLocalSimulada(async () => ({ error: null }))),
+  "true",
+);
+verificar(
+  "O2. resolveu COM error -> limpeza não confirmada",
+  String(
+    await derrubarSessaoLocalSimulada(async () => ({ error: { message: "network", status: 500 } })),
+  ),
   "false",
+);
+verificar(
+  "O3. lançou exceção -> limpeza não confirmada",
+  String(
+    await derrubarSessaoLocalSimulada(async () => {
+      throw new Error("falha de transporte");
+    }),
+  ),
+  "false",
+);
+
+// 4 a 6. O destino do fallback depende da confirmação.
+verificar(
+  "O4. a action inspeciona o error do signOut local",
+  String(/const \{ error: erroLocal \} = await supabase\.auth\.signOut/.test(acaoSemComentarios)),
+  "true",
+);
+verificar(
+  "O4b. e devolve o resultado em vez de engolir",
+  String(/return !erroLocal;/.test(acaoSemComentarios)),
+  "true",
+);
+verificar(
+  "O4c. exceção também devolve não-confirmado",
+  String(/catch \{\s*return false;\s*\}/.test(acaoSemComentarios)),
+  "true",
+);
+verificar(
+  "O5. o fallback guarda o resultado da limpeza",
+  String(/const sessaoLocalEncerrada = await derrubarSessaoLocal\(\)/.test(acaoSemComentarios)),
+  "true",
+);
+verificar(
+  "O6. limpeza NÃO confirmada -> destino que suprime o auto-redirect",
+  String(
+    /if \(!sessaoLocalEncerrada\) redirect\(ROTA_LOGIN_SESSOES_ATIVAS\)/.test(acaoSemComentarios),
+  ),
+  "true",
+);
+verificar(
+  "O6b. limpeza confirmada -> login normal",
+  String(
+    /if \(!sessaoLocalEncerrada\) redirect\(ROTA_LOGIN_SESSOES_ATIVAS\);\s*redirect\(ROTA_LOGIN_SENHA_REDEFINIDA\)/.test(
+      acaoSemComentarios,
+    ),
+  ),
+  "true",
+);
+
+// 7. Nenhum caminho de fallback chega ao painel.
+const trechoFallback = acaoSemComentarios.slice(
+  acaoSemComentarios.indexOf("if (!mesmoUsuario || !continuaEmAal2)"),
+  acaoSemComentarios.indexOf("redirect(ROTA_DASHBOARD)"),
+);
+verificar(
+  "O7. o ramo de revalidação falha nunca chega ao painel",
+  String(/ROTA_DASHBOARD/i.test(trechoFallback)),
+  "false",
+);
+
+// 8. O caminho feliz continua inteiro e na ordem.
+verificar(
+  "O8. caminho feliz: updateUser -> prova -> others -> revalidação -> painel",
+  String(
+    pUpdateUser < pApagaProva &&
+      pApagaProva < pSignOutOutras &&
+      pSignOutOutras < acaoSemComentarios.indexOf("mesmoUsuario") &&
+      acaoSemComentarios.indexOf("mesmoUsuario") < pDashboard,
+  ),
+  "true",
 );
 
 console.log("\nM. Login no desfecho parcial\n");

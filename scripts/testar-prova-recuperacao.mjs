@@ -480,27 +480,37 @@ const acaoTroca = readFileSync(
   .filter((l) => !l.trimStart().startsWith("//"))
   .join("\n");
 
+// A revogação da troca de senha deixou de ser global e passou a ser `others`:
+// o global derrubava também a sessão atual, que a essa altura já provou link,
+// prova e TOTP, e obrigava o usuário a informar o mesmo TOTP de novo. O que
+// esta asserção sempre protegeu continua valendo — as OUTRAS sessões da conta
+// têm de cair depois de uma troca de senha.
 verificar(
-  "H9. signOut da troca de senha continua global (sem scope)",
+  "H9. a troca de senha revoga as outras sessões",
+  String(/signOut\(\{ scope: "others" \}\)/.test(acaoTroca)),
+  "true",
+);
+verificar(
+  "H9b. a troca de senha NÃO usa mais signOut global",
   String(/auth\.signOut\(\)/.test(acaoTroca)),
-  "true",
+  "false",
 );
-// A troca de senha passou a usar `scope: "local"` — mas só como último recurso,
-// depois de o `signOut` global falhar. O que esta asserção protege continua
-// sendo o essencial: a revogação PRINCIPAL é global, porque depois de trocar a
-// senha todas as sessões da conta têm de cair. O local não pode substituí-la.
+// A limpeza local virou a função `derrubarSessaoLocal()`, declarada antes do
+// ramo de falha e chamada dentro dele. Medir a declaração acusaria a ordem
+// errada — o que importa é onde ela é CHAMADA.
 verificar(
-  "H9b. o scope local na troca de senha só aparece depois do signOut global",
-  String(acaoTroca.indexOf("auth.signOut()") < acaoTroca.indexOf('signOut({ scope: "local" })')),
-  "true",
-);
-verificar(
-  "H9c. o scope local está no ramo de falha do global, não no caminho normal",
+  "H9c. o scope local é só último recurso, chamado no ramo de falha",
   String(
-    acaoTroca.indexOf("if (erroAoSair)") < acaoTroca.indexOf('signOut({ scope: "local" })') &&
-      acaoTroca.indexOf("if (erroAoSair)") !== -1,
+    acaoTroca.indexOf("if (erroAoSair)") !== -1 &&
+      acaoTroca.indexOf("derrubarSessaoLocal()", acaoTroca.indexOf("if (erroAoSair)")) >
+        acaoTroca.indexOf("if (erroAoSair)"),
   ),
   "true",
+);
+verificar(
+  "H9d. o scope local não é o caminho principal de revogação",
+  String((acaoTroca.match(/signOut\(\{ scope: "local" \}\)/g) || []).length),
+  "1", // apenas dentro da própria função de limpeza best-effort
 );
 
 console.log("\nI. GET não consome token (achado do scanner de e-mail)\n");

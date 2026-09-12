@@ -30,6 +30,16 @@ export const ROTA_REDEFINIR_SENHA_MFA = "/redefinir-senha/mfa";
 export const ROTA_LOGIN = "/login";
 
 /**
+ * Destino de quem termina a recuperação com a sessão preservada.
+ *
+ * A sessão que chega aqui já provou posse do link, prova HMAC e o segundo
+ * fator, e está em aal2 — cobrar o mesmo TOTP de novo, no mesmo processo,
+ * seria fricção sem ganho de segurança. Quem decide o acesso continua sendo o
+ * guard do painel, com papel e AAL2, e a RLS.
+ */
+export const ROTA_DASHBOARD = "/dashboard";
+
+/**
  * Tela intermediária que pede a confirmação deliberada antes de consumir o
  * token de recuperação.
  *
