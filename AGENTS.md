@@ -2,7 +2,7 @@
 
 Documentação do projeto: [README](README.md) ·
 [Arquitetura](docs/ARQUITETURA.md) · [Segurança](docs/SEGURANCA.md) ·
-[Estado](docs/ESTADO_DO_PROJETO.md)
+[Progresso](PROGRESS.md)
 
 ## Stack definitiva
 
