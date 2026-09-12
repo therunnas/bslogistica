@@ -72,7 +72,11 @@ insert into public.operations (id, client_id, contract_id, name, agreed_amount) 
   ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333',
    '33333333-3333-4333-8333-333333333334', 'Operação com Contrato', null),
   ('44444444-4444-4444-8444-44444444444f', '33333333-3333-4333-8333-333333333333',
-   null, 'Operação sem Contrato', 150);
+   null, 'Operação sem Contrato', 150),
+  -- Isca do bloco G: nenhuma folha aponta para ela. Só existe para ser enviada
+  -- no payload e provar que o payload não manda no valor.
+  ('44444444-4444-4444-8444-44444444444c', '33333333-3333-4333-8333-333333333333',
+   null, 'Operação CARA (isca)', 999999);
 
 -- Turno diurno: 06:00–15:00 com 60 de intervalo -> 480 minutos previstos.
 -- Turno noturno: 22:00–06:00 virando o dia, sem intervalo -> 480 minutos.
@@ -102,7 +106,9 @@ insert into public.employees (id, name, daily_cost) values
   ('55555555-5555-4555-8555-555555555511', 'Colaborador Edicao',  120),
   ('55555555-5555-4555-8555-555555555512', 'Colaborador Notas',   120),
   ('55555555-5555-4555-8555-555555555513', 'Colaborador Fatura',  120),
-  ('55555555-5555-4555-8555-555555555514', 'Colaborador Vinculo', 120);
+  ('55555555-5555-4555-8555-555555555514', 'Colaborador Vinculo', 120),
+  ('55555555-5555-4555-8555-555555555515', 'Colaborador Forjado', 120),
+  ('55555555-5555-4555-8555-555555555516', 'Colaborador Sem Op',  120);
 
 insert into public.invoices (id, client_id, period_start, period_end) values
   ('99999999-9999-4999-8999-999999999991', '33333333-3333-4333-8333-333333333333',
@@ -453,6 +459,156 @@ begin
       _w::text, _o::text, to_char(_r,'FM999999990.00'), to_char(_h,'FM999999990.00')));
 end;
 $paridade$;
+
+
+-- ---------------------------------------------------------------------------
+-- G. OPERAÇÃO FORJADA NO PAYLOAD.
+--
+-- A folha manda. O `operation_id` que o cliente envia não pode influenciar
+-- valor nenhum — nem quando aponta para outra operação, nem quando vem nulo.
+--
+-- Sem a correção, o cálculo lê `NEW.operation_id` e o trigger de chave, que
+-- roda depois, conserta só a chave: a linha termina com a operação certa e o
+-- dinheiro da operação forjada.
+-- ---------------------------------------------------------------------------
+
+do $forjar_operacao$
+declare
+  _op     uuid;
+  _billed numeric;
+  _rate   numeric;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- G1. Folha da operação COM CONTRATO (diária 200), payload apontando para a
+  -- operação CARA (agreed 999999). O legítimo é 200.00.
+  insert into public.timesheet_entries
+    (id, timesheet_id, employee_id, operation_id, work_date, status,
+     check_in, check_out, break_minutes)
+  values
+    ('77777777-7777-4777-8777-77777777719a', '66666666-6666-4666-8666-666666666661',
+     '55555555-5555-4555-8555-555555555515', '44444444-4444-4444-8444-44444444444c',
+     current_date, 'present', '06:00:00', '15:00:00', 60);
+
+  select operation_id, billed_amount, daily_rate_snapshot
+    into _op, _billed, _rate
+    from public.timesheet_entries where id = '77777777-7777-4777-8777-77777777719a';
+
+  perform pg_temp.registrar('G1. operação forjada não muda billed_amount', '200.00', to_char(_billed, 'FM999999990.00'));
+  perform pg_temp.registrar('G1b. operação forjada não muda o snapshot',   '200.00', to_char(_rate,   'FM999999990.00'));
+  perform pg_temp.registrar('G1c. operation_id final é o da folha',
+    '44444444-4444-4444-8444-444444444444', _op::text);
+
+  -- G2. Mesmo cenário com `operation_id` omitido: a folha continua mandando.
+  insert into public.timesheet_entries
+    (id, timesheet_id, employee_id, work_date, status,
+     check_in, check_out, break_minutes)
+  values
+    ('77777777-7777-4777-8777-77777777719b', '66666666-6666-4666-8666-666666666661',
+     '55555555-5555-4555-8555-555555555516', current_date, 'present', '06:00:00', '15:00:00', 60);
+
+  select operation_id, billed_amount into _op, _billed
+    from public.timesheet_entries where id = '77777777-7777-4777-8777-77777777719b';
+
+  perform pg_temp.registrar('G2. operation_id omitido usa a operação da folha', '200.00', to_char(_billed, 'FM999999990.00'));
+  perform pg_temp.registrar('G2b. operation_id preenchido pela folha',
+    '44444444-4444-4444-8444-444444444444', _op::text);
+end;
+$forjar_operacao$;
+
+
+-- ---------------------------------------------------------------------------
+-- H. NÃO-NEGATIVIDADE DAS FONTES.
+--
+-- Enquanto um valor de origem puder ser negativo, `Math.round` do JavaScript e
+-- `round(numeric)` do PostgreSQL divergem no meio centavo — o JavaScript
+-- arredonda para +infinito e o numeric para longe do zero. Fechar a entrada
+-- resolve na raiz, sem mexer na fórmula.
+--
+-- `shift_hours` fica de FORA de propósito: valor <= 0 já é substituído por 8
+-- pela própria regra, então não produz valor negativo e uma constraint ali
+-- seria redundante.
+-- ---------------------------------------------------------------------------
+
+do $nao_negatividade$
+declare
+  _estado text;
+begin
+  reset role;
+
+  begin
+    insert into public.contracts (id, client_id, name, daily_rate)
+    values ('33333333-3333-4333-8333-3333333333e1', '33333333-3333-4333-8333-333333333333', 'Neg', -1);
+    _estado := 'aceitou';
+  exception when check_violation then _estado := 'recusou 23514';
+            when others then _estado := 'erro ' || sqlstate;
+  end;
+  perform pg_temp.registrar('H1. daily_rate negativo', 'recusou 23514', _estado);
+
+  begin
+    insert into public.contracts (id, client_id, name, daily_rate, ot_factor)
+    values ('33333333-3333-4333-8333-3333333333e2', '33333333-3333-4333-8333-333333333333', 'Neg', 100, -1);
+    _estado := 'aceitou';
+  exception when check_violation then _estado := 'recusou 23514';
+            when others then _estado := 'erro ' || sqlstate;
+  end;
+  perform pg_temp.registrar('H2. ot_factor negativo', 'recusou 23514', _estado);
+
+  -- Vetor que a auditoria encontrou: tolerância negativa faz `excess > tol`
+  -- valer para jornada INCOMPLETA, e a hora extra sai negativa.
+  begin
+    insert into public.contracts (id, client_id, name, daily_rate, ot_tolerance_min)
+    values ('33333333-3333-4333-8333-3333333333e3', '33333333-3333-4333-8333-333333333333', 'Neg', 100, -600);
+    _estado := 'aceitou';
+  exception when check_violation then _estado := 'recusou 23514';
+            when others then _estado := 'erro ' || sqlstate;
+  end;
+  perform pg_temp.registrar('H3. ot_tolerance_min negativo', 'recusou 23514', _estado);
+
+  begin
+    insert into public.employees (id, name, daily_cost)
+    values ('55555555-5555-4555-8555-5555555555e4', 'Neg', -1);
+    _estado := 'aceitou';
+  exception when check_violation then _estado := 'recusou 23514';
+            when others then _estado := 'erro ' || sqlstate;
+  end;
+  perform pg_temp.registrar('H4. daily_cost negativo', 'recusou 23514', _estado);
+
+  begin
+    insert into public.operations (id, client_id, name, agreed_amount)
+    values ('44444444-4444-4444-8444-4444444444e5', '33333333-3333-4333-8333-333333333333', 'Neg', -1);
+    _estado := 'aceitou';
+  exception when check_violation then _estado := 'recusou 23514';
+            when others then _estado := 'erro ' || sqlstate;
+  end;
+  perform pg_temp.registrar('H5. agreed_amount negativo', 'recusou 23514', _estado);
+
+  -- O zero continua válido: é o padrão das colunas e tem sentido de negócio.
+  begin
+    insert into public.contracts (id, client_id, name, daily_rate, ot_factor, ot_tolerance_min)
+    values ('33333333-3333-4333-8333-3333333333e6', '33333333-3333-4333-8333-333333333333', 'Zero', 0, 0, 0);
+    insert into public.employees (id, name, daily_cost)
+    values ('55555555-5555-4555-8555-5555555555e6', 'Zero', 0);
+    insert into public.operations (id, client_id, name, agreed_amount)
+    values ('44444444-4444-4444-8444-4444444444e6', '33333333-3333-4333-8333-333333333333', 'Zero', 0);
+    _estado := 'aceitou';
+  exception when others then _estado := 'erro ' || sqlstate;
+  end;
+  perform pg_temp.registrar('H6. zero continua permitido', 'aceitou', _estado);
+
+  -- E `shift_hours` negativo segue aceito: não gera valor negativo, e a regra
+  -- já o substitui por 8.
+  begin
+    insert into public.contracts (id, client_id, name, daily_rate, shift_hours)
+    values ('33333333-3333-4333-8333-3333333333e7', '33333333-3333-4333-8333-333333333333', 'SH', 100, -8);
+    _estado := 'aceitou';
+  exception when others then _estado := 'erro ' || sqlstate;
+  end;
+  perform pg_temp.registrar('H7. shift_hours negativo segue aceito (sem constraint redundante)', 'aceitou', _estado);
+end;
+$nao_negatividade$;
 
 
 -- ---------------------------------------------------------------------------

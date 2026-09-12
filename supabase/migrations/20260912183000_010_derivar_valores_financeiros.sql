@@ -59,6 +59,12 @@
 --   bloqueio_financeiro -> calculo_financeiro -> chave -> protect_invoice_link
 --   -> updated
 --
+-- Essa dependência de ordem vale SOMENTE para o par bloqueio/cálculo, que é
+-- interno a esta migration. O cálculo NÃO depende de rodar antes ou depois de
+-- `chave`: ele lê a operação da folha, não de `NEW.operation_id`. Foi assim que
+-- se fechou o bypass descrito adiante, e é o que mantém o resultado correto
+-- ainda que a ordem mude.
+--
 -- O QUE ESTA MIGRATION NÃO FAZ
 --
 -- Não altera fórmula, diária, hora extra, tolerância, custo, fallback sem
@@ -140,6 +146,7 @@ AS $$
 DECLARE
   _motriz_mudou boolean;
 
+  _operation_id   uuid;
   _contract_id    uuid;
   _agreed_amount  numeric;
 
@@ -176,6 +183,12 @@ BEGIN
   -- snapshots congelados quando alguém edita só `notes`, e é também o que faz o
   -- `UPDATE ... SET invoice_id` do `gerar_fatura` não recalcular nada com os
   -- valores de contrato de hoje.
+  --
+  -- `operation_id` e `work_date` NÃO são motrizes: nenhum dos dois entra no
+  -- cálculo, porque a operação vem da folha (ver abaixo) e a data não é usada.
+  -- Deixá-los na lista daria ao cliente um jeito de forçar recálculo — e com
+  -- ele a troca de um snapshot congelado — só mandando um valor qualquer nessas
+  -- colunas, que o trigger de chave depois sobrescreveria de volta.
   IF TG_OP = 'UPDATE' THEN
     _motriz_mudou :=
          NEW.status        IS DISTINCT FROM OLD.status
@@ -183,8 +196,6 @@ BEGIN
       OR NEW.check_out     IS DISTINCT FROM OLD.check_out
       OR NEW.break_minutes IS DISTINCT FROM OLD.break_minutes
       OR NEW.employee_id   IS DISTINCT FROM OLD.employee_id
-      OR NEW.operation_id  IS DISTINCT FROM OLD.operation_id
-      OR NEW.work_date     IS DISTINCT FROM OLD.work_date
       OR NEW.timesheet_id  IS DISTINCT FROM OLD.timesheet_id;
 
     IF NOT _motriz_mudou THEN
@@ -201,16 +212,30 @@ BEGIN
 
   -- Regras do contrato. Espelha `useContractRules` de src/lib/ledger.ts: quando
   -- a operação não tem contrato, cai no mesmo fallback usado pela tela.
-  -- `operation_id` é NULLABLE, e o TypeScript trata operação ausente sem
-  -- lançar: `operations.find(...)` devolve `undefined`, o contrato também, e o
-  -- cálculo segue com `agreed_amount ?? 0`. Levantar exceção aqui inventaria um
-  -- comportamento que `calcEntry` não tem e quebraria a paridade — então o
-  -- SELECT sem resultado apenas deixa as variáveis nulas e o fluxo cai no mesmo
-  -- fallback.
+  -- A OPERAÇÃO VEM DA FOLHA, NUNCA DO PAYLOAD.
+  --
+  -- `NEW.operation_id` é escolhido pelo cliente. Usá-lo aqui abria um bypass
+  -- real, reproduzido em revisão: bastava mandar `timesheet_id` de uma folha
+  -- barata e `operation_id` de uma operação cara para o valor sair da cara. A
+  -- linha terminava coerente — porque `sincronizar_chave_da_diaria` corrige a
+  -- chave depois — e o dinheiro, errado.
+  --
+  -- Ler a operação da folha fecha isso INDEPENDENTEMENTE da ordem dos triggers:
+  -- esta função passa a não depender de nenhuma coluna que o cliente controle
+  -- além de `timesheet_id`, que é a própria chave estrangeira da folha. Se a
+  -- ordem mudar, o resultado é o mesmo.
+  SELECT t.operation_id INTO _operation_id
+    FROM public.timesheets t
+   WHERE t.id = NEW.timesheet_id;
+
+  -- Folha inexistente ou operação ausente não lançam aqui: `calcEntry` também
+  -- não lança, e segue com `agreed_amount ?? 0`. Inventar exceção quebraria a
+  -- paridade. Quem recusa folha inexistente é o trigger de chave, que tem essa
+  -- responsabilidade e já falha fechado com 23503.
   SELECT o.contract_id, o.agreed_amount
     INTO _contract_id, _agreed_amount
     FROM public.operations o
-   WHERE o.id = NEW.operation_id;
+   WHERE o.id = _operation_id;
 
   SELECT c.daily_rate, c.shift_hours, c.ot_factor, c.ot_tolerance_min
     INTO _daily_rate, _shift_hours, _ot_factor, _ot_tolerance_min
@@ -334,3 +359,54 @@ DROP TRIGGER IF EXISTS trg_timesheet_entries_calculo_financeiro
 CREATE TRIGGER trg_timesheet_entries_calculo_financeiro
   BEFORE INSERT OR UPDATE ON public.timesheet_entries
   FOR EACH ROW EXECUTE FUNCTION public.derivar_valores_financeiros();
+
+-- ---------------------------------------------------------------------------
+-- 4. Não-negatividade das fontes do cálculo
+--
+-- POR QUE ISTO ENTRA JUNTO
+--
+-- `round2` do TypeScript é `Math.round(v * 100) / 100`, e `Math.round`
+-- arredonda o meio para +infinito: `Math.round(-112.5)` é `-112`. O `round()`
+-- do `numeric` arredonda o meio para LONGE do zero: `-113`. Os dois só
+-- divergem no negativo — e apontado em revisão, com o caso `daily_rate = -1`,
+-- `shift_hours = 1`, `ot_factor = 0.25` e 30 minutos de hora extra, dando
+-- `-1.12` no TypeScript e `-1.13` no SQL.
+--
+-- Em vez de reescrever a fórmula SQL para imitar o arredondamento do
+-- JavaScript — o que mascararia entrada inválida —, fecha-se a entrada. Valor
+-- financeiro de origem negativo não tem regra de negócio neste sistema.
+--
+-- QUAIS COLUNAS, E POR QUÊ
+--
+-- Cada uma abaixo foi verificada como capaz de produzir `billed_amount` ou
+-- `cost_amount` negativo, executando o próprio `calcEntry`:
+--
+--   daily_rate       -1   -> billed  -100
+--   daily_cost       -50  -> cost     -50
+--   ot_factor        -20  -> billed  -800
+--   ot_tolerance_min -600 -> billed -1600, e `overtime_minutes` NEGATIVO,
+--                            porque `excess > tolerancia` passa a valer para
+--                            jornada INCOMPLETA
+--   agreed_amount    -300 -> billed  -300, pelo fallback sem contrato
+--
+-- `shift_hours` fica de FORA de propósito: valor <= 0 já é substituído por 8
+-- pela própria regra, então não produz valor negativo, e a constraint seria
+-- redundante.
+--
+-- O zero continua permitido em todas: é o DEFAULT de `daily_rate`, de
+-- `daily_cost` e de `ot_tolerance_min`, e tem sentido de negócio.
+--
+-- Production tem zero linhas de negócio hoje, então não há backfill.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE public.contracts
+  ADD CONSTRAINT contracts_daily_rate_nao_negativa CHECK (daily_rate >= 0),
+  ADD CONSTRAINT contracts_ot_factor_nao_negativo CHECK (ot_factor >= 0),
+  ADD CONSTRAINT contracts_ot_tolerance_min_nao_negativa CHECK (ot_tolerance_min >= 0);
+
+ALTER TABLE public.employees
+  ADD CONSTRAINT employees_daily_cost_nao_negativo CHECK (daily_cost >= 0);
+
+ALTER TABLE public.operations
+  ADD CONSTRAINT operations_agreed_amount_nao_negativo
+    CHECK (agreed_amount IS NULL OR agreed_amount >= 0);
