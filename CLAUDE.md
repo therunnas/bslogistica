@@ -62,12 +62,19 @@ Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Comandos
 
-| Comando            | O que faz                   |
-| ------------------ | --------------------------- |
-| `npm run dev`      | servidor de desenvolvimento |
-| `npm run build`    | build de produção           |
-| `npm run lint`     | ESLint com Prettier         |
-| `npm run test:mfa` | testes das decisões de MFA  |
+| Comando                    | O que faz                           |
+| -------------------------- | ----------------------------------- |
+| `npm run dev`              | servidor de desenvolvimento         |
+| `npm run build`            | build de produção                   |
+| `npm run lint`             | ESLint com Prettier                 |
+| `npm run test:mfa`         | decisões de MFA                     |
+| `npm run test:recuperacao` | fluxo de recuperação de senha       |
+| `npm run test:prova`       | prova HMAC e saídas pós-`verifyOtp` |
+| `npm run test:troca`       | troca de senha e desfechos do login |
+
+As quatro suítes somam **357 asserções**. Mexer em auth, MFA ou recuperação
+exige rodar todas — várias delas asseveram a **forma literal** do código, não só
+o comportamento.
 
 Antes de entregar: `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 
@@ -77,12 +84,25 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 ## Auth
 
 - **Sem cadastro público.** `disable_signup = true`. Usuários são criados pelo
-  administrador; a tela de login não oferece registro.
+  administrador; a tela de login não oferece registro. **Contas nascem por
+  convite ou pela mão do admin** — nunca por autosserviço.
 - **Papel é explícito.** O trigger de onboarding cria apenas o `profiles`.
   Papel em `public.user_roles` é atribuição administrativa separada — nunca
   automática. Não reintroduzir bootstrap automático de admin.
+- **Operação administrativa privilegiada é server-side.** Convidar, atribuir ou
+  trocar papel, remover acesso: nada disso passa pelo navegador como
+  autoridade. O frontend nunca é a barreira.
+- **O último admin é protegido.** Nenhum caminho pode remover ou rebaixar o
+  único administrador restante.
+- **Alteração de usuário ou papel é auditada.**
 - **MFA TOTP é obrigatório** para o painel. O guard exige AAL2; sem ele a rota
   redireciona para `/mfa`.
+- **Conta com MFA ativo exige TOTP no login.** Não existe caminho que aceite só
+  a senha para uma conta com fator verificado.
+- **Recovery de conta com MFA exige um TOTP** — e **apenas um**. Depois de uma
+  redefinição bem-sucedida, **não cobrar um segundo TOTP**: a sessão que chega
+  ali já provou posse do link, prova HMAC e o segundo fator. Foi um defeito real
+  (PR #18), não uma preferência.
 - **Falha ao consultar o nível de garantia não é ausência de fator.** Erro
   transitório vai para a tela "não foi possível verificar", nunca para o
   cadastro de fator — cadastrar sobre conta que já tem fator trava a conta.
@@ -111,6 +131,37 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   papel ainda em AAL1, antes de mandar para o MFA; bloquear a tabela cria
   deadlock — seria preciso AAL2 para chegar à tela que concede AAL2. Não
   adicionar policy de AAL2 nela.
+
+### AAL por papel — decisão aprovada, ainda NÃO implementada
+
+Separar as duas coisas importa mais aqui do que em qualquer outro ponto deste
+arquivo. Leia as duas metades antes de agir.
+
+**ESTADO ATUAL — o que vale hoje:**
+
+- o guard do painel exige **AAL2 para qualquer papel**;
+- as **11 tabelas** de negócio exigem `aal2` por policy RESTRICTIVE **global**,
+  sem distinguir papel;
+- portanto **`operacional` em AAL1 ainda não usa o sistema**, e isso permanece
+  até que uma migration específica seja criada, testada e aplicada.
+
+**DECISÃO ARQUITETURAL APROVADA — o que ainda vai ser construído:**
+
+- **admin:** MFA obrigatório, sempre em AAL2;
+- **operacional:** MFA opcional, ativável pelo próprio usuário;
+- a implementação é **mudança coordenada de guard + papel + RLS**, num mesmo
+  desenho — nunca em pedaços soltos.
+
+**Enquanto isso não acontecer:**
+
+- **nunca simplesmente remover a policy AAL2 global** sem substituição segura.
+  Derrubá-la reabre o P1 que o PR #14 fechou, e que foi reproduzido de verdade
+  em PostgreSQL antes da migration 009;
+- **nunca confiar só no frontend** para essa decisão;
+- **não criar usuário `operacional` real** antes dessa mudança.
+
+O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
+
 - **Função `SECURITY DEFINER` roda acima da RLS**, então policy não a protege:
   a exigência de `aal2` precisa estar escrita dentro da própria função, como
   em `gerar_fatura`. Vale para toda RPC nova com `SECURITY DEFINER`.
