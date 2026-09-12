@@ -49,7 +49,8 @@ insert into public.operations (id, client_id, name, agreed_amount) values
 
 insert into public.employees (id, name, daily_cost) values
   ('55555555-5555-4555-8555-555555555555', 'Colaborador de Teste', 100),
-  ('55555555-5555-4555-8555-555555555556', 'Colaborador Dois',     100);
+  ('55555555-5555-4555-8555-555555555556', 'Colaborador Dois',     100),
+  ('55555555-5555-4555-8555-555555555557', 'Colaborador Três',     100);
 
 insert into public.invoices (id, client_id, period_start, period_end) values
   ('99999999-9999-4999-8999-999999999991', '33333333-3333-4333-8333-333333333333', current_date, current_date),
@@ -68,6 +69,12 @@ insert into public.timesheet_entries
   (id, timesheet_id, employee_id, operation_id, work_date, status) values
   ('77777777-7777-4777-8777-777777777777', '66666666-6666-4666-8666-666666666666',
    '55555555-5555-4555-8555-555555555555', '44444444-4444-4444-8444-444444444444',
+   current_date, 'present'),
+  -- Descartável, para o teste de vínculo do admin. Precisa ser um apontamento
+  -- SEPARADO desde a migration 011: vincular à fatura é irreversível, e o
+  -- `...777` acima é conferido depois como NÃO faturado por três blocos.
+  ('77777777-7777-4777-8777-777777777779', '66666666-6666-4666-8666-666666666666',
+   '55555555-5555-4555-8555-555555555557', '44444444-4444-4444-8444-444444444444',
    current_date, 'present');
 
 
@@ -79,6 +86,7 @@ do $admin$
 declare
   _n bigint;
   _afetadas integer;
+  _bloqueou boolean;
 begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
@@ -103,17 +111,33 @@ begin
 
   update public.timesheet_entries
      set invoice_id = '99999999-9999-4999-8999-999999999991'
-   where id = '77777777-7777-4777-8777-777777777777';
+   where id = '77777777-7777-4777-8777-777777777779';
   get diagnostics _afetadas = row_count;
   if _afetadas <> 1 then raise exception 'ADMIN FINANCEIRO: não vinculou apontamento à fatura'; end if;
 
-  update public.timesheet_entries
-     set invoice_id = null
-   where id = '77777777-7777-4777-8777-777777777777';
-  get diagnostics _afetadas = row_count;
-  if _afetadas <> 1 then raise exception 'ADMIN FINANCEIRO: não removeu vínculo de teste'; end if;
+  -- E o vínculo é de mão única. Até a migration 011 este bloco desfazia o
+  -- vínculo como limpeza, e essa limpeza era o próprio buraco: desvincular e
+  -- só então apagar contornava o bloqueio de exclusão de lastro. Agora nem o
+  -- admin desfaz — nem para NULL, nem para outra fatura.
+  _bloqueou := false;
+  begin
+    update public.timesheet_entries
+       set invoice_id = null
+     where id = '77777777-7777-4777-8777-777777777779';
+  exception when insufficient_privilege then _bloqueou := true;
+  end;
+  if not _bloqueou then raise exception 'ADMIN FINANCEIRO: desfez vínculo de fatura'; end if;
 
-  raise notice 'ADMIN: PASS (CRUD administrativo e vínculo financeiro)';
+  _bloqueou := false;
+  begin
+    update public.timesheet_entries
+       set invoice_id = '99999999-9999-4999-8999-999999999992'
+     where id = '77777777-7777-4777-8777-777777777779';
+  exception when insufficient_privilege then _bloqueou := true;
+  end;
+  if not _bloqueou then raise exception 'ADMIN FINANCEIRO: trocou a fatura do apontamento'; end if;
+
+  raise notice 'ADMIN: PASS (CRUD administrativo e vínculo financeiro irreversível)';
 end
 $admin$;
 

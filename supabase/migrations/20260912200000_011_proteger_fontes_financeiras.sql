@@ -59,6 +59,25 @@
 -- `operation_team` fica de fora de propósito: é composição de equipe, trabalho
 -- de campo, e a auditoria não encontrou efeito financeiro direto.
 -- `invoices` e `invoice_items` já são admin-only. Não faz backfill.
+--
+-- Também não cria fluxo de estorno. Onde a proteção é absoluta, a saída é a
+-- ausência de saída: correção contábil ganha mecanismo próprio e auditado
+-- quando for desenhada, e até lá nada aqui abre exceção "temporária".
+--
+-- SEGUNDA RODADA DE REVISÃO
+--
+-- Três caminhos a mais foram levantados em revisão depois da primeira versão
+-- desta migration, todos reproduzidos em banco local antes de fechar:
+--
+--   1. o vínculo de fatura era mutável, então dava para desvincular e só então
+--      apagar o lastro — seção 1b;
+--   2. `operations.client_id` ficara de fora da proteção por coluna, e é por
+--      ele que `gerar_fatura` decide elegibilidade — seção 3;
+--   3. a folha podia nascer com turno de OUTRA operação, porque a guarda de
+--      vínculo só cobria UPDATE — seção 3b.
+--
+-- Os três têm a mesma assinatura dos ataques originais: a configuração volta
+-- ao normal e o valor inflado, ou o cliente errado, fica congelado.
 
 -- ---------------------------------------------------------------------------
 -- 1. Lastro faturado — absoluto, sem exceção de papel
@@ -96,6 +115,79 @@ DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_delete_faturado
 CREATE TRIGGER trg_timesheet_entries_bloqueia_delete_faturado
   BEFORE DELETE ON public.timesheet_entries
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_delete_faturado();
+
+-- ---------------------------------------------------------------------------
+-- 1b. O vínculo com a fatura também é imutável — senão o bloqueio acima é
+--     contornável em dois passos
+--
+-- Levantado em revisão e reproduzido em banco local. O trigger acima lê
+-- `OLD.invoice_id`, e o vínculo era mutável:
+--
+--   admin: UPDATE timesheet_entries SET invoice_id = NULL  -> DESVINCULOU
+--          DELETE FROM timesheet_entries                   -> APAGOU
+--
+-- `protect_timesheet_invoice_link` não barra isso: ela isenta admin,
+-- `postgres` e `service_role` de propósito, porque é justamente quem gera
+-- fatura. E existe um segundo caminho, sem sequer tocar no apontamento:
+--
+--   admin: DELETE FROM invoices  -> FK ON DELETE SET NULL -> invoice_id = NULL
+--          DELETE FROM timesheet_entries                  -> APAGOU
+--
+-- Verificado em banco, não presumido: o UPDATE que a FK emite para o SET NULL
+-- DISPARA um trigger `BEFORE UPDATE OF`. Então uma guarda aqui fecha os dois
+-- caminhos de uma vez, e o DELETE da fatura passa a falhar enquanto houver
+-- apontamento vinculado. Isso é DESEJADO, e não ganha exceção por cascata pelo
+-- mesmo motivo de `clients`.
+--
+-- A regra é direcional, e a direção importa:
+--
+--   NULL          -> fatura X   PERMITIDO  (é o passo 6 de `gerar_fatura`)
+--   fatura X      -> NULL       RECUSADO
+--   fatura X      -> fatura Y   RECUSADO
+--
+-- `gerar_fatura` só alcança apontamentos com `te.invoice_id IS NULL`, então
+-- ela nunca cai nos dois casos recusados.
+--
+-- Sem exceção de papel, como no DELETE: estorno contábil terá fluxo próprio e
+-- auditado, e enquanto ele não existir a ausência de saída é a proteção.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_desvinculo_faturado()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  -- Sem checagem de `current_user` e sem checagem de papel, de propósito.
+  IF OLD.invoice_id IS NOT NULL
+     AND NEW.invoice_id IS DISTINCT FROM OLD.invoice_id THEN
+    RAISE EXCEPTION
+      'Vínculo de fatura de apontamento faturado é imutável. Fatura: %.',
+      OLD.invoice_id
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_desvinculo_faturado() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_desvinculo_faturado() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_desvinculo_faturado() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_desvinculo_faturado() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_desvinculo_faturado() IS
+  'Impede remover ou trocar o invoice_id de apontamento já faturado, incluindo o SET NULL emitido pela FK ao apagar a fatura. Sem exceção de papel. Vincular a partir de NULL continua permitido, que é o caminho de gerar_fatura.';
+
+-- `bloqueia` < `protect`: esta guarda roda antes de
+-- `trg_timesheet_entries_protect_invoice_link`, e a recusa sai com a mensagem
+-- sobre lastro em vez da mensagem sobre papel.
+DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_desvinculo
+  ON public.timesheet_entries;
+CREATE TRIGGER trg_timesheet_entries_bloqueia_desvinculo
+  BEFORE UPDATE OF invoice_id ON public.timesheet_entries
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_desvinculo_faturado();
 
 -- ---------------------------------------------------------------------------
 -- 2. Turno com histórico faturado — o caminho que a cascata não alcança
@@ -228,12 +320,20 @@ SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  IF (NEW.contract_id    IS DISTINCT FROM OLD.contract_id
+  -- `client_id` entra aqui pelo mesmo motivo que os outros dois, ainda que
+  -- não apareça na fórmula. `gerar_fatura` decide o que é elegível juntando
+  -- `timesheet_entries -> timesheets -> operations` e filtrando por
+  -- `o.client_id`. Mover a operação para outro cliente, faturar e devolvê-la
+  -- cobra o cliente errado e não deixa rastro na linha — a mesma silhueta do
+  -- ataque de `agreed_amount`. Levantado em revisão e reproduzido em banco
+  -- local: `operacional` em aal2 ALTEROU `client_id` sem qualquer recusa.
+  IF (NEW.client_id      IS DISTINCT FROM OLD.client_id
+      OR NEW.contract_id   IS DISTINCT FROM OLD.contract_id
       OR NEW.agreed_amount IS DISTINCT FROM OLD.agreed_amount)
      AND current_user NOT IN ('postgres', 'service_role')
      AND NOT COALESCE(public.has_role(auth.uid(), 'admin'::public.app_role), false) THEN
     RAISE EXCEPTION
-      'Contrato e valor acordado da operação são administrativos e não podem ser alterados por este papel.'
+      'Cliente, contrato e valor acordado da operação são administrativos e não podem ser alterados por este papel.'
       USING ERRCODE = '42501';
   END IF;
 
@@ -318,6 +418,90 @@ DROP TRIGGER IF EXISTS trg_timesheets_bloqueia_fontes ON public.timesheets;
 CREATE TRIGGER trg_timesheets_bloqueia_fontes
   BEFORE UPDATE ON public.timesheets
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_fontes_folha();
+
+-- ---------------------------------------------------------------------------
+-- 3b. Par operação/turno — invariante estrutural, não permissão de papel
+--
+-- A guarda acima cobre UPDATE. O INSERT de folha continua livre para
+-- `operacional`, de propósito — é o fluxo diário de `painel-apontamentos`. Só
+-- que nada exigia que o turno informado pertencesse à operação informada.
+-- Levantado em revisão e reproduzido em banco local: `operacional` em aal2
+-- CRIOU uma folha com `operation_id` da operação A e `shift_id` de um turno da
+-- operação B.
+--
+-- O estrago é silencioso porque `derivar_valores_financeiros` lê as duas
+-- pontas: a taxa vem da operação escolhida, e a jornada prevista vem do turno.
+-- Combinar a operação cara com o turno curto fabrica hora extra que nenhum
+-- admin configurou — sem alterar nenhuma linha protegida.
+--
+-- POR QUE TRIGGER E NÃO FK COMPOSTA
+--
+-- A FK composta `(shift_id, operation_id) -> shifts(id, operation_id)` seria a
+-- expressão mais declarativa, e foi a primeira opção avaliada. Ela esbarra em
+-- dois fatos do schema, ambos verificados:
+--
+--   1. `shifts` tem só `PRIMARY KEY (id)`. A FK exigiria criar um
+--      `UNIQUE (id, operation_id)` novo — índice redundante, já que `id` é
+--      único sozinho, mantido só para sustentar a FK.
+--
+--   2. Uma FK tem UMA ação referencial para todas as suas colunas, e as duas
+--      FKs atuais têm ações OPOSTAS: `timesheets_shift_id_fkey` é
+--      `ON DELETE SET NULL` e `timesheets_operation_id_fkey` é
+--      `ON DELETE CASCADE`. Não há ação única que sirva: SET NULL tentaria
+--      anular também `operation_id`, que é NOT NULL, e o DELETE de um turno
+--      passaria a falhar por violação de NOT NULL em vez de desvincular.
+--
+-- O critério era menor mudança estrutural e menor risco para as cascatas. A FK
+-- composta perde nos dois. Trigger.
+--
+-- ERRCODE 23514, NÃO 42501, e a escolha é deliberada: nenhum papel pode criar
+-- um par inválido, nem admin, nem `postgres`, nem `service_role`. Dizer
+-- "privilégio insuficiente" sugeriria que existe alguém com esse privilégio.
+-- É violação de invariante — o mesmo que uma FK composta teria recusado.
+--
+-- `shift_id` NULL segue aceito: a coluna é anulável no modelo atual, o painel
+-- cria folha sem turno, e a FK de turno anula esse campo ao apagar o turno.
+-- Não é papel desta migration proibir o que o modelo permite.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.validar_par_operacao_turno()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF NEW.shift_id IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1
+         FROM public.shifts s
+        WHERE s.id = NEW.shift_id
+          AND s.operation_id = NEW.operation_id
+     ) THEN
+    RAISE EXCEPTION
+      'Turno informado não pertence à operação da folha.'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.validar_par_operacao_turno() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.validar_par_operacao_turno() FROM anon;
+REVOKE ALL ON FUNCTION public.validar_par_operacao_turno() FROM authenticated;
+REVOKE ALL ON FUNCTION public.validar_par_operacao_turno() FROM service_role;
+
+COMMENT ON FUNCTION public.validar_par_operacao_turno() IS
+  'Exige que timesheets.shift_id pertença a timesheets.operation_id. Substitui uma FK composta, inviável porque shifts não tem UNIQUE (id, operation_id) e as duas FKs atuais têm ações de DELETE opostas. Invariante estrutural: vale para todos os papéis.';
+
+-- Vale em INSERT e em UPDATE. O UPDATE já tem a guarda de papel acima, mas
+-- ela isenta admin e a escrita interna — e nem eles devem produzir um par
+-- inválido. Rodam as duas, em camadas diferentes.
+DROP TRIGGER IF EXISTS trg_timesheets_valida_par ON public.timesheets;
+CREATE TRIGGER trg_timesheets_valida_par
+  BEFORE INSERT OR UPDATE OF operation_id, shift_id ON public.timesheets
+  FOR EACH ROW EXECUTE FUNCTION public.validar_par_operacao_turno();
 
 -- ---------------------------------------------------------------------------
 -- 4. Policies por comando em operations e shifts

@@ -24,6 +24,16 @@
 -- apontamento que J34 e J36b conferem. Depois da migration nada disso é
 -- apagado e os quatro passam. Isso é inerente a medir destruição: não dá para
 -- observar o estado posterior de um registro cuja exclusão o baseline permite.
+--
+-- SEGUNDA RODADA. Os casos J41..J58 vieram da revisão que apontou três
+-- caminhos ainda abertos na primeira versão da 011. Contra o schema anterior:
+--
+--   MEDEM O BURACO e falham: J41..J45, J49, J52, J54, J56, J57
+--   COLATERAL e falham:      J46, J47, J48 — no baseline J45 apaga mesmo a
+--                            fatura, e não há o que conferir depois
+--   PASSAM ANTES E DEPOIS:   J50, J51, J53, J55, J58, J58b — a prova de que
+--                            reenvio legítimo, decisão administrativa, fluxo
+--                            diário e `gerar_fatura` não foram atingidos
 
 begin;
 
@@ -58,8 +68,11 @@ insert into public.user_roles (user_id, role) values
   ('11111111-1111-4111-8111-111111111111', 'admin'),
   ('88888888-8888-4888-8888-888888888888', 'operacional');
 
+-- Cliente B existe só como DESTINO: é para onde os casos de `client_id` tentam
+-- mover a operação. Nunca recebe fatura nem apontamento.
 insert into public.clients (id, name) values
-  ('33333333-3333-4333-8333-333333333333', 'Cliente');
+  ('33333333-3333-4333-8333-333333333333', 'Cliente'),
+  ('33333333-3333-4333-8333-33333333333b', 'Cliente B destino');
 
 insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
   ('33333333-3333-4333-8333-333333333334', '33333333-3333-4333-8333-333333333333',
@@ -109,9 +122,14 @@ insert into public.employees (id, name, daily_cost) values
   ('55555555-5555-4555-8555-5555555555c1', 'Colab C', 120),
   ('55555555-5555-4555-8555-5555555555d1', 'Colab D', 120);
 
+-- A segunda fatura existe só para o caso "fatura A -> fatura B": trocar de
+-- fatura não é menos grave que desvincular, e sem um segundo destino não dá
+-- para medir isso.
 insert into public.invoices (id, client_id, period_start, period_end, total_amount) values
   ('99999999-9999-4999-8999-999999999991', '33333333-3333-4333-8333-333333333333',
-   current_date, current_date, 250);
+   current_date, current_date, 250),
+  ('99999999-9999-4999-8999-999999999992', '33333333-3333-4333-8333-333333333333',
+   current_date - 30, current_date - 30, 0);
 
 insert into public.invoice_items (invoice_id, operation_id, description, amount) values
   ('99999999-9999-4999-8999-999999999991', '44444444-4444-4444-8444-4444444444a1',
@@ -416,6 +434,92 @@ $lastro$;
 
 
 -- ---------------------------------------------------------------------------
+-- J41..J48. VÍNCULO DE FATURA — imutável depois de vinculado
+--
+-- Sem esta camada o bloqueio de DELETE acima é contornável em dois passos:
+-- desvincular primeiro, apagar depois. `protect_timesheet_invoice_link` não
+-- ajuda aqui, porque ela isenta exatamente quem tem esse poder — admin,
+-- `postgres` e `service_role`.
+--
+-- J45..J48 medem o efeito colateral DESEJADO: como a FK é ON DELETE SET NULL,
+-- apagar a fatura tentaria desvincular, e agora falha. A fatura, os itens e o
+-- vínculo continuam de pé.
+-- ---------------------------------------------------------------------------
+
+do $vinculo$
+declare
+  _e text;
+  _n integer;
+  _v uuid;
+begin
+  -- J41. admin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update public.timesheet_entries set invoice_id = null
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'DESVINCULOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J41. ADMIN faz invoice_id -> NULL', 'recusou 42501', _e);
+
+  -- J44. trocar de fatura é o mesmo problema, com outra roupa.
+  begin
+    update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999992'
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'TROCOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J44. ADMIN troca fatura A -> fatura B', 'recusou 42501', _e);
+
+  -- J45. apagar a FATURA é o caminho indireto: a FK faria o SET NULL.
+  begin
+    delete from public.invoices where id = '99999999-9999-4999-8999-999999999991';
+    _e := 'APAGOU a fatura';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J45. ADMIN apaga FATURA com lastro vinculado', 'recusou 42501', _e);
+
+  -- J42. service_role
+  execute 'reset role';
+  execute 'set local role service_role';
+  begin
+    update public.timesheet_entries set invoice_id = null
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'DESVINCULOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J42. service_role faz invoice_id -> NULL', 'recusou 42501', _e);
+
+  -- J43. postgres, dono das tabelas.
+  execute 'reset role';
+  begin
+    update public.timesheet_entries set invoice_id = null
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'DESVINCULOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J43. postgres faz invoice_id -> NULL', 'recusou 42501', _e);
+
+  -- J46..J48. Nada do lastro se moveu.
+  select count(*) into _n from public.invoices
+   where id = '99999999-9999-4999-8999-999999999991';
+  perform pg_temp.registrar('J46. fatura continua existindo', '1', _n::text);
+
+  select count(*) into _n from public.invoice_items
+   where invoice_id = '99999999-9999-4999-8999-999999999991';
+  perform pg_temp.registrar('J47. invoice_items continuam', '1', _n::text);
+
+  select invoice_id into _v from public.timesheet_entries
+   where id = '77777777-7777-4777-8777-7777777777a1';
+  perform pg_temp.registrar('J48. apontamento mantém o mesmo invoice_id',
+    '99999999-9999-4999-8999-999999999991', coalesce(_v::text, 'NULL'));
+end;
+$vinculo$;
+
+
+-- ---------------------------------------------------------------------------
 -- J28..J33. ADMIN — o que continua podendo
 -- ---------------------------------------------------------------------------
 
@@ -565,6 +669,176 @@ begin
   perform pg_temp.registrar('J40. guarda de cliente usa o mesmo advisory lock', '1', _n::text);
 end;
 $cliente$;
+
+
+-- ---------------------------------------------------------------------------
+-- J49..J52. operations.client_id — administrativo como contrato e valor
+--
+-- `client_id` não entra na fórmula, mas decide QUEM paga: `gerar_fatura` filtra
+-- os elegíveis por `operations.client_id`. Mover a operação para outro cliente,
+-- faturar e devolvê-la tem a mesma silhueta do ataque de `agreed_amount` — a
+-- configuração volta ao normal e a cobrança errada fica de pé.
+-- ---------------------------------------------------------------------------
+
+do $cliente_da_operacao$
+declare
+  _e text;
+  _n integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
+     where id = '44444444-4444-4444-8444-4444444444b1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J49. operacional muda operations.client_id', 'recusou 42501', _e);
+
+  -- Mesmo falso positivo de J18: a tela reenvia o objeto inteiro, e reenviar
+  -- `client_id` IGUAL ao OLD junto de uma edição legítima não pode ser recusado.
+  begin
+    update public.operations
+       set notes = 'observação do dia',
+           client_id = '33333333-3333-4333-8333-333333333333'
+     where id = '44444444-4444-4444-8444-4444444444b1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J50. reenvio de client_id IGUAL ao OLD é aceito', '1 linhas', _e);
+
+  -- J52. Ataque completo, com o passo 1 sendo o que importa: se ele passasse,
+  -- o resto seria indetectável depois da restauração.
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
+     where id = '44444444-4444-4444-8444-4444444444a1';
+    _e := 'passo 1 passou';
+  exception when insufficient_privilege then _e := 'bloqueado no passo 1';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J52. ataque via client_id', 'bloqueado no passo 1', _e);
+
+  -- J51. Admin continua podendo: é decisão administrativa, não proibição.
+  -- OP-C é descartável e não tem histórico faturado.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
+     where id = '44444444-4444-4444-8444-4444444444c1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J51. admin muda client_id', '1 linhas', _e);
+end;
+$cliente_da_operacao$;
+
+
+-- ---------------------------------------------------------------------------
+-- J53..J57. Par operação/turno — invariante estrutural
+--
+-- Não é questão de papel: nem admin deve conseguir montar uma folha cujo turno
+-- pertence a outra operação. A derivação leria a taxa de uma ponta e a jornada
+-- prevista da outra, fabricando hora extra que ninguém configurou. Por isso o
+-- erro é 23514 (violação de invariante) e não 42501 (privilégio) — não existe
+-- papel que possa.
+-- ---------------------------------------------------------------------------
+
+do $par$
+declare
+  _e text;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- J53. Par VÁLIDO: é o fluxo diário e continua livre.
+  begin
+    insert into public.timesheets (id, operation_id, shift_id, work_date, status)
+    values ('66666666-6666-4666-8666-66666666e001', '44444444-4444-4444-8444-4444444444b1',
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date - 2, 'open');
+    _e := 'criou';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J53. operacional cria folha com par VÁLIDO', 'criou', _e);
+
+  -- J54. Par INVÁLIDO: operação B com o turno da operação A.
+  begin
+    insert into public.timesheets (id, operation_id, shift_id, work_date, status)
+    values ('66666666-6666-4666-8666-66666666e002', '44444444-4444-4444-8444-4444444444b1',
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', current_date - 3, 'open');
+    _e := 'CRIOU par inválido';
+  exception when check_violation then _e := 'recusou 23514';
+            when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J54. operacional cria folha com par INVÁLIDO', 'recusou 23514', _e);
+
+  -- J55. Sem turno segue válido: a coluna é anulável no modelo atual e o
+  -- painel cria folha sem turno. Esta migration não inventa proibição nova.
+  begin
+    insert into public.timesheets (id, operation_id, shift_id, work_date, status)
+    values ('66666666-6666-4666-8666-66666666e003', '44444444-4444-4444-8444-4444444444b1',
+            null, current_date - 4, 'open');
+    _e := 'criou';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J55. folha com shift_id NULL segue aceita', 'criou', _e);
+
+  -- J56. ADMIN também não monta par inválido.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  begin
+    insert into public.timesheets (id, operation_id, shift_id, work_date, status)
+    values ('66666666-6666-4666-8666-66666666e004', '44444444-4444-4444-8444-4444444444b1',
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', current_date - 5, 'open');
+    _e := 'CRIOU par inválido';
+  exception when check_violation then _e := 'recusou 23514';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J56. ADMIN cria folha com par INVÁLIDO', 'recusou 23514', _e);
+
+  -- J57. E o UPDATE que PRODUZIRIA um par inválido também é recusado: a folha
+  -- de J53 é válida hoje, e mudar só a operação a tornaria inválida.
+  begin
+    update public.timesheets set operation_id = '44444444-4444-4444-8444-4444444444a1'
+     where id = '66666666-6666-4666-8666-66666666e001';
+    _e := 'ALTEROU para par inválido';
+  exception when check_violation then _e := 'recusou 23514';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J57. UPDATE que produziria par inválido', 'recusou 23514', _e);
+end;
+$par$;
+
+
+-- ---------------------------------------------------------------------------
+-- J58. O caminho legítimo continua aberto
+--
+-- Todo o resto deste arquivo mede recusa. Este caso mede o oposto, e é o que
+-- impede que a proteção do vínculo tenha fechado o faturamento junto: vincular
+-- a partir de NULL é exatamente o que `gerar_fatura` faz, e continua passando.
+-- ---------------------------------------------------------------------------
+
+do $faturamento$
+declare
+  _e          text;
+  _nova       public.invoices;
+  _vinculados integer;
+begin
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  begin
+    _nova := public.gerar_fatura(
+      '33333333-3333-4333-8333-333333333333', current_date, current_date);
+    _e := 'gerou';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J58. gerar_fatura ainda vincula NULL -> invoice_id', 'gerou', _e);
+
+  execute 'reset role';
+  select count(*) into _vinculados
+    from public.timesheet_entries where invoice_id = _nova.id;
+  perform pg_temp.registrar('J58b. a nova fatura recebeu lastro',
+    'pelo menos 1', case when _vinculados >= 1 then 'pelo menos 1'
+                         else _vinculados::text end);
+end;
+$faturamento$;
 
 
 -- ---------------------------------------------------------------------------
