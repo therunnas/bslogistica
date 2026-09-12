@@ -33,7 +33,10 @@ tem relação com o TanStack Router.
   um `middleware.ts` é ignorado em silêncio e a sessão deixa de ser renovada.
 - **Token de uso único não se consome em GET.** Gateways de segurança de e-mail
   visitam cada link da mensagem sozinhos; um GET que muda estado queima o token
-  antes do usuário. Validar no GET, consumir em ação deliberada.
+  antes do usuário. No GET, validar **apenas formato/estrutura e tipo
+  permitido** — nada além disso. Conferir a validade ou a autenticidade do
+  token **é** consumi-lo, então isso só pode acontecer depois de uma ação
+  deliberada do usuário.
 - **MFA é exigido também no banco.** 11 tabelas de negócio têm policy
   RESTRICTIVE pedindo `aal2`; `user_roles` fica de fora de propósito, porque é
   lida antes do MFA. Não adicionar AAL2 nela.

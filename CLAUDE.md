@@ -86,13 +86,14 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 - **Falha ao consultar o nível de garantia não é ausência de fator.** Erro
   transitório vai para a tela "não foi possível verificar", nunca para o
   cadastro de fator — cadastrar sobre conta que já tem fator trava a conta.
-- **Token de recuperação não se consome em GET.** O `GET /auth/confirm` valida
-  e guarda o token num cookie `httpOnly`; quem chama `verifyOtp` — e portanto
-  cria a sessão de recuperação — é a Server Action de
-  `src/app/auth/confirmar-recuperacao/`, disparada por um clique. Gateways de
-  segurança de e-mail visitam cada link da mensagem sozinhos, e a varredura
-  queimava a recuperação antes do usuário. Vale para qualquer link de uso único
-  que venha a existir.
+- **Token de recuperação não se consome em GET.** O `GET /auth/confirm` confere
+  **apenas formato e `type`** — não verifica se o token é válido — e o guarda
+  num cookie `httpOnly`. Quem chama `verifyOtp`, e portanto cria a sessão de
+  recuperação, é a Server Action de `src/app/auth/confirmar-recuperacao/`,
+  disparada por um clique. Gateways de segurança de e-mail visitam cada link da
+  mensagem sozinhos, e a varredura queimava a recuperação antes do usuário.
+  Conferir a validade do token **é** consumi-lo: não existe "só verificar" num
+  token de uso único. Vale para qualquer link desse tipo que venha a existir.
 - **Depois que a senha muda, a prova morre** — em qualquer desfecho, inclusive
   quando o `signOut` global falha. E a tela nunca diz que a redefinição falhou
   num caminho em que o `updateUser` teve sucesso.
