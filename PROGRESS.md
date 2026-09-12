@@ -220,7 +220,16 @@ reinstrumentar como no PR #19, não adivinhar.
 
 ### 6.2 ESTADO ATUAL — o que vale hoje, no código e no banco
 
-**Nada da seção 6.1 está implementado.**
+**A divisão por papel descrita na seção 6.1 ainda NÃO está implementada.**
+
+As proteções atuais do admin **já existem e permanecem ativas** — MFA
+obrigatório, painel exigindo AAL2, um TOTP no recovery e nenhum admin operando
+em AAL1. O painel e as 11 tabelas continuam exigindo AAL2.
+
+O que falta implementar é a **exceção segura para o papel `operacional`** e a
+**autorização coordenada por papel + AAL**: `operacional` com MFA opcional,
+`operacional` em AAL1 nas permissões expressamente autorizadas, o guard e a RLS
+cientes de papel, e a tela Configurações → Segurança.
 
 - o guard de `(painel)` **ainda exige AAL2** para qualquer papel;
 - **11 tabelas de negócio ainda têm policy RESTRICTIVE global exigindo `aal2`**;
