@@ -42,8 +42,10 @@ insert into public.user_roles (user_id, role) values
 insert into public.clients (id, name) values
   ('33333333-3333-4333-8333-333333333333', 'Cliente de Teste');
 
-insert into public.operations (id, client_id, name) values
-  ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333', 'Operação de Teste');
+-- `agreed_amount` importa desde a migration 010: sem contrato, é dele que sai a
+-- diária no fallback, e é o que faz o apontamento abaixo ser derivado em 250.00.
+insert into public.operations (id, client_id, name, agreed_amount) values
+  ('44444444-4444-4444-8444-444444444444', '33333333-3333-4333-8333-333333333333', 'Operação de Teste', 250);
 
 insert into public.employees (id, name, daily_cost) values
   ('55555555-5555-4555-8555-555555555555', 'Colaborador de Teste', 100),
@@ -56,9 +58,17 @@ insert into public.invoices (id, client_id, period_start, period_end) values
 insert into public.timesheets (id, operation_id, work_date) values
   ('66666666-6666-4666-8666-666666666666', '44444444-4444-4444-8444-444444444444', current_date);
 
-insert into public.timesheet_entries (id, timesheet_id, employee_id, billed_amount, cost_amount) values
+-- Desde a migration 010 os valores financeiros são DERIVADOS pelo banco, então
+-- gravá-los à mão aqui não teria efeito. O apontamento passa a carregar as
+-- colunas que a tela sempre envia, e a derivação produz exatamente os 250.00 e
+-- 100.00 que os casos adiante conferem: sem contrato, a diária vem do
+-- `agreed_amount` da operação (250), e o custo vem do colaborador (100). Sem
+-- entrada e sem saída não há hora extra.
+insert into public.timesheet_entries
+  (id, timesheet_id, employee_id, operation_id, work_date, status) values
   ('77777777-7777-4777-8777-777777777777', '66666666-6666-4666-8666-666666666666',
-   '55555555-5555-4555-8555-555555555555', 250.00, 100.00);
+   '55555555-5555-4555-8555-555555555555', '44444444-4444-4444-8444-444444444444',
+   current_date, 'present');
 
 
 -- ---------------------------------------------------------------------------
