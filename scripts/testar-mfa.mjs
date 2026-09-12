@@ -13,7 +13,7 @@
  * Sai com código diferente de zero em qualquer falha, para servir em CI.
  */
 
-import { decidirSituacaoMfa, decidirFluxoMfa } from "../src/lib/mfa.ts";
+import { decidirSituacaoMfa, decidirFluxoMfa, decidirMfaNaRecuperacao } from "../src/lib/mfa.ts";
 
 let passou = 0;
 const falhas = [];
@@ -110,6 +110,57 @@ verificar(
   decidirFluxoMfa(false, "mfa-pendente"),
   "sem-fator-esperado",
 );
+
+console.log("\nR. Segundo fator dentro da recuperação de senha\n");
+
+// O achado que motivou este bloco: `verifyOtp({ type: "recovery" })` cria a
+// sessão em aal1, e o Supabase recusa a troca de senha nela quando a conta tem
+// MFA — `PUT /user` devolve 401 "AAL2 session is required to update email or
+// password when MFA is enabled". A exigência é CONDICIONAL: só vale para quem
+// tem fator verificado.
+
+verificar(
+  "R1. aal1 com fator verificado -> desafiar-mfa",
+  decidirMfaNaRecuperacao(decidirSituacaoMfa({ currentLevel: "aal1", nextLevel: "aal2" }, false)),
+  "desafiar-mfa",
+);
+verificar(
+  "R2. aal2 -> prosseguir",
+  decidirMfaNaRecuperacao(decidirSituacaoMfa({ currentLevel: "aal2", nextLevel: "aal2" }, false)),
+  "prosseguir",
+);
+// Conta sem fator segue em aal1: exigir aal2 aqui travaria a recuperação de
+// quem nunca cadastrou MFA, e para ela o 401 do GoTrue não acontece.
+verificar(
+  "R3. conta sem fator verificado -> prosseguir em aal1",
+  decidirMfaNaRecuperacao(decidirSituacaoMfa({ currentLevel: "aal1", nextLevel: "aal1" }, false)),
+  "prosseguir",
+);
+// Erro na consulta não é ausência de fator: fail closed.
+verificar(
+  "R4. erro ao consultar o nível -> falhar",
+  decidirMfaNaRecuperacao(decidirSituacaoMfa(null, true)),
+  "falhar",
+);
+verificar(
+  "R4b. nível ausente sem erro declarado -> falhar",
+  decidirMfaNaRecuperacao(decidirSituacaoMfa(null, false)),
+  "falhar",
+);
+verificar(
+  "R4c. erro tem precedência sobre nível aparentemente válido",
+  decidirMfaNaRecuperacao(decidirSituacaoMfa({ currentLevel: "aal1", nextLevel: "aal2" }, true)),
+  "falhar",
+);
+
+// No recovery existem só três saídas, e nenhuma delas cadastra fator.
+for (const situacao of ["mfa-pendente", "mfa-ausente", "mfa-indisponivel", "liberado"]) {
+  verificar(
+    `R5. ${situacao} -> saída válida do recovery (nunca cadastro)`,
+    String(["desafiar-mfa", "prosseguir", "falhar"].includes(decidirMfaNaRecuperacao(situacao))),
+    "true",
+  );
+}
 
 console.log(`\n${passou} passaram, ${falhas.length} falharam\n`);
 

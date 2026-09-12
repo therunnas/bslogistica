@@ -229,3 +229,116 @@ export async function validarProvaDeRecuperacao(
   if (!segredo) return "sem-segredo";
   return verificarProva(token, segredo, esperado);
 }
+
+/* ------------------------------------------------------------------ */
+/* Reemissão após o segundo fator                                      */
+/* ------------------------------------------------------------------ */
+
+export type ProvaAutenticada =
+  { situacao: "valida"; exp: number } | { situacao: "invalida"; motivo: ResultadoDaProva };
+
+/**
+ * Valida a prova e devolve o `exp` AUTENTICADO.
+ *
+ * Existe porque a reemissão precisa herdar o prazo original, e ler esse prazo
+ * de um corpo não verificado seria confiar em texto que o navegador enviou.
+ * Aqui o `exp` só é devolvido depois de `verificarProva` aprovar a assinatura,
+ * a versão, o propósito, o prazo, o `sub` e o `session_id` — nesta ordem. Não é
+ * um decodificador: se qualquer etapa falhar, nada sai.
+ */
+export async function lerExpAutenticadoCom(
+  token: string | null | undefined,
+  segredo: string,
+  esperado: EsperadoNaProva,
+): Promise<ProvaAutenticada> {
+  const resultado = await verificarProva(token, segredo, esperado);
+  if (resultado !== "valida") return { situacao: "invalida", motivo: resultado };
+
+  // Chegou aqui: assinatura conferida e todos os campos validados. Só agora o
+  // corpo pode ser lido como fonte de verdade.
+  const corpo = (token as string).split(".")[0] as string;
+  const bytes = deBase64Url(corpo);
+  if (!bytes) return { situacao: "invalida", motivo: "malformada" };
+
+  const { exp } = JSON.parse(new TextDecoder().decode(bytes)) as CargaDaProva;
+  return { situacao: "valida", exp };
+}
+
+/** Mesma coisa, lendo o segredo do ambiente. Sem segredo, nega. */
+export async function lerExpAutenticado(
+  token: string | null | undefined,
+  esperado: EsperadoNaProva,
+): Promise<ProvaAutenticada> {
+  const segredo = lerSegredoDaProva();
+  if (!segredo) return { situacao: "invalida", motivo: "sem-segredo" };
+  return lerExpAutenticadoCom(token, segredo, esperado);
+}
+
+export type Reemissao =
+  | { situacao: "reemitida"; prova: string; segundosRestantes: number }
+  | { situacao: "sem-tempo" }
+  | { situacao: "sem-segredo" };
+
+/**
+ * Reemite a prova para a sessão de agora, herdando o prazo da anterior.
+ *
+ * POR QUE REEMITIR
+ *
+ * O segundo fator troca o access token. Se o `session_id` mudar nessa troca, a
+ * prova antiga — amarrada ao `session_id` de antes — deixaria de validar e o
+ * usuário seria barrado depois de acertar o TOTP. Reemitir cobre os dois
+ * cenários: se o id não mudou, a reemissão é inócua; se mudou, a prova
+ * acompanha.
+ *
+ * POR QUE O `exp` É HERDADO, NUNCA RECALCULADO
+ *
+ * Recalcular daria mais 10 minutos a cada reemissão, e a janela deixaria de
+ * existir na prática. O prazo aqui é o que sobrou do original — por isso o
+ * chamador precisa passar um `exp` que já veio de `lerExpAutenticado`, e não um
+ * valor qualquer.
+ *
+ * Sem tempo restante, não reemite: prova expirada não se renova.
+ */
+export async function reemitirProvaCom(
+  {
+    sub,
+    sessionId,
+    expOriginal,
+    agoraEmSegundos,
+  }: {
+    sub: string;
+    sessionId: string;
+    expOriginal: number;
+    agoraEmSegundos?: number;
+  },
+  segredo: string,
+): Promise<Reemissao> {
+  const agora = agoraEmSegundos ?? Math.floor(Date.now() / 1000);
+  const segundosRestantes = expOriginal - agora;
+  if (segundosRestantes <= 0) return { situacao: "sem-tempo" };
+
+  const prova = await assinarProva(
+    {
+      version: VERSAO_DA_PROVA,
+      purpose: PROPOSITO_DA_PROVA,
+      sub,
+      session_id: sessionId,
+      exp: expOriginal,
+    },
+    segredo,
+  );
+
+  return { situacao: "reemitida", prova, segundosRestantes };
+}
+
+/** Mesma coisa, lendo o segredo do ambiente. Sem segredo, não reemite. */
+export async function reemitirProvaDeRecuperacao(params: {
+  sub: string;
+  sessionId: string;
+  expOriginal: number;
+  agoraEmSegundos?: number;
+}): Promise<Reemissao> {
+  const segredo = lerSegredoDaProva();
+  if (!segredo) return { situacao: "sem-segredo" };
+  return reemitirProvaCom(params, segredo);
+}

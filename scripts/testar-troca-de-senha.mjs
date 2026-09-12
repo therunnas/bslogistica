@@ -446,6 +446,66 @@ verificar(
   "false",
 );
 
+console.log("\nN. Segundo fator antes da troca de senha\n");
+
+// O achado de Production: o verifyOtp cria a sessão em aal1, e o GoTrue recusa
+// PUT /user com 401 "AAL2 session is required to update email or password when
+// MFA is enabled". A exigência é condicional — só para conta com fator.
+const pNivelTroca = acaoSemComentarios.indexOf("getAuthenticatorAssuranceLevel()");
+const pDecisaoMfa = acaoSemComentarios.indexOf("decidirMfaNaRecuperacao(");
+const pUpdate2 = acaoSemComentarios.indexOf("auth.updateUser(");
+
+verificar("N1. a action consulta o nível de garantia", String(pNivelTroca !== -1), "true");
+verificar("N2. a consulta acontece ANTES do updateUser", String(pNivelTroca < pUpdate2), "true");
+verificar("N2b. a decisão de MFA vem antes do updateUser", String(pDecisaoMfa < pUpdate2), "true");
+verificar(
+  "N3. fator pendente NÃO chama updateUser",
+  String(/decisaoMfa === "desafiar-mfa"[\s\S]{0,160}?return \{/.test(acaoSemComentarios)),
+  "true",
+);
+verificar(
+  "N4. nível indisponível NÃO chama updateUser",
+  String(/decisaoMfa === "falhar"[\s\S]{0,160}?return \{/.test(acaoSemComentarios)),
+  "true",
+);
+// Conta sem fator segue em aal1: a action não exige aal2 incondicionalmente.
+verificar(
+  "N5. não há exigência incondicional de aal2 na action",
+  String(/currentLevel !== "aal2"/.test(acaoSemComentarios)),
+  "false",
+);
+verificar(
+  "N5b. a decisão usa a função pura do recovery, não uma comparação solta",
+  String(/decidirMfaNaRecuperacao\(\s*decidirSituacaoMfa\(/.test(acaoSemComentarios)),
+  "true",
+);
+
+// A página também revalida, e manda ao desafio em vez de deixar o 401 acontecer.
+const paginaTroca = readFileSync(
+  new URL("../src/app/redefinir-senha/page.tsx", import.meta.url),
+  "utf8",
+)
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .split("\n")
+  .filter((l) => !l.trimStart().startsWith("//"))
+  .join("\n");
+
+verificar(
+  "N6. a página redireciona ao desafio quando há fator pendente",
+  String(/decisao === "desafiar-mfa"\) redirect\(ROTA_REDEFINIR_SENHA_MFA\)/.test(paginaTroca)),
+  "true",
+);
+verificar(
+  "N7. a página falha fechada quando o nível é indisponível",
+  String(/decisao === "falhar"/.test(paginaTroca)),
+  "true",
+);
+verificar(
+  "N8. nenhuma rota da recuperação leva ao painel",
+  String(/dashboard/.test(paginaTroca) || /dashboard/.test(acaoSemComentarios)),
+  "false",
+);
+
 console.log("\nM. Login no desfecho parcial\n");
 
 // O login redireciona para /dashboard quem já tem sessão. No desfecho parcial

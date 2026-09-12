@@ -5,8 +5,11 @@ import { redirect } from "next/navigation";
 
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import { NOME_DO_COOKIE_DE_PROVA, validarProvaDeRecuperacao } from "@/lib/prova-recuperacao";
+import { decidirMfaNaRecuperacao, decidirSituacaoMfa } from "@/lib/mfa";
 import {
   MENSAGEM_FALHA_AO_TROCAR,
+  MENSAGEM_MFA_EXIGIDO,
+  MENSAGEM_MFA_INDISPONIVEL,
   MENSAGEM_RECUPERACAO_INVALIDA,
   ROTA_LOGIN_SENHA_REDEFINIDA,
   ROTA_LOGIN_SESSOES_ATIVAS,
@@ -95,6 +98,27 @@ export async function redefinirSenha(entrada: {
       situacao: "erro",
       mensagem: validacao.valida ? MENSAGEM_FALHA_AO_TROCAR : validacao.mensagem,
     };
+  }
+
+  /**
+   * Segundo fator revalidado no instante do envio, antes do `updateUser`.
+   *
+   * A página já decidiu isto ao renderizar, mas a decisão não é reaproveitada:
+   * entre abrir a tela e enviar o formulário a sessão pode ter mudado. E o
+   * `updateUser` é justamente o ponto onde o Supabase recusa aal1 quando a
+   * conta tem MFA — chegar nele sem checar devolveria um 401 cru ao usuário.
+   */
+  const { data: nivel, error: erroNivel } =
+    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  const decisaoMfa = decidirMfaNaRecuperacao(decidirSituacaoMfa(nivel ?? null, Boolean(erroNivel)));
+
+  if (decisaoMfa === "desafiar-mfa") {
+    return { situacao: "erro", mensagem: MENSAGEM_MFA_EXIGIDO };
+  }
+
+  if (decisaoMfa === "falhar") {
+    return { situacao: "erro", mensagem: MENSAGEM_MFA_INDISPONIVEL };
   }
 
   const { error } = await supabase.auth.updateUser({ password: senha });

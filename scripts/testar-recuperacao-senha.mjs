@@ -27,6 +27,7 @@ import {
   MENSAGEM_SOLICITACAO_ENVIADA,
   ROTA_ESQUECI_SENHA,
   ROTA_REDEFINIR_SENHA,
+  ROTA_REDEFINIR_SENHA_MFA,
   decidirConfirmacao,
   decidirRespostaDaSolicitacao,
   montarDestinoConfirmacao,
@@ -393,6 +394,72 @@ verificar(
   "G10. resetPasswordForEmail é chamado sem redirectTo",
   String(/resetPasswordForEmail\([^)]*redirectTo/.test(solicitacao)),
   "false",
+);
+
+console.log("\nH. Destino conforme a situação do segundo fator\n");
+
+const acaoConfirmacao = readFileSync(
+  new URL("../src/app/auth/confirmar-recuperacao/actions.ts", import.meta.url),
+  "utf8",
+)
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .split("\n")
+  .filter((l) => !l.trimStart().startsWith("//"))
+  .join("\n");
+
+// Depois do verifyOtp a sessão é aal1. Se a conta tem TOTP verificado, o
+// Supabase recusa a troca de senha nela — então o destino muda.
+verificar(
+  "H1. a confirmação consulta o nível de garantia",
+  String(/getAuthenticatorAssuranceLevel\(\)/.test(acaoConfirmacao)),
+  "true",
+);
+verificar(
+  "H2. a consulta acontece depois do verifyOtp",
+  String(
+    acaoConfirmacao.indexOf("verifyOtp(") <
+      acaoConfirmacao.indexOf("getAuthenticatorAssuranceLevel()"),
+  ),
+  "true",
+);
+verificar(
+  "H3. fator pendente -> vai ao desafio",
+  String(/desafiar-mfa"\) redirect\(ROTA_REDEFINIR_SENHA_MFA\)/.test(acaoConfirmacao)),
+  "true",
+);
+verificar(
+  "H4. caso contrário -> vai direto ao formulário de senha",
+  String(/redirect\(ROTA_REDEFINIR_SENHA\);/.test(acaoConfirmacao)),
+  "true",
+);
+verificar(
+  "H5. nível indisponível -> falha fechada pelo helper de limpeza",
+  String(/decisaoMfa === "falhar"\) return falharDepoisDeVerificar\(\)/.test(acaoConfirmacao)),
+  "true",
+);
+verificar(
+  "H6. a confirmação não cadastra nem remove fator",
+  String(/mfa\.enroll\(|mfa\.unenroll\(/.test(acaoConfirmacao)),
+  "false",
+);
+verificar(
+  "H7. a confirmação não leva ao painel",
+  String(/dashboard/.test(acaoConfirmacao)),
+  "false",
+);
+
+// A rota do desafio fica SOB /redefinir-senha por causa do Path do cookie de
+// prova: uma rota irmã não receberia a prova, e ampliar o Path para "/" a
+// entregaria à aplicação inteira.
+verificar(
+  "H8. a rota do desafio fica sob /redefinir-senha",
+  ROTA_REDEFINIR_SENHA_MFA.startsWith(`${ROTA_REDEFINIR_SENHA}/`) ? "sim" : "nao",
+  "sim",
+);
+verificar(
+  "H8b. a rota do desafio é /redefinir-senha/mfa",
+  ROTA_REDEFINIR_SENHA_MFA,
+  "/redefinir-senha/mfa",
 );
 
 console.log(`\n${passou} passaram, ${falhas.length} falharam\n`);
