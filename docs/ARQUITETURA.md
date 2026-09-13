@@ -171,9 +171,11 @@ gatilho `BEFORE` de linha dispara em ordem alfabética de nome, e
 `postgres` e `service_role` são isentos **desse bloqueio específico**, para que
 a derivação e o faturamento funcionem. Isento deste gatilho não significa isento
 do resto: as proteções da `011` — imutabilidade da linha faturada, `TRUNCATE`
-revogado, vínculo de fatura restrito ao contexto de `gerar_fatura` — continuam
-valendo, e várias delas não abrem exceção para papel nenhum, `service_role`
-incluído.
+revogado, criação do vínculo de fatura exigindo **execução como `postgres`** —
+continuam valendo, e várias delas não abrem exceção para papel nenhum,
+`service_role` incluído. A fronteira do vínculo é o papel de execução, não a
+função: o gatilho testa `current_user`, então não distingue `gerar_fatura` de
+uma sessão `postgres` escrevendo à mão.
 
 `src/lib/billing.ts` continua sendo a referência da regra e roda no navegador,
 mas **para previsão, não para decisão**: serve para a tela mostrar o número

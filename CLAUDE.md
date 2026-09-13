@@ -198,8 +198,13 @@ O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
   nasce em execução como `postgres`**, que é o contexto em que `gerar_fatura`
   roda: `authenticated` não cria — admin incluído —, `service_role` também não.
   A fronteira é a API da aplicação; **sessão `postgres` direta e superusuário
-  ficam fora dela**, e nenhuma proteção aqui promete o contrário. Cliente,
-  contrato e turno **em uso** não se apagam, mesmo em rascunho. Com faturamento
+  ficam fora dela**, e nenhuma proteção aqui promete o contrário. Os bloqueios
+  de `DELETE` têm **critérios distintos**, e não é "em uso": cliente só é
+  protegido se tiver **fatura ou apontamento faturado** — cliente com apenas
+  operação é apagável, e a operação cai por cascata; contrato é protegido se
+  **algum apontamento** dele já derivou valores, rascunho incluído; turno é
+  protegido se **alguma folha** o referencia — turno referenciado só por
+  `operation_team` é apagável, de propósito. Com faturamento
   congelam `operations.client_id`, o `work_date`/`operation_id`/`shift_id` da
   folha e a linha do apontamento — mas **não** `operations.contract_id`,
   `agreed_amount`, as taxas do contrato nem `employees.daily_cost`, que

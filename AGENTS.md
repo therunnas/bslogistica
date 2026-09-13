@@ -43,8 +43,10 @@ tem relação com o TanStack Router.
   recusa `UPDATE` e `DELETE`. O vínculo só nasce em execução como `postgres`,
   contexto em que `gerar_fatura` roda — `authenticated`, admin incluído, e
   `service_role` não criam; sessão `postgres` direta e superusuário estão fora
-  dessa fronteira. Cliente, contrato e turno **em uso** não se apagam; com
-  faturamento congelam `operations.client_id`, o
+  dessa fronteira. Os bloqueios de `DELETE` têm critérios **distintos**, não "em
+  uso": cliente exige **fatura ou apontamento faturado**; contrato, **qualquer
+  apontamento** já derivado dele; turno, ser referenciado por **folha** — só por
+  `operation_team` não basta. Com faturamento congelam `operations.client_id`, o
   `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
   **Não** congelam `operations.contract_id`, `agreed_amount`, as taxas do
   contrato nem `employees.daily_cost` — editáveis por admin, sem alterar o já
