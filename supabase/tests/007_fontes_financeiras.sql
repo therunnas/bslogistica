@@ -178,7 +178,10 @@ insert into public.shifts (id, operation_id, name, start_time, end_time, break_m
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6', '44444444-4444-4444-8444-4444444444f1',
    'Turno F livre',              '06:00:00', '15:00:00', 60, false),
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7', '44444444-4444-4444-8444-4444444444f1',
-   'Turno F com folha e equipe', '06:00:00', '15:00:00', 60, false);
+   'Turno F com folha e equipe', '06:00:00', '15:00:00', 60, false),
+  -- Destino do J31: existe só para uma folha VAZIA ter para onde apontar.
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa1a', '44444444-4444-4444-8444-4444444444f1',
+   'Turno F destino', '06:00:00', '15:00:00', 60, false);
 
 insert into public.timesheets (id, operation_id, shift_id, work_date) values
   ('66666666-6666-4666-8666-6666666666a1', '44444444-4444-4444-8444-4444444444a1',
@@ -187,7 +190,11 @@ insert into public.timesheets (id, operation_id, shift_id, work_date) values
    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date),
   -- Sem apontamento: existe só para dar ao turno F7 uma referência de folha.
   ('66666666-6666-4666-8666-6666666666f1', '44444444-4444-4444-8444-4444444444f1',
-   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7', current_date);
+   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7', current_date),
+  -- Folha VAZIA, sem turno, alvo do J31. Precisa ser vazia: desde a sétima
+  -- rodada, folha COM apontamento não muda mais de operação nem de turno.
+  ('66666666-6666-4666-8666-6666666666e1', '44444444-4444-4444-8444-4444444444f1',
+   null, current_date - 7);
 
 insert into public.employees (id, name, daily_cost) values
   ('55555555-5555-4555-8555-5555555555a1', 'Colab A', 120),
@@ -637,12 +644,17 @@ begin
   exception when others then _e := 'erro ' || sqlstate; end;
   perform pg_temp.registrar('J30. admin altera jornada do turno', '1 linhas', _e);
 
+  -- O alvo é uma folha VAZIA, e a troca é deliberada: até a sétima rodada este
+  -- caso mexia numa folha COM apontamento, e era exatamente isso que corrompia
+  -- o lastro — a chave ia para a operação nova e os snapshots ficavam na
+  -- antiga. Corrigir o vínculo de uma folha ainda sem apontamento continua
+  -- sendo decisão administrativa legítima.
   begin
-    update public.timesheets set shift_id = null
-     where id = '66666666-6666-4666-8666-6666666666b1';
+    update public.timesheets set shift_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa1a'
+     where id = '66666666-6666-4666-8666-6666666666e1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J31. admin altera vínculo da folha', '1 linhas', _e);
+  perform pg_temp.registrar('J31. admin altera vínculo de folha VAZIA', '1 linhas', _e);
 
   -- OP-D e o turno D são descartáveis e não têm histórico faturado: o admin
   -- apaga normalmente, e é isso que separa "sem lastro" de "com lastro".
@@ -1667,6 +1679,126 @@ begin
     'recusou 42501', _e);
 end;
 $delete_turno$;
+
+
+-- ---------------------------------------------------------------------------
+-- J114..J120. FOLHA COM APONTAMENTO NÃO MUDA DE OPERAÇÃO NEM DE TURNO
+--
+-- A guarda de folha faturada congelava tarde: mover uma folha ainda em
+-- rascunho já corrompe o lastro, porque os apontamentos guardam SNAPSHOTS.
+-- `propagar_chave_da_diaria` leva a chave para a operação nova e
+-- `derivar_valores_financeiros` preserva os valores da antiga, de propósito —
+-- então a fatura seguinte agrupa sob o cliente novo somando a configuração
+-- velha.
+--
+-- `work_date` NÃO entra nesta proibição: não é coluna motriz, e editar a data
+-- de uma folha em rascunho segue legítimo (J72).
+-- ---------------------------------------------------------------------------
+
+do $mover_folha$
+declare
+  _e text;
+  _n integer;
+  _b numeric;
+begin
+  -- Folha VAZIA para os casos permitidos.
+  execute 'reset role';
+  insert into public.timesheets (id, operation_id, shift_id, work_date)
+  values ('66666666-6666-4666-8666-6666666666e2', '44444444-4444-4444-8444-4444444444f1',
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa1a', current_date - 8);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- J114. Folha vazia: mover é correção administrativa legítima. O turno vai
+  -- junto para manter o par válido.
+  begin
+    update public.timesheets
+       set operation_id = '44444444-4444-4444-8444-4444444444b1',
+           shift_id     = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
+     where id = '66666666-6666-4666-8666-6666666666e2';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J114. admin move folha VAZIA de operação', '1 linhas', _e);
+
+  -- J115. E só o turno, também na folha vazia.
+  begin
+    update public.timesheets set shift_id = null
+     where id = '66666666-6666-4666-8666-6666666666e2';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J115. admin altera shift_id de folha VAZIA', '1 linhas', _e);
+
+  -- J116..J118. Folha PRÓPRIA com apontamento NÃO faturado, e ela precisa ser
+  -- própria: a folha da OP-B já carrega a entry que J97 vinculou, e ali quem
+  -- recusaria seria a guarda de folha FATURADA — o caso mediria outra coisa.
+  -- Sem turno, para que a recusa venha da regra nova e não do par
+  -- operação/turno. Data distante, fora do período que J58 fatura.
+  execute 'reset role';
+  insert into public.timesheets (id, operation_id, shift_id, work_date)
+  values ('66666666-6666-4666-8666-6666666666e3', '44444444-4444-4444-8444-4444444444f1',
+          null, current_date - 60);
+  insert into public.timesheet_entries
+    (id, timesheet_id, employee_id, operation_id, work_date, status, check_in, check_out, break_minutes)
+  values ('77777777-7777-4777-8777-7777777777e3', '66666666-6666-4666-8666-6666666666e3',
+          '55555555-5555-4555-8555-5555555555d1', '44444444-4444-4444-8444-4444444444f1',
+          current_date - 60, 'present', '06:00:00', '15:00:00', 60);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  begin
+    update public.timesheets set operation_id = '44444444-4444-4444-8444-4444444444b1'
+     where id = '66666666-6666-4666-8666-6666666666e3';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'MOVEU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when check_violation then _e := 'recusou 23514';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J116. admin move operação de folha COM apontamento',
+    'recusou 42501', _e);
+
+  begin
+    update public.timesheets set shift_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5'
+     where id = '66666666-6666-4666-8666-6666666666e3';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when check_violation then _e := 'recusou 23514';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J117. admin altera turno de folha COM apontamento',
+    'recusou 42501', _e);
+
+  -- J118. Reenvio dos MESMOS valores não pode virar 42501.
+  begin
+    update public.timesheets
+       set operation_id = '44444444-4444-4444-8444-4444444444f1',
+           shift_id     = null,
+           status       = 'closed'
+     where id = '66666666-6666-4666-8666-6666666666e3';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J118. reenvio de operação/turno IGUAIS é aceito', '1 linhas', _e);
+
+  -- J119. E a folha FATURADA segue recusada, agora por duas guardas.
+  begin
+    update public.timesheets set operation_id = '44444444-4444-4444-8444-4444444444b1'
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    _e := 'MOVEU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J119. admin move operação de folha FATURADA', 'recusou 42501', _e);
+
+  -- J120. E o apontamento continua com o valor da configuração em que nasceu.
+  -- J29 trocou o contrato da OP-B para o Contrato Caro DEPOIS deste
+  -- apontamento; como contrato não é coluna motriz, o snapshot não se mexeu.
+  execute 'reset role';
+  select billed_amount into _b from public.timesheet_entries
+   where id = '77777777-7777-4777-8777-7777777777b1';
+  perform pg_temp.registrar('J120. snapshot do apontamento intacto', '200.00',
+    to_char(_b, 'FM999999990.00'));
+end;
+$mover_folha$;
 
 
 -- ---------------------------------------------------------------------------

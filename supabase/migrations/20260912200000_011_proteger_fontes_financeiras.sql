@@ -148,6 +148,23 @@
 -- O padrão das rodadas anteriores era acrescentar guarda. Aqui foi trocar uma
 -- condição por outra mais simples e mais forte, e o advisory lock saiu porque
 -- a nova pergunta não depende mais do estado de faturamento.
+--
+-- SÉTIMA RODADA DE REVISÃO
+--
+-- Dois, e o segundo é regressão introduzida por esta própria migration:
+--
+--  14. mover uma folha que JÁ TEM apontamento preservava os snapshots da
+--      configuração antiga enquanto a chave ia para a nova. Medido com
+--      contratos de 100.00 e 1000.00: o cliente caro foi faturado em 100.00.
+--      A seção 3c só congelava depois do faturamento, e isso era tarde —
+--      seção 3g, com a âncora correspondente na seção 1f;
+--  15. a guarda de itens da seção 1e roda um EXISTS por `invoice_id` para cada
+--      item, e não havia índice por essa coluna: cada fatura gerada custava
+--      uma varredura do histórico por item — seção 1g.
+--
+-- O 15 é o primeiro achado de DESEMPENHO desta série, e ele não aparecia em
+-- teste nenhum porque toda fixture aqui é pequena. Correção por índice, sem
+-- reescrever a guarda: o desenho simples continua certo.
 
 -- ---------------------------------------------------------------------------
 -- 1. Lastro faturado — absoluto, sem exceção de papel
@@ -441,6 +458,79 @@ DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_vinculo_direto
 CREATE TRIGGER trg_timesheet_entries_bloqueia_vinculo_direto
   BEFORE INSERT OR UPDATE OF invoice_id ON public.timesheet_entries
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_vinculo_fora_do_faturamento();
+
+-- ---------------------------------------------------------------------------
+-- 1f. Âncora: a folha pai não muda enquanto se deriva a partir dela
+--
+-- Metade da correção da seção 3g, e a que fica deste lado. Os valores de um
+-- apontamento são derivados da configuração da folha — operação, contrato,
+-- turno — e essa configuração precisa estar estável entre a leitura e o
+-- commit. A FK já toma `FOR KEY SHARE` na folha, mas esse modo protege a
+-- EXISTÊNCIA da linha, não as suas colunas: ele não conflita com o
+-- `FOR NO KEY UPDATE` de um `UPDATE timesheets SET operation_id`.
+--
+-- `FOR SHARE` é o modo certo, pelo mesmo motivo da seção 3b: conflita com
+-- qualquer alteração da folha, e NÃO conflita com outro `FOR SHARE` — vários
+-- apontamentos sendo gravados na mesma folha, que é o fluxo diário inteiro,
+-- continuam paralelos entre si.
+--
+-- O nome começa com `ancora` para ordenar ANTES de todas as guardas `bloqueia`
+-- e do `calculo_financeiro`: a folha é travada antes de qualquer leitura da
+-- sua configuração.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.ancorar_folha_do_apontamento()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  PERFORM 1 FROM public.timesheets t WHERE t.id = NEW.timesheet_id FOR SHARE;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.ancorar_folha_do_apontamento() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.ancorar_folha_do_apontamento() FROM anon;
+REVOKE ALL ON FUNCTION public.ancorar_folha_do_apontamento() FROM authenticated;
+REVOKE ALL ON FUNCTION public.ancorar_folha_do_apontamento() FROM service_role;
+
+COMMENT ON FUNCTION public.ancorar_folha_do_apontamento() IS
+  'Trava a folha pai com FOR SHARE enquanto o apontamento é gravado, para que a configuração usada na derivação não mude no meio. Não serializa apontamentos entre si.';
+
+DROP TRIGGER IF EXISTS trg_timesheet_entries_ancora_folha ON public.timesheet_entries;
+CREATE TRIGGER trg_timesheet_entries_ancora_folha
+  BEFORE INSERT OR UPDATE OF timesheet_id ON public.timesheet_entries
+  FOR EACH ROW EXECUTE FUNCTION public.ancorar_folha_do_apontamento();
+
+-- ---------------------------------------------------------------------------
+-- 1g. Índice para a busca por vínculo de fatura
+--
+-- Levantado em revisão: a guarda da seção 1e roda um EXISTS sobre
+-- `timesheet_entries.invoice_id` PARA CADA linha de `invoice_items`, e durante
+-- `gerar_fatura` a fatura ainda não tem vínculo nenhum — então o EXISTS
+-- precisa provar AUSÊNCIA. Sem índice por essa coluna, provar ausência é
+-- varrer a tabela inteira, uma vez por item gerado.
+--
+-- Auditado antes de criar: os índices existentes são por `id`, por
+-- `(timesheet_id, employee_id)`, por `timesheet_id`, por `employee_id` e por
+-- `(employee_id, operation_id, work_date)`. Nenhum começa por `invoice_id`,
+-- então não há redundância aqui.
+--
+-- PARCIAL, e de propósito. A guarda sempre procura `invoice_id = <uuid não
+-- nulo>`, e o histórico ainda não faturado tem `invoice_id` NULL — que num
+-- sistema em uso é a maior parte da tabela. O índice parcial indexa só o que
+-- se procura, fica pequeno, e o custo de escrita recai apenas sobre a
+-- transição para vinculado, que acontece uma vez por apontamento.
+-- ---------------------------------------------------------------------------
+
+CREATE INDEX IF NOT EXISTS idx_timesheet_entries_invoice
+  ON public.timesheet_entries (invoice_id)
+  WHERE invoice_id IS NOT NULL;
+
+COMMENT ON INDEX public.idx_timesheet_entries_invoice IS
+  'Sustenta o EXISTS por invoice_id das guardas de fatura fechada. Parcial porque a busca é sempre por um invoice_id não nulo e o histórico não faturado é NULL.';
 
 -- ---------------------------------------------------------------------------
 -- 1e. A FATURA fechada também congela — e a afirmação anterior era falsa
@@ -1067,6 +1157,112 @@ DROP TRIGGER IF EXISTS trg_timesheets_bloqueia_faturada ON public.timesheets;
 CREATE TRIGGER trg_timesheets_bloqueia_faturada
   BEFORE UPDATE OF work_date, operation_id, shift_id ON public.timesheets
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_alteracao_folha_faturada();
+
+-- ---------------------------------------------------------------------------
+-- 3g. Folha COM apontamento não muda de operação nem de turno
+--
+-- A seção 3c congela a folha depois do FATURAMENTO. Levantado em revisão e
+-- reproduzido, isso era tarde demais: mover uma folha ainda em rascunho já
+-- corrompe o lastro, porque os apontamentos guardam SNAPSHOTS.
+--
+-- Medido, com duas configurações propositalmente distantes — contrato de
+-- 100.00 e contrato de 1000.00:
+--
+--   ANTES:  billed 100.00 / daily_rate_snapshot 100.00   (config BARATA)
+--   ADMIN:  UPDATE timesheets SET operation_id = <OP CARA>, shift_id = ...
+--           -> MOVEU
+--   DEPOIS: billed 100.00 / daily_rate_snapshot 100.00   (config BARATA)
+--           entry.operation_id -> OP CARA
+--   gerar_fatura no cliente CARO -> FATUROU: total 100.00
+--
+-- Ou seja: `propagar_chave_da_diaria` leva a CHAVE desnormalizada para a
+-- operação nova, mas `derivar_valores_financeiros` trata `operation_id` e
+-- `work_date` como NÃO motrizes — de propósito, pela seção 010 — e preserva os
+-- snapshots. `gerar_fatura` então agrupa sob o cliente novo somando valores da
+-- configuração velha. O cliente CARO é cobrado 100.00 em vez de 1000.00; na
+-- direção inversa, cobra-se dez vezes a mais.
+--
+-- POR QUE RECUSAR E NÃO REDERIVAR
+--
+-- Recalcular todos os filhos ao mover a folha mudaria preço, hora extra,
+-- snapshots, cliente e agrupamento de faturamento — uma operação de negócio
+-- significativa, que não pode acontecer como efeito colateral de um UPDATE
+-- administrativo comum. Se "mover folha" for necessário um dia, será operação
+-- explícita, transacional e auditável. Fora do escopo desta migration.
+--
+-- `work_date` NÃO entra nesta proibição: ele não é motriz nem altera
+-- configuração, e editar a data de uma folha em rascunho segue legítimo. A
+-- seção 3c já o congela depois do faturamento.
+--
+-- ERRCODE 42501, e não 23514: isto não é par estruturalmente impossível — a
+-- combinação seria perfeitamente válida numa folha vazia. É proteção de
+-- contexto já utilizado, a mesma família das guardas de histórico.
+--
+-- CONCORRÊNCIA — a matriz de conflito, e por que a FK não bastava
+--
+-- Auditado, não presumido: ao inserir um apontamento, a FK
+-- `timesheet_entries.timesheet_id` toma `FOR KEY SHARE` na folha pai (visível
+-- como RowShareLock na tabela e `xmax` na linha). E `FOR KEY SHARE` NÃO
+-- conflita com `FOR NO KEY UPDATE`, que é o modo de um
+-- `UPDATE timesheets SET operation_id`. A FK protege a existência da folha,
+-- não a sua configuração — exatamente o mesmo padrão da seção 3b.
+--
+-- Reproduzido nas DUAS ordens antes da correção. As transações até esperavam
+-- ~4 s uma pela outra, por causa do `propagar_chave_da_diaria`, e mesmo assim
+-- o estado final era o proibido: folha na OP CARA com snapshot de 100.00.
+-- Serializar não bastava; era preciso RECUSAR.
+--
+--   lado do apontamento: `FOR SHARE` na folha pai (seção 1f). Conflita com
+--     qualquer alteração da linha e NÃO conflita com outro `FOR SHARE`, então
+--     vários apontamentos na mesma folha — o fluxo diário — não se serializam.
+--   lado do movimento: `FOR NO KEY UPDATE` ANTES do EXISTS. É o modo mínimo
+--     que conflita com aquele `FOR SHARE`, e é o mesmo que o UPDATE tomaria
+--     sozinho. `FOR UPDATE` também fecharia, mas conflitaria além do
+--     necessário, com o `FOR KEY SHARE` da própria FK.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_mover_folha_com_apontamento()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF NEW.operation_id IS NOT DISTINCT FROM OLD.operation_id
+     AND NEW.shift_id IS NOT DISTINCT FROM OLD.shift_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- Antes do EXISTS: um `BEFORE UPDATE` roda antes de o executor travar a
+  -- linha, e sem isto a verificação decidiria sobre estado velho.
+  PERFORM 1 FROM public.timesheets t WHERE t.id = OLD.id FOR NO KEY UPDATE;
+
+  IF EXISTS (
+    SELECT 1 FROM public.timesheet_entries te WHERE te.timesheet_id = OLD.id
+  ) THEN
+    RAISE EXCEPTION
+      'Folha com apontamento não pode mudar de operação nem de turno. Os valores já gravados vêm da configuração atual.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_mover_folha_com_apontamento() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_mover_folha_com_apontamento() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_mover_folha_com_apontamento() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_mover_folha_com_apontamento() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_mover_folha_com_apontamento() IS
+  'Impede mudar operation_id ou shift_id de folha que já tenha apontamento, faturado ou não, porque os apontamentos guardam snapshots da configuração antiga. Trava a folha antes de verificar. Sem exceção de papel. work_date fica de fora: não é motriz.';
+
+-- `bloqueia_faturada` < `bloqueia_fontes` < `bloqueia_mover_folha`: quando as
+-- três se aplicam, vence a mensagem mais específica, sobre lastro faturado.
+DROP TRIGGER IF EXISTS trg_timesheets_bloqueia_mover_folha ON public.timesheets;
+CREATE TRIGGER trg_timesheets_bloqueia_mover_folha
+  BEFORE UPDATE OF operation_id, shift_id ON public.timesheets
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_mover_folha_com_apontamento();
 
 -- ---------------------------------------------------------------------------
 -- 3d. O outro lado da relação: turno já usado não muda de operação
