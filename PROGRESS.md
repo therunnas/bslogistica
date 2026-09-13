@@ -596,23 +596,35 @@ está no `.gitignore`.
 prova**: num banco vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência
 de dado. Foi por isso que a prova do enforcement se apoiou em `profiles`.
 
-**Otimização da tela de login — parada em `git stash`.** Existe um
-`stash@{0}` chamado `login-optimization-before-pr23-round4`, com **4 arquivos,
-+64/-21**: `<main>` como landmark, logo dimensionada, fontes do Google
-auto-hospedadas por `next/font/google` e prioridade de LCP. Foi guardada para
-não entrar no PR #23 e **ainda não foi aplicada** — não tem branch nem PR. Ao
-retomar, aplicar em branch própria. SEO segue intencionalmente bloqueado
-(`noindex` + `robots`): é painel interno, não mexer.
+**Otimização da tela de login — guardada fora do Git.** Existe, **na máquina de
+desenvolvimento**, um stash local com a mensagem
+`login-optimization-before-pr23-round4`: `<main>` como landmark, logo
+dimensionada, fontes do Google auto-hospedadas por `next/font/google` e
+prioridade de LCP. Foi guardada para não entrar no PR #23 e **ainda não foi
+retomada** — não tem branch nem PR.
+
+**Esse estado não é versionado.** Não existe num clone novo e não se recupera
+pelo repositório; some com a máquina. O índice `stash@{N}` é **transitório** —
+qualquer `git stash` novo desloca a numeração —, então localizar pela **mensagem**,
+nunca pelo índice. Ao retomar, aplicar em branch própria. SEO segue
+intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer.
 
 **Pendências antigas ainda abertas:**
 
 - decidir sobre Vercel Preview Deployments (P3);
 - `auth.sms.twilio.enabled = true` no remoto com `external.phone = false` —
   conferir origem numa passagem pelo Dashboard;
-- `docs/ESTADO_DO_PROJETO.md` está obsoleto (fotografia de 04/09/2026).
-  `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` **deixou de ser
-  obsoleto**: já registra a resolução pelo trigger de 09/09 e a mudança de
-  abordagem trazida pela `010`.
+- `docs/ESTADO_DO_PROJETO.md` está obsoleto (fotografia de 04/09/2026);
+- `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` continua
+  **OBSOLETO/HISTÓRICO**. A dívida que ele descreve foi **fechada**: pelo
+  trigger de 09/09 e, em definitivo, pela migration `011`. O cabeçalho do
+  arquivo registra a resolução, mas o **corpo não foi atualizado** e ainda
+  descreve o mundo anterior — a isenção de `service_role` no vínculo, uma
+  contagem de usuários que não vale mais, e uma "Direção da correção" que a
+  `011` substituiu por outro desenho. **Não usar esse arquivo como
+  especificação para implementação futura.** A fonte de verdade do
+  comportamento atual é a seção 9 deste arquivo, mais `docs/SEGURANCA.md` e
+  `docs/ARQUITETURA.md`. Reescrevê-lo é tarefa própria, não dívida nova.
 
 ## 11. Não fazer
 
