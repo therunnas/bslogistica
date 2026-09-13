@@ -64,6 +64,15 @@
 -- que já carregue incoerência herdada faz os três acusarem — e é exatamente o
 -- que se quer que aconteça.
 --
+-- QUINTA RODADA. Os casos J93..J107 vieram da revisão seguinte, e os três
+-- achados são consequência das correções anteriores. Contra o schema anterior:
+--
+--   MEDEM O BURACO e falham: J93..J96, J98..J104, J106, J107
+--   PASSAM ANTES E DEPOIS:   J97, J105, J58c, J58d, J58e — o contexto de
+--                            `gerar_fatura` vinculando, a alocação com par
+--                            válido, e as três invariantes semânticas que já
+--                            eram verdadeiras por construção da RPC
+--
 -- A CORRIDA NÃO CABE AQUI. J82, J91 e J92 varrem o estado final, mas uma suíte
 -- roda numa transação só e não consegue exercitar duas sessões. A prova da
 -- corrida entre criar folha e mover turno está em
@@ -1307,6 +1316,241 @@ $invariante_cliente$;
 
 
 -- ---------------------------------------------------------------------------
+-- J93..J97. A ENTRADA do vínculo
+--
+-- Fechar `X -> NULL` e `X -> Y` sem fechar `NULL -> X` deixava o admin criar
+-- vínculo arbitrário — e as guardas novas tornavam o erro irreversível.
+--
+-- A fronteira é `current_user = 'postgres'`, que é o contexto de
+-- `gerar_fatura` por ela ser SECURITY DEFINER de `postgres`. J97 mede isso em
+-- vez de presumir.
+-- ---------------------------------------------------------------------------
+
+do $vinculo_entrada$
+declare
+  _e text;
+  _n integer;
+begin
+  -- Apontamento livre da OP-B para servir de alvo.
+  execute 'reset role';
+  insert into public.timesheet_entries
+    (id, timesheet_id, employee_id, operation_id, work_date, status, check_in, check_out, break_minutes)
+  values ('77777777-7777-4777-8777-777777777791', '66666666-6666-4666-8666-6666666666b1',
+          '55555555-5555-4555-8555-5555555555d1', '44444444-4444-4444-8444-4444444444b1',
+          current_date, 'present', '06:00:00', '15:00:00', 60);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999991'
+     where id = '77777777-7777-4777-8777-777777777791';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'VINCULOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J93. ADMIN cria vínculo direto (NULL -> X)', 'recusou 42501', _e);
+
+  -- J95. Nem criando o apontamento já vinculado.
+  begin
+    insert into public.timesheet_entries
+      (id, timesheet_id, employee_id, operation_id, work_date, status, invoice_id)
+    values ('77777777-7777-4777-8777-777777777792', '66666666-6666-4666-8666-6666666666b1',
+            '55555555-5555-4555-8555-5555555555c1', '44444444-4444-4444-8444-4444444444b1',
+            current_date, 'present', '99999999-9999-4999-8999-999999999991');
+    _e := 'CRIOU já vinculado';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J95. ADMIN insere apontamento já vinculado', 'recusou 42501', _e);
+
+  -- J94. `service_role` perde o acesso de propósito: a aplicação não a usa, e
+  -- ela chegaria pela mesma API que se está fechando.
+  execute 'reset role';
+  execute 'set local role service_role';
+  begin
+    update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999991'
+     where id = '77777777-7777-4777-8777-777777777791';
+    _e := 'VINCULOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J94. service_role cria vínculo direto', 'recusou 42501', _e);
+
+  -- J96. operacional continua barrado, como já era.
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999991'
+     where id = '77777777-7777-4777-8777-777777777791';
+    _e := 'VINCULOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J96. operacional cria vínculo direto', 'recusou 42501', _e);
+
+  -- J97. A fronteira é `current_user`, não papel. Como `postgres` — o mesmo
+  -- contexto de `gerar_fatura` — o vínculo passa. Sem este caso a proteção
+  -- poderia estar simplesmente proibindo tudo, e o faturamento quebraria.
+  execute 'reset role';
+  begin
+    update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999991'
+     where id = '77777777-7777-4777-8777-777777777791';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J97. postgres (contexto de gerar_fatura) vincula', '1 linhas', _e);
+end;
+$vinculo_entrada$;
+
+
+-- ---------------------------------------------------------------------------
+-- J98..J104. FATURA FECHADA — o resumo congela junto com o lastro
+--
+-- Este bloco existe por um erro de método registrado no PR: a migration
+-- AFIRMAVA que a fatura era imutável, e não era. Lastro congelado com resumo
+-- mutável é pior que nenhum dos dois, porque parece protegido.
+--
+-- "Fechada" = possui ao menos um apontamento vinculado. A fatura nasce
+-- `'closed'` em `gerar_fatura`, então `status` não serve para distinguir
+-- construção de histórico; o vínculo, que é o último passo, serve.
+-- ---------------------------------------------------------------------------
+
+do $fatura_fechada$
+declare
+  _e text;
+  _n integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  begin
+    update public.invoices set total_amount = 1
+     where id = '99999999-9999-4999-8999-999999999991';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J98. ADMIN altera total_amount de fatura fechada', 'recusou 42501', _e);
+
+  begin
+    update public.invoices set client_id = '33333333-3333-4333-8333-33333333333b',
+                               period_start = current_date - 90,
+                               period_end = current_date - 80
+     where id = '99999999-9999-4999-8999-999999999991';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J99. ADMIN altera cliente e período de fatura fechada', 'recusou 42501', _e);
+
+  begin
+    update public.invoices set status = 'draft'::public.invoice_status, notes = 'reescrito'
+     where id = '99999999-9999-4999-8999-999999999991';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J100. ADMIN altera status e notes de fatura fechada', 'recusou 42501', _e);
+
+  begin
+    update public.invoice_items set amount = 1, description = 'reescrito'
+     where invoice_id = '99999999-9999-4999-8999-999999999991';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J101. ADMIN altera invoice_items de fatura fechada', 'recusou 42501', _e);
+
+  begin
+    insert into public.invoice_items (invoice_id, operation_id, description, amount)
+    values ('99999999-9999-4999-8999-999999999991',
+            '44444444-4444-4444-8444-4444444444b1', 'item injetado', 99999);
+    _e := 'INSERIU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J102. ADMIN insere invoice_item em fatura fechada', 'recusou 42501', _e);
+
+  begin
+    delete from public.invoice_items
+     where invoice_id = '99999999-9999-4999-8999-999999999991';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J103. ADMIN apaga invoice_item de fatura fechada', 'recusou 42501', _e);
+
+  -- J104. E não é questão de papel: `postgres`, que é quem PODE vincular,
+  -- não pode reescrever o resumo depois de fechado.
+  execute 'reset role';
+  begin
+    update public.invoices set total_amount = 1
+     where id = '99999999-9999-4999-8999-999999999991';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J104. postgres altera fatura fechada', 'recusou 42501', _e);
+end;
+$fatura_fechada$;
+
+
+-- ---------------------------------------------------------------------------
+-- J105..J107. PAR DA ALOCAÇÃO
+--
+-- Simétrico de J89/J90: lá se impede mover o turno, aqui se impede criar a
+-- alocação já torta.
+-- ---------------------------------------------------------------------------
+
+do $par_alocacao$
+declare
+  _e text;
+  _n integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- J105. Par VÁLIDO: alocação na OP-F com turno da OP-F.
+  -- O turno é o F5, e não o F6: o F6 foi movido para a OP-B em J88, então a
+  -- essa altura ele já NÃO pertence mais à OP-F. O F5 ficou porque J89 recusou
+  -- movê-lo.
+  begin
+    insert into public.operation_team (operation_id, shift_id, employee_id)
+    values ('44444444-4444-4444-8444-4444444444f1',
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5',
+            '55555555-5555-4555-8555-5555555555a1');
+    _e := 'criou';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J105. operacional cria alocação com par VÁLIDO', 'criou', _e);
+
+  -- J106. Par INVÁLIDO no INSERT.
+  begin
+    insert into public.operation_team (operation_id, shift_id, employee_id)
+    values ('44444444-4444-4444-8444-4444444444b1',
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7',
+            '55555555-5555-4555-8555-5555555555d1');
+    _e := 'CRIOU par inválido';
+  exception when check_violation then _e := 'recusou 23514';
+            when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J106. operacional cria alocação com par INVÁLIDO', 'recusou 23514', _e);
+
+  -- J107. E o UPDATE que produziria par inválido, também para o ADMIN.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  -- `get diagnostics` é obrigatório aqui: sem ele, um UPDATE que não encontra
+  -- linha alguma passaria por sucesso e o caso mediria nada. Foi o que
+  -- aconteceu na primeira escrita deste teste.
+  begin
+    update public.operation_team
+       set shift_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
+     where operation_id = '44444444-4444-4444-8444-4444444444f1'
+       and employee_id  = '55555555-5555-4555-8555-5555555555a1';
+    get diagnostics _n = row_count;
+    _e := case when _n > 0 then 'ALTEROU para par inválido'
+               else 'ALVO INEXISTENTE — caso não mediu nada' end;
+  exception when check_violation then _e := 'recusou 23514';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J107. ADMIN faz UPDATE que produziria alocação inválida',
+    'recusou 23514', _e);
+end;
+$par_alocacao$;
+
+
+-- ---------------------------------------------------------------------------
 -- J58. O caminho legítimo continua aberto
 --
 -- Todo o resto deste arquivo mede recusa. Este caso mede o oposto, e é o que
@@ -1319,6 +1563,7 @@ declare
   _e          text;
   _nova       public.invoices;
   _vinculados integer;
+  _n          integer;
 begin
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object(
@@ -1338,6 +1583,35 @@ begin
   perform pg_temp.registrar('J58b. a nova fatura recebeu lastro',
     'pelo menos 1', case when _vinculados >= 1 then 'pelo menos 1'
                          else _vinculados::text end);
+
+  -- J58c..J58e. As invariantes semânticas do vínculo. Elas NÃO viraram CHECK
+  -- na migration de propósito: com a entrada restrita a `gerar_fatura`, já são
+  -- verdadeiras por construção dela — o passo 6 filtra por `o.client_id` e por
+  -- `t.work_date BETWEEN`, e os passos 7 a 9 derivam totais e itens dos mesmos
+  -- ids. Reescrevê-las como constraint duplicaria a regra em dois lugares que
+  -- podem divergir. Ficam aqui, como medição.
+  select count(*) into _n
+    from public.timesheet_entries te
+    join public.timesheets t ON t.id = te.timesheet_id
+    join public.operations  o ON o.id = t.operation_id
+   where te.invoice_id = _nova.id
+     and o.client_id is distinct from _nova.client_id;
+  perform pg_temp.registrar('J58c. todo lastro da fatura é do cliente dela', '0', _n::text);
+
+  select count(*) into _n
+    from public.timesheet_entries te
+    join public.timesheets t ON t.id = te.timesheet_id
+   where te.invoice_id = _nova.id
+     and t.work_date not between _nova.period_start and _nova.period_end;
+  perform pg_temp.registrar('J58d. todo lastro cai dentro do período', '0', _n::text);
+
+  select case
+           when coalesce(sum(ii.amount), 0) = _nova.total_amount then 'fecha'
+           else coalesce(sum(ii.amount), 0)::text || ' vs ' || _nova.total_amount::text
+         end
+    into _e
+    from public.invoice_items ii where ii.invoice_id = _nova.id;
+  perform pg_temp.registrar('J58e. soma dos itens fecha com o total da fatura', 'fecha', _e);
 end;
 $faturamento$;
 

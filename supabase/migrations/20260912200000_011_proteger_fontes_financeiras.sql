@@ -114,6 +114,24 @@
 -- O padrão desta rodada é outro: não são colunas esquecidas, são consequências
 -- de segunda ordem — quem mais lê o dado, quem mais referencia a linha, e o
 -- que acontece quando duas transações decidem ao mesmo tempo.
+--
+-- QUINTA RODADA DE REVISÃO
+--
+-- Mais três, e os três são consequência das correções anteriores:
+--
+--  10. fechar `X -> NULL` e `X -> Y` sem fechar `NULL -> X` deixava o admin
+--      criar vínculo arbitrário pelo PostgREST — e as guardas novas tornavam
+--      esse vínculo errado IRREVERSÍVEL. Total de 400.00 contra lastro de
+--      600.00, medido — seção 1d;
+--  11. este arquivo AFIRMAVA que "a fatura é imutável" para justificar o
+--      congelamento do lastro, e a afirmação era FALSA: admin alterava fatura
+--      e itens à vontade. O lastro congelado e o resumo mutável é pior que
+--      nenhum dos dois, porque parece protegido — seção 1e;
+--  12. `operation_team` foi fechada pelo lado de mover o turno e não pelo de
+--      criar a alocação — seção 3f.
+--
+-- A lição desta rodada é sobre método, não sobre SQL: eu afirmei imutabilidade
+-- sem verificar, e desenhei uma saída sem olhar a entrada correspondente.
 
 -- ---------------------------------------------------------------------------
 -- 1. Lastro faturado — absoluto, sem exceção de papel
@@ -317,6 +335,236 @@ DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_edicao_faturada
 CREATE TRIGGER trg_timesheet_entries_bloqueia_edicao_faturada
   BEFORE UPDATE ON public.timesheet_entries
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_edicao_faturada();
+
+-- ---------------------------------------------------------------------------
+-- 1d. A ENTRADA do vínculo, que as seções 1b e 1c deixaram aberta
+--
+-- As guardas acima fecham `X -> NULL` e `X -> Y`. Não fechavam `NULL -> X`, e
+-- `protect_timesheet_invoice_link` isenta admin. Levantado em revisão e
+-- reproduzido em banco local, sessão de admin em aal2, direto no PostgREST:
+--
+--   UPDATE timesheet_entries SET invoice_id = <fatura existente>
+--     -> VINCULOU
+--     -> total da fatura 400.00  x  soma do lastro vinculado 600.00
+--
+-- Nenhum `invoice_item` foi criado, nenhum total ajustado. E o agravante é que
+-- a seção 1b torna esse vínculo errado IRREVERSÍVEL. Fechar a saída sem fechar
+-- a entrada foi um erro meu de desenho, não um caso de borda.
+--
+-- ONDE FICA A FRONTEIRA, E O QUE ELA NÃO PROMETE
+--
+-- `gerar_fatura` é `SECURITY DEFINER` e pertence a `postgres`, então dentro
+-- dela `current_user` é `postgres`. Isso foi MEDIDO, não presumido: um trigger
+-- espião instalado durante a chamada registrou `postgres`.
+--
+-- É essa a única distinção confiável disponível aqui, e ela é deliberadamente
+-- MAIS restrita que a de `protect_timesheet_invoice_link`:
+--
+--   authenticated (inclusive admin)  -> recusado
+--   service_role                     -> recusado
+--   postgres                         -> permitido
+--
+-- `service_role` perde o acesso de propósito. A aplicação não a usa, e ela
+-- chegaria pela mesma API que se está fechando.
+--
+-- O QUE ISTO NÃO PROTEGE, dito sem rodeio: uma sessão `postgres` direta — o
+-- SQL Editor, por exemplo — continua podendo vincular à mão, e um superusuário
+-- pode desabilitar triggers ou alterar o schema de qualquer jeito. Não existe
+-- defesa de banco contra o dono do banco. A meta aqui é outra e é alcançável:
+-- nenhum caminho normal da aplicação ou da API cria vínculo arbitrário.
+--
+-- Não se usa GUC nem `set_config` como segredo: um caller que alcança o
+-- PostgREST também alcança `set_config`, e a "proteção" seria teatro.
+--
+-- VALIDAÇÃO SEMÂNTICA — por que ela NÃO vira regra nova aqui
+--
+-- Com a entrada restrita a `gerar_fatura`, as invariantes que se poderia
+-- querer checar já são verdadeiras por construção dela: o passo 6 seleciona
+-- por `o.client_id = _client_id` e `t.work_date BETWEEN _period_start AND
+-- _period_end`, e os passos 7 a 9 derivam totais e itens dos MESMOS
+-- `_ids`. Reescrever essas condições como CHECK duplicaria a regra em dois
+-- lugares que podem divergir. Ficam como TESTE, não como código.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_vinculo_fora_do_faturamento()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  _vinculando boolean;
+BEGIN
+  _vinculando :=
+    CASE
+      WHEN TG_OP = 'INSERT' THEN NEW.invoice_id IS NOT NULL
+      ELSE OLD.invoice_id IS NULL AND NEW.invoice_id IS NOT NULL
+    END;
+
+  -- Sem exceção para admin nem para `service_role`, de propósito.
+  IF _vinculando AND current_user <> 'postgres' THEN
+    RAISE EXCEPTION
+      'Vínculo de fatura só pode ser criado pelo faturamento. Use gerar_fatura.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_vinculo_fora_do_faturamento() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_vinculo_fora_do_faturamento() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_vinculo_fora_do_faturamento() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_vinculo_fora_do_faturamento() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_vinculo_fora_do_faturamento() IS
+  'Restringe a criação do vínculo entry->fatura ao contexto de gerar_fatura, medido por current_user = postgres. Recusa authenticated (admin incluído) e service_role. Não protege contra sessão postgres direta nem contra superusuário: a fronteira é a API da aplicação.';
+
+DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_vinculo_direto
+  ON public.timesheet_entries;
+CREATE TRIGGER trg_timesheet_entries_bloqueia_vinculo_direto
+  BEFORE INSERT OR UPDATE OF invoice_id ON public.timesheet_entries
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_vinculo_fora_do_faturamento();
+
+-- ---------------------------------------------------------------------------
+-- 1e. A FATURA fechada também congela — e a afirmação anterior era falsa
+--
+-- Este bloco existe por um erro meu de método, e vale registrá-lo: as seções
+-- acima AFIRMAM que "a fatura é imutável" para justificar o congelamento do
+-- lastro. Eu nunca verifiquei. `invoices_write_admin` e
+-- `invoice_items_write_admin` são `ALL`, e não havia trigger algum nas duas
+-- tabelas — só o de `updated_at`. Reproduzido em banco local, admin em aal2:
+--
+--   UPDATE invoices SET total_amount = 1, period_start = ...  -> ALTEROU
+--   UPDATE invoice_items SET amount = 1, description = ...    -> ALTEROU 2
+--   INSERT INTO invoice_items (...)                           -> INSERIU
+--   DELETE FROM invoice_items WHERE invoice_id = ...          -> APAGOU 3
+--
+-- O lastro estava congelado e a fatura que o resume, não. A assimetria é pior
+-- que nenhuma das duas: dá a impressão de histórico protegido.
+--
+-- QUANDO A FATURA FECHA
+--
+-- Foi preciso ler `gerar_fatura` inteira antes de escolher a condição, porque
+-- uma proteção mal colocada quebraria a própria construção. A ordem real é:
+--
+--   5. advisory lock por cliente
+--   6. SELECT dos elegíveis, com `te.invoice_id IS NULL`, FOR UPDATE
+--   7. INSERT invoices           <- já nasce com status 'closed'
+--   8. INSERT invoice_items      (diárias)
+--   9. INSERT invoice_items      (horas extras, condicional)
+--  10. UPDATE timesheet_entries SET invoice_id  <- o vínculo é o ÚLTIMO passo
+--
+-- Duas consequências decidem o desenho. A fatura NASCE `'closed'`, então
+-- `status` não distingue construção de histórico — usá-lo travaria a fatura
+-- antes mesmo de os itens existirem. E o vínculo vem por último, então
+-- "possui ao menos uma entry vinculada" é falso durante os passos 7 a 9 e
+-- verdadeiro a partir do commit. É exatamente a fronteira que se quer, e ela
+-- não atravessa a construção.
+--
+-- CONCORRÊNCIA: por que não precisa de lock novo
+--
+-- Tudo isso acontece em UMA transação. Enquanto ela não commita, a fatura não
+-- existe para mais ninguém — não há janela em que a fatura esteja visível e
+-- ainda não congelada. Não se acrescenta lock aqui, e portanto nenhuma ordem
+-- nova entra no grafo de deadlock.
+--
+-- Como em 1c, a comparação é sobre a LINHA, não sobre uma lista de colunas.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_edicao_fatura_fechada()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  _antes  jsonb;
+  _depois jsonb;
+  _campos text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.timesheet_entries te WHERE te.invoice_id = OLD.id
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  _antes  := to_jsonb(OLD) - 'updated_at';
+  _depois := to_jsonb(NEW) - 'updated_at';
+
+  IF _depois IS DISTINCT FROM _antes THEN
+    SELECT string_agg(k, ', ' ORDER BY k)
+      INTO _campos
+      FROM jsonb_object_keys(_antes) AS k
+     WHERE _antes -> k IS DISTINCT FROM _depois -> k;
+
+    RAISE EXCEPTION
+      'Fatura com lastro vinculado é imutável. Alterações recusadas em: %.',
+      _campos
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.bloquear_itens_fatura_fechada()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  _faturas uuid[];
+BEGIN
+  -- No UPDATE entram as DUAS faturas: a de origem e a de destino. Mover um
+  -- item para fora de uma fatura fechada é tão grave quanto editá-lo.
+  _faturas :=
+    CASE TG_OP
+      WHEN 'DELETE' THEN ARRAY[OLD.invoice_id]
+      WHEN 'INSERT' THEN ARRAY[NEW.invoice_id]
+      ELSE ARRAY[OLD.invoice_id, NEW.invoice_id]
+    END;
+
+  IF EXISTS (
+    SELECT 1
+      FROM public.timesheet_entries te
+     WHERE te.invoice_id = ANY(_faturas)
+  ) THEN
+    RAISE EXCEPTION
+      'Itens de fatura com lastro vinculado são imutáveis.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN CASE TG_OP WHEN 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_edicao_fatura_fechada() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_edicao_fatura_fechada() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_edicao_fatura_fechada() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_edicao_fatura_fechada() FROM service_role;
+
+REVOKE ALL ON FUNCTION public.bloquear_itens_fatura_fechada() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_itens_fatura_fechada() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_itens_fatura_fechada() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_itens_fatura_fechada() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_edicao_fatura_fechada() IS
+  'Congela a linha inteira de uma fatura que já tenha apontamento vinculado, comparando to_jsonb e ignorando apenas updated_at. Não atinge a construção em gerar_fatura, onde o vínculo é o último passo. Sem exceção de papel.';
+
+COMMENT ON FUNCTION public.bloquear_itens_fatura_fechada() IS
+  'Impede INSERT, UPDATE e DELETE de itens de fatura já com lastro vinculado, incluindo mover um item de uma fatura fechada para outra. Sem exceção de papel.';
+
+DROP TRIGGER IF EXISTS trg_invoices_bloqueia_edicao_fechada ON public.invoices;
+CREATE TRIGGER trg_invoices_bloqueia_edicao_fechada
+  BEFORE UPDATE ON public.invoices
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_edicao_fatura_fechada();
+
+DROP TRIGGER IF EXISTS trg_invoice_items_bloqueia_fechada ON public.invoice_items;
+CREATE TRIGGER trg_invoice_items_bloqueia_fechada
+  BEFORE INSERT OR UPDATE OR DELETE ON public.invoice_items
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_itens_fatura_fechada();
 
 -- ---------------------------------------------------------------------------
 -- 2. Turno com histórico faturado — o caminho que a cascata não alcança
@@ -852,7 +1100,10 @@ COMMENT ON FUNCTION public.bloquear_mover_turno_referenciado() IS
 --   ADMIN: UPDATE operations SET client_id = <Cliente B>  ->  ALTEROU
 --   operação -> Cliente B   |   fatura -> Cliente A   ->  DIVERGE
 --
--- A fatura é imutável e guarda o `invoices.client_id` original. Mas o extrato
+-- A fatura guarda o `invoices.client_id` original, e a seção 1e a torna
+-- imutável depois de fechada — quando escrevi este comentário pela primeira
+-- vez eu AFIRMEI essa imutabilidade sem ter verificado, e ela era falsa. Mas o
+-- extrato
 -- resolve o cliente pelo `operations.client_id` de HOJE
 -- (`src/lib/ledger.ts`), então o mesmo apontamento passa a aparecer sob o
 -- cliente B no relatório e sob o cliente A na fatura que o cobra.
@@ -937,6 +1188,77 @@ DROP TRIGGER IF EXISTS trg_shifts_bloqueia_mover_referenciado ON public.shifts;
 CREATE TRIGGER trg_shifts_bloqueia_mover_referenciado
   BEFORE UPDATE OF operation_id ON public.shifts
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_mover_turno_referenciado();
+
+-- ---------------------------------------------------------------------------
+-- 3f. O par da ALOCAÇÃO, pelo lado que faltava
+--
+-- A seção 3d fechou "mover turno já alocado". Faltava o simétrico: `criar`
+-- alocação incompatível. `operation_team_staff` é `ALL`, não há constraint
+-- composta, e a tabela guarda `operation_id` e `shift_id` separados.
+-- Levantado em revisão e reproduzido em banco local, `operacional` em aal2:
+--
+--   INSERT operation_team (operation_id = OP-A, shift_id = turno da OP-B)
+--     -> CRIOU par incompatível
+--
+-- O estrago é o mesmo da seção 3d, alcançado pela outra ponta: a tela de
+-- apontamento exige que os dois campos batam, o colaborador some de todo turno
+-- selecionável, e o índice de alocação exclusiva impede realocá-lo.
+--
+-- É a mesma invariante estrutural da seção 3b, na tabela vizinha, então segue
+-- as mesmas três decisões, pelas mesmas razões: ERRCODE 23514 e não 42501,
+-- porque nenhum papel pode; `shift_id` NULL segue aceito, porque a coluna é
+-- anulável no modelo e alocação sem turno é alocação na operação inteira; e o
+-- turno é lido com `FOR SHARE` do próprio SELECT travado, para não repetir a
+-- corrida que a seção 3b teve de corrigir depois — `FOR SHARE` aqui conflita
+-- com o `FOR NO KEY UPDATE` que a seção 3d toma, e é isso que serializa criar
+-- alocação contra mover turno.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.validar_par_alocacao()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  _operacao_do_turno uuid;
+BEGIN
+  IF NEW.shift_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT s.operation_id INTO _operacao_do_turno
+    FROM public.shifts s
+   WHERE s.id = NEW.shift_id
+     FOR SHARE;
+
+  -- Turno inexistente é assunto da FK, que recusa com 23503.
+  IF NOT FOUND THEN
+    RETURN NEW;
+  END IF;
+
+  IF _operacao_do_turno IS DISTINCT FROM NEW.operation_id THEN
+    RAISE EXCEPTION
+      'Turno informado não pertence à operação da alocação.'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.validar_par_alocacao() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.validar_par_alocacao() FROM anon;
+REVOKE ALL ON FUNCTION public.validar_par_alocacao() FROM authenticated;
+REVOKE ALL ON FUNCTION public.validar_par_alocacao() FROM service_role;
+
+COMMENT ON FUNCTION public.validar_par_alocacao() IS
+  'Exige que operation_team.shift_id pertença a operation_team.operation_id. Trava o turno com FOR SHARE para serializar contra o movimento do turno. Invariante estrutural: vale para todos os papéis.';
+
+DROP TRIGGER IF EXISTS trg_operation_team_valida_par ON public.operation_team;
+CREATE TRIGGER trg_operation_team_valida_par
+  BEFORE INSERT OR UPDATE OF operation_id, shift_id ON public.operation_team
+  FOR EACH ROW EXECUTE FUNCTION public.validar_par_alocacao();
 
 -- ---------------------------------------------------------------------------
 -- 4. Policies por comando em operations e shifts
