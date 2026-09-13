@@ -1802,6 +1802,110 @@ $mover_folha$;
 
 
 -- ---------------------------------------------------------------------------
+-- J121..J126. CONTRATO JÁ USADO, e composições adversariais
+--
+-- O contrato é a origem da TAXA como o turno é a origem da JORNADA. Este bloco
+-- não veio de revisão: veio da auditoria preventiva que percorreu o grafo de
+-- FKs procurando a mesma forma da guarda de turno, e achou
+-- `operations.contract_id ON DELETE SET NULL`.
+--
+-- J125 e J126 medem COMPOSIÇÃO, não regras novas: o formato real de gravação
+-- da tela (objeto inteiro, várias colunas por instrução) e um turno
+-- referenciado por mais de uma folha.
+-- ---------------------------------------------------------------------------
+
+do $contrato$
+declare
+  _e text;
+  _n integer;
+  _c uuid;
+begin
+  -- Contrato NOVO, sem apontamento nenhum derivado dele.
+  execute 'reset role';
+  insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min)
+  values ('33333333-3333-4333-8333-333333333336', '33333333-3333-4333-8333-333333333333',
+          'Contrato sem uso', 300, 8, 1.5, 10);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- J121. Sem uso: continua excluível. Sem este caso a guarda poderia estar
+  -- proibindo todo DELETE de contrato.
+  begin
+    delete from public.contracts where id = '33333333-3333-4333-8333-333333333336';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J121. admin apaga contrato SEM apontamento', '1 linhas', _e);
+
+  -- J122. O contrato da OP-A tem apontamento faturado derivado dele.
+  begin
+    delete from public.contracts where id = '33333333-3333-4333-8333-333333333334';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J122. admin apaga contrato COM apontamento', 'recusou 42501', _e);
+
+  -- J123. E a mensagem precisa dizer o que fazer no lugar.
+  begin
+    delete from public.contracts where id = '33333333-3333-4333-8333-333333333334';
+    _e := 'não recusou';
+  exception when insufficient_privilege then
+    _e := case when sqlerrm like '%Inative-o%' then 'orienta inativar'
+               else 'mensagem sem orientação: ' || sqlerrm end;
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J123. a recusa orienta inativação', 'orienta inativar', _e);
+
+  -- J124. E a origem da taxa continua ligada à operação: sem a guarda, o
+  -- ON DELETE SET NULL teria deixado NULL aqui e a operação cairia no
+  -- fallback de agreed_amount em silêncio.
+  execute 'reset role';
+  select contract_id into _c from public.operations
+   where id = '44444444-4444-4444-8444-4444444444a1';
+  perform pg_temp.registrar('J124. operations.contract_id intacto',
+    '33333333-3333-4333-8333-333333333334', coalesce(_c::text, 'NULL'));
+
+  -- J125. Composição: a tela grava o objeto INTEIRO. Numa entry faturada, um
+  -- UPDATE que muda só `notes` e reenvia o resto igual continua recusado —
+  -- é a comparação da linha inteira funcionando sob o payload real.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    update public.timesheet_entries
+       set notes = 'observação nova', status = 'present',
+           check_in = '06:00:00', check_out = '15:00:00', break_minutes = 60
+     where id = '77777777-7777-4777-8777-7777777777a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J125. UPDATE misto em entry faturada, só notes muda',
+    'recusou 42501', _e);
+
+  -- J126. Composição: turno referenciado por MAIS DE UMA folha. A guarda usa
+  -- EXISTS, então uma folha basta — mas o caso fixa que várias não criam
+  -- caminho alternativo.
+  execute 'reset role';
+  insert into public.timesheets (id, operation_id, shift_id, work_date) values
+    ('66666666-6666-4666-8666-66666666f9a1', '44444444-4444-4444-8444-4444444444a1',
+     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', current_date - 91),
+    ('66666666-6666-4666-8666-66666666f9a2', '44444444-4444-4444-8444-4444444444a1',
+     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', current_date - 92);
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    delete from public.shifts where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+    _e := 'APAGOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J126. turno usado por VÁRIAS folhas não é apagável',
+    'recusou 42501', _e);
+end;
+$contrato$;
+
+
+-- ---------------------------------------------------------------------------
 -- J58. O caminho legítimo continua aberto
 --
 -- Todo o resto deste arquivo mede recusa. Este caso mede o oposto, e é o que

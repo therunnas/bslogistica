@@ -165,6 +165,28 @@
 -- O 15 é o primeiro achado de DESEMPENHO desta série, e ele não aparecia em
 -- teste nenhum porque toda fixture aqui é pequena. Correção por índice, sem
 -- reescrever a guarda: o desenho simples continua certo.
+--
+-- OITAVA RODADA, E AUDITORIA PREVENTIVA DE FECHAMENTO
+--
+-- Da revisão, mais índices ausentes — `timesheets.shift_id` e
+-- `operation_team.shift_id`. Ao inventariar TODAS as queries desta migration
+-- para corrigi-los, apareceu um terceiro que a revisão não apontou,
+-- `invoices.client_id`, e um vetor que nenhuma revisão apontou:
+--
+--  16. `DELETE` de CONTRATO com histórico de apontamento era aceito, e
+--      `operations.contract_id ON DELETE SET NULL` fazia a operação cair no
+--      fallback de `agreed_amount` em silêncio — a mesma forma da seção 2, na
+--      outra fonte do cálculo: o turno é a origem da jornada, o contrato é a
+--      origem da taxa — seção 2c.
+--
+-- Sete outros vetores foram testados e NÃO procederam: DELETE de colaborador
+-- com apontamento faturado (já recusado), UPDATE multi-coluna misturando
+-- protegida e livre (reenvio igual aceito, entry faturada recusada), turno
+-- usado por várias folhas, `invoice_items.operation_id ON DELETE SET NULL`
+-- (inalcançável, porque o DELETE da operação já é recusado antes), DELETE de
+-- fatura, DELETE de cliente faturado, e alteração de `contracts.daily_rate` ou
+-- de `operations.contract_id` com apontamentos existentes — estes dois são a
+-- semântica de snapshot funcionando como projetado, não defeito.
 
 -- ---------------------------------------------------------------------------
 -- 1. Lastro faturado — absoluto, sem exceção de papel
@@ -533,6 +555,64 @@ COMMENT ON INDEX public.idx_timesheet_entries_invoice IS
   'Sustenta o EXISTS por invoice_id das guardas de fatura fechada. Parcial porque a busca é sempre por um invoice_id não nulo e o histórico não faturado é NULL.';
 
 -- ---------------------------------------------------------------------------
+-- 1h. Índices para as demais buscas introduzidas por esta migration
+--
+-- Mesmo problema da seção 1g, em outras três colunas. Levantado em revisão
+-- para as duas primeiras; a terceira apareceu ao inventariar TODAS as queries
+-- desta migration, e não estava no achado.
+--
+-- Cada índice abaixo corresponde a uma consulta concreta escrita aqui, e
+-- nenhum é especulativo:
+--
+--   timesheets.shift_id       -> `bloquear_delete_turno_usado` e
+--                                `bloquear_mover_turno_referenciado`
+--   operation_team.shift_id   -> `bloquear_mover_turno_referenciado`
+--   invoices.client_id        -> `bloquear_delete_cliente_faturado`
+--
+-- Auditado antes de criar: em `timesheets` e `operation_team` os únicos
+-- índices compostos que contêm `shift_id` começam por `operation_id`
+-- (`timesheets_operation_id_shift_id_work_date_key`,
+-- `operation_team_operation_id_shift_id_employee_id_key`), e um btree não
+-- serve para buscar pela segunda coluna. `invoices` tinha SÓ a primary key.
+--
+-- Medido em banco local com 40 000 folhas, 40 000 alocações e 2 000 faturas:
+--
+--   timesheets.shift_id      Seq Scan 534 buffers 2.553 ms -> Index Only 2 buffers 0.060 ms
+--   operation_team.shift_id  Seq Scan 534 buffers 2.854 ms -> Index Only 2 buffers 0.037 ms
+--   invoices.client_id       Seq Scan  29 buffers 0.195 ms -> Index Only 2 buffers 0.044 ms
+--
+-- PARCIAIS nos dois `shift_id`, porque a coluna é anulável nas duas tabelas e
+-- a busca é sempre por um id concreto — folha sem turno e alocação sem turno
+-- ficam fora do índice. `invoices.client_id` é NOT NULL, então o índice é
+-- completo: um índice parcial ali só acrescentaria um predicado inútil.
+--
+-- Custo de escrita: 1248 kB de índice para 8544 kB de tabela nos dois
+-- primeiros, 80 kB para 464 kB no terceiro. `invoices` recebe uma linha por
+-- fatura gerada, e as outras duas uma por folha e por alocação criadas — não é
+-- caminho de escrita quente.
+-- ---------------------------------------------------------------------------
+
+CREATE INDEX IF NOT EXISTS idx_timesheets_shift
+  ON public.timesheets (shift_id)
+  WHERE shift_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_operation_team_shift
+  ON public.operation_team (shift_id)
+  WHERE shift_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_invoices_client
+  ON public.invoices (client_id);
+
+COMMENT ON INDEX public.idx_timesheets_shift IS
+  'Sustenta o EXISTS por shift_id das guardas de DELETE e de movimento de turno. Parcial: folha sem turno nunca é procurada por este caminho.';
+
+COMMENT ON INDEX public.idx_operation_team_shift IS
+  'Sustenta o EXISTS por shift_id da guarda de movimento de turno. Parcial: alocação sem turno nunca é procurada por este caminho.';
+
+COMMENT ON INDEX public.idx_invoices_client IS
+  'Sustenta o EXISTS por client_id da guarda de DELETE de cliente com histórico faturado. Completo porque client_id é NOT NULL.';
+
+-- ---------------------------------------------------------------------------
 -- 1e. A FATURA fechada também congela — e a afirmação anterior era falsa
 --
 -- Este bloco existe por um erro meu de método, e vale registrá-lo: as seções
@@ -765,6 +845,97 @@ DROP TRIGGER IF EXISTS trg_shifts_bloqueia_delete_usado ON public.shifts;
 CREATE TRIGGER trg_shifts_bloqueia_delete_usado
   BEFORE DELETE ON public.shifts
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_delete_turno_usado();
+
+-- ---------------------------------------------------------------------------
+-- 2c. Contrato já usado não é excluível — a origem da TAXA
+--
+-- Não veio de revisão: apareceu na auditoria preventiva de fechamento, ao
+-- percorrer o grafo de FKs procurando a mesma forma da seção 2. Reproduzido em
+-- banco local, com fatura já gerada:
+--
+--   ADMIN: DELETE FROM contracts                -> APAGOU
+--   operations.contract_id                      -> NULL (FK SET NULL)
+--
+-- É o mesmo desenho do turno, na outra fonte. O turno é a origem da JORNADA; o
+-- contrato é a origem da TAXA. Apagá-lo deixa o histórico faturado sem a
+-- configuração que justificou o seu valor, e mais: como `operations.contract_id`
+-- vira NULL, toda derivação seguinte cai silenciosamente no fallback de
+-- `agreed_amount` — a operação muda de preço sem ninguém ter mudado preço.
+--
+-- O CRITÉRIO É "JÁ FOI USADO", e usado significa "existe apontamento". Um
+-- contrato ligado a uma operação que nunca registrou trabalho continua
+-- excluível: nada derivou dele. `contracts` tem `status` e `valid_to`, então
+-- inativar é caminho real, e a mensagem aponta para ele.
+--
+-- CONCORRÊNCIA: dois locks, e o primeiro desenho estava errado
+--
+-- O contrato não é tocado por quem grava apontamento, então travar a linha do
+-- contrato não encostaria nessa transação. A primeira tentativa travou as
+-- OPERAÇÕES com `FOR UPDATE`, supondo que inserir apontamento tomasse
+-- `FOR KEY SHARE` nelas pela FK. Medido em corrida real: **não bloqueou**. A
+-- razão é que `timesheet_entries` NÃO tem FK para `operations` — só para
+-- `timesheets`, `employees` e `invoices`. A suposição estava errada.
+--
+-- O caminho do apontamento trava a FOLHA: a FK toma `FOR KEY SHARE` nela e a
+-- seção 1f acrescenta `FOR SHARE`. Então são precisos DOIS locks aqui, cada um
+-- fechando uma interleaving diferente:
+--
+--   operations  FOR UPDATE          conflita com o `FOR KEY SHARE` que a FK de
+--                                   `timesheets.operation_id` toma -> fecha o
+--                                   caso de a PRIMEIRA folha estar nascendo;
+--   timesheets  FOR NO KEY UPDATE   conflita com o `FOR SHARE` da seção 1f ->
+--                                   fecha o caso de um apontamento estar sendo
+--                                   gravado numa folha que já existe.
+--
+-- O custo fica todo no lado raro: quem apaga contrato trava as operações e as
+-- folhas dele. O fluxo diário não paga nada.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_delete_contrato_usado()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  -- Os dois locks vêm ANTES da pergunta, e nesta ordem: operação e depois
+  -- folha, que é a mesma ordem em que o caminho de escrita os alcança.
+  PERFORM 1 FROM public.operations o WHERE o.contract_id = OLD.id FOR UPDATE;
+
+  PERFORM 1
+     FROM public.timesheets t
+     JOIN public.operations o ON o.id = t.operation_id
+    WHERE o.contract_id = OLD.id
+      FOR NO KEY UPDATE OF t;
+
+  IF EXISTS (
+    SELECT 1
+      FROM public.timesheet_entries te
+      JOIN public.timesheets t ON t.id = te.timesheet_id
+      JOIN public.operations  o ON o.id = t.operation_id
+     WHERE o.contract_id = OLD.id
+  ) THEN
+    RAISE EXCEPTION
+      'Contrato já usado em apontamento não pode ser excluído. Inative-o ou encerre a vigência.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN OLD;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_delete_contrato_usado() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_delete_contrato_usado() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_delete_contrato_usado() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_delete_contrato_usado() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_delete_contrato_usado() IS
+  'Impede DELETE de contrato do qual algum apontamento já derivou valores. Existe porque operations.contract_id é ON DELETE SET NULL: sem esta guarda a operação perderia a origem da taxa e passaria a cair no fallback de agreed_amount em silêncio. Sem exceção de papel.';
+
+DROP TRIGGER IF EXISTS trg_contracts_bloqueia_delete_usado ON public.contracts;
+CREATE TRIGGER trg_contracts_bloqueia_delete_usado
+  BEFORE DELETE ON public.contracts
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_delete_contrato_usado();
 
 -- ---------------------------------------------------------------------------
 -- 2b. Cliente com histórico faturado — falha cedo, na raiz da árvore
