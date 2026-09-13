@@ -478,15 +478,38 @@ mandasse — a RLS deixava passar porque a policy era `ALL` sobre a linha inteir
 
 **Como foi resolvido:** em vez de proibir a escrita coluna a coluna, o banco
 passou a **derivar**. Um trigger `BEFORE INSERT OR UPDATE` recalcula os valores
-a partir de contrato, operação, turno e colaborador, e **ignora** o que veio no
-payload — não recusa, sobrescreve. A operação que decide o cálculo é lida da
-folha (`SELECT t.operation_id INTO _operation_id`), nunca do payload.
+a partir de contrato, operação, turno e colaborador. A operação que decide o
+cálculo é lida da folha (`SELECT t.operation_id INTO _operation_id`), nunca do
+payload.
+
+**O desfecho não é o mesmo em toda operação**, e a distinção importa para quem
+trata erro:
+
+| Operação                                      | O que acontece                                      |
+| --------------------------------------------- | --------------------------------------------------- |
+| `INSERT`                                      | a derivação **sobrescreve** o payload               |
+| `UPDATE` mexendo **apenas** em campo derivado | **recusado**, `SQLSTATE 42501`                      |
+| `UPDATE` com outra alteração legítima junto   | o bloqueio não dispara; os valores são recalculados |
+
+A recusa vem de `bloquear_edicao_financeira()`, e ela roda **antes** da
+derivação porque gatilho `BEFORE` de linha dispara em ordem alfabética:
+`trg_timesheet_entries_bloqueio_financeiro` precede
+`trg_timesheet_entries_calculo_financeiro`. `postgres` e `service_role` são
+isentos **desse bloqueio específico** — não das proteções da 011, das quais
+várias recusam justamente `service_role`.
 
 **Objetos:** 2 funções · 2 triggers · **5 CHECK** de não-negatividade em
 `contracts`, `employees` e `operations`.
 
 `src/lib/billing.ts` continua existindo e continua correto — serve para a
 interface mostrar o número antes de salvar. **Deixou de ser autoridade.**
+
+**A paridade entre as duas implementações é conferida à mão.**
+`supabase/tests/006_valores_financeiros.sql` guarda expectativas cujos números
+saíram de uma execução anterior do `calcEntry()` e hoje estão gravados como
+**constantes** — o teste não roda as duas implementações lado a lado. Se o
+`calcEntry()` mudar, a paridade precisa ser revista explicitamente. Ver a dívida
+registrada na seção 10.
 
 ### 9.2 A₀.1 — `011_proteger_fontes_financeiras`
 
@@ -579,8 +602,9 @@ tarefa própria, com escopo próprio.
 **Dívida técnica que só se manifesta com conta não-admin — FECHADA na parte
 financeira.** As tabelas operacionais aceitavam qualquer coluna do payload,
 incluindo `billed_amount`, `cost_amount` e `invoice_id` em `timesheet_entries`.
-As migrations `010` e `011` fecharam isso (seção 9): os valores são derivados e
-o payload é ignorado; o vínculo de fatura só nasce em `gerar_fatura`.
+As migrations `010` e `011` fecharam isso (seção 9): os valores passaram a ser
+derivados — sobrescritos no `INSERT`, e a edição puramente financeira **recusada
+com `42501`** no `UPDATE` — e o vínculo de fatura só nasce em `gerar_fatura`.
 **Continua aberto** o que não é financeiro:
 `docs/divida-tecnica/escrita-em-operation-team.md` — qualquer `is_staff()` ainda
 inclui, altera e remove alocação, e a tabela não guarda autor nem histórico. É
@@ -595,6 +619,20 @@ está no `.gitignore`.
 **0 linhas**. Não é defeito, mas **limita o que qualquer teste em Production
 prova**: num banco vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência
 de dado. Foi por isso que a prova do enforcement se apoiou em `profiles`.
+
+**Dívida nova — automatizar o teste diferencial `calcEntry()` × derivação SQL.**
+`src/lib/billing.ts` e o trigger da `010` implementam a mesma regra duas vezes,
+e hoje **nada no repositório prova que continuam iguais**. As expectativas de
+`supabase/tests/006_valores_financeiros.sql` saíram de uma execução do
+`calcEntry()` e estão gravadas como **constantes**; o teste não executa as duas
+implementações sobre a mesma entrada. Se o `calcEntry()` mudar sem que alguém
+atualize as constantes à mão, a divergência passa despercebida — a interface
+prevê um número e o banco grava outro.
+
+O diferencial de 12 casos rodado durante o PR #23 foi **validação pontual de
+desenvolvimento**, não ficou no repositório e **não é cobertura permanente**.
+Automatizar isso é tarefa própria, com escopo próprio. Enquanto não existir,
+**toda mudança em `calcEntry()` exige revisar a paridade explicitamente.**
 
 **Otimização da tela de login — guardada fora do Git.** Existe, **na máquina de
 desenvolvimento**, um stash local com a mensagem

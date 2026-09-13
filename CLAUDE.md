@@ -179,10 +179,15 @@ O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
   em `gerar_fatura`. Vale para toda RPC nova com `SECURITY DEFINER`.
 - **O payload do cliente não é fonte de valor financeiro.** Desde a migration
   010, `billed_amount`, `cost_amount` e os três snapshots são **derivados por
-  trigger** a partir de contrato, operação, turno e colaborador; o que vier do
-  navegador nessas colunas é ignorado, não recusado. Não reintroduzir cálculo
-  no cliente como autoridade — `src/lib/billing.ts` existe para a interface
-  mostrar o número antes de salvar, não para decidi-lo.
+  trigger** a partir de contrato, operação, turno e colaborador. O desfecho
+  depende da operação: no `INSERT` a derivação **sobrescreve** o payload; um
+  `UPDATE` que mexa **apenas** em campo derivado é **recusado com `42501`** por
+  `bloquear_edicao_financeira()`, que roda antes da derivação; um `UPDATE` com
+  outra alteração legítima passa e é recalculado. `postgres` e `service_role`
+  são isentos **desse bloqueio específico**, não das demais proteções. Não
+  reintroduzir cálculo no cliente como autoridade — `src/lib/billing.ts` existe
+  para a interface mostrar o número antes de salvar, não para decidi-lo, e a
+  paridade entre os dois é conferida **à mão** (ver `PROGRESS.md`).
 - **Linha faturada é imutável e o lastro não se destrói.** Desde a 011,
   `timesheet_entries` com `invoice_id` preenchido recusa `UPDATE` e `DELETE`; o
   vínculo de fatura só nasce dentro de `gerar_fatura`; e as fontes que já foram

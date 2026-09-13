@@ -29,9 +29,13 @@ tem relação com o TanStack Router.
   faturamento — fora de tarefa com esse escopo explícito.
 - **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
   `cost_amount` e os snapshots de diária, hora extra e custo são derivados por
-  trigger a partir de contrato, operação, turno e colaborador; o que o
-  navegador mandar nessas colunas é ignorado. `src/lib/billing.ts` serve para a
-  interface prever o número, nunca para decidi-lo.
+  trigger a partir de contrato, operação, turno e colaborador. No `INSERT` a
+  derivação sobrescreve o que veio do navegador; um `UPDATE` que mexa **apenas**
+  em campo derivado é **recusado com `42501`**, não corrigido em silêncio; um
+  `UPDATE` com outra alteração legítima passa e é recalculado. `postgres` e
+  `service_role` escapam desse bloqueio específico, não das demais proteções.
+  `src/lib/billing.ts` serve para a interface prever o número, nunca para
+  decidi-lo; a paridade entre as duas implementações é conferida à mão.
 - **Histórico faturado é imutável.** `timesheet_entries` com `invoice_id`
   recusa `UPDATE` e `DELETE`; o vínculo de fatura só é criado por
   `gerar_fatura`; cliente, contrato, operação, turno e folha já faturados não

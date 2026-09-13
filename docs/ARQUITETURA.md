@@ -136,14 +136,40 @@ Os valores financeiros são **derivados no banco**, desde a migration
 `20260912183000_010`. Um trigger `BEFORE INSERT OR UPDATE` em
 `timesheet_entries` recalcula `worked_minutes`, `overtime_minutes`,
 `billed_amount`, `cost_amount` e os snapshots de diária, hora extra e custo a
-partir de contrato, operação, turno e colaborador. **O que o navegador manda
-nessas colunas é ignorado** — sobrescrito, não recusado. Dashboard, faturamento
-e relatórios apenas **leem** o que ficou gravado.
+partir de contrato, operação, turno e colaborador. **O payload do navegador não
+é fonte de verdade nessas colunas.** Dashboard, faturamento e relatórios apenas
+**leem** o que ficou gravado.
+
+**Como isso chega a quem escreve, porém, depende da operação** — e a diferença
+importa para o tratamento de erro:
+
+| Operação                                      | O que acontece                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------- |
+| `INSERT`                                      | a derivação **sobrescreve** o que veio no payload                         |
+| `UPDATE` mexendo **apenas** em campo derivado | **recusado**, com `SQLSTATE 42501` — não é corrigido em silêncio          |
+| `UPDATE` com outra alteração legítima junto   | o bloqueio específico não dispara; a `010` recalcula conforme a alteração |
+
+A recusa vem de `bloquear_edicao_financeira()`, que roda **antes** da derivação:
+gatilho `BEFORE` de linha dispara em ordem alfabética de nome, e
+`trg_timesheet_entries_bloqueio_financeiro` precede
+`trg_timesheet_entries_calculo_financeiro`.
+
+`postgres` e `service_role` são isentos **desse bloqueio específico**, para que
+a derivação e o faturamento funcionem. Isento deste gatilho não significa isento
+do resto: as proteções da `011` — imutabilidade da linha faturada, vínculo de
+fatura restrito a `gerar_fatura`, `TRUNCATE` revogado — continuam valendo, e
+várias delas recusam justamente `service_role`.
 
 `src/lib/billing.ts` continua sendo a referência da regra e roda no navegador,
 mas **para previsão, não para decisão**: serve para a tela mostrar o número
-antes de salvar. A autoridade é o trigger, e as duas implementações precisam
-continuar espelhadas — há teste diferencial cobrindo isso.
+antes de salvar. A autoridade é o trigger.
+
+**As duas implementações precisam continuar espelhadas, e isso hoje é manual.**
+`supabase/tests/006_valores_financeiros.sql` guarda expectativas de paridade
+cujos números saíram de uma execução anterior do `calcEntry()` e estão gravados
+como **constantes**. O teste **não** executa as duas implementações lado a lado:
+se o `calcEntry()` mudar, a paridade precisa ser revista à mão. Automatizar esse
+diferencial está registrado como dívida em `PROGRESS.md`.
 
 Consequência prática que não mudou: a tela de apontamentos mostra o valor
 **calculado na hora**, não o gravado. Conferir uma alteração pela interface não
