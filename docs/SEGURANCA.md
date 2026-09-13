@@ -601,6 +601,15 @@ manutenção e restauração"_ **estava errada como postura de segurança**.
 service_role` para que tabela nova não volte a nascer com ele. **Conferido em
 Production: 0/10.**
 
+**O que continua fora desse revoke, e é preciso dizer:** a `011` listou as 10
+tabelas de negócio, e `ALTER DEFAULT PRIVILEGES` só alcança tabela **futura** —
+não mexe em grant existente. Então `profiles` e `user_roles` **seguem com
+`TRUNCATE` para `service_role`**, medido em Production em 13/09/2026. Para
+`anon` e `authenticated` o revoke é total: **0 nas 12**. Essas duas tabelas não
+guardam lastro financeiro, mas um `TRUNCATE` nelas derrubaria papéis e perfis —
+avaliar incluí-las é tarefa própria, e é a condição de fechamento que fica
+registrada aqui.
+
 A segunda é que `REVOKE` sozinho não é o bastante. `TRUNCATE` **não dispara
 trigger de linha e não consulta a RLS**, e alcança por `CASCADE` tabelas que
 ninguém nomeou no comando. Foi verificado — não presumido — que `BEFORE

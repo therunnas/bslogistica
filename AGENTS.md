@@ -44,14 +44,19 @@ tem relação com o TanStack Router.
   contexto em que `gerar_fatura` roda — `authenticated`, admin incluído, e
   `service_role` não criam; sessão `postgres` direta e superusuário estão fora
   dessa fronteira. Os bloqueios de `DELETE` têm critérios **distintos**, não "em
-  uso": cliente exige **fatura ou apontamento faturado**; contrato, **qualquer
-  apontamento** já derivado dele; turno, ser referenciado por **folha** — só por
-  `operation_team` não basta. Com faturamento congelam `operations.client_id`, o
+  uso": cliente exige **fatura ou apontamento faturado**; contrato, ser o
+  `contract_id` **atual** de uma operação com apontamento — remapear a operação
+  torna o contrato de origem apagável; turno, ser referenciado por **folha** —
+  só por `operation_team` não basta. Com faturamento congelam
+  `operations.client_id`, o
   `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
   **Não** congelam `operations.contract_id`, `agreed_amount`, as taxas do
   contrato nem `employees.daily_cost` — editáveis por admin, sem alterar o já
-  faturado, mas perdendo proveniência. `TRUNCATE` está revogado de `anon`,
-  `authenticated` e `service_role`. Não afrouxar fora de tarefa própria.
+  faturado, mas perdendo proveniência. `TRUNCATE` está revogado de `anon` e
+  `authenticated` em `public`, e de `service_role` **nas 10 tabelas de
+  negócio** — `profiles` e `user_roles` **continuam** com ele para
+  `service_role`, porque a `011` não as listou e `ALTER DEFAULT PRIVILEGES` não
+  mexe em grant existente. Não afrouxar fora de tarefa própria.
 - **Não tocar no projeto `bs-logisticas`.** É o site institucional, outro
   repositório e outro projeto na Vercel.
 - **`proxy.ts`, não `middleware.ts`.** No Next.js 16 a convenção foi renomeada;

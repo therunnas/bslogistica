@@ -542,10 +542,17 @@ podia ser desfeito por vários caminhos.
   incluído**, e `service_role`. O gatilho **não distingue** `gerar_fatura` de um
   `INSERT`/`UPDATE` manual numa sessão `postgres`: a fronteira protegida é a API
   da aplicação, não o banco contra quem já é seu dono;
-- **fontes já faturadas não se apagam** — cliente com histórico faturado, turno
-  referenciado por qualquer folha e contrato do qual algum apontamento já derivou
-  valores. Os dois últimos valem **mesmo em rascunho**, de propósito: as FKs são
-  `ON DELETE SET NULL` e o rascunho vira fatura depois;
+- **fontes não se apagam, com três critérios distintos** — cliente com fatura ou
+  apontamento faturado; turno referenciado por **alguma folha** (só
+  `operation_team` não basta); e contrato **atualmente referenciado** por
+  operação que tenha apontamento. Os dois últimos valem **mesmo em rascunho**, de
+  propósito: as FKs são `ON DELETE SET NULL` e o rascunho vira fatura depois.
+  **Atenção ao "atualmente":** o gatilho do contrato junta por
+  `o.contract_id = OLD.id`, o valor corrente. Se um admin remapear o
+  `contract_id` da operação, o contrato **de origem** — aquele de onde a diária
+  faturada realmente saiu — passa a ser apagável, e o contrato recém-atribuído
+  passa a ser protegido sem que nada tenha derivado dele. É a mesma lacuna de
+  proveniência do item abaixo;
 - **o que congela como valor, com faturamento, é menos do que "a fonte
   inteira"** — e a lista exata importa. Congelam, sem exceção de papel:
   `operations.client_id`; `work_date`, `operation_id` e `shift_id` da folha; e a
@@ -566,13 +573,18 @@ podia ser desfeito por vários caminhos.
 - **fatura com lastro vinculado congela**, e seus itens recusam `INSERT`,
   `UPDATE` e `DELETE` — inclusive mover um item para outra fatura. O critério é
   ter apontamento vinculado, não a coluna `status`;
-- **`TRUNCATE` fechado como classe** — revogado de `anon`, `authenticated` e
-  `service_role`, mais `ALTER DEFAULT PRIVILEGES ... REVOKE TRUNCATE ... FROM
-service_role`, que corrige a origem do privilégio para tabelas futuras. Os
-  gatilhos `BEFORE TRUNCATE` em `timesheet_entries` e `invoice_items` são
-  **condicionais ao estado**: recusam enquanto existir apontamento faturado, e
-  disparam também quando a tabela é alcançada por `CASCADE`, que é o que cobre
-  o `TRUNCATE` de `clients`, `operations`, `timesheets` e `invoices`.
+- **`TRUNCATE` fechado como classe, nas tabelas de negócio** — revogado de
+  `anon`, `authenticated` e `service_role` **nas 10 tabelas listadas**, mais
+  `ALTER DEFAULT PRIVILEGES ... REVOKE TRUNCATE ... FROM service_role`, que
+  corrige a origem do privilégio **para tabelas futuras** — não mexe em grant
+  existente. Por isso `profiles` e `user_roles` **continuam** com `TRUNCATE`
+  para `service_role`: não estavam na lista da `011`. Medido em Production em
+  13/09/2026 — `anon` e `authenticated` com **0 nas 12**; `service_role` com
+  **0 nas 10** de negócio e **1 em cada** das duas de identidade. Os gatilhos
+  `BEFORE TRUNCATE` em `timesheet_entries` e `invoice_items` são **condicionais
+  ao estado**: recusam enquanto existir apontamento faturado, e disparam também
+  quando a tabela é alcançada por `CASCADE`, que é o que cobre o `TRUNCATE` de
+  `clients`, `operations`, `timesheets` e `invoices`.
 
 **Objetos:** 20 funções · 21 triggers · 8 policies novas (substituindo
 `operations_staff` e `shifts_staff`) · 4 índices para as consultas das guardas ·
@@ -672,6 +684,12 @@ resposta para "de qual contrato, e com que taxa, saiu esta fatura": a operação
 passa a apontar para outro contrato e nada na linha registra a troca. É a mesma
 silhueta do ataque de `client_id` que a `011` fechou, sobrando pelo caminho do
 admin.
+
+O remapeamento tem um **segundo efeito**, notado na review: como
+`bloquear_delete_contrato_usado()` junta pelo `contract_id` corrente, remapear
+libera o `DELETE` do contrato **de origem** e passa a proteger o recém-atribuído.
+Ou seja, o contrato que produziu a diária cobrada pode ser apagado depois da
+troca.
 
 Fechar isso é migration própria — congelar `contract_id`/`agreed_amount` quando
 a operação tiver apontamento faturado, e decidir se as taxas do contrato viram

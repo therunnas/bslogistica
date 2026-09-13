@@ -202,18 +202,21 @@ O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
   de `DELETE` têm **critérios distintos**, e não é "em uso": cliente só é
   protegido se tiver **fatura ou apontamento faturado** — cliente com apenas
   operação é apagável, e a operação cai por cascata; contrato é protegido se
-  **algum apontamento** dele já derivou valores, rascunho incluído; turno é
-  protegido se **alguma folha** o referencia — turno referenciado só por
-  `operation_team` é apagável, de propósito. Com faturamento
+  for **o `contract_id` atual** de uma operação que tenha apontamento — lido do
+  valor corrente, então remapear a operação torna o contrato **de origem**
+  apagável; turno é protegido se **alguma folha** o referencia — turno
+  referenciado só por `operation_team` é apagável, de propósito. Com faturamento
   congelam `operations.client_id`, o `work_date`/`operation_id`/`shift_id` da
   folha e a linha do apontamento — mas **não** `operations.contract_id`,
   `agreed_amount`, as taxas do contrato nem `employees.daily_cost`, que
   continuam editáveis por admin. Isso não altera o já faturado, cujos snapshots
   estão congelados; perde-se **proveniência**, não dinheiro. `TRUNCATE` está
-  revogado de `anon`,
-  `authenticated` e `service_role`, com trigger `BEFORE TRUNCATE` sobre
-  `timesheet_entries` e `invoice_items`. Não afrouxar nada disso sem tarefa de
-  escopo próprio.
+  revogado de `anon` e `authenticated` em `public`, e de `service_role`
+  **apenas nas 10 tabelas de negócio**: `profiles` e `user_roles` seguem com
+  esse privilégio para `service_role` — conferido em Production —, porque a
+  `011` não as listou e `ALTER DEFAULT PRIVILEGES` só vale para tabela futura.
+  Há trigger `BEFORE TRUNCATE` sobre `timesheet_entries` e `invoice_items`. Não
+  afrouxar nada disso sem tarefa de escopo próprio.
 - **Nunca editar migration já aplicada.** Criar nova com
   `supabase migration new <nome>`.
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse
