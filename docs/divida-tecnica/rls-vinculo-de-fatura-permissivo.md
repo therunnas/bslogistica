@@ -1,10 +1,37 @@
 # Não-admin consegue alterar o vínculo de fatura de um apontamento
 
 **Levantado em:** 05/09/2026, durante a implementação do faturamento transacional.
-**Situação:** registrada, **não corrigida**. Decisão deliberada de não misturar
-com a mudança do faturamento.
-**Gravidade:** média — não permite criar fatura, mas permite desfazer o lastro de
-uma já fechada.
+**Situação:** **RESOLVIDA** em 09/09/2026 pela migration
+`20260909175435_protect_timesheet_invoice_link.sql`.
+**Gravidade na época:** média — não permitia criar fatura, mas permitia desfazer
+o lastro de uma já fechada.
+
+> ## Resolvida — leia antes do resto
+>
+> A correção veio como **trigger**, não como divisão de policy:
+>
+> ```sql
+> CREATE TRIGGER trg_timesheet_entries_protect_invoice_link
+>   BEFORE INSERT OR UPDATE OF invoice_id ON public.timesheet_entries
+>   FOR EACH ROW EXECUTE FUNCTION public.protect_timesheet_invoice_link();
+> ```
+>
+> `protect_timesheet_invoice_link()` levanta **42501** quando o vínculo muda e o
+> chamador não é admin, isentando `postgres` e `service_role` para que
+> `gerar_fatura` — que é `SECURITY DEFINER` — continue funcionando. A função é
+> `SECURITY INVOKER` de propósito: é isso que a deixa enxergar o `current_user`
+> real.
+>
+> Trigger instalado e conferido em Production em 12/09/2026.
+>
+> **Não recriar esta proteção.** O texto abaixo é o registro histórico do
+> problema e da análise que levou à correção.
+>
+> **Esta dívida não cobria `billed_amount` e `cost_amount`.** Essas colunas
+> ficaram desprotegidas até a migration
+> `20260912183000_010_derivar_valores_financeiros.sql`, que mudou a abordagem:
+> em vez de proibir a escrita, o banco passou a **derivar** os valores e ignorar
+> o que vem no payload.
 
 ## O que foi encontrado
 
