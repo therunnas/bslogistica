@@ -51,8 +51,8 @@ src/lib/mfa.ts               decisões de segundo fator, funções puras
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         15 arquivos (o que já foi aplicado: PROGRESS.md)
-supabase/tests/              5 testes SQL de RLS e invariáveis
+supabase/migrations/         17 arquivos, todos aplicados em Production
+supabase/tests/              7 testes SQL de RLS, invariáveis e fontes
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
@@ -177,6 +177,20 @@ O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
 - **Função `SECURITY DEFINER` roda acima da RLS**, então policy não a protege:
   a exigência de `aal2` precisa estar escrita dentro da própria função, como
   em `gerar_fatura`. Vale para toda RPC nova com `SECURITY DEFINER`.
+- **O payload do cliente não é fonte de valor financeiro.** Desde a migration
+  010, `billed_amount`, `cost_amount` e os três snapshots são **derivados por
+  trigger** a partir de contrato, operação, turno e colaborador; o que vier do
+  navegador nessas colunas é ignorado, não recusado. Não reintroduzir cálculo
+  no cliente como autoridade — `src/lib/billing.ts` existe para a interface
+  mostrar o número antes de salvar, não para decidi-lo.
+- **Linha faturada é imutável e o lastro não se destrói.** Desde a 011,
+  `timesheet_entries` com `invoice_id` preenchido recusa `UPDATE` e `DELETE`; o
+  vínculo de fatura só nasce dentro de `gerar_fatura`; e as fontes que já foram
+  faturadas — cliente, contrato, operação, turno, folha — não podem ser
+  apagadas nem remanejadas. `TRUNCATE` está revogado de `anon`,
+  `authenticated` e `service_role`, com trigger `BEFORE TRUNCATE` sobre
+  `timesheet_entries` e `invoice_items`. Não afrouxar nada disso sem tarefa de
+  escopo próprio.
 - **Nunca editar migration já aplicada.** Criar nova com
   `supabase migration new <nome>`.
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse

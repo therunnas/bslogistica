@@ -132,14 +132,26 @@ navegador → PostgREST → **RLS** → Postgres.
 Escrita: formulário → `mutations.ts` ou chamada direta → mesma cadeia →
 invalidação das queries afetadas.
 
-Os valores financeiros são **calculados no navegador e gravados** no
-apontamento: `worked_minutes`, `overtime_minutes`, `billed_amount`,
-`cost_amount` e os snapshots de diária e custo. Dashboard, faturamento e
-relatórios apenas **leem** o que foi gravado — não recalculam.
+Os valores financeiros são **derivados no banco**, desde a migration
+`20260912183000_010`. Um trigger `BEFORE INSERT OR UPDATE` em
+`timesheet_entries` recalcula `worked_minutes`, `overtime_minutes`,
+`billed_amount`, `cost_amount` e os snapshots de diária, hora extra e custo a
+partir de contrato, operação, turno e colaborador. **O que o navegador manda
+nessas colunas é ignorado** — sobrescrito, não recusado. Dashboard, faturamento
+e relatórios apenas **leem** o que ficou gravado.
 
-Consequência prática: a tela de apontamentos mostra o valor **calculado na
-hora**, não o gravado. Conferir uma alteração pela interface não prova o que foi
-persistido.
+`src/lib/billing.ts` continua sendo a referência da regra e roda no navegador,
+mas **para previsão, não para decisão**: serve para a tela mostrar o número
+antes de salvar. A autoridade é o trigger, e as duas implementações precisam
+continuar espelhadas — há teste diferencial cobrindo isso.
+
+Consequência prática que não mudou: a tela de apontamentos mostra o valor
+**calculado na hora**, não o gravado. Conferir uma alteração pela interface não
+prova o que foi persistido.
+
+Uma vez faturado, o apontamento **congela**: linha com `invoice_id` preenchido
+recusa `UPDATE` e `DELETE`, e as fontes que alimentaram o cálculo não podem ser
+apagadas nem remanejadas (migration `20260912200000_011`).
 
 ## Módulos
 

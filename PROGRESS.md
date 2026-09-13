@@ -6,23 +6,27 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 | Item          | Valor                                      |
 | ------------- | ------------------------------------------ |
-| Data          | 2026-09-12                                 |
-| Branch atual  | `docs/checkpoint-auth-users-policy`        |
-| `main`        | `8149a4de60240af115bd3e9cc29160af230c7755` |
-| `origin/main` | `8149a4d` — idêntico ao `main` local       |
-| Production    | **verde** no commit `8149a4d`              |
+| Data          | 2026-09-13                                 |
+| Branch atual  | `main`                                     |
+| `main`        | `c019e428882f2088bca590c42b24a29dbcb74146` |
+| `origin/main` | `c019e42` — idêntico ao `main` local       |
+| Production    | **verde** no commit `c019e42`              |
+| Migrations    | **17 aplicadas, 0 pendentes**              |
 
-**A frente de recuperação de senha está CONCLUÍDA**, em Production, validada por
-E2E real e sem resíduo de diagnóstico no código.
+| Frente                               | Merge     | Estado                                |
+| ------------------------------------ | --------- | ------------------------------------- |
+| Enforcement AAL2                     | `359dd90` | **CONCLUÍDO** — PR #14, em Production |
+| Password recovery                    | `8149a4d` | **CONCLUÍDO** — PRs #13, #17 a #20    |
+| A₀ — valores derivados no banco      | `83ed1f3` | **CONCLUÍDO** — PR #22, em Production |
+| A₀.1 — fontes financeiras protegidas | `c019e42` | **CONCLUÍDO** — PR #23, em Production |
 
-| Frente            | Merge     | Estado                                |
-| ----------------- | --------- | ------------------------------------- |
-| Enforcement AAL2  | `359dd90` | **CONCLUÍDO** — PR #14, em Production |
-| Password recovery | `8149a4d` | **CONCLUÍDO** — PRs #13, #17 a #20    |
+**A₀ e A₀.1 estão concluídos e implantados** — migrations `010` e `011`
+aplicadas em Production em 13/09/2026, com validação read-only completa. O
+detalhe está na **seção 9**.
 
-O próximo trabalho é a **nova política de autorização** (seção 7). Ela está
-**aprovada e ainda não implementada** — leia a seção 6 antes de tocar em guard,
-policy ou usuário.
+O próximo trabalho é a **nova política de autorização** (seção 7), que começa
+pelo **PR A**. Ela está **aprovada e ainda não implementada** — leia a seção 6
+antes de tocar em guard, policy ou usuário.
 
 ## 2. Ambiente
 
@@ -273,11 +277,27 @@ cientes de papel, e a tela Configurações → Segurança.
   antes da migration 009);
 - **NÃO criar usuário `operacional` real** antes dessa mudança. Além do AAL2,
   há dívida técnica aberta que só se manifesta quando existir uma conta não-admin
-  — ver seção 9 e `docs/SEGURANCA.md`, que registra "condição para reabertura:
-  criação da primeira conta não-admin";
+  — ver seção 10 e `docs/SEGURANCA.md`, que registra "condição para reabertura:
+  criação da primeira conta não-admin". A parte **financeira** dessa dívida já
+  foi fechada pelas migrations `010` e `011` (seção 9); o que resta é a escrita
+  permissiva em `operation_team`;
 - **NÃO confiar no frontend** para nenhuma parte dessa decisão.
 
 ## 7. Próximas etapas oficiais
+
+Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
+quebrada em três PRs, **nesta ordem obrigatória**:
+
+| PR       | Entrega                                                                                                                                                         | Cabe em |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| **PR A** | estado de MFA **verificável no banco** — indicador confiável e não forjável pelo usuário, fail-closed, lido de `auth.mfa_factors` por função `SECURITY DEFINER` | ETAPA 1 |
+| **PR B** | **RLS seletiva**: AAL1 permitido ao `operacional` só onde autorizado, mantendo AAL2 para admin e para quem já ativou MFA                                        | ETAPA 2 |
+| **PR C** | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                               | ETAPA 2 |
+
+**O primeiro usuário `operacional` real só existe depois dos três**, e depois da
+matriz E2E da ETAPA 6. PR A é pré-requisito de PR B: sem um indicador confiável
+de MFA no banco, a exceção de AAL1 vira bypass para a conta que optou pelo
+segundo fator.
 
 ### ETAPA 1 — próxima
 
@@ -424,6 +444,9 @@ funcionava em AAL1. Depois da 009: **`005` 38/38 PASS**, e `001` a `004` PASS.
 
 ### Verificação em Production — 2026-09-11
 
+Registro **daquela data**, preservado como está. As contagens de migration e de
+policy mudaram depois, com a `010` e a `011` — o estado atual é o da seção 9.
+
 15 migrations local / 15 remoto, 0 pendentes · 11 policies `*_exige_aal2`, todas
 RESTRICTIVE/`ALL`/`authenticated` · `USING` e `WITH CHECK` com `aal2` nas 11 ·
 **0** em `user_roles` · 19 policies permissivas antigas intactas (30 no total) ·
@@ -441,7 +464,105 @@ Login com senha funcionou; **antes do TOTP o painel não foi liberado**; TOTP
 funcionou; o painel carregou; F5 e nova aba preservaram a sessão; logout
 funcionou; novo login voltou a exigir TOTP.
 
-## 9. Achados menores registrados
+## 9. Proteção financeira no banco — A₀ e A₀.1, EM PRODUCTION
+
+**Estado: CONCLUÍDO e implantado.** PR #22 (`83ed1f3`) e PR #23 (`c019e42`)
+mergeados com merge commit; migrations `010` e `011` aplicadas em Production em
+**13/09/2026**, por `supabase db push --linked`, depois de pre-flight read-only.
+
+### 9.1 A₀ — `010_derivar_valores_financeiros`
+
+**Problema que fecha:** o valor financeiro chegava pronto no payload do
+navegador. `billed_amount`, `cost_amount` e os snapshots eram o que o cliente
+mandasse — a RLS deixava passar porque a policy era `ALL` sobre a linha inteira.
+
+**Como foi resolvido:** em vez de proibir a escrita coluna a coluna, o banco
+passou a **derivar**. Um trigger `BEFORE INSERT OR UPDATE` recalcula os valores
+a partir de contrato, operação, turno e colaborador, e **ignora** o que veio no
+payload — não recusa, sobrescreve. A operação que decide o cálculo é lida da
+folha (`SELECT t.operation_id INTO _operation_id`), nunca do payload.
+
+**Objetos:** 2 funções · 2 triggers · **5 CHECK** de não-negatividade em
+`contracts`, `employees` e `operations`.
+
+`src/lib/billing.ts` continua existindo e continua correto — serve para a
+interface mostrar o número antes de salvar. **Deixou de ser autoridade.**
+
+### 9.2 A₀.1 — `011_proteger_fontes_financeiras`
+
+**Problema que fecha:** derivar o valor não bastava. A **fonte** do cálculo
+continuava editável e apagável depois do faturamento, e o histórico faturado
+podia ser desfeito por vários caminhos.
+
+**O que passou a ser garantido:**
+
+- **linha faturada é imutável** — `UPDATE` e `DELETE` recusados em
+  `timesheet_entries` com `invoice_id`. A comparação é da **linha inteira**
+  (`to_jsonb(OLD) - 'updated_at'`), não de uma lista de colunas, para que uma
+  coluna nova no futuro nasça protegida;
+- **o vínculo de fatura só nasce dentro de `gerar_fatura`** — a entrada é
+  restrita pelo `current_user`, que a `SECURITY DEFINER` fixa em `postgres`;
+- **fontes já faturadas não se apagam nem se remanejam** — cliente, contrato,
+  operação, turno e folha;
+- **invariante do par** operação × turno, em `timesheets` e `operation_team`,
+  lida do `SELECT` travado e não do payload;
+- **fatura fechada e seus itens** não aceitam edição;
+- **`TRUNCATE` fechado como classe** — revogado de `anon`, `authenticated` e
+  `service_role`, com `ALTER DEFAULT PRIVILEGES` para as tabelas futuras, mais
+  trigger `BEFORE TRUNCATE` em `timesheet_entries` e `invoice_items`.
+
+**Objetos:** 20 funções · 21 triggers · 8 policies novas (substituindo
+`operations_staff` e `shifts_staff`) · 4 índices para as consultas das guardas ·
+82 `REVOKE` · 1 `ALTER DEFAULT PRIVILEGES`.
+
+**Nove rodadas de review do Codex**, 18 achados numerados, cada um reproduzido
+localmente **antes** da correção — teste que falha primeiro, migration depois.
+Cinco corridas de concorrência foram fechadas com **duas sessões `psql` reais**,
+nos dois sentidos. O teste `supabase/tests/007_fontes_financeiras.sql` cresceu
+para **139 casos**.
+
+### 9.3 Validação em Production — 13/09/2026
+
+Pre-flight read-only antes de aplicar: zero drift, zero violação de invariante,
+zero violação dos 5 CHECK, nenhuma das 22 funções já existente, nenhuma colisão
+de nome de policy, índice ou constraint. **Nenhum DML de dados nas duas
+migrations** — puro DDL, sem backfill.
+
+Depois de aplicar, conferido no banco:
+
+| Verificação                                   | Esperado | Encontrado |
+| --------------------------------------------- | -------- | ---------- |
+| migrations remotas                            | 17       | **17**     |
+| migrations pendentes                          | 0        | **0**      |
+| funções da 011                                | 20       | **20**     |
+| triggers da 011                               | 21       | **21**     |
+| policies novas                                | 8        | **8**      |
+| `operations_staff` / `shifts_staff` removidas | 0        | **0**      |
+| índices novos                                 | 4        | **4**      |
+| CHECK da 010                                  | 5        | **5**      |
+| `service_role` com `TRUNCATE`                 | 0/10     | **0/10**   |
+| `anon` + `authenticated` com `TRUNCATE`       | 0        | **0**      |
+| policies `*_exige_aal2` RESTRICTIVE           | 11       | **11**     |
+| violações de invariante                       | 0        | **0**      |
+
+Smoke de schema: `SELECT` com projeção de linha inteira nas 10 tabelas, todas
+sem erro. **Nenhuma fixture foi inserida em Production**; as 10 tabelas de
+negócio seguem com 0 linhas e só a conta admin existe. **Nenhum rollback
+executado** — o plano permanece só como contingência.
+
+### 9.4 Por que a janela era esta
+
+Aplicar com as tabelas vazias foi deliberado. Os 5 `ADD CONSTRAINT CHECK` e os
+4 `CREATE INDEX` — que não podem ser `CONCURRENTLY`, porque migration roda em
+transação — varreriam e travariam tabelas populadas. Com zero linhas, o custo
+foi nulo. Adiar teria encarecido o mesmo deploy.
+
+**Mudança de comportamento, não de dado:** criar operação e turno passou a ser
+**admin-only**, e `service_role` perdeu `TRUNCATE`. Sem dados e com um único
+admin, nada quebrou — mas é o tipo de coisa que aparece quando o primeiro
+`operacional` existir.
+
+## 10. Achados menores registrados
 
 **P3 —** `sincronizar_chave_da_diaria` pode retornar `23503` "Folha não
 encontrada" numa tentativa AAL1, antes do `WITH CHECK`. O trigger é
@@ -455,11 +576,16 @@ distintos colapsam na mesma mensagem `link-invalido`. Foi isso que escondeu a
 causa no incidente da seção 5. Separá-los exigiria mudar mensagens e destinos —
 tarefa própria, com escopo próprio.
 
-**Dívida técnica que só se manifesta com conta não-admin:**
-`docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` e
-`docs/divida-tecnica/escrita-em-operation-team.md`. As tabelas operacionais
-aceitam qualquer coluna do payload — incluindo `billed_amount`, `cost_amount` e
-`invoice_id` em `timesheet_entries`. **Fechar antes da ETAPA 3.**
+**Dívida técnica que só se manifesta com conta não-admin — FECHADA na parte
+financeira.** As tabelas operacionais aceitavam qualquer coluna do payload,
+incluindo `billed_amount`, `cost_amount` e `invoice_id` em `timesheet_entries`.
+As migrations `010` e `011` fecharam isso (seção 9): os valores são derivados e
+o payload é ignorado; o vínculo de fatura só nasce em `gerar_fatura`.
+**Continua aberto** o que não é financeiro:
+`docs/divida-tecnica/escrita-em-operation-team.md` — qualquer `is_staff()` ainda
+inclui, altera e remove alocação, e a tabela não guarda autor nem histórico. É
+decisão de negócio, não de migration, e a `011` não a mudou: o que a `011` passou
+a exigir ali é só a **invariante do par** operação × turno.
 
 **Resíduo de CLI —** `supabase/.branches/` reaparece a cada operação local e não
 está no `.gitignore`.
@@ -470,18 +596,31 @@ está no `.gitignore`.
 prova**: num banco vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência
 de dado. Foi por isso que a prova do enforcement se apoiou em `profiles`.
 
+**Otimização da tela de login — parada em `git stash`.** Existe um
+`stash@{0}` chamado `login-optimization-before-pr23-round4`, com **4 arquivos,
++64/-21**: `<main>` como landmark, logo dimensionada, fontes do Google
+auto-hospedadas por `next/font/google` e prioridade de LCP. Foi guardada para
+não entrar no PR #23 e **ainda não foi aplicada** — não tem branch nem PR. Ao
+retomar, aplicar em branch própria. SEO segue intencionalmente bloqueado
+(`noindex` + `robots`): é painel interno, não mexer.
+
 **Pendências antigas ainda abertas:**
 
 - decidir sobre Vercel Preview Deployments (P3);
 - `auth.sms.twilio.enabled = true` no remoto com `external.phone = false` —
   conferir origem numa passagem pelo Dashboard;
-- `docs/ESTADO_DO_PROJETO.md` e
-  `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` estão obsoletos.
+- `docs/ESTADO_DO_PROJETO.md` está obsoleto (fotografia de 04/09/2026).
+  `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` **deixou de ser
+  obsoleto**: já registra a resolução pelo trigger de 09/09 e a mudança de
+  abordagem trazida pela `010`.
 
-## 10. Não fazer
+## 11. Não fazer
 
 - Não reconstruir o Supabase de novo.
-- Não reaplicar migrations já aplicadas, nem a 009 — já está em Production (15/15).
+- Não reaplicar migrations já aplicadas — Production está **17/17, 0 pendentes**.
+- **Não afrouxar as proteções de `010`/`011`** (seção 9): não devolver
+  autoridade de cálculo ao payload, não reabrir `UPDATE`/`DELETE` de linha
+  faturada, não devolver `TRUNCATE` a `anon`, `authenticated` ou `service_role`.
 - Não usar `supabase config push`.
 - Não ativar signup público.
 - Não expor `service_role`, nem colocar segredo em `NEXT_PUBLIC_*`.
@@ -489,18 +628,19 @@ de dado. Foi por isso que a prova do enforcement se apoiou em `profiles`.
 - Não modificar DNS sem confirmação.
 - Não adicionar enforcement AAL2 em `user_roles`.
 - **Não remover a policy AAL2 global sem substituição segura** (seção 6.3).
-- **Não criar usuário `operacional` real** antes da ETAPA 2 (seção 6.3).
+- **Não criar usuário `operacional` real** antes dos PRs A, B e C e da matriz
+  E2E da ETAPA 6 (seções 6.3 e 7).
 - Não alterar as quatro linhas `if (…) return falharDepoisDeVerificar()` sem
   entender o guardrail que elas sustentam (seção 4.2).
 - Não reabrir a hipótese PKCE do recovery — foi refutada pelo fonte (seção 5).
 - Não tocar no site institucional.
 
-## 11. Como retomar após `/clear`
+## 12. Como retomar após `/clear`
 
 1. leia `CLAUDE.md`;
 2. leia este arquivo — em especial a **seção 6**, antes de qualquer mudança de
    autorização;
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
-5. continue da seção **7 — Próximas etapas oficiais**, pela ETAPA 1;
+5. continue da seção **7 — Próximas etapas oficiais**, pelo **PR A**;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.

@@ -27,6 +27,16 @@ tem relação com o TanStack Router.
   `supabase migration new <nome>`.
 - **Não alterar regras financeiras** — cálculo de diária, hora extra, custo ou
   faturamento — fora de tarefa com esse escopo explícito.
+- **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
+  `cost_amount` e os snapshots de diária, hora extra e custo são derivados por
+  trigger a partir de contrato, operação, turno e colaborador; o que o
+  navegador mandar nessas colunas é ignorado. `src/lib/billing.ts` serve para a
+  interface prever o número, nunca para decidi-lo.
+- **Histórico faturado é imutável.** `timesheet_entries` com `invoice_id`
+  recusa `UPDATE` e `DELETE`; o vínculo de fatura só é criado por
+  `gerar_fatura`; cliente, contrato, operação, turno e folha já faturados não
+  se apagam nem se remanejam; `TRUNCATE` está revogado de `anon`,
+  `authenticated` e `service_role`. Não afrouxar fora de tarefa própria.
 - **Não tocar no projeto `bs-logisticas`.** É o site institucional, outro
   repositório e outro projeto na Vercel.
 - **`proxy.ts`, não `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
