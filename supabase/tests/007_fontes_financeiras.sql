@@ -47,6 +47,28 @@
 --                            a derivação recalcula em cima dele
 --   PASSAM ANTES E DEPOIS:   J69, J72, J77, J79 — reenvio sem alteração, folha
 --                            sem faturamento e turno sem folha
+--
+-- QUARTA RODADA. Os casos J83..J92 vieram da revisão seguinte. Contra o schema
+-- anterior:
+--
+--   MEDEM O BURACO e falham: J83, J84, J85, J87, J89
+--   COLATERAL e falham:      J91, J92 — no baseline os movimentos acontecem
+--                            mesmo, e a varredura final encontra o estrago
+--   PASSAM ANTES E DEPOIS:   J86, J88, J90 — reenvio do mesmo cliente,
+--                            movimento de turno sem nenhuma referência, e o
+--                            turno com folha E equipe, que a metade "folha"
+--                            da guarda anterior já recusava
+--
+-- J82, J91 e J92 varrem o BANCO INTEIRO, não só a fixture. É deliberado: são
+-- invariantes, não casos. A contrapartida é que rodar a suíte contra um banco
+-- que já carregue incoerência herdada faz os três acusarem — e é exatamente o
+-- que se quer que aconteça.
+--
+-- A CORRIDA NÃO CABE AQUI. J82, J91 e J92 varrem o estado final, mas uma suíte
+-- roda numa transação só e não consegue exercitar duas sessões. A prova da
+-- corrida entre criar folha e mover turno está em
+-- `scratchpad/corrida.sh`, com duas sessões psql — comandos e resultados
+-- documentados no PR.
 
 begin;
 
@@ -111,7 +133,12 @@ insert into public.operations (id, client_id, contract_id, name, agreed_amount) 
   ('44444444-4444-4444-8444-4444444444c1', '33333333-3333-4333-8333-333333333333',
    '33333333-3333-4333-8333-333333333334', 'OP-C descartavel', 250),
   ('44444444-4444-4444-8444-4444444444d1', '33333333-3333-4333-8333-333333333333',
-   '33333333-3333-4333-8333-333333333334', 'OP-D descartavel', 250);
+   '33333333-3333-4333-8333-333333333334', 'OP-D descartavel', 250),
+  -- OP-F existe só para os casos de `operation_team`, e precisa ser separada:
+  -- J21 apaga a equipe INTEIRA da OP-B, e uma alocação de fixture ali seria
+  -- levada junto, quebrando aquele caso e sumindo com a desta.
+  ('44444444-4444-4444-8444-4444444444f1', '33333333-3333-4333-8333-333333333333',
+   '33333333-3333-4333-8333-333333333334', 'OP-F equipe', 250);
 
 insert into public.shifts (id, operation_id, name, start_time, end_time, break_minutes, crosses_midnight) values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '44444444-4444-4444-8444-4444444444a1',
@@ -121,13 +148,24 @@ insert into public.shifts (id, operation_id, name, start_time, end_time, break_m
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', '44444444-4444-4444-8444-4444444444c1',
    'Turno C descartavel', '06:00:00', '15:00:00', 60, false),
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', '44444444-4444-4444-8444-4444444444d1',
-   'Turno D descartavel', '06:00:00', '15:00:00', 60, false);
+   'Turno D descartavel', '06:00:00', '15:00:00', 60, false),
+  -- Os três turnos da OP-F cobrem as três combinações de referência que a
+  -- guarda de movimento precisa distinguir.
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5', '44444444-4444-4444-8444-4444444444f1',
+   'Turno F so com equipe',      '06:00:00', '15:00:00', 60, false),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6', '44444444-4444-4444-8444-4444444444f1',
+   'Turno F livre',              '06:00:00', '15:00:00', 60, false),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7', '44444444-4444-4444-8444-4444444444f1',
+   'Turno F com folha e equipe', '06:00:00', '15:00:00', 60, false);
 
 insert into public.timesheets (id, operation_id, shift_id, work_date) values
   ('66666666-6666-4666-8666-6666666666a1', '44444444-4444-4444-8444-4444444444a1',
    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', current_date),
   ('66666666-6666-4666-8666-6666666666b1', '44444444-4444-4444-8444-4444444444b1',
-   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date);
+   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date),
+  -- Sem apontamento: existe só para dar ao turno F7 uma referência de folha.
+  ('66666666-6666-4666-8666-6666666666f1', '44444444-4444-4444-8444-4444444444f1',
+   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7', current_date);
 
 insert into public.employees (id, name, daily_cost) values
   ('55555555-5555-4555-8555-5555555555a1', 'Colab A', 120),
@@ -164,6 +202,16 @@ insert into public.timesheet_entries
 update public.timesheet_entries
    set invoice_id = '99999999-9999-4999-8999-999999999991'
  where id = '77777777-7777-4777-8777-7777777777a1';
+
+-- Alocações de equipe da OP-F. Colaboradores DIFERENTES de propósito: o índice
+-- `operation_team_um_ativo_por_colaborador` só admite uma alocação ativa por
+-- colaborador, e `active` já nasce true. O Colab D fica de fora porque J21 o
+-- usa.
+insert into public.operation_team (operation_id, shift_id, employee_id) values
+  ('44444444-4444-4444-8444-4444444444f1', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5',
+   '55555555-5555-4555-8555-5555555555c1'),
+  ('44444444-4444-4444-8444-4444444444f1', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7',
+   '55555555-5555-4555-8555-5555555555b1');
 
 
 -- ---------------------------------------------------------------------------
@@ -1103,6 +1151,159 @@ begin
     '0', _incoerentes::text);
 end;
 $turno$;
+
+
+-- ---------------------------------------------------------------------------
+-- J83..J87. CLIENTE DE OPERAÇÃO FATURADA
+--
+-- A fatura é imutável e guarda o cliente original; o extrato resolve o cliente
+-- pelo `operations.client_id` de hoje. Mover o cliente de uma operação já
+-- faturada faz os dois discordarem sobre quem pagou o quê.
+--
+-- J51, mais acima, prova o outro lado: operação SEM faturamento continua livre
+-- para o admin. A proteção é sobre o passado, não sobre a operação.
+-- ---------------------------------------------------------------------------
+
+do $cliente_faturado$
+declare
+  _e text;
+  _n integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
+     where id = '44444444-4444-4444-8444-4444444444a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J83. ADMIN muda client_id de operação FATURADA', 'recusou 42501', _e);
+
+  -- J86. Reenvio do MESMO cliente não pode virar 42501, nem aqui.
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-333333333333',
+                                 notes = 'anotação administrativa'
+     where id = '44444444-4444-4444-8444-4444444444a1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J86. reenvio do MESMO client_id em operação faturada', '1 linhas', _e);
+
+  execute 'reset role';
+  execute 'set local role service_role';
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
+     where id = '44444444-4444-4444-8444-4444444444a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J84. service_role muda client_id de operação FATURADA', 'recusou 42501', _e);
+
+  execute 'reset role';
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
+     where id = '44444444-4444-4444-8444-4444444444a1';
+    _e := 'ALTEROU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J85. postgres muda client_id de operação FATURADA', 'recusou 42501', _e);
+
+  -- J87. A corrida com `gerar_fatura` é fechada pelo advisory lock por cliente,
+  -- como em J40 e J78.
+  select count(*) into _n
+    from pg_proc p
+    join pg_namespace ns on ns.oid = p.pronamespace
+   where ns.nspname = 'public'
+     and p.proname = 'bloquear_cliente_operacao_faturada'
+     and p.prosrc like '%pg_advisory_xact_lock(hashtextextended(%';
+  perform pg_temp.registrar('J87. guarda de cliente da operação usa o advisory lock', '1', _n::text);
+end;
+$cliente_faturado$;
+
+
+-- ---------------------------------------------------------------------------
+-- J88..J91. `operation_team` também é uso do turno
+--
+-- Uma alocação guarda `operation_id` E `shift_id`. Mover o turno sem mover a
+-- alocação deixa o par quebrado, o colaborador some da tela de apontamento, e
+-- o índice de alocação exclusiva impede realocá-lo — ele fica preso. Não é
+-- dano financeiro, e foi por isso que passou despercebido antes.
+-- ---------------------------------------------------------------------------
+
+do $equipe$
+declare
+  _e text;
+  _n integer;
+  _incoerentes integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- J89. Só equipe, sem folha nenhuma: basta isso para recusar.
+  begin
+    update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444b1'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5';
+    _e := 'MOVEU';
+  exception when check_violation then _e := 'recusou 23514';
+            when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J89. admin move turno com SÓ operation_team', 'recusou 23514', _e);
+
+  -- J90. Folha e equipe ao mesmo tempo.
+  begin
+    update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444b1'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa7';
+    _e := 'MOVEU';
+  exception when check_violation then _e := 'recusou 23514';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J90. admin move turno com folha E equipe', 'recusou 23514', _e);
+
+  -- J88. Nenhuma referência: mover continua sendo decisão administrativa
+  -- legítima. Sem este caso a guarda poderia estar recusando tudo.
+  begin
+    update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444b1'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa6';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J88. admin move turno SEM folha e SEM equipe', '1 linhas', _e);
+
+  -- J91. Invariante B: varredura do banco inteiro.
+  execute 'reset role';
+  select count(*) into _incoerentes
+    from public.operation_team ot
+    join public.shifts s on s.id = ot.shift_id
+   where s.operation_id is distinct from ot.operation_id;
+  perform pg_temp.registrar('J91. nenhuma alocação apontando para turno de outra operação',
+    '0', _incoerentes::text);
+end;
+$equipe$;
+
+
+-- ---------------------------------------------------------------------------
+-- J92. Invariante C, varrida no banco inteiro
+--
+-- Todo apontamento faturado precisa estar sob o mesmo cliente que a fatura que
+-- o cobra. É a formulação global do que J83..J85 medem caso a caso, e o que
+-- falharia em silêncio se alguém afrouxasse aquela guarda depois.
+-- ---------------------------------------------------------------------------
+
+do $invariante_cliente$
+declare
+  _divergentes integer;
+begin
+  execute 'reset role';
+  select count(*) into _divergentes
+    from public.timesheet_entries te
+    join public.invoices   i ON i.id = te.invoice_id
+    join public.timesheets t ON t.id = te.timesheet_id
+    join public.operations o ON o.id = t.operation_id
+   where o.client_id is distinct from i.client_id;
+  perform pg_temp.registrar('J92. nenhum lastro faturado sob cliente diferente da fatura',
+    '0', _divergentes::text);
+end;
+$invariante_cliente$;
 
 
 -- ---------------------------------------------------------------------------

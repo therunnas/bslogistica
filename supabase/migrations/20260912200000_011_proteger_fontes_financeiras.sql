@@ -96,6 +96,24 @@
 -- A lição das seções 1c e 3c está escrita nelas: onde havia lista de colunas,
 -- passou a haver invariante sobre a linha. Uma lista protege o que alguém
 -- lembrou; a comparação protege também o que ainda não existe.
+--
+-- QUARTA RODADA DE REVISÃO
+--
+-- Mais três, reproduzidos antes de fechar — dois deles com DUAS sessões psql,
+-- porque leitura de snapshot não os revelava:
+--
+--   7. ADMIN seguia isento em `operations.client_id`, e para operação já
+--      faturada isso faz o extrato cobrar um cliente e a fatura outro —
+--      seção 3e;
+--   8. mover um turno era recusado por folha, mas não por `operation_team`:
+--      turno só com equipe alocada era movido, e o colaborador ficava preso
+--      pelo índice de alocação exclusiva — seção 3d;
+--   9. as duas guardas do par eram leitura de snapshot sem lock, e as duas
+--      ordens produziam par inválido em corrida real — seção 3b.
+--
+-- O padrão desta rodada é outro: não são colunas esquecidas, são consequências
+-- de segunda ordem — quem mais lê o dado, quem mais referencia a linha, e o
+-- que acontece quando duas transações decidem ao mesmo tempo.
 
 -- ---------------------------------------------------------------------------
 -- 1. Lastro faturado — absoluto, sem exceção de papel
@@ -575,20 +593,69 @@ CREATE TRIGGER trg_timesheets_bloqueia_fontes
 -- Não é papel desta migration proibir o que o modelo permite.
 -- ---------------------------------------------------------------------------
 
+-- CONCORRÊNCIA: por que `FOR SHARE`, e por que sem ele a guarda não fecha
+--
+-- Levantado em revisão e reproduzido com duas sessões psql no banco local. A
+-- versão anterior era leitura de snapshot pura, e o mesmo valia do outro lado:
+--
+--   T1 BEGIN; INSERT folha (OP-A + turno S)   -- transação aberta
+--   T2 UPDATE shifts SET operation_id = OP-B  -- 3 ms, NÃO bloqueou
+--   estado final: folha.op = A | turno.op = B  -> PAR INVALIDO
+--
+-- E na ordem inversa, com T2 segurando a transação, o resultado era o mesmo.
+-- Write skew clássico: as duas transações enxergam o estado anterior, as duas
+-- commitam, e o par proibido nasce sem que nenhuma tenha feito nada ilegal
+-- isoladamente.
+--
+-- A FK `timesheets.shift_id` já toma `FOR KEY SHARE` na linha do turno, e é
+-- exatamente por isso que a corrida existia: `FOR KEY SHARE` NÃO conflita com
+-- `FOR NO KEY UPDATE`, que é o modo que um `UPDATE shifts SET operation_id`
+-- adquire. A FK protege a existência do turno, não a sua operação.
+--
+-- `FOR SHARE` é o modo certo aqui, e não `FOR UPDATE`:
+--
+--   conflita     com UPDATE/DELETE da linha, FOR UPDATE e FOR NO KEY UPDATE
+--                -> qualquer tentativa de mover o turno passa a esperar;
+--   NÃO conflita com outro FOR SHARE
+--                -> duas folhas sendo criadas para o MESMO turno, que é o
+--                   fluxo diário normal, não se serializam uma na outra.
+--
+-- `FOR UPDATE` fecharia a mesma janela enfileirando o fluxo diário à toa. Esta
+-- guarda só LÊ `operation_id`; o que ela precisa dizer é "li esta linha e ela
+-- não pode mudar até eu commitar", que é a definição de `FOR SHARE`.
+--
+-- O `operation_id` é lido DO PRÓPRIO SELECT travado, de propósito. Em READ
+-- COMMITTED, uma leitura travada que espera por outra transação reavalia a
+-- linha depois da espera: se o turno acabou de ser movido, é o valor NOVO que
+-- volta aqui, e a validação recusa. Ler antes e travar depois perderia isso.
 CREATE OR REPLACE FUNCTION public.validar_par_operacao_turno()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $$
+DECLARE
+  _operacao_do_turno uuid;
+  _achou boolean;
 BEGIN
-  IF NEW.shift_id IS NOT NULL
-     AND NOT EXISTS (
-       SELECT 1
-         FROM public.shifts s
-        WHERE s.id = NEW.shift_id
-          AND s.operation_id = NEW.operation_id
-     ) THEN
+  IF NEW.shift_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT s.operation_id INTO _operacao_do_turno
+    FROM public.shifts s
+   WHERE s.id = NEW.shift_id
+     FOR SHARE;
+
+  _achou := FOUND;
+
+  -- Turno inexistente não é problema desta guarda: a própria FK recusa com
+  -- 23503, e sequestrar esse caso aqui trocaria o código de erro sem motivo.
+  IF NOT _achou THEN
+    RETURN NEW;
+  END IF;
+
+  IF _operacao_do_turno IS DISTINCT FROM NEW.operation_id THEN
     RAISE EXCEPTION
       'Turno informado não pertence à operação da folha.'
       USING ERRCODE = '23514';
@@ -730,12 +797,36 @@ SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  IF NEW.operation_id IS DISTINCT FROM OLD.operation_id
-     AND EXISTS (
-       SELECT 1 FROM public.timesheets t WHERE t.shift_id = OLD.id
-     ) THEN
+  IF NEW.operation_id IS NOT DISTINCT FROM OLD.operation_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- O lock vem ANTES das verificações, e o motivo é sutil: um trigger
+  -- `BEFORE UPDATE` roda antes de o executor travar a linha. Sem esta linha, o
+  -- EXISTS abaixo leria o estado anterior, aprovaria, e só então o UPDATE
+  -- esperaria pelo lock — tarde demais, porque a decisão já teria sido tomada
+  -- sobre dados velhos. Foi assim que a corrida com a criação de folha
+  -- aconteceu de verdade em banco local.
+  --
+  -- `FOR NO KEY UPDATE` é exatamente o modo que o UPDATE seguinte adquiriria
+  -- sozinho, já que `operation_id` não é coluna de chave: não escala o lock, e
+  -- conflita com o `FOR SHARE` que `validar_par_operacao_turno` toma.
+  PERFORM 1 FROM public.shifts s WHERE s.id = OLD.id FOR NO KEY UPDATE;
+
+  -- Duas tabelas referenciam um turno, e as duas contam como uso.
+  --
+  -- `operation_team` entrou aqui depois, levantado em revisão e reproduzido:
+  -- um turno SEM folha mas COM equipe alocada era movido sem recusa. A
+  -- alocação guarda `operation_id` E `shift_id`, e a tela de apontamento exige
+  -- que os dois batam — então o colaborador sumia de todo turno selecionável.
+  -- Pior: o índice `operation_team_um_ativo_por_colaborador` impede alocá-lo em
+  -- outro lugar enquanto a alocação órfã estiver ativa, e o colaborador ficava
+  -- preso. Não é dano financeiro, é dano operacional, e foi por procurar só
+  -- efeito financeiro que ele passou na primeira vez.
+  IF EXISTS (SELECT 1 FROM public.timesheets t WHERE t.shift_id = OLD.id)
+     OR EXISTS (SELECT 1 FROM public.operation_team ot WHERE ot.shift_id = OLD.id) THEN
     RAISE EXCEPTION
-      'Turno já usado em folha não pode mudar de operação. Crie um turno novo na operação de destino.'
+      'Turno já usado em folha ou alocação não pode mudar de operação. Crie um turno novo na operação de destino.'
       USING ERRCODE = '23514';
   END IF;
 
@@ -749,7 +840,98 @@ REVOKE ALL ON FUNCTION public.bloquear_mover_turno_referenciado() FROM authentic
 REVOKE ALL ON FUNCTION public.bloquear_mover_turno_referenciado() FROM service_role;
 
 COMMENT ON FUNCTION public.bloquear_mover_turno_referenciado() IS
-  'Impede mudar shifts.operation_id enquanto alguma folha referenciar o turno. Fecha o par operação/turno pelo lado do turno, que validar_par_operacao_turno não alcança. Invariante estrutural: vale para todos os papéis.';
+  'Impede mudar shifts.operation_id enquanto alguma folha OU alocação de equipe referenciar o turno. Trava a linha do turno antes de verificar, porque o BEFORE trigger roda antes do lock do executor. Invariante estrutural: vale para todos os papéis.';
+
+-- ---------------------------------------------------------------------------
+-- 3e. Cliente de operação com histórico faturado
+--
+-- A seção 3 já impede `operacional` de mexer em `client_id`. ADMIN seguia
+-- isento, e para operação já faturada isso quebra o histórico. Levantado em
+-- revisão e reproduzido em banco local:
+--
+--   ADMIN: UPDATE operations SET client_id = <Cliente B>  ->  ALTEROU
+--   operação -> Cliente B   |   fatura -> Cliente A   ->  DIVERGE
+--
+-- A fatura é imutável e guarda o `invoices.client_id` original. Mas o extrato
+-- resolve o cliente pelo `operations.client_id` de HOJE
+-- (`src/lib/ledger.ts`), então o mesmo apontamento passa a aparecer sob o
+-- cliente B no relatório e sob o cliente A na fatura que o cobra.
+--
+-- Sem exceção de papel. Operação SEM histórico faturado continua livre para o
+-- admin — é decisão administrativa legítima, e a proteção é sobre o passado,
+-- não sobre a operação.
+--
+-- ADVISORY LOCK: UM cliente, não dois
+--
+-- Trava-se `OLD.client_id`, a mesma chave de `gerar_fatura`, e a verificação
+-- vem depois. As duas ordens ficam corretas:
+--
+--   fatura primeiro -> o UPDATE espera, e ao prosseguir já ENXERGA o lastro
+--                      recém-criado, então recusa;
+--   UPDATE primeiro -> `gerar_fatura` espera; ao prosseguir, a operação não
+--                      está mais sob o cliente A e o seu `WHERE o.client_id`
+--                      simplesmente não a alcança.
+--
+-- `NEW.client_id` NÃO é travado, e isso é deliberado em vez de esquecimento.
+-- Faturar sob o cliente de DESTINO depois da mudança é legítimo: a invariante
+-- protegida é "operação com passado faturado não troca de cliente", e ela é
+-- decidida inteiramente pelo lado de OLD. Travar dois clientes exigiria ordem
+-- determinística contra deadlock e não compraria nada.
+--
+-- ORDEM GLOBAL DE LOCKS, para que nenhum ciclo exista: todo caminho deste
+-- schema adquire o advisory por cliente ANTES de qualquer lock de linha em
+-- `shifts`, nunca o contrário. `gerar_fatura`, as guardas de DELETE de
+-- `clients` e `shifts`, a guarda de folha faturada e esta seguem a mesma
+-- ordem; `validar_par_operacao_turno` e `bloquear_mover_turno_referenciado`
+-- tomam lock de linha e nenhum advisory.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_cliente_operacao_faturada()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  -- Reenvio do mesmo cliente não pode virar 42501: a tela manda o objeto todo.
+  IF NEW.client_id IS NOT DISTINCT FROM OLD.client_id THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended(OLD.client_id::text, 0));
+
+  -- Verificação DEPOIS do lock, de propósito. O caminho é o mesmo de
+  -- `gerar_fatura`: entry -> folha -> operação.
+  IF EXISTS (
+    SELECT 1
+      FROM public.timesheet_entries te
+      JOIN public.timesheets t ON t.id = te.timesheet_id
+     WHERE t.operation_id = OLD.id
+       AND te.invoice_id IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION
+      'Operação com histórico faturado não pode mudar de cliente. A fatura continuaria no cliente original.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_cliente_operacao_faturada() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_cliente_operacao_faturada() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_cliente_operacao_faturada() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_cliente_operacao_faturada() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_cliente_operacao_faturada() IS
+  'Congela operations.client_id quando a operação já tem apontamento faturado, para que o extrato não resolva um cliente diferente do que a fatura cobra. Toma o advisory lock do cliente de OLD, o mesmo de gerar_fatura. Sem exceção de papel.';
+
+-- `bloqueia_faturada` < `bloqueia_fontes`: a recusa por histórico vem antes da
+-- recusa por papel, que é a mensagem certa quando as duas se aplicam.
+DROP TRIGGER IF EXISTS trg_operations_bloqueia_faturada ON public.operations;
+CREATE TRIGGER trg_operations_bloqueia_faturada
+  BEFORE UPDATE OF client_id ON public.operations
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_cliente_operacao_faturada();
 
 DROP TRIGGER IF EXISTS trg_shifts_bloqueia_mover_referenciado ON public.shifts;
 CREATE TRIGGER trg_shifts_bloqueia_mover_referenciado
