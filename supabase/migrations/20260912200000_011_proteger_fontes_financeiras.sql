@@ -1734,3 +1734,129 @@ CREATE POLICY shifts_insert_admin ON public.shifts
 CREATE POLICY shifts_delete_admin ON public.shifts
   FOR DELETE TO authenticated
   USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+-- ---------------------------------------------------------------------------
+-- 5. TRUNCATE — a classe inteira, não só a tabela apontada
+--
+-- Levantado em revisão para `timesheet_entries`, e a auditoria da classe
+-- mostrou que o problema era muito maior. `TRUNCATE` não executa trigger de
+-- LINHA, então TODAS as guardas acima, que são row-level, são invisíveis para
+-- ele. Medido em banco local, com uma fatura de lastro único:
+--
+--   TRUNCATE timesheet_entries        EXECUTOU  entries=0 fat=0 | inv=1 items=1
+--   TRUNCATE invoice_items            EXECUTOU  fatura fechada com ZERO itens
+--   TRUNCATE invoices                 recusou 0A000 (FK) — única defesa natural
+--   TRUNCATE invoices CASCADE         EXECUTOU  varre entries e itens
+--   TRUNCATE timesheets CASCADE       EXECUTOU  entries somem, fatura órfã
+--   TRUNCATE operations CASCADE       EXECUTOU  turnos, equipe, folhas, itens, entries
+--   TRUNCATE clients CASCADE          EXECUTOU  TUDO, inclusive as faturas
+--
+-- Seis dos sete caminhos destroem lastro faturado. Corrigir só o primeiro
+-- deixaria `TRUNCATE invoice_items` como forma equivalente de destruir a
+-- composição da fatura, e `TRUNCATE clients CASCADE` como forma de destruir o
+-- sistema inteiro.
+--
+-- DUAS GUARDAS BASTAM, e não dez
+--
+-- Verificado em banco, não presumido: um `BEFORE TRUNCATE` DISPARA quando a
+-- tabela é alcançada por CASCADE. E todo caminho da tabela acima alcança
+-- `timesheet_entries` ou `invoice_items` — é para lá que as cascatas
+-- convergem. Guardar as duas pontas cobre os sete casos sem espalhar trigger
+-- por simetria.
+--
+-- A POLÍTICA É POR ESTADO, como as outras
+--
+-- Não é "TRUNCATE é sempre proibido": é "não enquanto existir lastro
+-- faturado". Coerente com `bloquear_delete_faturado`, que barra a linha
+-- faturada e não a tabela, e com `bloquear_delete_turno_usado`, que barra o
+-- turno usado e não todo turno. Um ambiente ainda sem faturamento — instalação
+-- nova, banco de desenvolvimento — continua truncável.
+--
+-- O predicado é o mesmo nas duas e usa o índice parcial da seção 1g:
+-- `EXISTS (... WHERE invoice_id IS NOT NULL)` é um Index Only Scan, não uma
+-- varredura do histórico.
+--
+-- A FRONTEIRA, dita com precisão
+--
+-- `postgres` continua podendo desabilitar o trigger, alterar a função ou
+-- reescrever o schema. Não existe defesa de banco contra o dono do banco, e
+-- não se promete isso aqui. O que estas guardas entregam é: nenhum papel da
+-- API alcança TRUNCATE, e o comando normal executado como `postgres` — o SQL
+-- Editor, um script de manutenção — falha em vez de destruir lastro por
+-- acidente.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.bloquear_truncate_lastro()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.timesheet_entries te WHERE te.invoice_id IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION
+      'TRUNCATE bloqueado: existe apontamento faturado. Lastro financeiro não é removível em massa.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.bloquear_truncate_lastro() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_truncate_lastro() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_truncate_lastro() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_truncate_lastro() FROM service_role;
+
+COMMENT ON FUNCTION public.bloquear_truncate_lastro() IS
+  'Recusa TRUNCATE em timesheet_entries e invoice_items enquanto existir apontamento faturado. Necessária porque TRUNCATE não executa trigger de linha, tornando invisíveis todas as demais guardas. Dispara também quando a tabela é alcançada por CASCADE, que é o que cobre TRUNCATE de clients, operations, timesheets e invoices.';
+
+DROP TRIGGER IF EXISTS trg_timesheet_entries_bloqueia_truncate ON public.timesheet_entries;
+CREATE TRIGGER trg_timesheet_entries_bloqueia_truncate
+  BEFORE TRUNCATE ON public.timesheet_entries
+  FOR EACH STATEMENT EXECUTE FUNCTION public.bloquear_truncate_lastro();
+
+DROP TRIGGER IF EXISTS trg_invoice_items_bloqueia_truncate ON public.invoice_items;
+CREATE TRIGGER trg_invoice_items_bloqueia_truncate
+  BEFORE TRUNCATE ON public.invoice_items
+  FOR EACH STATEMENT EXECUTE FUNCTION public.bloquear_truncate_lastro();
+
+-- ---------------------------------------------------------------------------
+-- 5b. E nenhum papel da API precisa de TRUNCATE
+--
+-- A migration 007 já revogou TRUNCATE de `anon` e `authenticated`, e manteve
+-- `service_role` de propósito, com a justificativa de que era papel
+-- administrativo de manutenção e restauração. A premissa mudou: esta migration
+-- promete que lastro faturado não é destrutível "sem exceção de papel,
+-- incluindo postgres e service_role", e manter TRUNCATE em `service_role`
+-- contradiz isso frontalmente.
+--
+-- Auditado antes de revogar: a busca por `TRUNCATE` em `src/`, `scripts/` e
+-- `supabase/` não encontra USO NENHUM — os únicos acertos são a classe CSS
+-- `truncate` do Tailwind. E o próprio CLAUDE.md registra que a aplicação não
+-- usa `service_role`. Manutenção e restauração são feitas como `postgres`, que
+-- é como o SQL Editor conecta.
+--
+-- A origem do privilégio é `GRANT ALL ON <tabela> TO service_role` da
+-- 20260903173204, onde `ALL` inclui TRUNCATE. O `ALTER DEFAULT PRIVILEGES`
+-- abaixo corrige a origem, e não só o estado atual: sem ele a próxima tabela
+-- criada volta a nascer com o privilégio.
+-- ---------------------------------------------------------------------------
+
+REVOKE TRUNCATE ON TABLE
+  public.clients,
+  public.contracts,
+  public.employees,
+  public.operations,
+  public.shifts,
+  public.operation_team,
+  public.timesheets,
+  public.timesheet_entries,
+  public.invoices,
+  public.invoice_items
+FROM anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE TRUNCATE ON TABLES FROM service_role;

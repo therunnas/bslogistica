@@ -1906,6 +1906,94 @@ $contrato$;
 
 
 -- ---------------------------------------------------------------------------
+-- J127..J134. TRUNCATE — a classe que nenhuma guarda de linha enxerga
+--
+-- `TRUNCATE` não executa trigger de LINHA, então todas as proteções acima são
+-- invisíveis para ele. Medido antes da correção: SEIS dos sete caminhos
+-- destruíam lastro faturado, incluindo `TRUNCATE invoice_items`, que deixava a
+-- fatura fechada com zero itens, e `TRUNCATE clients CASCADE`, que levava o
+-- sistema inteiro.
+--
+-- Duas guardas `BEFORE TRUNCATE ... FOR EACH STATEMENT` cobrem os sete casos,
+-- porque um `BEFORE TRUNCATE` DISPARA quando a tabela é alcançada por CASCADE
+-- — e todas as cascatas convergem para `timesheet_entries` ou `invoice_items`.
+--
+-- A política é por ESTADO, como as demais: não é "TRUNCATE é sempre proibido",
+-- é "não enquanto existir lastro faturado". Instalação nova continua truncável.
+-- ---------------------------------------------------------------------------
+
+do $truncate$
+declare
+  _e text;
+  _n integer;
+begin
+  execute 'reset role';
+
+  -- J127/J128. Privilégio, antes do comportamento: nenhum papel da API alcança
+  -- TRUNCATE nas dez tabelas de negócio.
+  select count(*) into _n
+    from (values ('clients'),('contracts'),('employees'),('operations'),('shifts'),
+                 ('operation_team'),('timesheets'),('timesheet_entries'),
+                 ('invoices'),('invoice_items')) t(tabela)
+   where has_table_privilege('service_role', 'public.' || t.tabela, 'TRUNCATE');
+  perform pg_temp.registrar('J127. service_role sem TRUNCATE nas 10 tabelas', '0', _n::text);
+
+  select count(*) into _n
+    from (values ('clients'),('contracts'),('employees'),('operations'),('shifts'),
+                 ('operation_team'),('timesheets'),('timesheet_entries'),
+                 ('invoices'),('invoice_items')) t(tabela)
+   where has_table_privilege('authenticated', 'public.' || t.tabela, 'TRUNCATE')
+      or has_table_privilege('anon', 'public.' || t.tabela, 'TRUNCATE');
+  perform pg_temp.registrar('J128. authenticated e anon sem TRUNCATE', '0', _n::text);
+
+  -- J129..J133. O comando normal, como `postgres`, falha em vez de destruir.
+  -- Cada um destes EXECUTOU no baseline.
+  begin execute 'truncate table public.timesheet_entries'; _e := 'TRUNCOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J129. TRUNCATE timesheet_entries com lastro', 'recusou 42501', _e);
+
+  begin execute 'truncate table public.invoice_items'; _e := 'TRUNCOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J130. TRUNCATE invoice_items com lastro', 'recusou 42501', _e);
+
+  begin execute 'truncate table public.invoices cascade'; _e := 'TRUNCOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J131. TRUNCATE invoices CASCADE', 'recusou 42501', _e);
+
+  begin execute 'truncate table public.timesheets cascade'; _e := 'TRUNCOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J132. TRUNCATE timesheets CASCADE', 'recusou 42501', _e);
+
+  -- O pior caso: a raiz da árvore inteira.
+  begin execute 'truncate table public.clients cascade'; _e := 'TRUNCOU';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J133. TRUNCATE clients CASCADE', 'recusou 42501', _e);
+
+  -- J134. E depois de todas as tentativas, o lastro e a fatura seguem de pé.
+  -- A asserção é por IDENTIDADE e não por contagem: a esta altura da suíte há
+  -- mais de um apontamento faturado, e contar tornaria o caso frágil a cada
+  -- bloco novo. O que importa é que estas três linhas específicas continuam lá.
+  perform pg_temp.registrar('J134. lastro, fatura e item intactos após os TRUNCATE',
+    'entry sim / fatura sim / item sim',
+    (select case when count(*) = 1 then 'entry sim' else 'entry SUMIU' end
+       from public.timesheet_entries
+      where id = '77777777-7777-4777-8777-7777777777a1'
+        and invoice_id = '99999999-9999-4999-8999-999999999991') || ' / ' ||
+    (select case when count(*) = 1 then 'fatura sim' else 'fatura SUMIU' end
+       from public.invoices where id = '99999999-9999-4999-8999-999999999991') || ' / ' ||
+    (select case when count(*) >= 1 then 'item sim' else 'item SUMIU' end
+       from public.invoice_items
+      where invoice_id = '99999999-9999-4999-8999-999999999991'));
+end;
+$truncate$;
+
+
+-- ---------------------------------------------------------------------------
 -- J58. O caminho legítimo continua aberto
 --
 -- Todo o resto deste arquivo mede recusa. Este caso mede o oposto, e é o que
