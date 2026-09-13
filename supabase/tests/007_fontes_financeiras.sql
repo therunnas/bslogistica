@@ -73,6 +73,19 @@
 --                            válido, e as três invariantes semânticas que já
 --                            eram verdadeiras por construção da RPC
 --
+-- SEXTA RODADA. Os casos J108..J113 acompanham a troca da pergunta na guarda
+-- de DELETE de turno: de "tem apontamento faturado" para "tem folha". Contra o
+-- schema anterior:
+--
+--   MEDEM O BURACO e falham: J109, J110, J111, J113
+--   PASSAM ANTES E DEPOIS:   J108, J112 — turno sem folha segue excluível, e o
+--                            turno do lastro faturado já era protegido
+--
+-- J113 registra uma MUDANÇA DE COMPORTAMENTO, não um buraco fechado: como não
+-- há exceção por cascata, apagar operação ou cliente que tenha qualquer folha
+-- passa a falhar mesmo sem faturamento. O caminho é apagar as folhas antes
+-- (J20) ou inativar.
+--
 -- A CORRIDA NÃO CABE AQUI. J82, J91 e J92 varrem o estado final, mas uma suíte
 -- roda numa transação só e não consegue exercitar duas sessões. A prova da
 -- corrida entre criar folha e mover turno está em
@@ -1548,6 +1561,112 @@ begin
     'recusou 23514', _e);
 end;
 $par_alocacao$;
+
+
+-- ---------------------------------------------------------------------------
+-- J108..J113. DELETE DE TURNO — a pergunta é referência, não faturamento
+--
+-- A guarda antiga perguntava se o turno tinha apontamento FATURADO, e isso era
+-- cedo demais: o turno era apagado enquanto o apontamento ainda era rascunho,
+-- a FK zerava `timesheets.shift_id`, e o rascunho virava fatura depois — com
+-- `billed_amount` derivado de uma jornada que não existe mais.
+--
+-- J113 documenta a CONSEQUÊNCIA da regra nova, que vai além do turno: como não
+-- há exceção por cascata, apagar operação ou cliente que tenha qualquer folha
+-- também passa a falhar, mesmo sem faturamento. O caminho continua sendo
+-- apagar as folhas primeiro (J20) ou inativar.
+-- ---------------------------------------------------------------------------
+
+do $delete_turno$
+declare
+  _e text;
+  _n integer;
+begin
+  -- Turno F8 com folha e apontamento NÃO faturado. `work_date` fora do período
+  -- de J58 de propósito, para não mexer no que aquele caso fatura.
+  execute 'reset role';
+  insert into public.shifts (id, operation_id, name, start_time, end_time, break_minutes, crosses_midnight)
+  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8', '44444444-4444-4444-8444-4444444444f1',
+          'Turno F8 com rascunho', '06:00:00', '15:00:00', 60, false);
+  insert into public.timesheets (id, operation_id, shift_id, work_date)
+  values ('66666666-6666-4666-8666-6666666666f8', '44444444-4444-4444-8444-4444444444f1',
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8', current_date - 20);
+  insert into public.timesheet_entries
+    (id, timesheet_id, employee_id, operation_id, work_date, status, check_in, check_out, break_minutes)
+  values ('77777777-7777-4777-8777-7777777777f8', '66666666-6666-4666-8666-6666666666f8',
+          '55555555-5555-4555-8555-5555555555a1', '44444444-4444-4444-8444-4444444444f1',
+          current_date - 20, 'present', '06:00:00', '17:00:00', 60);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- J109. O caso do achado: entry ainda NÃO faturada.
+  begin
+    delete from public.shifts where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J109. admin apaga turno com folha e entry NÃO faturada',
+    'recusou 42501', _e);
+
+  -- J111. E a mensagem precisa dizer o que fazer no lugar.
+  begin
+    delete from public.shifts where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8';
+    _e := 'não recusou';
+  exception when insufficient_privilege then
+    _e := case when sqlerrm like '%Inative-o%' then 'orienta inativar'
+               else 'mensagem sem orientação: ' || sqlerrm end;
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J111. a recusa orienta inativação', 'orienta inativar', _e);
+
+  -- J110. Folha SEM apontamento nenhum já basta: a referência é o critério.
+  -- O turno B é referenciado pela folha criada em J53, que não tem entries.
+  begin
+    delete from public.shifts where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J110. admin apaga turno com folha SEM apontamentos',
+    'recusou 42501', _e);
+
+  -- J108. Turno sem folha nenhuma continua excluível. Sem este caso a guarda
+  -- poderia estar simplesmente proibindo todo DELETE de turno.
+  execute 'reset role';
+  insert into public.shifts (id, operation_id, name, start_time, end_time, break_minutes, crosses_midnight)
+  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaab0', '44444444-4444-4444-8444-4444444444f1',
+          'Turno F9 sem uso', '06:00:00', '15:00:00', 60, false);
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    delete from public.shifts where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaab0';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J108. admin apaga turno SEM folha', '1 linhas', _e);
+
+  -- J112. A jornada de origem continua de pé depois de tudo.
+  execute 'reset role';
+  perform pg_temp.registrar('J112. turno do lastro faturado continua existindo',
+    '1', (select count(*)::text from public.shifts
+           where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'));
+
+  -- J113. CONSEQUÊNCIA: sem exceção por cascata, apagar a operação que tem
+  -- folha também falha, mesmo sem faturamento. É mudança de comportamento e
+  -- está registrada aqui para não passar despercebida. J32 continua provando
+  -- que operação SEM folha é excluível.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+  begin
+    delete from public.operations where id = '44444444-4444-4444-8444-4444444444f1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J113. cascata: apagar operação COM folha também falha',
+    'recusou 42501', _e);
+end;
+$delete_turno$;
 
 
 -- ---------------------------------------------------------------------------

@@ -50,7 +50,9 @@
 -- Mas NÃO cobre `shifts`: a FK é `timesheets.shift_id ON DELETE SET NULL`,
 -- não CASCADE. Nenhum apontamento é tocado, o trigger nunca dispara, e o turno
 -- sumiria levando junto a jornada que originou os valores. Daí a função
--- própria de `shifts`.
+-- própria de `shifts`, na seção 2 — que na sexta rodada deixou de perguntar
+-- por faturamento e passou a perguntar por REFERÊNCIA, porque o turno também
+-- sumia enquanto o apontamento ainda era rascunho.
 --
 -- O QUE ESTA MIGRATION NÃO FAZ
 --
@@ -132,6 +134,20 @@
 --
 -- A lição desta rodada é sobre método, não sobre SQL: eu afirmei imutabilidade
 -- sem verificar, e desenhei uma saída sem olhar a entrada correspondente.
+--
+-- SEXTA RODADA DE REVISÃO
+--
+-- Um só, e a correção é uma SIMPLIFICAÇÃO:
+--
+--  13. a guarda de DELETE de turno perguntava por FATURAMENTO, e a pergunta
+--      era cedo demais. O turno era apagado enquanto o apontamento ainda era
+--      rascunho, e o rascunho virava fatura depois — histórico faturado com
+--      `shift_id` nulo e sem jornada de origem. Passou a perguntar por
+--      REFERÊNCIA, que subsume a pergunta antiga — seção 2.
+--
+-- O padrão das rodadas anteriores era acrescentar guarda. Aqui foi trocar uma
+-- condição por outra mais simples e mais forte, e o advisory lock saiu porque
+-- a nova pergunta não depende mais do estado de faturamento.
 
 -- ---------------------------------------------------------------------------
 -- 1. Lastro faturado — absoluto, sem exceção de papel
@@ -567,39 +583,73 @@ CREATE TRIGGER trg_invoice_items_bloqueia_fechada
   FOR EACH ROW EXECUTE FUNCTION public.bloquear_itens_fatura_fechada();
 
 -- ---------------------------------------------------------------------------
--- 2. Turno com histórico faturado — o caminho que a cascata não alcança
+-- 2. Turno JÁ USADO EM FOLHA não é excluível — o caminho que a cascata não
+--    alcança
+--
+-- A primeira versão desta guarda perguntava se o turno tinha apontamento
+-- FATURADO. Levantado em revisão e reproduzido em banco local, essa pergunta
+-- era cedo demais — a cadeia inteira, medida:
+--
+--   ADMIN: DELETE FROM shifts                        -> APAGOU
+--   timesheets.shift_id                              -> NULL (FK SET NULL)
+--   o apontamento continua existindo                 -> 1
+--   billed_amount, derivado da jornada do turno já apagado -> 275.00
+--   ADMIN: gerar_fatura(...)                         -> FATUROU: total 275.00
+--   lastro faturado com shift_id                     -> NULL
+--
+-- Ou seja: o turno some enquanto o apontamento ainda é rascunho, e só DEPOIS
+-- o rascunho vira histórico faturado — já sem a jornada que originou o valor.
+-- `gerar_fatura` não exige turno na seleção (passo 6 filtra por cliente,
+-- período e `invoice_id IS NULL`), então nada ali barra o caso.
+--
+-- POR QUE A PERGUNTA NOVA É MAIS SIMPLES, E NÃO MAIS COMPLEXA
+--
+-- A tentação seria tentar decidir no DELETE se o apontamento "ainda pode ser
+-- faturado" — uma previsão sobre o futuro, que depende de período, status e do
+-- que o admin vier a fazer. A invariante estrutural é mais barata e mais
+-- forte: se ALGUMA folha aponta para o turno, o turno é origem de registro de
+-- trabalho e não se apaga. Inativar é o caminho.
+--
+-- A regra nova SUBSUME a antiga: todo apontamento faturado que a versão
+-- anterior protegia estava numa folha com `shift_id = OLD.id`, que é
+-- exatamente o que se testa agora. Nada que era recusado passou a ser aceito.
+--
+-- O ADVISORY LOCK SAIU, e a troca é deliberada. Ele existia porque a pergunta
+-- antiga dependia do estado de FATURAMENTO, que `gerar_fatura` podia mudar
+-- entre o EXISTS e o commit. A pergunta nova não olha faturamento: olha
+-- referência. O que pode mudar concorrentemente agora é a criação da primeira
+-- folha, e isso se fecha com lock de LINHA, não com lock por cliente — ver
+-- abaixo. Sem advisory aqui, nenhuma ordem nova entra no grafo de deadlock;
+-- a guarda de `clients` continua tomando o advisory antes de descer a cascata.
+--
+-- O LOCK VEM ANTES DA VERIFICAÇÃO, pelo mesmo motivo da seção 3d: um trigger
+-- `BEFORE DELETE` roda antes de o executor travar a linha. `FOR UPDATE`
+-- conflita com o `FOR SHARE` que `validar_par_operacao_turno` toma ao criar
+-- folha, e é isso que serializa criar-folha contra apagar-turno.
+--
+-- ESCOPO: `operation_team` NÃO entra aqui, e foi medido, não presumido.
+-- Apagar um turno que só tem alocação remove a alocação em cascata (1 -> 0,
+-- via `operation_team.shift_id ON DELETE CASCADE`). Isso é coerente: sem folha
+-- nenhuma, o turno nunca registrou trabalho, a alocação é "quem está escalado
+-- neste turno" e perde sentido junto com ele. Não há órfão, não há histórico
+-- perdido, e o índice de alocação exclusiva libera o colaborador. Ampliar a
+-- regra por analogia proibiria apagar um turno recém-criado por engano.
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.bloquear_delete_turno_faturado()
+CREATE OR REPLACE FUNCTION public.bloquear_delete_turno_usado()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $$
-DECLARE
-  _client_id uuid;
 BEGIN
-  SELECT o.client_id INTO _client_id
-    FROM public.operations o
-   WHERE o.id = OLD.operation_id;
-
-  -- Mesmo advisory lock que `gerar_fatura` toma. Sem ele existe janela real:
-  -- a fatura pode ser gerada entre o EXISTS abaixo e o commit, e o turno
-  -- sumiria mesmo assim. `gerar_fatura` trava por cliente, então travar pelo
-  -- mesmo hash serializa as duas operações.
-  IF _client_id IS NOT NULL THEN
-    PERFORM pg_advisory_xact_lock(hashtextextended(_client_id::text, 0));
-  END IF;
+  PERFORM 1 FROM public.shifts s WHERE s.id = OLD.id FOR UPDATE;
 
   IF EXISTS (
-    SELECT 1
-      FROM public.timesheets t
-      JOIN public.timesheet_entries te ON te.timesheet_id = t.id
-     WHERE t.shift_id = OLD.id
-       AND te.invoice_id IS NOT NULL
+    SELECT 1 FROM public.timesheets t WHERE t.shift_id = OLD.id
   ) THEN
     RAISE EXCEPTION
-      'Turno com apontamento faturado não pode ser excluído. Inative-o em vez de apagar.'
+      'Turno já utilizado em folha não pode ser excluído. Inative-o.'
       USING ERRCODE = '42501';
   END IF;
 
@@ -607,18 +657,24 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.bloquear_delete_turno_faturado() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.bloquear_delete_turno_faturado() FROM anon;
-REVOKE ALL ON FUNCTION public.bloquear_delete_turno_faturado() FROM authenticated;
-REVOKE ALL ON FUNCTION public.bloquear_delete_turno_faturado() FROM service_role;
+REVOKE ALL ON FUNCTION public.bloquear_delete_turno_usado() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bloquear_delete_turno_usado() FROM anon;
+REVOKE ALL ON FUNCTION public.bloquear_delete_turno_usado() FROM authenticated;
+REVOKE ALL ON FUNCTION public.bloquear_delete_turno_usado() FROM service_role;
 
-COMMENT ON FUNCTION public.bloquear_delete_turno_faturado() IS
-  'Impede DELETE de turno cujo histórico contenha apontamento faturado. Existe porque timesheets.shift_id é ON DELETE SET NULL, e a cascata não alcança os apontamentos.';
+COMMENT ON FUNCTION public.bloquear_delete_turno_usado() IS
+  'Impede DELETE de turno referenciado por qualquer folha. Existe porque timesheets.shift_id é ON DELETE SET NULL: sem esta guarda o turno sumia enquanto o apontamento era rascunho, e o rascunho virava fatura depois, sem jornada de origem. Sem exceção de papel.';
 
+-- A função antiga perguntava por faturamento e foi substituída pela pergunta
+-- estrutural acima, que a subsume. Removida junto com o trigger que a usava
+-- para não deixar duas guardas concorrentes sobre o mesmo DELETE.
 DROP TRIGGER IF EXISTS trg_shifts_bloqueia_delete_faturado ON public.shifts;
-CREATE TRIGGER trg_shifts_bloqueia_delete_faturado
+DROP FUNCTION IF EXISTS public.bloquear_delete_turno_faturado();
+
+DROP TRIGGER IF EXISTS trg_shifts_bloqueia_delete_usado ON public.shifts;
+CREATE TRIGGER trg_shifts_bloqueia_delete_usado
   BEFORE DELETE ON public.shifts
-  FOR EACH ROW EXECUTE FUNCTION public.bloquear_delete_turno_faturado();
+  FOR EACH ROW EXECUTE FUNCTION public.bloquear_delete_turno_usado();
 
 -- ---------------------------------------------------------------------------
 -- 2b. Cliente com histórico faturado — falha cedo, na raiz da árvore
