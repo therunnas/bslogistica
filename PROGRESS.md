@@ -485,18 +485,31 @@ payload.
 **O desfecho não é o mesmo em toda operação**, e a distinção importa para quem
 trata erro:
 
-| Operação                                      | O que acontece                                      |
-| --------------------------------------------- | --------------------------------------------------- |
-| `INSERT`                                      | a derivação **sobrescreve** o payload               |
-| `UPDATE` mexendo **apenas** em campo derivado | **recusado**, `SQLSTATE 42501`                      |
-| `UPDATE` com outra alteração legítima junto   | o bloqueio não dispara; os valores são recalculados |
+| Operação                                       | O que acontece                                           |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| `INSERT`                                       | a derivação **sobrescreve** o payload                    |
+| `UPDATE` mexendo **apenas** em campo derivado  | **recusado**, `SQLSTATE 42501`                           |
+| `UPDATE` que altera coluna **motriz**          | **recalcula** a partir das fontes atuais                 |
+| `UPDATE` aceito que **não** toca coluna motriz | **preserva** os valores gravados; o payload é descartado |
+
+**Motrizes são seis:** `status`, `check_in`, `check_out`, `break_minutes`,
+`employee_id`, `timesheet_id`. `operation_id` e `work_date` ficaram de fora **de
+propósito** — nenhum dos dois entra no cálculo, e incluí-los daria ao cliente um
+jeito de forçar recálculo, e com ele a troca de um snapshot congelado, só
+mandando qualquer valor nessas colunas.
+
+A quarta linha é o caso comum, e é o oposto de recalcular: editar `notes`
+reenviando valores divergentes preserva `worked_minutes`, `overtime_minutes`, os
+três snapshots, `billed_amount` e `cost_amount` de `OLD` — provado pelos casos
+C2b e C2c da `006`. É também o que faz o `UPDATE ... SET invoice_id` do
+`gerar_fatura` não recalcular nada com as taxas de hoje.
 
 A recusa vem de `bloquear_edicao_financeira()`, e ela roda **antes** da
 derivação porque gatilho `BEFORE` de linha dispara em ordem alfabética:
 `trg_timesheet_entries_bloqueio_financeiro` precede
 `trg_timesheet_entries_calculo_financeiro`. `postgres` e `service_role` são
 isentos **desse bloqueio específico** — não das proteções da 011, das quais
-várias recusam justamente `service_role`.
+várias não abrem exceção para papel nenhum.
 
 **Objetos:** 2 funções · 2 triggers · **5 CHECK** de não-negatividade em
 `contracts`, `employees` e `operations`.
@@ -520,19 +533,35 @@ podia ser desfeito por vários caminhos.
 **O que passou a ser garantido:**
 
 - **linha faturada é imutável** — `UPDATE` e `DELETE` recusados em
-  `timesheet_entries` com `invoice_id`. A comparação é da **linha inteira**
-  (`to_jsonb(OLD) - 'updated_at'`), não de uma lista de colunas, para que uma
-  coluna nova no futuro nasça protegida;
-- **o vínculo de fatura só nasce dentro de `gerar_fatura`** — a entrada é
-  restrita pelo `current_user`, que a `SECURITY DEFINER` fixa em `postgres`;
+  `timesheet_entries` com `invoice_id`, **inclusive o `SET NULL`** que a FK
+  emitiria ao apagar a fatura, e inclusive a troca de uma fatura por outra. A
+  comparação é da **linha inteira** (`to_jsonb(OLD) - 'updated_at'`), não de uma
+  lista de colunas, para que uma coluna nova no futuro nasça protegida;
+- **o vínculo de fatura exige execução como `postgres`** — é o contexto em que
+  `gerar_fatura` roda, medido por `current_user`. Recusa `authenticated`, **admin
+  incluído**, e `service_role`. O gatilho **não distingue** `gerar_fatura` de um
+  `INSERT`/`UPDATE` manual numa sessão `postgres`: a fronteira protegida é a API
+  da aplicação, não o banco contra quem já é seu dono;
 - **fontes já faturadas não se apagam nem se remanejam** — cliente, contrato,
-  operação, turno e folha;
+  operação, turno e folha. **Duas guardas vão além do faturado**, de propósito:
+  turno referenciado por qualquer folha e contrato do qual algum apontamento já
+  derivou valores não podem ser apagados **mesmo em rascunho**, porque as FKs são
+  `ON DELETE SET NULL` e o rascunho vira fatura depois; e mover `operation_id` ou
+  `shift_id` de folha **com qualquer apontamento**, faturado ou não, é recusado,
+  porque os apontamentos guardam snapshots da configuração antiga. Folha com
+  apontamento **faturado** congela também `work_date`;
 - **invariante do par** operação × turno, em `timesheets` e `operation_team`,
   lida do `SELECT` travado e não do payload;
-- **fatura fechada e seus itens** não aceitam edição;
+- **fatura com lastro vinculado congela**, e seus itens recusam `INSERT`,
+  `UPDATE` e `DELETE` — inclusive mover um item para outra fatura. O critério é
+  ter apontamento vinculado, não a coluna `status`;
 - **`TRUNCATE` fechado como classe** — revogado de `anon`, `authenticated` e
-  `service_role`, com `ALTER DEFAULT PRIVILEGES` para as tabelas futuras, mais
-  trigger `BEFORE TRUNCATE` em `timesheet_entries` e `invoice_items`.
+  `service_role`, mais `ALTER DEFAULT PRIVILEGES ... REVOKE TRUNCATE ... FROM
+service_role`, que corrige a origem do privilégio para tabelas futuras. Os
+  gatilhos `BEFORE TRUNCATE` em `timesheet_entries` e `invoice_items` são
+  **condicionais ao estado**: recusam enquanto existir apontamento faturado, e
+  disparam também quando a tabela é alcançada por `CASCADE`, que é o que cobre
+  o `TRUNCATE` de `clients`, `operations`, `timesheets` e `invoices`.
 
 **Objetos:** 20 funções · 21 triggers · 8 policies novas (substituindo
 `operations_staff` e `shifts_staff`) · 4 índices para as consultas das guardas ·
@@ -604,7 +633,9 @@ financeira.** As tabelas operacionais aceitavam qualquer coluna do payload,
 incluindo `billed_amount`, `cost_amount` e `invoice_id` em `timesheet_entries`.
 As migrations `010` e `011` fecharam isso (seção 9): os valores passaram a ser
 derivados — sobrescritos no `INSERT`, e a edição puramente financeira **recusada
-com `42501`** no `UPDATE` — e o vínculo de fatura só nasce em `gerar_fatura`.
+com `42501`** no `UPDATE` — e o vínculo de fatura passou a exigir execução como
+`postgres`, o contexto de `gerar_fatura`, recusando `authenticated` e
+`service_role`.
 **Continua aberto** o que não é financeiro:
 `docs/divida-tecnica/escrita-em-operation-team.md` — qualquer `is_staff()` ainda
 inclui, altera e remove alocação, e a tabela não guarda autor nem histórico. É

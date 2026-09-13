@@ -32,13 +32,18 @@ tem relação com o TanStack Router.
   trigger a partir de contrato, operação, turno e colaborador. No `INSERT` a
   derivação sobrescreve o que veio do navegador; um `UPDATE` que mexa **apenas**
   em campo derivado é **recusado com `42501`**, não corrigido em silêncio; um
-  `UPDATE` com outra alteração legítima passa e é recalculado. `postgres` e
-  `service_role` escapam desse bloqueio específico, não das demais proteções.
+  `UPDATE` aceito **recalcula só se mexeu em coluna motriz** (`status`,
+  `check_in`, `check_out`, `break_minutes`, `employee_id`, `timesheet_id`) e do
+  contrário **preserva** o que estava gravado, descartando o payload — é a
+  preservação que mantém o snapshot congelado. `postgres` e `service_role`
+  escapam desse bloqueio específico, não das demais proteções.
   `src/lib/billing.ts` serve para a interface prever o número, nunca para
   decidi-lo; a paridade entre as duas implementações é conferida à mão.
 - **Histórico faturado é imutável.** `timesheet_entries` com `invoice_id`
-  recusa `UPDATE` e `DELETE`; o vínculo de fatura só é criado por
-  `gerar_fatura`; cliente, contrato, operação, turno e folha já faturados não
+  recusa `UPDATE` e `DELETE`. O vínculo só nasce em execução como `postgres`,
+  contexto em que `gerar_fatura` roda — `authenticated`, admin incluído, e
+  `service_role` não criam; sessão `postgres` direta e superusuário estão fora
+  dessa fronteira. Cliente, contrato, operação, turno e folha já faturados não
   se apagam nem se remanejam; `TRUNCATE` está revogado de `anon`,
   `authenticated` e `service_role`. Não afrouxar fora de tarefa própria.
 - **Não tocar no projeto `bs-logisticas`.** É o site institucional, outro

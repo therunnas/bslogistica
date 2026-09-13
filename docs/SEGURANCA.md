@@ -323,10 +323,15 @@ de proteção — os dados ficam íntegros —, mas engana o usuário. Ver
 `invoice_id` deixou de ser alcançável por ela: o trigger
 `protect_timesheet_invoice_link` (migration `20260909175435`) já recusava a
 alteração do vínculo por quem não é admin, e a migration `011`, em Production
-desde 13/09/2026, fechou o resto — o vínculo **só nasce dentro de
-`gerar_fatura`**, e uma linha com `invoice_id` preenchido recusa `UPDATE` e
-`DELETE`. Ver [dívida técnica](divida-tecnica/rls-vinculo-de-fatura-permissivo.md)
-e `PROGRESS.md`, seção 9.
+desde 13/09/2026, fechou o resto — a criação do vínculo passou a **exigir
+execução como `postgres`**, que é o contexto em que `gerar_fatura` roda,
+recusando `authenticated` (admin incluído) e `service_role`; e uma linha com
+`invoice_id` preenchido recusa `UPDATE` e `DELETE`, inclusive o `SET NULL` da
+FK. **O que isso não cobre:** o gatilho mede `current_user`, então não distingue
+`gerar_fatura` de uma sessão `postgres` escrevendo à mão. A fronteira protegida
+é a API da aplicação, não o banco contra quem já é seu dono. Ver
+[dívida técnica](divida-tecnica/rls-vinculo-de-fatura-permissivo.md) e
+`PROGRESS.md`, seção 9.
 
 **Sem FK de `profiles` e `user_roles` para `auth.users`** — remover usuário pelo
 painel não limpa essas tabelas e deixa registros órfãos. Ao remover uma conta,

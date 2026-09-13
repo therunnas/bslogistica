@@ -143,11 +143,25 @@ partir de contrato, operação, turno e colaborador. **O payload do navegador n�
 **Como isso chega a quem escreve, porém, depende da operação** — e a diferença
 importa para o tratamento de erro:
 
-| Operação                                      | O que acontece                                                            |
-| --------------------------------------------- | ------------------------------------------------------------------------- |
-| `INSERT`                                      | a derivação **sobrescreve** o que veio no payload                         |
-| `UPDATE` mexendo **apenas** em campo derivado | **recusado**, com `SQLSTATE 42501` — não é corrigido em silêncio          |
-| `UPDATE` com outra alteração legítima junto   | o bloqueio específico não dispara; a `010` recalcula conforme a alteração |
+| Operação                                       | O que acontece                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `INSERT`                                       | a derivação **sobrescreve** o que veio no payload                |
+| `UPDATE` mexendo **apenas** em campo derivado  | **recusado**, com `SQLSTATE 42501` — não é corrigido em silêncio |
+| `UPDATE` que altera coluna **motriz**          | **recalcula** a partir das fontes atuais                         |
+| `UPDATE` aceito que **não** toca coluna motriz | **preserva** os valores já gravados; o payload é descartado      |
+
+**As colunas motrizes são seis:** `status`, `check_in`, `check_out`,
+`break_minutes`, `employee_id` e `timesheet_id`. `operation_id`, `work_date`,
+`notes` e `invoice_id` **não** são motrizes — nenhuma entra no cálculo, e
+mantê-las fora é o que impede o cliente de forçar recálculo (e a troca de um
+snapshot congelado) só reenviando um valor qualquer.
+
+A última linha é o caso comum: editar `notes` reenviando valores financeiros
+divergentes **não** recusa e **não** recalcula — `worked_minutes`,
+`overtime_minutes`, os três snapshots, `billed_amount` e `cost_amount` voltam a
+ser os de `OLD`. É isso que mantém o snapshot congelado quando o contrato mudou
+depois, e é também o que faz o `UPDATE ... SET invoice_id` do `gerar_fatura` não
+recalcular nada com as taxas de hoje.
 
 A recusa vem de `bloquear_edicao_financeira()`, que roda **antes** da derivação:
 gatilho `BEFORE` de linha dispara em ordem alfabética de nome, e
@@ -156,9 +170,10 @@ gatilho `BEFORE` de linha dispara em ordem alfabética de nome, e
 
 `postgres` e `service_role` são isentos **desse bloqueio específico**, para que
 a derivação e o faturamento funcionem. Isento deste gatilho não significa isento
-do resto: as proteções da `011` — imutabilidade da linha faturada, vínculo de
-fatura restrito a `gerar_fatura`, `TRUNCATE` revogado — continuam valendo, e
-várias delas recusam justamente `service_role`.
+do resto: as proteções da `011` — imutabilidade da linha faturada, `TRUNCATE`
+revogado, vínculo de fatura restrito ao contexto de `gerar_fatura` — continuam
+valendo, e várias delas não abrem exceção para papel nenhum, `service_role`
+incluído.
 
 `src/lib/billing.ts` continua sendo a referência da regra e roda no navegador,
 mas **para previsão, não para decisão**: serve para a tela mostrar o número

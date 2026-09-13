@@ -182,17 +182,25 @@ O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
   trigger** a partir de contrato, operação, turno e colaborador. O desfecho
   depende da operação: no `INSERT` a derivação **sobrescreve** o payload; um
   `UPDATE` que mexa **apenas** em campo derivado é **recusado com `42501`** por
-  `bloquear_edicao_financeira()`, que roda antes da derivação; um `UPDATE` com
-  outra alteração legítima passa e é recalculado. `postgres` e `service_role`
-  são isentos **desse bloqueio específico**, não das demais proteções. Não
-  reintroduzir cálculo no cliente como autoridade — `src/lib/billing.ts` existe
-  para a interface mostrar o número antes de salvar, não para decidi-lo, e a
-  paridade entre os dois é conferida **à mão** (ver `PROGRESS.md`).
+  `bloquear_edicao_financeira()`, que roda antes da derivação; um `UPDATE`
+  aceito **recalcula só se alterou coluna motriz** — `status`, `check_in`,
+  `check_out`, `break_minutes`, `employee_id`, `timesheet_id` —, e do contrário
+  **preserva** os valores gravados, descartando o payload. Não usar "recalcula"
+  como descrição genérica de `UPDATE`: é a preservação que mantém o snapshot
+  congelado. `postgres` e `service_role` são isentos **desse bloqueio
+  específico**, não das demais proteções. Não reintroduzir cálculo no cliente
+  como autoridade — `src/lib/billing.ts` existe para a interface mostrar o
+  número antes de salvar, não para decidi-lo, e a paridade entre os dois é
+  conferida **à mão** (ver `PROGRESS.md`).
 - **Linha faturada é imutável e o lastro não se destrói.** Desde a 011,
-  `timesheet_entries` com `invoice_id` preenchido recusa `UPDATE` e `DELETE`; o
-  vínculo de fatura só nasce dentro de `gerar_fatura`; e as fontes que já foram
-  faturadas — cliente, contrato, operação, turno, folha — não podem ser
-  apagadas nem remanejadas. `TRUNCATE` está revogado de `anon`,
+  `timesheet_entries` com `invoice_id` preenchido recusa `UPDATE` e `DELETE`,
+  inclusive o `SET NULL` que a FK emitiria ao apagar a fatura. **O vínculo só
+  nasce em execução como `postgres`**, que é o contexto em que `gerar_fatura`
+  roda: `authenticated` não cria — admin incluído —, `service_role` também não.
+  A fronteira é a API da aplicação; **sessão `postgres` direta e superusuário
+  ficam fora dela**, e nenhuma proteção aqui promete o contrário. Fontes já
+  faturadas não se apagam nem se remanejam, e turno e contrato **em uso** não se
+  apagam mesmo sem faturamento. `TRUNCATE` está revogado de `anon`,
   `authenticated` e `service_role`, com trigger `BEFORE TRUNCATE` sobre
   `timesheet_entries` e `invoice_items`. Não afrouxar nada disso sem tarefa de
   escopo próprio.
