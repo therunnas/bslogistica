@@ -51,8 +51,8 @@ src/lib/mfa.ts               decisões de segundo fator, funções puras
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         17 arquivos, todos aplicados em Production
-supabase/tests/              7 testes SQL de RLS, invariáveis e fontes
+supabase/migrations/         18 arquivos; 17 em Production, a 012 pendente
+supabase/tests/              8 testes SQL de RLS, invariáveis, fontes e MFA
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
@@ -161,8 +161,17 @@ isoladamente não distinguem** quem nunca ativou MFA de quem ativou e ainda não
 fez o TOTP. A futura autorização precisa exigir o segundo fator **também no
 enforcement do banco** para os acessos protegidos, com um indicador confiável e
 **não manipulável pelo usuário** do estado de MFA, ou mecanismo equivalente.
-**Nunca implementar isso só no guard ou no frontend.** Também **não está
-implementado** — é requisito da ETAPA 1.
+**Nunca implementar isso só no guard ou no frontend.**
+
+**Esse indicador passou a existir** — `public.mfa_bloqueia_excecao_aal1()`,
+migration 012, PR A. Ela lê `auth.mfa_factors` por `SECURITY DEFINER` e responde
+se o estado de MFA da conta **impede** a futura exceção de AAL1. Responde que
+impede em três casos além do fator verificado: sem sessão, com erro de leitura, e
+quando o `uid` do JWT **não existe mais** em `auth.users` — um token ainda não
+expirado de conta apagada, cujos fatores o `ON DELETE CASCADE` levou junto,
+enquanto a linha órfã de `user_roles` sobrevive. **Ter o indicador não é ter a
+autorização:** o PR A **não liberou AAL1**, as 11 policies `*_exige_aal2`
+continuam globais, e nenhuma policy chama a função ainda. Quem a usar é o PR B.
 
 **Enquanto isso não acontecer:**
 

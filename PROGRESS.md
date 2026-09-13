@@ -4,14 +4,14 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 ## 1. Checkpoint
 
-| Item          | Valor                                      |
-| ------------- | ------------------------------------------ |
-| Data          | 2026-09-13                                 |
-| Branch atual  | `main`                                     |
-| `main`        | `c019e428882f2088bca590c42b24a29dbcb74146` |
-| `origin/main` | `c019e42` — idêntico ao `main` local       |
-| Production    | **verde** no commit `c019e42`              |
-| Migrations    | **17 aplicadas, 0 pendentes**              |
+| Item          | Valor                                        |
+| ------------- | -------------------------------------------- |
+| Data          | 2026-09-13                                   |
+| Branch atual  | `feat/pr-a-estado-mfa-confiavel`             |
+| `main`        | `78574acf1d7b97c94a3e7a5bd8d94961ec831df8`   |
+| `origin/main` | `78574ac` — idêntico ao `main` local         |
+| Production    | **verde** no commit `78574ac`                |
+| Migrations    | **17 em Production**; a 012 do PR A pendente |
 
 | Frente                               | Merge     | Estado                                |
 | ------------------------------------ | --------- | ------------------------------------- |
@@ -24,9 +24,11 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 aplicadas em Production em 13/09/2026, com validação read-only completa. O
 detalhe está na **seção 9**.
 
-O próximo trabalho é a **nova política de autorização** (seção 7), que começa
-pelo **PR A**. Ela está **aprovada e ainda não implementada** — leia a seção 6
-antes de tocar em guard, policy ou usuário.
+O trabalho em curso é a **nova política de autorização** (seção 7). O **PR A**
+está implementado e **ainda não em Production** — ele entrega só o primitivo de
+MFA no banco (seção 7.1) e **não libera AAL1**. Os PRs B e C continuam
+**aprovados e não implementados** — leia a seção 6 antes de tocar em guard,
+policy ou usuário.
 
 ## 2. Ambiente
 
@@ -288,16 +290,82 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR       | Entrega                                                                                                                                                                     | Cabe em |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| **PR A** | estado de MFA **verificável no banco** — indicador confiável, não forjável pelo próprio usuário e fail-closed. **O mecanismo não está escolhido**: é o que a ETAPA 1 audita | ETAPA 1 |
-| **PR B** | **RLS seletiva**: AAL1 permitido ao `operacional` só onde autorizado, mantendo AAL2 para admin e para quem já ativou MFA                                                    | ETAPA 2 |
-| **PR C** | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                                           | ETAPA 2 |
+| PR       | Entrega                                                                                                                                                                            | Cabe em |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| **PR A** | estado de MFA **verificável no banco** — indicador confiável, não forjável pelo próprio usuário e fail-closed. **IMPLEMENTADO** na migration 012, ainda não em Production. Ver 7.1 | ETAPA 1 |
+| **PR B** | **RLS seletiva**: AAL1 permitido ao `operacional` só onde autorizado, mantendo AAL2 para admin e para quem já ativou MFA                                                           | ETAPA 2 |
+| **PR C** | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                                                  | ETAPA 2 |
 
 **O primeiro usuário `operacional` real só existe depois dos três**, e depois da
 matriz E2E da ETAPA 6. PR A é pré-requisito de PR B: sem um indicador confiável
 de MFA no banco, a exceção de AAL1 vira bypass para a conta que optou pelo
 segundo fator.
+
+### 7.1 PR A — primitivo de MFA no banco
+
+**Estado: implementado, ainda NÃO em Production.** Migration
+`20260913201030_012_estado_mfa_confiavel.sql` e teste
+`supabase/tests/008_estado_mfa.sql`.
+
+**O risco que motivou, medido e não suposto.** O guard chama
+`getAuthenticatorAssuranceLevel()` **sem argumento**, e nessa forma o
+`@supabase/auth-js` 2.115.0 não fala com o servidor: lê `getSession()` do
+cookie e decodifica o JWT. `currentLevel` vem da claim `aal`, que é assinada;
+mas `nextLevel` vem de `session.user.factors`, campo do **mesmo cookie, fora da
+assinatura**. Reproduzido com o cliente de servidor real, variando só o cookie:
+
+| JWT    | `user.factors` no cookie | `nextLevel` |
+| ------ | ------------------------ | ----------- |
+| `aal1` | um `verified`            | `aal2`      |
+| `aal1` | `[]`                     | **`aal1`**  |
+
+O próprio SDK embrulha esse objeto num proxy que avisa: _"could be insecure!
+This value comes directly from the storage medium (usually cookies on the
+server) and may not be authentic."_
+
+**Hoje isso não é explorável**, e vale dizer por quê: `nextLevel` forjado para
+`aal1` produz `mfa-ausente`, que manda para `/mfa` e **fecha** o painel — a
+mentira só nega acesso a quem mente. O risco aparece no PR B, onde "não tem
+fator verificado" passa a ser a **condição de concessão** da exceção de AAL1.
+
+**O que o PR A entrega:** `public.mfa_bloqueia_excecao_aal1()` — sem parâmetro,
+`RETURNS boolean`, `STABLE`, `SECURITY DEFINER` de `postgres`,
+`search_path = pg_catalog, public`, `EXECUTE` só para `authenticated`. Lê
+`auth.mfa_factors`, que nega `SELECT` a `anon`, `authenticated` **e**
+`service_role`. Responde `true` quando há fator verificado de qualquer
+`factor_type`, `true` quando não há sessão, `true` quando o `uid` do JWT não
+existe mais em `auth.users`, `false` sem fator ou só com `unverified`, e **deixa
+o erro propagar** se a leitura falhar — capturar e devolver `false`
+transformaria falha de infraestrutura em concessão silenciosa.
+
+**O caso da conta apagada veio da review e foi reproduzido antes de corrigir.**
+`auth.mfa_factors` cascateia com `auth.users`, mas `user_roles` não tem FK para
+lá — remoção deixa papel órfão, como `docs/SEGURANCA.md` já registrava. Com um
+token AAL1 ainda válido, o PostgREST aceita a assinatura sem consultar o GoTrue,
+os fatores já sumiram, e a primeira versão da função respondia `false`: a conta
+**apagada** ficaria elegível à exceção que, viva, lhe era negada. Medido no
+banco local — `true` antes do `DELETE`, `false` depois — e fechado pelo ramo que
+exige a existência do `uid`.
+
+**O que o PR A NÃO faz:** não libera AAL1, não altera nenhuma das 11 policies
+`*_exige_aal2`, não consulta papel — `admin` fica fora da exceção tendo fator ou
+não, e essa regra pertence ao PR B, não a um primitivo. Nenhuma policy chama a
+função ainda.
+
+**Testes:** `008` cobre 25 casos — semântica por estado de fator, isolamento por
+`auth.uid()`, conta inexistente e a regressão da conta apagada com token vivo,
+os quatro grants, a prova de que `authenticated` não lê a tabela
+direto mas obtém a resposta pela função, e a conferência de que as 11 policies
+seguem RESTRICTIVE. Escrito **antes** da migration: contra o schema sem a 012 dá
+17 FAIL, com os casos semânticos falhando em `42883` (função inexistente); e os
+casos K/L, medidos contra a primeira versão da função, davam 3 FAIL — foi essa
+falha que documentou o furo da conta apagada.
+
+**Pendência registrada para o PR C:** o comentário em
+`src/app/(painel)/_autorizacao.ts:47-51` afirma que
+`getAuthenticatorAssuranceLevel()` valida o token chamando `getUser(jwt)`. **É
+falso** — descreve o ramo `if (jwt)`, que o projeto nunca usa. Não foi corrigido
+aqui de propósito, para manter o escopo do PR A.
 
 ### ETAPA 1 — próxima
 
@@ -744,7 +812,8 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 ## 11. Não fazer
 
 - Não reconstruir o Supabase de novo.
-- Não reaplicar migrations já aplicadas — Production está **17/17, 0 pendentes**.
+- Não reaplicar migrations já aplicadas — Production tem **17 aplicadas**, e a
+  **012 do PR A ainda não foi implantada**.
 - **Não afrouxar as proteções de `010`/`011`** (seção 9): não devolver
   autoridade de cálculo ao payload, não reabrir `UPDATE`/`DELETE` de linha
   faturada, não devolver `TRUNCATE` a `anon`, `authenticated` ou `service_role`.

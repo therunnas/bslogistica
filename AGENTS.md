@@ -82,6 +82,12 @@ tem relação com o TanStack Router.
   PostgREST/RPC — papel + `aal` sozinhos não distinguem quem nunca ativou MFA de
   quem ativou e ainda não fez o TOTP. A decisão precisa ser enforceable no
   banco, não só no guard.
+- **Estado de MFA vindo da sessão não vale para enforcement.**
+  `getAuthenticatorAssuranceLevel()` sem argumento não fala com o servidor:
+  `nextLevel` sai de `session.user.factors`, que é campo do cookie fora da
+  assinatura do JWT — o próprio SDK chama isso de inseguro. Serve para UX. Para
+  autorização, usar `public.mfa_bloqueia_excecao_aal1()` (migration 012), que lê
+  `auth.mfa_factors` e falha fechada. Ela **não** libera AAL1 nem decide papel.
 - **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
   Operação administrativa privilegiada é server-side, o último admin é
   protegido, e alteração de usuário ou papel é auditada.
