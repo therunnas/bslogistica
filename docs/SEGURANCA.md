@@ -714,18 +714,29 @@ campos arbitrários e modificar dados que não deveria? **Não.** Sem papel,
 `is_staff()` e `has_role()` devolvem `false` e toda escrita é recusada, com ou
 sem campos extras.
 
-**Por que continua sendo risco de design.** O dia em que existir uma conta
-`operacional`, `is_staff()` passa a ser verdadeiro para ela, e as tabelas
-operacionais aceitam qualquer coluna que o payload trouxer — incluindo
-`billed_amount`, `cost_amount` e `invoice_id` em `timesheet_entries`. Isso já está
-rastreado como dívida técnica em
+**Por que continua sendo risco de design — com o escopo já reduzido.** O dia em
+que existir uma conta `operacional`, `is_staff()` passa a ser verdadeiro para
+ela, e as tabelas operacionais aceitam as colunas que o payload trouxer.
+
+A parte **financeira** disso **está fechada** desde 13/09/2026, e o parágrafo
+anterior a esta revisão dizia o contrário: `billed_amount`, `cost_amount` e os
+snapshots são **derivados** pela migration `010` — sobrescritos no `INSERT`, e a
+edição puramente financeira recusada com `42501` —, e `invoice_id` só é criado
+em execução como `postgres` pela `011`. Payload forjado nessas colunas deixou de
+ser caminho. Ver `PROGRESS.md`, seção 9.
+
+**O que permanece:** as demais colunas operacionais continuam vindo do payload,
+o que é legítimo, mas sem allowlist no servidor; e a escrita permissiva em
+`operation_team` segue aberta, em
+[`escrita-em-operation-team.md`](divida-tecnica/escrita-em-operation-team.md). A
+dívida de
 [`rls-vinculo-de-fatura-permissivo.md`](divida-tecnica/rls-vinculo-de-fatura-permissivo.md)
-e [`escrita-em-operation-team.md`](divida-tecnica/escrita-em-operation-team.md), e
-a correção certa é na RLS e nos privilégios de coluna, não numa allowlist no
-navegador — que o atacante contorna ignorando o navegador.
+**foi fechada** — o arquivo em si continua obsoleto no corpo, e não serve como
+especificação. A correção certa segue sendo RLS e privilégio de coluna, nunca
+allowlist no navegador, que o atacante contorna ignorando o navegador.
 
 **Condição para reabertura:** criação da primeira conta não-admin. Antes disso,
-fechar as duas dívidas acima.
+fechar a dívida de `operation_team`.
 
 ### Line endings mistos na working tree
 

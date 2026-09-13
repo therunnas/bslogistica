@@ -288,11 +288,11 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR       | Entrega                                                                                                                                                         | Cabe em |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| **PR A** | estado de MFA **verificável no banco** — indicador confiável e não forjável pelo usuário, fail-closed, lido de `auth.mfa_factors` por função `SECURITY DEFINER` | ETAPA 1 |
-| **PR B** | **RLS seletiva**: AAL1 permitido ao `operacional` só onde autorizado, mantendo AAL2 para admin e para quem já ativou MFA                                        | ETAPA 2 |
-| **PR C** | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                               | ETAPA 2 |
+| PR       | Entrega                                                                                                                                                                     | Cabe em |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| **PR A** | estado de MFA **verificável no banco** — indicador confiável, não forjável pelo próprio usuário e fail-closed. **O mecanismo não está escolhido**: é o que a ETAPA 1 audita | ETAPA 1 |
+| **PR B** | **RLS seletiva**: AAL1 permitido ao `operacional` só onde autorizado, mantendo AAL2 para admin e para quem já ativou MFA                                                    | ETAPA 2 |
+| **PR C** | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                                           | ETAPA 2 |
 
 **O primeiro usuário `operacional` real só existe depois dos três**, e depois da
 matriz E2E da ETAPA 6. PR A é pré-requisito de PR B: sem um indicador confiável
