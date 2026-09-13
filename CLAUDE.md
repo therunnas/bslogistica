@@ -51,8 +51,8 @@ src/lib/mfa.ts               decisões de segundo fator, funções puras
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         15 arquivos (o que já foi aplicado: PROGRESS.md)
-supabase/tests/              5 testes SQL de RLS e invariáveis
+supabase/migrations/         17 arquivos, todos aplicados em Production
+supabase/tests/              7 testes SQL de RLS, invariáveis e fontes
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
@@ -177,6 +177,46 @@ O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
 - **Função `SECURITY DEFINER` roda acima da RLS**, então policy não a protege:
   a exigência de `aal2` precisa estar escrita dentro da própria função, como
   em `gerar_fatura`. Vale para toda RPC nova com `SECURITY DEFINER`.
+- **O payload do cliente não é fonte de valor financeiro.** Desde a migration
+  010, `billed_amount`, `cost_amount` e os três snapshots são **derivados por
+  trigger** a partir de contrato, operação, turno e colaborador. O desfecho
+  depende da operação: no `INSERT` a derivação **sobrescreve** o payload; um
+  `UPDATE` que mexa **apenas** em campo derivado é **recusado com `42501`** por
+  `bloquear_edicao_financeira()`, que roda antes da derivação; um `UPDATE`
+  aceito **recalcula só se alterou coluna motriz** — `status`, `check_in`,
+  `check_out`, `break_minutes`, `employee_id`, `timesheet_id` —, e do contrário
+  **preserva** os valores gravados, descartando o payload. Não usar "recalcula"
+  como descrição genérica de `UPDATE`: é a preservação que mantém o snapshot
+  congelado. `postgres` e `service_role` são isentos **desse bloqueio
+  específico**, não das demais proteções. Não reintroduzir cálculo no cliente
+  como autoridade — `src/lib/billing.ts` existe para a interface mostrar o
+  número antes de salvar, não para decidi-lo, e a paridade entre os dois é
+  conferida **à mão** (ver `PROGRESS.md`).
+- **Linha faturada é imutável e o lastro não se destrói.** Desde a 011,
+  `timesheet_entries` com `invoice_id` preenchido recusa `UPDATE` e `DELETE`,
+  inclusive o `SET NULL` que a FK emitiria ao apagar a fatura. **O vínculo só
+  nasce em execução como `postgres`**, que é o contexto em que `gerar_fatura`
+  roda: `authenticated` não cria — admin incluído —, `service_role` também não.
+  A fronteira é a API da aplicação; **sessão `postgres` direta e superusuário
+  ficam fora dela**, e nenhuma proteção aqui promete o contrário. Os bloqueios
+  de `DELETE` têm **critérios distintos**, e não é "em uso": cliente só é
+  protegido se tiver **fatura ou apontamento faturado** — cliente com apenas
+  operação é apagável, e a operação cai por cascata; contrato é protegido se
+  for **o `contract_id` atual** de uma operação que tenha apontamento — lido do
+  valor corrente, então remapear a operação torna o contrato **de origem**
+  apagável; turno é protegido se **alguma folha** o referencia — turno
+  referenciado só por `operation_team` é apagável, de propósito. Com faturamento
+  congelam `operations.client_id`, o `work_date`/`operation_id`/`shift_id` da
+  folha e a linha do apontamento — mas **não** `operations.contract_id`,
+  `agreed_amount`, as taxas do contrato nem `employees.daily_cost`, que
+  continuam editáveis por admin. Isso não altera o já faturado, cujos snapshots
+  estão congelados; perde-se **proveniência**, não dinheiro. `TRUNCATE` está
+  revogado de `anon` e `authenticated` em `public`, e de `service_role`
+  **apenas nas 10 tabelas de negócio**: `profiles` e `user_roles` seguem com
+  esse privilégio para `service_role` — conferido em Production —, porque a
+  `011` não as listou e `ALTER DEFAULT PRIVILEGES` só vale para tabela futura.
+  Há trigger `BEFORE TRUNCATE` sobre `timesheet_entries` e `invoice_items`. Não
+  afrouxar nada disso sem tarefa de escopo próprio.
 - **Nunca editar migration já aplicada.** Criar nova com
   `supabase migration new <nome>`.
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse

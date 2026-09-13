@@ -42,9 +42,18 @@ se ele tivesse um defeito, as tabelas continuariam protegidas.
 
 - 12 tabelas no schema `public`, **todas com RLS ativa e ao menos uma política**
 - Um event trigger (`ensure_rls`) habilita RLS automaticamente em tabelas novas
-- Três funções `SECURITY DEFINER` — `handle_bslog_auth_user_created`,
-  `provision_bslog_user` e `rls_auto_enable` — com `EXECUTE` restrito a
-  `postgres` e `service_role`
+- **Cinco** funções `SECURITY DEFINER` em `public`, conferidas no banco em
+  13/09/2026: `handle_bslog_auth_user_created`, `provision_bslog_user`,
+  `rls_auto_enable`, `gerar_fatura` e `derivar_valores_financeiros`. A lista
+  dizia três até aqui — omitia `gerar_fatura`, que já existia, e ganhou
+  `derivar_valores_financeiros` com a migration `010`
+- `EXECUTE` conferido em 13/09/2026, papel a papel: **nenhuma** delas é
+  executável por `anon`. Só `gerar_fatura` é executável por `authenticated` —
+  é a RPC do faturamento, e confere `aal2` **dentro da função**, porque policy
+  RESTRICTIVE não protege o que roda acima da RLS. Só `provision_bslog_user` é
+  executável por `service_role`. `derivar_valores_financeiros`,
+  `handle_bslog_auth_user_created` e `rls_auto_enable` não são executáveis por
+  nenhum dos três: chega-se a elas apenas por trigger
 - O advisor de segurança do Supabase reporta um único achado, listado nas
   pendências
 
@@ -309,12 +318,20 @@ levanta erro, e a interface mostra "Registro salvo." sem ter salvo. Não é falh
 de proteção — os dados ficam íntegros —, mas engana o usuário. Ver
 [dívida técnica](divida-tecnica/falso-sucesso-em-update-bloqueado-por-rls.md).
 
-**Vínculo de fatura gravável por não-admin** — a policy de
-`timesheet_entries` exige apenas `is_staff()`, e a coluna `invoice_id` está
-coberta por ela. Um usuário `operacional` pode desfazer o lastro de uma fatura
-fechada escrevendo direto pela API. Precisa ser fechado antes de existir a
-primeira conta `operacional`. Ver
-[dívida técnica](divida-tecnica/rls-vinculo-de-fatura-permissivo.md).
+**Vínculo de fatura gravável por não-admin — FECHADO.** A policy de
+`timesheet_entries` continua exigindo apenas `is_staff()`, mas a coluna
+`invoice_id` deixou de ser alcançável por ela: o trigger
+`protect_timesheet_invoice_link` (migration `20260909175435`) já recusava a
+alteração do vínculo por quem não é admin, e a migration `011`, em Production
+desde 13/09/2026, fechou o resto — a criação do vínculo passou a **exigir
+execução como `postgres`**, que é o contexto em que `gerar_fatura` roda,
+recusando `authenticated` (admin incluído) e `service_role`; e uma linha com
+`invoice_id` preenchido recusa `UPDATE` e `DELETE`, inclusive o `SET NULL` da
+FK. **O que isso não cobre:** o gatilho mede `current_user`, então não distingue
+`gerar_fatura` de uma sessão `postgres` escrevendo à mão. A fronteira protegida
+é a API da aplicação, não o banco contra quem já é seu dono. Ver
+[dívida técnica](divida-tecnica/rls-vinculo-de-fatura-permissivo.md) e
+`PROGRESS.md`, seção 9.
 
 **Sem FK de `profiles` e `user_roles` para `auth.users`** — remover usuário pelo
 painel não limpa essas tabelas e deixa registros órfãos. Ao remover uma conta,
@@ -525,8 +542,16 @@ WHERE n.nspname = 'public' AND p.proname IN ('is_staff', 'update_updated_at_colu
 
 ### SEC-009 — `TRUNCATE` concedido a `anon` e `authenticated`
 
-**Status:** HARDENING PREVENTIVO APLICADO — verificado no banco em 06/09/2026 / estado anterior não provado
-**Severidade:** média se confirmado
+**Status:** **PARCIAL** — o escopo original (`anon` e `authenticated`) está
+fechado e medido; o `TRUNCATE` de `service_role` foi revogado só nas 10 tabelas
+de negócio pela migration `011`, em Production desde 13/09/2026
+**Severidade:** média se confirmado; o resíduo abaixo é baixo, mas não é zero
+
+**Condição de fechamento, ainda não cumprida:** decidir sobre o `TRUNCATE` de
+`service_role` em `profiles` e `user_roles` — revogar, ou registrar
+explicitamente como risco aceito. Enquanto essa decisão não for tomada, **este
+item não sai da lista**, pela regra desta seção. Não marquei como fechado nem
+aceitei o risco por conta própria: é decisão de quem responde pelo projeto.
 
 **Diagnóstico.** As tabelas de `public` provavelmente concedem `TRUNCATE` a
 `anon` e a `authenticated`.
@@ -567,6 +592,47 @@ SELECT table_name, grantee FROM information_schema.role_table_grants
 WHERE table_schema = 'public' AND privilege_type = 'TRUNCATE'
   AND grantee IN ('anon', 'authenticated');
 ```
+
+**Fechamento em 13/09/2026, pela migration `011`.** A auditoria de encerramento
+do PR #23 tratou `TRUNCATE` como **classe**, não como um grant isolado, e achou
+duas coisas que o hardening de 06/09 não cobria.
+
+A primeira contradiz o parágrafo acima, e vale dizer com todas as letras: a
+frase _"`service_role` e `postgres` mantêm `TRUNCATE`: são os papéis de
+manutenção e restauração"_ **estava errada como postura de segurança**.
+`service_role` é a chave que a API expõe a quem a possua; deixá-la com
+`TRUNCATE` mantinha aberto exatamente o caminho que o `REVOKE` de `anon` e
+`authenticated` tentava fechar. A `011` revoga `TRUNCATE` de `service_role` nas
+10 tabelas de negócio, e acrescenta
+`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE TRUNCATE ON TABLES FROM
+service_role` para que tabela nova não volte a nascer com ele. **Conferido em
+Production: 0/10.**
+
+**O que continua fora desse revoke, e é preciso dizer:** a `011` listou as 10
+tabelas de negócio, e `ALTER DEFAULT PRIVILEGES` só alcança tabela **futura** —
+não mexe em grant existente. Então `profiles` e `user_roles` **seguem com
+`TRUNCATE` para `service_role`**, medido em Production em 13/09/2026. Para
+`anon` e `authenticated` o revoke é total: **0 nas 12**. Essas duas tabelas não
+guardam lastro financeiro, mas um `TRUNCATE` nelas derrubaria papéis e perfis. É
+o resíduo que mantém este item em **PARCIAL** — a condição de fechamento está no
+cabeçalho.
+
+**O que atenua, sem zerar:** alcançar esse `TRUNCATE` exige possuir a chave
+`service_role` **e** conexão direta ao Postgres. O PostgREST não expõe
+`TRUNCATE`, e a aplicação não usa essa chave — ela nunca vai para o navegador.
+O privilégio está errado; a via pela API não existe.
+
+A segunda é que `REVOKE` sozinho não é o bastante. `TRUNCATE` **não dispara
+trigger de linha e não consulta a RLS**, e alcança por `CASCADE` tabelas que
+ninguém nomeou no comando. Foi verificado — não presumido — que `BEFORE
+TRUNCATE` **dispara** nas tabelas atingidas por cascata. Por isso a `011`
+instala dois gatilhos de statement, `bloquear_truncate_lastro()` sobre
+`timesheet_entries` e `invoice_items`, que recusam o comando quando existe
+lastro faturado. É proteção **por estado**, não por papel.
+
+**O que isto não promete.** Um superusuário PostgreSQL hostil desabilita
+trigger e recoloca grant. A proteção vale contra a API, contra `service_role`
+vazada e contra engano operacional — não contra quem já é dono do banco.
 
 ### SEC-007 — Injeção de fórmula na exportação CSV
 
@@ -648,18 +714,29 @@ campos arbitrários e modificar dados que não deveria? **Não.** Sem papel,
 `is_staff()` e `has_role()` devolvem `false` e toda escrita é recusada, com ou
 sem campos extras.
 
-**Por que continua sendo risco de design.** O dia em que existir uma conta
-`operacional`, `is_staff()` passa a ser verdadeiro para ela, e as tabelas
-operacionais aceitam qualquer coluna que o payload trouxer — incluindo
-`billed_amount`, `cost_amount` e `invoice_id` em `timesheet_entries`. Isso já está
-rastreado como dívida técnica em
+**Por que continua sendo risco de design — com o escopo já reduzido.** O dia em
+que existir uma conta `operacional`, `is_staff()` passa a ser verdadeiro para
+ela, e as tabelas operacionais aceitam as colunas que o payload trouxer.
+
+A parte **financeira** disso **está fechada** desde 13/09/2026, e o parágrafo
+anterior a esta revisão dizia o contrário: `billed_amount`, `cost_amount` e os
+snapshots são **derivados** pela migration `010` — sobrescritos no `INSERT`, e a
+edição puramente financeira recusada com `42501` —, e `invoice_id` só é criado
+em execução como `postgres` pela `011`. Payload forjado nessas colunas deixou de
+ser caminho. Ver `PROGRESS.md`, seção 9.
+
+**O que permanece:** as demais colunas operacionais continuam vindo do payload,
+o que é legítimo, mas sem allowlist no servidor; e a escrita permissiva em
+`operation_team` segue aberta, em
+[`escrita-em-operation-team.md`](divida-tecnica/escrita-em-operation-team.md). A
+dívida de
 [`rls-vinculo-de-fatura-permissivo.md`](divida-tecnica/rls-vinculo-de-fatura-permissivo.md)
-e [`escrita-em-operation-team.md`](divida-tecnica/escrita-em-operation-team.md), e
-a correção certa é na RLS e nos privilégios de coluna, não numa allowlist no
-navegador — que o atacante contorna ignorando o navegador.
+**foi fechada** — o arquivo em si continua obsoleto no corpo, e não serve como
+especificação. A correção certa segue sendo RLS e privilégio de coluna, nunca
+allowlist no navegador, que o atacante contorna ignorando o navegador.
 
 **Condição para reabertura:** criação da primeira conta não-admin. Antes disso,
-fechar as duas dívidas acima.
+fechar a dívida de `operation_team`.
 
 ### Line endings mistos na working tree
 

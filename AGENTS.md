@@ -27,6 +27,36 @@ tem relação com o TanStack Router.
   `supabase migration new <nome>`.
 - **Não alterar regras financeiras** — cálculo de diária, hora extra, custo ou
   faturamento — fora de tarefa com esse escopo explícito.
+- **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
+  `cost_amount` e os snapshots de diária, hora extra e custo são derivados por
+  trigger a partir de contrato, operação, turno e colaborador. No `INSERT` a
+  derivação sobrescreve o que veio do navegador; um `UPDATE` que mexa **apenas**
+  em campo derivado é **recusado com `42501`**, não corrigido em silêncio; um
+  `UPDATE` aceito **recalcula só se mexeu em coluna motriz** (`status`,
+  `check_in`, `check_out`, `break_minutes`, `employee_id`, `timesheet_id`) e do
+  contrário **preserva** o que estava gravado, descartando o payload — é a
+  preservação que mantém o snapshot congelado. `postgres` e `service_role`
+  escapam desse bloqueio específico, não das demais proteções.
+  `src/lib/billing.ts` serve para a interface prever o número, nunca para
+  decidi-lo; a paridade entre as duas implementações é conferida à mão.
+- **Histórico faturado é imutável.** `timesheet_entries` com `invoice_id`
+  recusa `UPDATE` e `DELETE`. O vínculo só nasce em execução como `postgres`,
+  contexto em que `gerar_fatura` roda — `authenticated`, admin incluído, e
+  `service_role` não criam; sessão `postgres` direta e superusuário estão fora
+  dessa fronteira. Os bloqueios de `DELETE` têm critérios **distintos**, não "em
+  uso": cliente exige **fatura ou apontamento faturado**; contrato, ser o
+  `contract_id` **atual** de uma operação com apontamento — remapear a operação
+  torna o contrato de origem apagável; turno, ser referenciado por **folha** —
+  só por `operation_team` não basta. Com faturamento congelam
+  `operations.client_id`, o
+  `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
+  **Não** congelam `operations.contract_id`, `agreed_amount`, as taxas do
+  contrato nem `employees.daily_cost` — editáveis por admin, sem alterar o já
+  faturado, mas perdendo proveniência. `TRUNCATE` está revogado de `anon` e
+  `authenticated` em `public`, e de `service_role` **nas 10 tabelas de
+  negócio** — `profiles` e `user_roles` **continuam** com ele para
+  `service_role`, porque a `011` não as listou e `ALTER DEFAULT PRIVILEGES` não
+  mexe em grant existente. Não afrouxar fora de tarefa própria.
 - **Não tocar no projeto `bs-logisticas`.** É o site institucional, outro
   repositório e outro projeto na Vercel.
 - **`proxy.ts`, não `middleware.ts`.** No Next.js 16 a convenção foi renomeada;

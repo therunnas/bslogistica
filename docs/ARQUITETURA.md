@@ -132,14 +132,75 @@ navegador → PostgREST → **RLS** → Postgres.
 Escrita: formulário → `mutations.ts` ou chamada direta → mesma cadeia →
 invalidação das queries afetadas.
 
-Os valores financeiros são **calculados no navegador e gravados** no
-apontamento: `worked_minutes`, `overtime_minutes`, `billed_amount`,
-`cost_amount` e os snapshots de diária e custo. Dashboard, faturamento e
-relatórios apenas **leem** o que foi gravado — não recalculam.
+Os valores financeiros são **derivados no banco**, desde a migration
+`20260912183000_010`. Um trigger `BEFORE INSERT OR UPDATE` em
+`timesheet_entries` recalcula `worked_minutes`, `overtime_minutes`,
+`billed_amount`, `cost_amount` e os snapshots de diária, hora extra e custo a
+partir de contrato, operação, turno e colaborador. **O payload do navegador não
+é fonte de verdade nessas colunas.** Dashboard, faturamento e relatórios apenas
+**leem** o que ficou gravado.
 
-Consequência prática: a tela de apontamentos mostra o valor **calculado na
-hora**, não o gravado. Conferir uma alteração pela interface não prova o que foi
-persistido.
+**Como isso chega a quem escreve, porém, depende da operação** — e a diferença
+importa para o tratamento de erro:
+
+| Operação                                       | O que acontece                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `INSERT`                                       | a derivação **sobrescreve** o que veio no payload                |
+| `UPDATE` mexendo **apenas** em campo derivado  | **recusado**, com `SQLSTATE 42501` — não é corrigido em silêncio |
+| `UPDATE` que altera coluna **motriz**          | **recalcula** a partir das fontes atuais                         |
+| `UPDATE` aceito que **não** toca coluna motriz | **preserva** os valores já gravados; o payload é descartado      |
+
+**As colunas motrizes são seis:** `status`, `check_in`, `check_out`,
+`break_minutes`, `employee_id` e `timesheet_id`. `operation_id`, `work_date`,
+`notes` e `invoice_id` **não** são motrizes — nenhuma entra no cálculo, e
+mantê-las fora é o que impede o cliente de forçar recálculo (e a troca de um
+snapshot congelado) só reenviando um valor qualquer.
+
+A última linha é o caso comum: editar `notes` reenviando valores financeiros
+divergentes **não** recusa e **não** recalcula — `worked_minutes`,
+`overtime_minutes`, os três snapshots, `billed_amount` e `cost_amount` voltam a
+ser os de `OLD`. É isso que mantém o snapshot congelado quando o contrato mudou
+depois, e é também o que faz o `UPDATE ... SET invoice_id` do `gerar_fatura` não
+recalcular nada com as taxas de hoje.
+
+A recusa vem de `bloquear_edicao_financeira()`, que roda **antes** da derivação:
+gatilho `BEFORE` de linha dispara em ordem alfabética de nome, e
+`trg_timesheet_entries_bloqueio_financeiro` precede
+`trg_timesheet_entries_calculo_financeiro`.
+
+`postgres` e `service_role` são isentos **desse bloqueio específico**, para que
+a derivação e o faturamento funcionem. Isento deste gatilho não significa isento
+do resto: as proteções da `011` — imutabilidade da linha faturada, `TRUNCATE`
+revogado, criação do vínculo de fatura exigindo **execução como `postgres`** —
+continuam valendo, e várias delas não abrem exceção para papel nenhum,
+`service_role` incluído. A fronteira do vínculo é o papel de execução, não a
+função: o gatilho testa `current_user`, então não distingue `gerar_fatura` de
+uma sessão `postgres` escrevendo à mão.
+
+`src/lib/billing.ts` continua sendo a referência da regra e roda no navegador,
+mas **para previsão, não para decisão**: serve para a tela mostrar o número
+antes de salvar. A autoridade é o trigger.
+
+**As duas implementações precisam continuar espelhadas, e isso hoje é manual.**
+`supabase/tests/006_valores_financeiros.sql` guarda expectativas de paridade
+cujos números saíram de uma execução anterior do `calcEntry()` e estão gravados
+como **constantes**. O teste **não** executa as duas implementações lado a lado:
+se o `calcEntry()` mudar, a paridade precisa ser revista à mão. Automatizar esse
+diferencial está registrado como dívida em `PROGRESS.md`.
+
+Consequência prática que não mudou: a tela de apontamentos mostra o valor
+**calculado na hora**, não o gravado. Conferir uma alteração pela interface não
+prova o que foi persistido.
+
+Uma vez faturado, o apontamento **congela**: linha com `invoice_id` preenchido
+recusa `UPDATE` e `DELETE`, e as fontes do cálculo não podem ser **apagadas**
+(migration `20260912200000_011`). O congelamento das fontes é mais estreito que
+o da linha: valem `operations.client_id` e o
+`work_date`/`operation_id`/`shift_id` da folha, mas `operations.contract_id`,
+`agreed_amount`, as taxas do contrato e `employees.daily_cost` continuam
+editáveis por admin. Isso não altera valor já cobrado — a entry guarda os
+snapshots —, mas a proveniência da taxa não é preservada; está registrado como
+dívida em `PROGRESS.md`, seção 10.
 
 ## Módulos
 
