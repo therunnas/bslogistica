@@ -248,6 +248,67 @@ $superficie$;
 
 
 -- ---------------------------------------------------------------------------
+-- K e L. JWT residual de conta que não existe mais.
+--
+-- O PostgREST valida a ASSINATURA do JWT e não consulta o GoTrue a cada
+-- requisição, então um token emitido antes de a conta ser apagada continua
+-- aceito até expirar — cerca de uma hora. Nesse intervalo `auth.uid()` devolve
+-- o `sub` de um usuário que já não existe.
+--
+-- Isso importa porque `auth.mfa_factors` tem FK para `auth.users` com
+-- ON DELETE CASCADE: apagar a conta leva os fatores junto. Uma função que só
+-- perguntasse "existe fator verificado?" responderia `false` — ou seja, "pode
+-- aplicar a exceção de AAL1" — para uma conta APAGADA que, viva, era bloqueada.
+-- A conta ganharia acesso ao morrer.
+--
+-- E o papel sobrevive: `user_roles` não tem FK para `auth.users`, o que já está
+-- registrado em docs/SEGURANCA.md como remoção que deixa registro órfão. Então
+-- a futura policy do PR B veria papel `operacional` + "sem MFA" e concederia.
+--
+-- Levantado na review do Codex no PR #25 e reproduzido antes de corrigir.
+-- ---------------------------------------------------------------------------
+
+do $removido$
+declare _antes text; _depois text; _fatores int; _papel int;
+begin
+  perform pg_temp.registrar('K. uid que nunca existiu bloqueia',
+    'true', pg_temp.consultar('99999999-9999-4999-8999-999999999999'));
+
+  insert into auth.users (id) values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+  values ('f0000005-0000-4000-8000-000000000005', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          'ativo', 'totp', 'verified', now(), now());
+  -- O papel é atribuição administrativa separada; o trigger de onboarding cria
+  -- apenas `profiles`. Inserido à mão para reproduzir a órfã.
+  insert into public.user_roles (user_id, role)
+  values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'operacional');
+
+  _antes := pg_temp.consultar('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  perform pg_temp.registrar('L1. conta viva com fator verificado bloqueia',
+    'true', _antes);
+
+  delete from auth.users where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+  select count(*) into _fatores from auth.mfa_factors
+   where user_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  perform pg_temp.registrar('L2. o CASCADE levou os fatores', '0', _fatores::text);
+
+  select count(*) into _papel from public.user_roles
+   where user_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  perform pg_temp.registrar('L3. mas o papel ficou orfao', '1', _papel::text);
+
+  -- Mesmo `sub`, como num token ainda não expirado.
+  _depois := pg_temp.consultar('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  perform pg_temp.registrar(
+    'L4. conta APAGADA continua bloqueando a excecao', 'true', _depois);
+
+  perform pg_temp.registrar(
+    'L5. apagar a conta nao afrouxa a resposta', 'true|true', _antes || '|' || _depois);
+end;
+$removido$;
+
+
+-- ---------------------------------------------------------------------------
 -- Relatório
 -- ---------------------------------------------------------------------------
 

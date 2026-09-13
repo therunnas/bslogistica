@@ -99,6 +99,26 @@ AS $$
     -- Sem sessão não existe conta para avaliar. Responder `false` aqui diria
     -- "esta conta não tem MFA", e uma policy futura leria isso como permissão.
     WHEN auth.uid() IS NULL THEN true
+
+    -- CONTA QUE NÃO EXISTE MAIS. O PostgREST valida a ASSINATURA do JWT e não
+    -- consulta o GoTrue a cada requisição, então um token emitido antes de a
+    -- conta ser apagada continua aceito até expirar — cerca de uma hora. Nesse
+    -- intervalo `auth.uid()` devolve o `sub` de alguém que já não existe.
+    --
+    -- Sem esta linha o resultado se invertia: `auth.mfa_factors` tem FK para
+    -- `auth.users` com ON DELETE CASCADE, então apagar a conta leva os fatores
+    -- junto, o EXISTS abaixo dá `false`, e a conta APAGADA passaria a ser
+    -- elegível à exceção de AAL1 que, viva, lhe era negada. O papel sobrevive
+    -- para completar o quadro: `user_roles` não tem FK para `auth.users` — é a
+    -- remoção que deixa registro órfão, já registrada em docs/SEGURANCA.md.
+    --
+    -- Conta inexistente é "não sei quem é", e "não sei" já é `true` aqui.
+    -- Levantado na review do PR #25 e reproduzido antes de corrigir; os casos
+    -- K e L de `supabase/tests/008_estado_mfa.sql` guardam a regressão.
+    WHEN NOT EXISTS (
+      SELECT 1 FROM auth.users u WHERE u.id = auth.uid()
+    ) THEN true
+
     ELSE EXISTS (
       SELECT 1
         FROM auth.mfa_factors f
@@ -133,4 +153,4 @@ REVOKE ALL ON FUNCTION public.mfa_bloqueia_excecao_aal1() FROM service_role;
 GRANT EXECUTE ON FUNCTION public.mfa_bloqueia_excecao_aal1() TO authenticated;
 
 COMMENT ON FUNCTION public.mfa_bloqueia_excecao_aal1() IS
-  'Responde se o estado de MFA da conta atual impede a futura excecao de AAL1. TRUE quando ha fator verificado, e tambem quando nao ha sessao: o valor seguro e o que exige aal2. Nao decide papel, nao concede acesso e nao libera AAL1. SECURITY DEFINER porque auth.mfa_factors nega SELECT a anon, authenticated e service_role; sem parametro, para nao permitir enumerar outra conta.';
+  'Responde se o estado de MFA da conta atual impede a futura excecao de AAL1. TRUE quando ha fator verificado, quando nao ha sessao e quando o uid do JWT nao existe mais em auth.users: o valor seguro e o que exige aal2. Nao decide papel, nao concede acesso e nao libera AAL1. SECURITY DEFINER porque auth.mfa_factors nega SELECT a anon, authenticated e service_role; sem parametro, para nao permitir enumerar outra conta.';

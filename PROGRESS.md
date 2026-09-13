@@ -333,20 +333,33 @@ fator verificado" passa a ser a **condição de concessão** da exceção de AAL
 `search_path = pg_catalog, public`, `EXECUTE` só para `authenticated`. Lê
 `auth.mfa_factors`, que nega `SELECT` a `anon`, `authenticated` **e**
 `service_role`. Responde `true` quando há fator verificado de qualquer
-`factor_type`, `true` quando não há sessão, `false` sem fator ou só com
-`unverified`, e **deixa o erro propagar** se a leitura falhar — capturar e
-devolver `false` transformaria falha de infraestrutura em concessão silenciosa.
+`factor_type`, `true` quando não há sessão, `true` quando o `uid` do JWT não
+existe mais em `auth.users`, `false` sem fator ou só com `unverified`, e **deixa
+o erro propagar** se a leitura falhar — capturar e devolver `false`
+transformaria falha de infraestrutura em concessão silenciosa.
+
+**O caso da conta apagada veio da review e foi reproduzido antes de corrigir.**
+`auth.mfa_factors` cascateia com `auth.users`, mas `user_roles` não tem FK para
+lá — remoção deixa papel órfão, como `docs/SEGURANCA.md` já registrava. Com um
+token AAL1 ainda válido, o PostgREST aceita a assinatura sem consultar o GoTrue,
+os fatores já sumiram, e a primeira versão da função respondia `false`: a conta
+**apagada** ficaria elegível à exceção que, viva, lhe era negada. Medido no
+banco local — `true` antes do `DELETE`, `false` depois — e fechado pelo ramo que
+exige a existência do `uid`.
 
 **O que o PR A NÃO faz:** não libera AAL1, não altera nenhuma das 11 policies
 `*_exige_aal2`, não consulta papel — `admin` fica fora da exceção tendo fator ou
 não, e essa regra pertence ao PR B, não a um primitivo. Nenhuma policy chama a
 função ainda.
 
-**Testes:** `008` cobre 19 casos — semântica por estado de fator, isolamento por
-`auth.uid()`, os quatro grants, a prova de que `authenticated` não lê a tabela
+**Testes:** `008` cobre 25 casos — semântica por estado de fator, isolamento por
+`auth.uid()`, conta inexistente e a regressão da conta apagada com token vivo,
+os quatro grants, a prova de que `authenticated` não lê a tabela
 direto mas obtém a resposta pela função, e a conferência de que as 11 policies
-seguem RESTRICTIVE. Escrito **antes** da migration: no baseline dá 17 FAIL, com
-os casos semânticos falhando em `42883` (função inexistente).
+seguem RESTRICTIVE. Escrito **antes** da migration: contra o schema sem a 012 dá
+17 FAIL, com os casos semânticos falhando em `42883` (função inexistente); e os
+casos K/L, medidos contra a primeira versão da função, davam 3 FAIL — foi essa
+falha que documentou o furo da conta apagada.
 
 **Pendência registrada para o PR C:** o comentário em
 `src/app/(painel)/_autorizacao.ts:47-51` afirma que

@@ -165,8 +165,11 @@ enforcement do banco** para os acessos protegidos, com um indicador confiável e
 
 **Esse indicador passou a existir** — `public.mfa_bloqueia_excecao_aal1()`,
 migration 012, PR A. Ela lê `auth.mfa_factors` por `SECURITY DEFINER` e responde
-se o estado de MFA da conta **impede** a futura exceção de AAL1; sem sessão ou
-com erro de leitura, responde que impede. **Ter o indicador não é ter a
+se o estado de MFA da conta **impede** a futura exceção de AAL1. Responde que
+impede em três casos além do fator verificado: sem sessão, com erro de leitura, e
+quando o `uid` do JWT **não existe mais** em `auth.users` — um token ainda não
+expirado de conta apagada, cujos fatores o `ON DELETE CASCADE` levou junto,
+enquanto a linha órfã de `user_roles` sobrevive. **Ter o indicador não é ter a
 autorização:** o PR A **não liberou AAL1**, as 11 policies `*_exige_aal2`
 continuam globais, e nenhuma policy chama a função ainda. Quem a usar é o PR B.
 
