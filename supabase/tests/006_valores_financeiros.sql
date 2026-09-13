@@ -84,7 +84,15 @@ insert into public.shifts (id, operation_id, name, start_time, end_time, break_m
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '44444444-4444-4444-8444-444444444444',
    'Diurno',  '06:00:00', '15:00:00', 60, false),
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', '44444444-4444-4444-8444-444444444444',
-   'Noturno', '22:00:00', '06:00:00',  0, true);
+   'Noturno', '22:00:00', '06:00:00',  0, true),
+  -- Turno PRÓPRIO da operação sem contrato, com jornada idêntica à do Diurno.
+  -- Até a migration 011 a folha do caso F apontava para o Diurno, que pertence
+  -- à OUTRA operação: exatamente o par inválido que a 011 passou a recusar. A
+  -- fixture só conseguia existir porque a invariante não existia. Mesmos
+  -- 06:00–15:00 com 60 de intervalo, então os 480 minutos previstos e todos os
+  -- números do caso F seguem iguais.
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaf', '44444444-4444-4444-8444-44444444444f',
+   'Diurno sem contrato', '06:00:00', '15:00:00', 60, false);
 
 insert into public.timesheets (id, operation_id, shift_id, work_date) values
   ('66666666-6666-4666-8666-666666666661', '44444444-4444-4444-8444-444444444444',
@@ -92,7 +100,7 @@ insert into public.timesheets (id, operation_id, shift_id, work_date) values
   ('66666666-6666-4666-8666-666666666662', '44444444-4444-4444-8444-444444444444',
    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date),
   ('66666666-6666-4666-8666-66666666666f', '44444444-4444-4444-8444-44444444444f',
-   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', current_date);
+   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaf', current_date);
 
 -- Um colaborador por caso: o índice único permite uma diária faturável por
 -- colaborador/operação/data.
