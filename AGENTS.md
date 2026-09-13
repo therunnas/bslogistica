@@ -43,8 +43,12 @@ tem relação com o TanStack Router.
   recusa `UPDATE` e `DELETE`. O vínculo só nasce em execução como `postgres`,
   contexto em que `gerar_fatura` roda — `authenticated`, admin incluído, e
   `service_role` não criam; sessão `postgres` direta e superusuário estão fora
-  dessa fronteira. Cliente, contrato, operação, turno e folha já faturados não
-  se apagam nem se remanejam; `TRUNCATE` está revogado de `anon`,
+  dessa fronteira. Cliente, contrato e turno **em uso** não se apagam; com
+  faturamento congelam `operations.client_id`, o
+  `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
+  **Não** congelam `operations.contract_id`, `agreed_amount`, as taxas do
+  contrato nem `employees.daily_cost` — editáveis por admin, sem alterar o já
+  faturado, mas perdendo proveniência. `TRUNCATE` está revogado de `anon`,
   `authenticated` e `service_role`. Não afrouxar fora de tarefa própria.
 - **Não tocar no projeto `bs-logisticas`.** É o site institucional, outro
   repositório e outro projeto na Vercel.

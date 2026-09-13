@@ -198,9 +198,14 @@ O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
   nasce em execução como `postgres`**, que é o contexto em que `gerar_fatura`
   roda: `authenticated` não cria — admin incluído —, `service_role` também não.
   A fronteira é a API da aplicação; **sessão `postgres` direta e superusuário
-  ficam fora dela**, e nenhuma proteção aqui promete o contrário. Fontes já
-  faturadas não se apagam nem se remanejam, e turno e contrato **em uso** não se
-  apagam mesmo sem faturamento. `TRUNCATE` está revogado de `anon`,
+  ficam fora dela**, e nenhuma proteção aqui promete o contrário. Cliente,
+  contrato e turno **em uso** não se apagam, mesmo em rascunho. Com faturamento
+  congelam `operations.client_id`, o `work_date`/`operation_id`/`shift_id` da
+  folha e a linha do apontamento — mas **não** `operations.contract_id`,
+  `agreed_amount`, as taxas do contrato nem `employees.daily_cost`, que
+  continuam editáveis por admin. Isso não altera o já faturado, cujos snapshots
+  estão congelados; perde-se **proveniência**, não dinheiro. `TRUNCATE` está
+  revogado de `anon`,
   `authenticated` e `service_role`, com trigger `BEFORE TRUNCATE` sobre
   `timesheet_entries` e `invoice_items`. Não afrouxar nada disso sem tarefa de
   escopo próprio.

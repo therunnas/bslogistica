@@ -542,14 +542,25 @@ podia ser desfeito por vários caminhos.
   incluído**, e `service_role`. O gatilho **não distingue** `gerar_fatura` de um
   `INSERT`/`UPDATE` manual numa sessão `postgres`: a fronteira protegida é a API
   da aplicação, não o banco contra quem já é seu dono;
-- **fontes já faturadas não se apagam nem se remanejam** — cliente, contrato,
-  operação, turno e folha. **Duas guardas vão além do faturado**, de propósito:
-  turno referenciado por qualquer folha e contrato do qual algum apontamento já
-  derivou valores não podem ser apagados **mesmo em rascunho**, porque as FKs são
-  `ON DELETE SET NULL` e o rascunho vira fatura depois; e mover `operation_id` ou
-  `shift_id` de folha **com qualquer apontamento**, faturado ou não, é recusado,
-  porque os apontamentos guardam snapshots da configuração antiga. Folha com
-  apontamento **faturado** congela também `work_date`;
+- **fontes já faturadas não se apagam** — cliente com histórico faturado, turno
+  referenciado por qualquer folha e contrato do qual algum apontamento já derivou
+  valores. Os dois últimos valem **mesmo em rascunho**, de propósito: as FKs são
+  `ON DELETE SET NULL` e o rascunho vira fatura depois;
+- **o que congela como valor, com faturamento, é menos do que "a fonte
+  inteira"** — e a lista exata importa. Congelam, sem exceção de papel:
+  `operations.client_id`; `work_date`, `operation_id` e `shift_id` da folha; e a
+  própria linha do apontamento. Mover `operation_id`/`shift_id` de folha é
+  recusado com **qualquer** apontamento, faturado ou não; `work_date` só com
+  faturado;
+- **NÃO congelam, nem com histórico faturado:** `operations.contract_id` e
+  `operations.agreed_amount`, porque `bloquear_fontes_operacao()` **isenta
+  admin**; as taxas do contrato (`daily_rate`, `shift_hours`, `ot_factor`,
+  `ot_tolerance_min`), porque **não existe gatilho de `UPDATE` em `contracts`**;
+  `employees.daily_cost`, pelo mesmo motivo; e a jornada do turno, que também
+  isenta admin. **O dinheiro já faturado não muda** — a entry está congelada e
+  seus snapshots com ela —, mas a **proveniência** se perde: a operação passa a
+  apontar para um contrato diferente daquele de onde a diária cobrada saiu, sem
+  rastro na linha. Ver a dívida registrada na seção 10;
 - **invariante do par** operação × turno, em `timesheets` e `operation_team`,
   lida do `SELECT` travado e não do payload;
 - **fatura com lastro vinculado congela**, e seus itens recusam `INSERT`,
@@ -650,6 +661,23 @@ está no `.gitignore`.
 **0 linhas**. Não é defeito, mas **limita o que qualquer teste em Production
 prova**: num banco vazio, "AAL1 leu 0 linhas" não distingue bloqueio de ausência
 de dado. Foi por isso que a prova do enforcement se apoiou em `profiles`.
+
+**Dívida nova — proveniência da taxa faturada não é preservada.** Com
+apontamento já faturado, um **admin** ainda altera `operations.contract_id` e
+`agreed_amount` — `bloquear_fontes_operacao()` isenta admin — e altera as taxas
+do próprio contrato, porque **não existe gatilho de `UPDATE` em `contracts`**; o
+mesmo vale para `employees.daily_cost`. **O valor já cobrado não muda**, porque a
+entry faturada está congelada e carrega os snapshots. O que se perde é a
+resposta para "de qual contrato, e com que taxa, saiu esta fatura": a operação
+passa a apontar para outro contrato e nada na linha registra a troca. É a mesma
+silhueta do ataque de `client_id` que a `011` fechou, sobrando pelo caminho do
+admin.
+
+Fechar isso é migration própria — congelar `contract_id`/`agreed_amount` quando
+a operação tiver apontamento faturado, e decidir se as taxas do contrato viram
+imutáveis ou versionadas. **Decisão de desenho, não correção mecânica:** hoje
+admin edita contrato legitimamente para valer daqui pra frente, e um congelamento
+ingênuo quebraria esse fluxo. Levantado na review do PR #24.
 
 **Dívida nova — automatizar o teste diferencial `calcEntry()` × derivação SQL.**
 `src/lib/billing.ts` e o trigger da `010` implementam a mesma regra duas vezes,

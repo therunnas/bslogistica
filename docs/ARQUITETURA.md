@@ -191,8 +191,14 @@ Consequência prática que não mudou: a tela de apontamentos mostra o valor
 prova o que foi persistido.
 
 Uma vez faturado, o apontamento **congela**: linha com `invoice_id` preenchido
-recusa `UPDATE` e `DELETE`, e as fontes que alimentaram o cálculo não podem ser
-apagadas nem remanejadas (migration `20260912200000_011`).
+recusa `UPDATE` e `DELETE`, e as fontes do cálculo não podem ser **apagadas**
+(migration `20260912200000_011`). O congelamento das fontes é mais estreito que
+o da linha: valem `operations.client_id` e o
+`work_date`/`operation_id`/`shift_id` da folha, mas `operations.contract_id`,
+`agreed_amount`, as taxas do contrato e `employees.daily_cost` continuam
+editáveis por admin. Isso não altera valor já cobrado — a entry guarda os
+snapshots —, mas a proveniência da taxa não é preservada; está registrado como
+dívida em `PROGRESS.md`, seção 10.
 
 ## Módulos
 
