@@ -441,7 +441,7 @@ um operacional atribuído listou os turnos sem `aal` nenhum. Medido pelo caso A9
 do teste `009`. Corrigido em duas camadas — `coalesce(..., false)` no retorno dos
 helpers e `IS NOT TRUE` nas cinco RPCs.
 
-**Testes:** `009` cobre **94 casos** — acesso (operacional sem MFA atribuído,
+**Testes:** `009` cobre **112 casos** — acesso (operacional sem MFA atribuído,
 operação alheia, UUID inexistente, `operation_id` nulo, operacional com fator
 verificado em aal1 e em aal2, operacional sem MFA em aal2, sem claim `aal`,
 admin em aal1 e em aal2, quem acumula admin+operacional, sem papel, anon, conta
@@ -450,9 +450,53 @@ quatro leituras), dados, escrita aceita com derivação conferida contra a 010,
 dezesseis vetores de escrita recusada, lastro faturado congelado, o que o PR
 **não** relaxou (11 policies, leitura e escrita direta nas tabelas, a própria
 `user_operation_access` nos dois papéis e nos dois AAL), privilégios das sete
-funções e schema/grants da tabela. Escrito **antes** da migration: contra o
+funções, schema/grants da tabela e a auditoria de camada 2 descrita abaixo.
+Escrito **antes** da migration: contra o
 schema sem a 013 o arquivo nem monta a fixture —
 `relation "public.user_operation_access" does not exist`.
+
+**Auditoria de camada 2 — gate de segurança pedido antes do PR.** Dentro de
+qualquer função `SECURITY DEFINER` de `postgres`, `current_user` é `postgres`, e
+sete guardas de 010/011 perguntam exatamente isso. Auditado uma a uma, com as
+tentativas executadas **no contexto real da RPC** (bloco K do teste `009`):
+
+| Invariante                                       | Por dentro da RPC     |
+| ------------------------------------------------ | --------------------- |
+| linha faturada imutável                          | **viva** (K7)         |
+| `DELETE` de linha faturada                       | **viva** (K8)         |
+| desvínculo de fatura                             | **viva** (K6)         |
+| folha com apontamento não muda de operação/turno | **viva** (K10)        |
+| par operação/turno                               | **viva** (K13)        |
+| valor financeiro derivado pelo banco             | **viva** (K1, K2, K4) |
+| chave diária sincronizada pela folha             | **viva** (E6)         |
+| uma diária por colaborador/operação/dia          | **viva** (K17)        |
+| uma alocação ativa por colaborador               | **viva** (K18)        |
+| **criar vínculo de fatura**                      | **ausente** (K5)      |
+| **mensagem de recusa de coluna financeira**      | **ausente** (K1)      |
+| **mover folha vazia**                            | **ausente** (K12)     |
+| **colaborador fora da equipe**                   | **ausente** (K14)     |
+| **folha fechada**                                | **ausente** (K16)     |
+
+Nenhuma das cinco ausências é alcançável pelo operador hoje: a RPC não escreve
+`invoice_id` nem coluna financeira, não faz `UPDATE` em `timesheets`, e a lista
+branca de chaves recusa a chamada inteira. As duas últimas nunca foram
+invariantes de banco — o admin também aponta quem quiser e escreve em folha
+fechada. O risco real é de **edição futura da RPC** perder a rede sem que nada
+avise.
+
+**PR B1.1 — owner dedicado (desenhado e provado, não implementado).** A correção
+estrutural é as cinco funções pertencerem a um papel próprio, que não seja
+`postgres` e portanto não seja isento das guardas. Provado em banco local:
+`ALTER FUNCTION ... OWNER TO bslog_rpc_operacional` mantém leitura, escrita e
+derivação corretas, e as guardas passam a ver `current_user =
+bslog_rpc_operacional`. Requisitos medidos: o papel precisa de `BYPASSRLS` (um
+papel com `CREATEROLE + BYPASSRLS` e **sem** superusuário consegue criá-lo em
+PG16 — confirmar em Production dentro de `BEGIN … ROLLBACK`), `USAGE` em `auth`
+e `SELECT` em `auth.users`, e `UPDATE` em `shifts`/`timesheets` — não para
+escrever, mas porque o PostgreSQL cobra privilégio de `UPDATE` para tomar
+`FOR SHARE`. Esse último ponto merece refinamento antes de implementar: mover os
+dois `FOR SHARE` para helpers `SECURITY DEFINER` de `postgres` evitaria conceder
+`UPDATE` em `shifts`.
 
 **Validação local.** PostgreSQL 16.13 com um harness que reproduz o que as
 migrations usam do Supabase: papéis (`anon`, `authenticated`, `service_role`,

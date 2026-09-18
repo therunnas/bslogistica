@@ -82,6 +82,23 @@ begin
 end;
 $$;
 
+-- Executa SQL SEM trocar de papel, ou seja com `current_user = postgres` — que e
+-- exatamente o contexto em que as RPCs SECURITY DEFINER rodam. E o unico jeito
+-- de medir quais guardas de 010/011 ainda disparam por dentro da superficie e
+-- quais ficam neutralizadas pela isencao de `postgres`.
+create or replace function pg_temp.como_postgres(_sql text)
+returns text language plpgsql as $$
+declare _r text;
+begin
+  begin
+    execute _sql into _r;
+  exception when others then
+    return 'erro ' || sqlstate;
+  end;
+  return coalesce(_r, 'nulo');
+end;
+$$;
+
 -- Atalho para a RPC de escrita: devolve `ok` ou `erro <sqlstate>`.
 create or replace function pg_temp.salvar(
   _uid text, _aal text, _op text, _turno text, _data text, _linhas jsonb
@@ -917,6 +934,182 @@ begin
              or p.proname like 'delete%')));
 end;
 $schema$;
+
+
+-- ---------------------------------------------------------------------------
+-- K. O que sobra da CAMADA 2 quando a escrita entra por uma função
+--    SECURITY DEFINER de `postgres`.
+--
+-- POR QUE ESTE BLOCO EXISTE. As guardas de 010 e 011 se dividem em duas
+-- famílias: as que perguntam `current_user NOT IN ('postgres','service_role')`
+-- e as que não perguntam nada. Dentro de qualquer função SECURITY DEFINER de
+-- `postgres` — `gerar_fatura` desde a 009, as cinco RPCs desde a 013 —
+-- `current_user` É `postgres`. Logo a primeira família NÃO dispara ali.
+--
+-- Cada caso abaixo mede, com `current_user = postgres`, se a proteção ainda
+-- existe. Um `erro 42501` significa CAMADA 2 VIVA; um sucesso significa que
+-- naquele ponto só resta a CAMADA 1 — o contrato estreito da RPC.
+--
+-- Os casos que registram sucesso NÃO são aprovação da brecha: são o tripwire
+-- que documenta onde a rede não está, para que a decisão seja explícita e para
+-- que a expectativa mude de lado no dia em que a superfície passar a rodar sob
+-- um owner dedicado.
+-- ---------------------------------------------------------------------------
+
+do $camada2$
+declare
+  _op    constant text := '0e000000-0000-4000-8000-000000000001';
+  _op2   constant text := '0e000000-0000-4000-8000-000000000002';
+  _t     constant text := '0b000000-0000-4000-8000-000000000001';
+  _t2    constant text := '0b000000-0000-4000-8000-000000000002';
+  _dia   constant text := '2026-09-15';
+  _e_fat uuid;   -- linha ja faturada
+  _e_liv uuid;   -- linha ainda nao faturada
+  _fatura uuid;
+  _folha uuid;
+  _folha_vazia uuid;
+  _antes numeric;
+  _r text;
+begin
+  select te.id, te.invoice_id, te.billed_amount, te.timesheet_id
+    into _e_fat, _fatura, _antes, _folha
+    from public.timesheet_entries te
+   where te.employee_id = '05000000-0000-4000-8000-000000000001'
+     and te.work_date = _dia::date;
+
+  select te.id into _e_liv
+    from public.timesheet_entries te
+   where te.employee_id = '05000000-0000-4000-8000-000000000002'
+     and te.work_date = _dia::date;
+
+  -- K1/K2. `bloquear_edicao_financeira` ISENTA postgres — mas o valor nao muda
+  -- assim mesmo, porque quem manda no numero e `derivar_valores_financeiros`,
+  -- que nao tem isencao de papel e, sem coluna motriz alterada, copia os
+  -- valores de OLD por cima do payload. A guarda perdida era a MENSAGEM, nao o
+  -- VALOR.
+  perform pg_temp.registrar('K1. como postgres, UPDATE so de billed_amount NAO levanta erro',
+    '1', pg_temp.como_postgres(format(
+      'with u as (update public.timesheet_entries set billed_amount = 9999 where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
+
+  perform pg_temp.registrar('K2. mas a derivacao preservou o valor: nada mudou',
+    '0.00', (select billed_amount::text from public.timesheet_entries where id = _e_liv));
+
+  perform pg_temp.registrar('K3. o mesmo UPDATE como admin aal2 e recusado com 42501',
+    'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000003', 'aal2', format(
+      'with u as (update public.timesheet_entries set billed_amount = 9999 where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
+
+  -- K4. Snapshot: mesmo desfecho, e pelo mesmo motivo.
+  perform pg_temp.registrar('K4. como postgres, snapshot tambem volta ao valor derivado',
+    '150.00', pg_temp.como_postgres(format(
+      'with u as (update public.timesheet_entries set daily_rate_snapshot = 1 where id = %L::uuid returning daily_rate_snapshot) select daily_rate_snapshot::text from u', _e_liv)));
+
+  -- K5. VINCULO DE FATURA: aqui a rede REALMENTE some. As duas guardas do
+  -- vinculo — `bloquear_vinculo_fora_do_faturamento` (exige postgres) e
+  -- `protect_timesheet_invoice_link` (isenta postgres) — deixam passar. Hoje
+  -- nada na RPC escreve `invoice_id`, e e SO isso que impede: CAMADA 1 sozinha.
+  perform pg_temp.registrar('K5. como postgres, vincular linha livre a uma fatura FUNCIONA (camada 2 ausente)',
+    '1', pg_temp.como_postgres(format(
+      'with u as (update public.timesheet_entries set invoice_id = %L::uuid where id = %L::uuid returning 1) select count(*)::text from u', _fatura, _e_liv)));
+
+  -- Desfaz o vinculo indevido para nao contaminar os casos seguintes — e o
+  -- proprio desfazer mostra que a SAIDA continua fechada para todos.
+  perform pg_temp.registrar('K6. e desvincular e recusado ate como postgres (camada 2 viva)',
+    'erro 42501', pg_temp.como_postgres(format(
+      'with u as (update public.timesheet_entries set invoice_id = null where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
+
+  -- K7. A LINHA FATURADA continua imutavel: `bloquear_edicao_faturada` compara
+  -- a linha inteira e nao isenta ninguem.
+  perform pg_temp.registrar('K7. como postgres, editar linha faturada e recusado (camada 2 viva)',
+    'erro 42501', pg_temp.como_postgres(format(
+      'with u as (update public.timesheet_entries set status = ''absent''::public.attendance_status where id = %L::uuid returning 1) select count(*)::text from u', _e_fat)));
+
+  perform pg_temp.registrar('K8. como postgres, apagar linha faturada e recusado (camada 2 viva)',
+    'erro 42501', pg_temp.como_postgres(format(
+      'with d as (delete from public.timesheet_entries where id = %L::uuid returning 1) select count(*)::text from d', _e_fat)));
+
+  perform pg_temp.registrar('K9. o valor faturado segue intocado depois de K5..K8',
+    _antes::text, (select billed_amount::text from public.timesheet_entries where id = _e_fat));
+
+  -- K10. MOVER A FOLHA. `bloquear_fontes_folha` isenta postgres, mas
+  -- `bloquear_mover_folha_com_apontamento` nao isenta ninguem — e e ela que
+  -- vale aqui, porque a folha tem apontamento.
+  perform pg_temp.registrar('K10. como postgres, mover folha COM apontamento e recusado (camada 2 viva)',
+    'erro 42501', pg_temp.como_postgres(format(
+      'with u as (update public.timesheets set operation_id = %L::uuid, shift_id = null where id = %L::uuid returning 1) select count(*)::text from u', _op2, _folha)));
+
+  -- K11. Folha VAZIA nao tem essa rede: so a guarda de papel, que isenta
+  -- postgres. A RPC nunca faz UPDATE em `timesheets`, entao isto hoje e
+  -- inalcancavel por ela — mas e o que aconteceria se um dia fizesse.
+  insert into public.timesheets (operation_id, shift_id, work_date)
+  values (_op::uuid, _t2::uuid, '2026-09-19') returning id into _folha_vazia;
+
+  perform pg_temp.registrar('K12. como postgres, mover folha VAZIA para outra operacao FUNCIONA (camada 2 ausente)',
+    '1', pg_temp.como_postgres(format(
+      'with u as (update public.timesheets set operation_id = %L::uuid, shift_id = null where id = %L::uuid returning 1) select count(*)::text from u', _op2, _folha_vazia)));
+
+  delete from public.timesheets where id = _folha_vazia;
+
+  -- K13. PAR OPERACAO/TURNO: `validar_par_operacao_turno` nao isenta ninguem,
+  -- entao a verificacao que a RPC faz por conta propria tem rede por baixo.
+  perform pg_temp.registrar('K13. como postgres, folha com turno de outra operacao e recusada (camada 2 viva)',
+    'erro 23514', pg_temp.como_postgres(format(
+      'with i as (insert into public.timesheets (operation_id, shift_id, work_date) values (%L::uuid, ''0b000000-0000-4000-8000-000000000009''::uuid, ''2026-09-21'') returning 1) select count(*)::text from i', _op)));
+
+  -- K14. EQUIPE: nao existe invariante de banco nenhuma ligando
+  -- `timesheet_entries` a `operation_team`. A regra e SO da RPC — e vale para o
+  -- admin tambem, que hoje aponta quem quiser pela tela.
+  select t.id into _folha from public.timesheets t
+   where t.operation_id = _op::uuid and t.shift_id = _t::uuid and t.work_date = _dia::date;
+
+  perform pg_temp.registrar('K14. como postgres, apontar colaborador FORA da equipe FUNCIONA (camada 2 ausente)',
+    '1', pg_temp.como_postgres(format(
+      'with i as (insert into public.timesheet_entries (timesheet_id, employee_id, status) values (%L::uuid, ''05000000-0000-4000-8000-000000000003''::uuid, ''absent''::public.attendance_status) returning 1) select count(*)::text from i', _folha)));
+
+  delete from public.timesheet_entries
+   where timesheet_id = _folha and employee_id = '05000000-0000-4000-8000-000000000003';
+
+  -- K15/K16. FOLHA FECHADA: a recusa e regra da RPC, nao invariante do banco.
+  -- Folha propria, de outro dia: a linha do dia 15 ficou vinculada a fatura em
+  -- K5, e ai quem recusaria seria `bloquear_edicao_faturada` — mediria outra
+  -- coisa.
+  _r := pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1', _op, _t, '2026-09-17',
+    '[{"employee_id":"05000000-0000-4000-8000-000000000002","status":"present","check_in":"08:00","check_out":"17:00","break_minutes":60}]'::jsonb);
+  perform pg_temp.registrar('K14b. folha nova do dia 17 gravada pela RPC', 'ok', _r);
+
+  select t.id into _folha_vazia from public.timesheets t
+   where t.operation_id = _op::uuid and t.shift_id = _t::uuid and t.work_date = '2026-09-17';
+  update public.timesheets set status = 'closed'::public.timesheet_status where id = _folha_vazia;
+
+  perform pg_temp.registrar('K15. a RPC recusa gravar em folha fechada',
+    'erro 42501', pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1', _op, _t, '2026-09-17',
+      '[{"employee_id":"05000000-0000-4000-8000-000000000002","status":"absent"}]'::jsonb));
+
+  perform pg_temp.registrar('K16. mas o banco sozinho aceita escrita em folha fechada (camada 2 ausente)',
+    '1', pg_temp.como_postgres(format(
+      'with u as (update public.timesheet_entries set notes = ''x'' where timesheet_id = %L::uuid returning 1) select count(*)::text from u', _folha_vazia)));
+
+  -- K17. UNICIDADE DA DIARIA: indice unico nao consulta papel. O cenario e
+  -- real: o admin remaneja o colaborador de turno no meio do dia, e o operador
+  -- tenta lancar a diaria de novo no turno novo. Note que a exclusividade de
+  -- alocacao (`operation_team_um_ativo_por_colaborador`) obriga a desativar a
+  -- alocacao anterior — sao duas invariantes encaixadas, nenhuma delas sensivel
+  -- a papel.
+  update public.operation_team set active = false
+   where operation_id = _op::uuid and shift_id = _t::uuid
+     and employee_id = '05000000-0000-4000-8000-000000000001';
+  insert into public.operation_team (operation_id, shift_id, employee_id, active)
+  values (_op::uuid, _t2::uuid, '05000000-0000-4000-8000-000000000001', true);
+
+  perform pg_temp.registrar('K17. segunda diaria no mesmo dia pela RPC e recusada pelo indice (camada 2 viva)',
+    'erro 23505', pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1', _op, _t2, _dia,
+      '[{"employee_id":"05000000-0000-4000-8000-000000000001","status":"present","check_in":"18:00","check_out":"02:00"}]'::jsonb));
+
+  -- K18. E a exclusividade de alocacao tambem nao depende de papel.
+  perform pg_temp.registrar('K18. segunda alocacao ATIVA do mesmo colaborador e recusada (camada 2 viva)',
+    'erro 23505', pg_temp.como_postgres(format(
+      'with i as (insert into public.operation_team (operation_id, shift_id, employee_id, active) values (%L::uuid, %L::uuid, ''05000000-0000-4000-8000-000000000001''::uuid, true) returning 1) select count(*)::text from i', _op2, '0b000000-0000-4000-8000-000000000009')));
+end;
+$camada2$;
 
 
 -- ---------------------------------------------------------------------------

@@ -221,6 +221,20 @@ linha** de `operations`, `shifts`, `employees`, `contracts`, `timesheets` e
 - **A interface ainda não consome nada disso** — é o PR B2 que adapta
   `queries.ts`, `painel-apontamentos.tsx`, o guard e o login.
 
+**Dentro dessas funções `current_user` é `postgres`**, então as guardas de 010 e
+011 que isentam `postgres` **não disparam ali**. Auditado guarda por guarda e
+medido no bloco K do teste `009`. Continuam valendo por dentro da superfície:
+linha faturada imutável, `DELETE` de linha faturada, desvínculo, folha com
+apontamento que não muda de operação/turno, par operação/turno, derivação
+financeira, sincronização da chave diária e os índices únicos. **Dependem só do
+contrato da RPC**: não escrever `invoice_id` (o vínculo passaria), a mensagem de
+recusa de coluna financeira (o valor segue protegido pela derivação), não fazer
+`UPDATE` em `timesheets` (mover folha vazia passaria), a exigência de equipe
+ativa e a recusa de folha fechada — essas duas últimas não são invariantes de
+banco para papel nenhum. **Nunca escrever `invoice_id` nem coluna financeira
+nesta superfície, e reavaliar esta lista antes de acrescentar qualquer comando
+novo à RPC de escrita.**
+
 **Enquanto isso não acontecer:**
 
 - **nunca simplesmente remover a policy AAL2 global** sem substituição segura.

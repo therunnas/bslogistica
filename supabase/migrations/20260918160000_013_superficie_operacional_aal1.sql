@@ -48,14 +48,61 @@
 -- recusa UPDATE, e o vínculo com fatura não nasce aqui.
 --
 -- CUIDADO DOCUMENTADO: dentro de uma função SECURITY DEFINER de `postgres`,
--- `current_user` é `postgres`. As guardas da 010 e da 011 que isentam
--- `postgres` — `bloquear_edicao_financeira`, `bloquear_fontes_*`,
--- `bloquear_vinculo_fora_do_faturamento` — portanto NÃO disparam aqui. É por
--- isso que a RPC de escrita nunca escreve as colunas que elas protegem, e
--- recusa explicitamente apontamento já faturado antes de tentar: a proteção
--- precisa estar no contrato, não na sorte de um trigger disparar.
--- `bloquear_edicao_faturada` não isenta ninguém e continua sendo a rede de
--- segurança por baixo dessa recusa.
+-- `current_user` é `postgres`. As guardas de 010 e 011 que perguntam
+-- `current_user NOT IN ('postgres','service_role')` portanto NÃO disparam aqui.
+-- O mesmo já valia para `gerar_fatura` desde a 009 — a novidade é que agora
+-- existe uma SEGUNDA porta com esse privilégio, e ela é operada por um papel
+-- menos confiável.
+--
+-- ISTO FOI AUDITADO GUARDA POR GUARDA E MEDIDO, não presumido. O bloco K de
+-- `supabase/tests/009_superficie_operacional.sql` executa cada tentativa com
+-- `current_user = postgres`, que é exatamente o contexto destas funções.
+--
+-- CAMADA 2 VIVA — continua valendo mesmo por dentro desta superfície, porque
+-- estas guardas não isentam papel nenhum:
+--
+--   bloquear_edicao_faturada        linha faturada é imutável        (K7)
+--   bloquear_delete_faturado        linha faturada não se apaga      (K8)
+--   bloquear_desvinculo_faturado    vínculo não se desfaz            (K6)
+--   bloquear_mover_folha_com_apontamento  folha com apontamento não muda de
+--                                   operação nem de turno            (K10)
+--   validar_par_operacao_turno      turno tem de ser da operação     (K13)
+--   derivar_valores_financeiros     o valor é do banco, não do payload (K1/K2/K4)
+--   sincronizar_chave_da_diaria     a chave vem da folha             (E6)
+--   índices únicos: uma diária por colaborador/operação/dia e uma alocação
+--                                   ativa por colaborador            (K17/K18)
+--
+-- CAMADA 2 AUSENTE por aqui — onde SÓ o contrato desta RPC protege:
+--
+--   1. VÍNCULO DE FATURA. `bloquear_vinculo_fora_do_faturamento` exige
+--      `current_user = postgres` para criar vínculo, e
+--      `protect_timesheet_invoice_link` isenta `postgres`: as duas deixam
+--      passar aqui (K5). O que impede é esta RPC nunca nomear `invoice_id` em
+--      lista de colunas nenhuma, e a lista branca de chaves do JSON recusar a
+--      chamada inteira se ele aparecer (F3). **Nunca escrever `invoice_id`
+--      nesta superfície.**
+--   2. COLUNA FINANCEIRA EM UPDATE. `bloquear_edicao_financeira` isenta
+--      `postgres`, então a MENSAGEM de recusa some (K1). O VALOR continua
+--      protegido por `derivar_valores_financeiros`, que não isenta ninguém e
+--      sobrescreve ou preserva o payload (K2/K4). Perdeu-se o aviso, não a
+--      invariante.
+--   3. MOVER FOLHA VAZIA. `bloquear_fontes_folha` isenta `postgres` (K12).
+--      Inalcançável hoje: esta RPC não faz `UPDATE` em `timesheets`. **Nunca
+--      passar a fazer sem antes reavaliar isto.**
+--   4. EQUIPE. Não existe invariante de banco ligando `timesheet_entries` a
+--      `operation_team` — para papel nenhum, nem hoje para o admin (K14). A
+--      exigência de equipe ativa é regra DESTA RPC.
+--   5. FOLHA FECHADA. Também não é invariante de banco (K16). A recusa é regra
+--      DESTA RPC.
+--
+-- Por isso a RPC de escrita nunca escreve as colunas que essas guardas
+-- protegem, e recusa explicitamente apontamento já faturado antes de tentar:
+-- a proteção precisa estar no contrato, não na sorte de um trigger disparar.
+--
+-- A correção estrutural — dar às cinco funções um OWNER DEDICADO, que não seja
+-- `postgres` e portanto não seja isento — está desenhada e provada em banco
+-- local, e está registrada em PROGRESS.md, seção 7.2, como PR B1.1. Não entra
+-- aqui: mexe em privilégio de papel do Supabase e merece escopo próprio.
 
 
 -- ---------------------------------------------------------------------------
