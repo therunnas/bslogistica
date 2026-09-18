@@ -4,14 +4,14 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 ## 1. Checkpoint
 
-| Item          | Valor                                        |
-| ------------- | -------------------------------------------- |
-| Data          | 2026-09-13                                   |
-| Branch atual  | `feat/pr-a-estado-mfa-confiavel`             |
-| `main`        | `78574acf1d7b97c94a3e7a5bd8d94961ec831df8`   |
-| `origin/main` | `78574ac` — idêntico ao `main` local         |
-| Production    | **verde** no commit `78574ac`                |
-| Migrations    | **17 em Production**; a 012 do PR A pendente |
+| Item          | Valor                                         |
+| ------------- | --------------------------------------------- |
+| Data          | 2026-09-18                                    |
+| Branch atual  | `claude/laughing-archimedes-cq6a4z` — PR B1   |
+| `main`        | `3ec924269ff98df8e63af688faf386142671c222`    |
+| `origin/main` | `3ec9242` — idêntico ao `main` local          |
+| Production    | **verde** no commit `3ec9242`                 |
+| Migrations    | **18 em Production**; a 013 do PR B1 pendente |
 
 | Frente                               | Merge     | Estado                                |
 | ------------------------------------ | --------- | ------------------------------------- |
@@ -19,16 +19,22 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Password recovery                    | `8149a4d` | **CONCLUÍDO** — PRs #13, #17 a #20    |
 | A₀ — valores derivados no banco      | `83ed1f3` | **CONCLUÍDO** — PR #22, em Production |
 | A₀.1 — fontes financeiras protegidas | `c019e42` | **CONCLUÍDO** — PR #23, em Production |
+| PR A — estado de MFA no banco        | `3ec9242` | **CONCLUÍDO** — PR #25, em Production |
 
 **A₀ e A₀.1 estão concluídos e implantados** — migrations `010` e `011`
 aplicadas em Production em 13/09/2026, com validação read-only completa. O
 detalhe está na **seção 9**.
 
 O trabalho em curso é a **nova política de autorização** (seção 7). O **PR A**
-está implementado e **ainda não em Production** — ele entrega só o primitivo de
-MFA no banco (seção 7.1) e **não libera AAL1**. Os PRs B e C continuam
-**aprovados e não implementados** — leia a seção 6 antes de tocar em guard,
-policy ou usuário.
+está **em Production** — migration `012`, o primitivo de MFA no banco (seção
+7.1), que **não libera AAL1**. O **PR B1** está **implementado e ainda não em
+Production**: migration `013`, a fundação da superfície operacional AAL1 (seção
+7.2). Ele também **não libera AAL1 em tabela nenhuma** — entrega uma superfície
+de RPC estreita que **a interface ainda não consome**.
+
+Seguem **aprovados e não implementados**: **PR B2** (adaptar a interface à
+superfície) e **PR C** (guard role-aware). Leia a seção 6 antes de tocar em
+guard, policy ou usuário.
 
 ## 2. Ambiente
 
@@ -269,7 +275,10 @@ cientes de papel, e a tela Configurações → Segurança.
 - **11 tabelas de negócio ainda têm policy RESTRICTIVE global exigindo `aal2`**;
 - portanto **um usuário `operacional` em AAL1 ainda NÃO consegue usar o
   sistema** — ele seria barrado pelo guard e, mesmo contornando o guard, pela
-  RLS.
+  RLS;
+- o **PR B1** (migration 013, seção 7.2) acrescentou uma **superfície de RPC**
+  para o operador em AAL1, mas **nenhuma policy foi afrouxada** e **a interface
+  não a consome**. O quadro acima continua valendo integralmente.
 
 ### 6.3 Proibições enquanto a refatoração não acontecer
 
@@ -290,20 +299,21 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR       | Entrega                                                                                                                                                                            | Cabe em |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| **PR A** | estado de MFA **verificável no banco** — indicador confiável, não forjável pelo próprio usuário e fail-closed. **IMPLEMENTADO** na migration 012, ainda não em Production. Ver 7.1 | ETAPA 1 |
-| **PR B** | **RLS seletiva**: AAL1 permitido ao `operacional` só onde autorizado, mantendo AAL2 para admin e para quem já ativou MFA                                                           | ETAPA 2 |
-| **PR C** | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                                                  | ETAPA 2 |
+| PR        | Entrega                                                                                                                                                                                        | Cabe em |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| **PR A**  | estado de MFA **verificável no banco** — indicador confiável, não forjável pelo próprio usuário e fail-closed. **IMPLEMENTADO** na migration 012, ainda não em Production. Ver 7.1             | ETAPA 1 |
+| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers de autorização e RPCs estreitas, sem afrouxar policy. **IMPLEMENTADO** na migration 013, ainda não em Production. Ver 7.2 | ETAPA 2 |
+| **PR B2** | **interface** consumindo a superfície: `queries.ts`, `painel-apontamentos.tsx` e o caminho de login do operador                                                                                | ETAPA 2 |
+| **PR C**  | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                                                              | ETAPA 2 |
 
-**O primeiro usuário `operacional` real só existe depois dos três**, e depois da
-matriz E2E da ETAPA 6. PR A é pré-requisito de PR B: sem um indicador confiável
+**O primeiro usuário `operacional` real só existe depois de todos**, e depois da
+matriz E2E da ETAPA 6. PR A é pré-requisito de PR B1: sem um indicador confiável
 de MFA no banco, a exceção de AAL1 vira bypass para a conta que optou pelo
 segundo fator.
 
 ### 7.1 PR A — primitivo de MFA no banco
 
-**Estado: implementado, ainda NÃO em Production.** Migration
+**Estado: EM PRODUCTION** (PR #25, merge `3ec9242`). Migration
 `20260913201030_012_estado_mfa_confiavel.sql` e teste
 `supabase/tests/008_estado_mfa.sql`.
 
@@ -361,11 +371,96 @@ seguem RESTRICTIVE. Escrito **antes** da migration: contra o schema sem a 012 d�
 casos K/L, medidos contra a primeira versão da função, davam 3 FAIL — foi essa
 falha que documentou o furo da conta apagada.
 
+**Quem usa a função:** o PR B1, por dentro de
+`public.operador_elegivel_aal1()` (seção 7.2). Nenhuma **policy** a chama, e
+isso continua verdadeiro.
+
 **Pendência registrada para o PR C:** o comentário em
 `src/app/(painel)/_autorizacao.ts:47-51` afirma que
 `getAuthenticatorAssuranceLevel()` valida o token chamando `getUser(jwt)`. **É
 falso** — descreve o ramo `if (jwt)`, que o projeto nunca usa. Não foi corrigido
 aqui de propósito, para manter o escopo do PR A.
+
+### 7.2 PR B1 — fundação da superfície operacional AAL1
+
+**Estado: implementado, testado localmente, ainda NÃO em Production.** Migration
+`20260918160000_013_superficie_operacional_aal1.sql` e teste
+`supabase/tests/009_superficie_operacional.sql`.
+
+**A pergunta que o PR B1 respondeu.** A ETAPA 1 previa "RLS seletiva": afrouxar
+a policy de AAL2 para `operacional` e deixar a RLS filtrar. Ao desenhar, isso
+não fecha a decisão de produto — **RLS filtra LINHA, não COLUNA**. Uma policy
+que devolvesse `operations` ao operador devolveria `agreed_amount` junto;
+`employees`, o `daily_cost`; `timesheet_entries`, `billed_amount`,
+`cost_amount` e os três snapshots. Proteger coluna exigiria view com
+`security_invoker`, grants por coluna e policy nova por tabela — mais superfície,
+não menos.
+
+**O que foi construído em vez disso:** uma superfície de **RPC de contrato
+fechado**. O que não está no `RETURNS TABLE` não existe para quem chama.
+
+| Objeto                                                           | Papel                                           |
+| ---------------------------------------------------------------- | ----------------------------------------------- |
+| `public.user_operation_access`                                   | atribuição usuário → operação; só admin em AAL2 |
+| `public.operador_elegivel_aal1()`                                | a sessão é operador elegível? (interno)         |
+| `public.operador_autorizado(uuid)`                               | ... e tem ESTA operação atribuída? (interno)    |
+| `public.listar_operacoes_do_operador()`                          | 7 colunas, com `cliente_nome` e sem `client_id` |
+| `public.listar_turnos_do_operador(uuid)`                         | 6 colunas de jornada                            |
+| `public.listar_equipe_do_operador(uuid, uuid)`                   | 4 colunas; sem `daily_cost`, `doc` ou `phone`   |
+| `public.listar_apontamentos_do_operador(uuid, uuid, date)`       | folha + linhas; `faturado` é boolean derivado   |
+| `public.salvar_apontamento_operacional(uuid, uuid, date, jsonb)` | escreve 6 campos por linha; não apaga nada      |
+
+**As seis condições de `operador_elegivel_aal1()`**, todas obrigatórias: `uid`
+presente · conta ainda existente em `auth.users` · papel `operacional` · **não**
+`admin` · `aal = aal1` · `mfa_bloqueia_excecao_aal1() = false`. É aqui que o PR A
+entra em uso — e é o que impede a conta que optou pelo MFA de contornar o
+segundo fator por esta porta.
+
+**O que o PR B1 NÃO faz:** não altera nenhuma das 11 policies `*_exige_aal2`,
+que seguem RESTRICTIVE e globais; não concede SELECT/UPDATE direto em tabela
+nenhuma para AAL1; não cria usuário; não toca em uma linha de frontend, guard,
+login ou `/mfa`. **A interface ainda não consome a superfície** — isso é o PR B2.
+
+**Decisões de produto congeladas neste PR** (do enunciado da tarefa):
+
+- do cliente, o operador recebe **somente `cliente_nome`** — nem `client_id`,
+  nem documento, telefone ou e-mail;
+- **nenhum valor financeiro** atravessa, em nenhuma direção: nem
+  `daily_cost`, `daily_rate`, `shift_hours`, `ot_factor`, `ot_tolerance_min`,
+  `agreed_amount`, `billed_amount`, `cost_amount`, snapshot, `invoice_id`, nem
+  prévia de "a faturar" ou de custo;
+- a **migration 010 continua sendo a autoridade financeira**: a RPC de escrita
+  não menciona coluna derivada, e o trigger calcula igual ao caminho do admin;
+- **admin em AAL2 mantém o comportamento atual**, inclusive `gerar_fatura`.
+
+**Um fail-open real foi encontrado e corrigido antes do merge.** Na primeira
+versão, os helpers eram uma cadeia de `AND` sem `coalesce` e as RPCs decidiam com
+`IF NOT helper()`. Com um JWT **sem o claim `aal`**, a comparação com `'aal1'` é
+NULL, a cadeia inteira devolve NULL, `NOT NULL` é NULL e o `IF` **não dispara**:
+um operacional atribuído listou os turnos sem `aal` nenhum. Medido pelo caso A9
+do teste `009`. Corrigido em duas camadas — `coalesce(..., false)` no retorno dos
+helpers e `IS NOT TRUE` nas cinco RPCs.
+
+**Testes:** `009` cobre **94 casos** — acesso (operacional sem MFA atribuído,
+operação alheia, UUID inexistente, `operation_id` nulo, operacional com fator
+verificado em aal1 e em aal2, operacional sem MFA em aal2, sem claim `aal`,
+admin em aal1 e em aal2, quem acumula admin+operacional, sem papel, anon, conta
+apagada com token vivo), contrato (nenhuma coluna proibida na assinatura das
+quatro leituras), dados, escrita aceita com derivação conferida contra a 010,
+dezesseis vetores de escrita recusada, lastro faturado congelado, o que o PR
+**não** relaxou (11 policies, leitura e escrita direta nas tabelas, a própria
+`user_operation_access` nos dois papéis e nos dois AAL), privilégios das sete
+funções e schema/grants da tabela. Escrito **antes** da migration: contra o
+schema sem a 013 o arquivo nem monta a fixture —
+`relation "public.user_operation_access" does not exist`.
+
+**Validação local.** PostgreSQL 16.13 com um harness que reproduz o que as
+migrations usam do Supabase: papéis (`anon`, `authenticated`, `service_role`,
+`supabase_auth_admin`, `authenticator`), schema `auth` (`users`, `mfa_factors`,
+`uid()`, `jwt()`) e os DEFAULT PRIVILEGES que o Supabase mantém em `public`.
+**Não é o stack do Supabase** — a fidelidade é aferida pelo fato de as **oito
+suítes anteriores passarem sem alteração** no mesmo harness. Nada remoto foi
+tocado: nenhum `db push`, nenhum `--linked`, nenhuma escrita em Production.
 
 ### ETAPA 1 — próxima
 
@@ -812,8 +907,8 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 ## 11. Não fazer
 
 - Não reconstruir o Supabase de novo.
-- Não reaplicar migrations já aplicadas — Production tem **17 aplicadas**, e a
-  **012 do PR A ainda não foi implantada**.
+- Não reaplicar migrations já aplicadas — Production tem **18 aplicadas**, e a
+  **013 do PR B1 ainda não foi implantada**.
 - **Não afrouxar as proteções de `010`/`011`** (seção 9): não devolver
   autoridade de cálculo ao payload, não reabrir `UPDATE`/`DELETE` de linha
   faturada, não devolver `TRUNCATE` a `anon`, `authenticated` ou `service_role`.
@@ -824,8 +919,13 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 - Não modificar DNS sem confirmação.
 - Não adicionar enforcement AAL2 em `user_roles`.
 - **Não remover a policy AAL2 global sem substituição segura** (seção 6.3).
-- **Não criar usuário `operacional` real** antes dos PRs A, B e C e da matriz
-  E2E da ETAPA 6 (seções 6.3 e 7).
+- **Não criar usuário `operacional` real** antes dos PRs A, B1, B2 e C e da
+  matriz E2E da ETAPA 6 (seções 6.3 e 7).
+- **Não afrouxar a superfície do PR B1** (seção 7.2): não acrescentar coluna
+  financeira, `client_id`, documento ou telefone ao retorno das RPCs; não
+  aceitar campo novo no JSON da escrita sem decisão de produto; não criar RPC de
+  exclusão; não conceder `EXECUTE` dos helpers a `authenticated`; não abrir
+  `user_operation_access` a quem não é admin em AAL2.
 - Não alterar as quatro linhas `if (…) return falharDepoisDeVerificar()` sem
   entender o guardrail que elas sustentam (seção 4.2).
 - Não reabrir a hipótese PKCE do recovery — foi refutada pelo fonte (seção 5).
@@ -838,5 +938,7 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
    autorização;
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
-5. continue da seção **7 — Próximas etapas oficiais**, pelo **PR A**;
+5. continue da seção **7 — Próximas etapas oficiais**: o **PR A** está em
+   Production, o **PR B1** está implementado e pendente de deploy, e o próximo
+   passo é o **PR B2** (interface consumindo a superfície);
 6. se o estado real divergir deste checkpoint, **pare e reporte**.

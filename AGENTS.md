@@ -88,6 +88,18 @@ tem relação com o TanStack Router.
   assinatura do JWT — o próprio SDK chama isso de inseguro. Serve para UX. Para
   autorização, usar `public.mfa_bloqueia_excecao_aal1()` (migration 012), que lê
   `auth.mfa_factors` e falha fechada. Ela **não** libera AAL1 nem decide papel.
+- **A superfície operacional AAL1 entra por RPC, nunca por policy.** A
+  migration 013 criou `public.user_operation_access`, os helpers
+  `operador_elegivel_aal1()`/`operador_autorizado(uuid)` e cinco RPCs de
+  contrato fechado. As 11 policies `*_exige_aal2` **não** foram afrouxadas, e
+  `operacional` em AAL1 continua sem ler tabela de negócio direto. Ao mexer
+  nessa superfície: nenhum valor financeiro atravessa (do cliente só
+  `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
+  por linha e recusa a chamada inteira diante de chave inesperada, não existe
+  DELETE, e toda função `SECURITY DEFINER` revalida papel + AAL + MFA +
+  atribuição por dentro, sempre sobre `auth.uid()` e nunca sobre um `user_id`
+  recebido. Decisão de autorização fecha com `coalesce(..., false)` e
+  `IS NOT TRUE`: NULL não é `false`.
 - **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
   Operação administrativa privilegiada é server-side, o último admin é
   protegido, e alteração de usuário ou papel é auditada.

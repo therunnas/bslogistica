@@ -51,8 +51,9 @@ src/lib/mfa.ts               decisões de segundo fator, funções puras
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         18 arquivos; 17 em Production, a 012 pendente
-supabase/tests/              8 testes SQL de RLS, invariáveis, fontes e MFA
+supabase/migrations/         19 arquivos; 18 em Production, a 013 pendente
+supabase/tests/              9 testes SQL de RLS, invariáveis, fontes, MFA e
+                             superfície operacional
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
@@ -124,7 +125,8 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 ## RLS e banco
 
 - **A RLS é a proteção real.** Nunca tratar o guard do layout como substituto.
-- 12 tabelas em `public`, todas com RLS ativa.
+- 13 tabelas em `public`, todas com RLS ativa — as 12 de sempre mais
+  `user_operation_access`, criada pela 013.
 - Autorização em SQL usa `public.has_role()` e `public.is_staff()`.
 - **O MFA também é exigido no banco.** 11 tabelas de negócio têm policy
   RESTRICTIVE pedindo `aal2`, porque papel sozinho não distinguia uma sessão
@@ -144,8 +146,10 @@ arquivo. Leia as duas metades antes de agir.
 - o guard do painel exige **AAL2 para qualquer papel**;
 - as **11 tabelas** de negócio exigem `aal2` por policy RESTRICTIVE **global**,
   sem distinguir papel;
-- portanto **`operacional` em AAL1 ainda não usa o sistema**, e isso permanece
-  até que uma migration específica seja criada, testada e aplicada.
+- portanto **`operacional` em AAL1 ainda não alcança tabela nenhuma**, e isso
+  permanece: a exceção de AAL1 NÃO entra por policy;
+- o que existe desde o **PR B1** (migration 013) é uma **superfície estreita de
+  RPC** — descrita mais abaixo — que ainda **não é consumida pela interface**.
 
 **DECISÃO ARQUITETURAL APROVADA — o que ainda vai ser construído:**
 
@@ -171,7 +175,51 @@ quando o `uid` do JWT **não existe mais** em `auth.users` — um token ainda n�
 expirado de conta apagada, cujos fatores o `ON DELETE CASCADE` levou junto,
 enquanto a linha órfã de `user_roles` sobrevive. **Ter o indicador não é ter a
 autorização:** o PR A **não liberou AAL1**, as 11 policies `*_exige_aal2`
-continuam globais, e nenhuma policy chama a função ainda. Quem a usar é o PR B.
+continuam globais, e nenhuma policy chama a função ainda. Quem a usa é o PR B1,
+por dentro de `public.operador_elegivel_aal1()`.
+
+### A superfície operacional AAL1 — PR B1, migration 013
+
+**O que existe.** `public.user_operation_access` (atribuição usuário →
+operação), dois helpers internos — `operador_elegivel_aal1()` e
+`operador_autorizado(operation_id)` — e cinco RPCs de contrato fechado:
+`listar_operacoes_do_operador`, `listar_turnos_do_operador`,
+`listar_equipe_do_operador`, `listar_apontamentos_do_operador` e
+`salvar_apontamento_operacional`.
+
+**O que continua fechado, e é o ponto:** nenhuma policy foi afrouxada. As 11
+`*_exige_aal2` seguem RESTRICTIVE e globais, e `operacional` em AAL1 lê **zero
+linha** de `operations`, `shifts`, `employees`, `contracts`, `timesheets` e
+`timesheet_entries` pelo PostgREST. A única porta é a RPC.
+
+**Regras permanentes desta superfície:**
+
+- **O operador não recebe valor financeiro.** Nem `billed_amount`,
+  `cost_amount`, snapshot, `invoice_id`, `daily_cost`, `daily_rate`,
+  `shift_hours`, `ot_factor`, `ot_tolerance_min` ou `agreed_amount`. Do cliente
+  atravessa **apenas `cliente_nome`** — nunca `client_id`, documento, telefone
+  ou e-mail. Quem precisa de número é o admin, em AAL2. "Faturado" chega ao
+  operador como **boolean derivado**, nunca como id de fatura.
+- **A escrita aceita seis campos por linha** — `employee_id`, `status`,
+  `check_in`, `check_out`, `break_minutes`, `notes` — e **recusa a chamada
+  inteira** com `22023` diante de qualquer outra chave no JSON. Não existe
+  DELETE nesta superfície; linha ausente do payload é linha não tocada.
+- **A autoridade financeira continua sendo a 010.** A RPC não escreve coluna
+  derivada: quem calcula é o trigger, igual ao caminho do admin.
+- **`SECURITY DEFINER` ignora RLS**, então cada função revalida tudo por dentro:
+  papel `operacional`, **não** `admin`, `aal = aal1`,
+  `mfa_bloqueia_excecao_aal1() = false`, conta ainda existente e atribuição em
+  `user_operation_access`. Nunca acrescentar RPC aqui sem essa verificação
+  completa — e **nunca** aceitar `user_id` por parâmetro: a decisão é sempre
+  sobre `auth.uid()`.
+- **`NULL` não é `false` nessa decisão.** Os helpers fecham o retorno com
+  `coalesce(..., false)` e as RPCs decidem com `IS NOT TRUE`. Um JWT sem o claim
+  `aal` fazia a cadeia de `AND` devolver NULL, e `IF NOT NULL` não dispara — era
+  fail-open, medido e corrigido antes do merge (caso A9 do teste `009`).
+- **`user_operation_access` é só do admin em AAL2**, por policy permissiva e
+  por RESTRICTIVE de mesmo predicado. O operador não a consulta; ela o autoriza.
+- **A interface ainda não consome nada disso** — é o PR B2 que adapta
+  `queries.ts`, `painel-apontamentos.tsx`, o guard e o login.
 
 **Enquanto isso não acontecer:**
 
