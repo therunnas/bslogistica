@@ -57,6 +57,11 @@ tem relação com o TanStack Router.
   negócio** — `profiles` e `user_roles` **continuam** com ele para
   `service_role`, porque a `011` não as listou e `ALTER DEFAULT PRIVILEGES` não
   mexe em grant existente. Não afrouxar fora de tarefa própria.
+- **O `postgres` do Supabase não é superusuário; o do harness local é.** Teste
+  de privilégio que passa localmente não prova nada sobre Production — superusuário
+  pula checagem de ACL. Em especial, `ALTER ... OWNER TO` exige que o **novo dono**
+  tenha `CREATE` no schema: conceder antes e revogar depois, na mesma transação,
+  nunca deixar permanente.
 - **Não tocar no projeto `bs-logisticas`.** É o site institucional, outro
   repositório e outro projeto na Vercel.
 - **`proxy.ts`, não `middleware.ts`.** No Next.js 16 a convenção foi renomeada;

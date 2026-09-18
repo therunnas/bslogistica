@@ -336,6 +336,18 @@ Está registrado assim de propósito; se virar invariante, é tarefa própria.
 - **`db query` é caminho de leitura.** Escrita só pelo SQL Editor ou por
   transação guardada explicitamente autorizada, com pré-condições reverificadas
   dentro da transação e `GET DIAGNOSTICS` em cada comando.
+- **O `postgres` do Supabase NÃO é superusuário, e o do harness local é.** Toda
+  verificação de privilégio que passa localmente herda essa ressalva: superusuário
+  pula checagem de ACL, e Production não pula. Isso já custou um deploy — a
+  primeira tentativa da 013 falhou com `42501 permission denied for schema public`
+  no primeiro `ALTER FUNCTION ... OWNER TO`, porque **o NOVO dono precisa de
+  `CREATE` no schema** para receber a posse, e o harness nunca cobrou isso.
+  Ao transferir posse de objeto, conceder `CREATE` imediatamente antes e revogar
+  imediatamente depois, na mesma transação — nunca deixar o privilégio
+  permanente. O harness também **não consegue** simular isso por completo: o
+  usuário de bootstrap do PostgreSQL não pode perder `SUPERUSER`, e as regras de
+  administração de papel do PG16 divergem das do Supabase. Reproduzir esse tipo
+  de falha exige um experimento isolado com executor não-superusuário.
 - **Nunca `supabase config push`.** O `config.toml` não descreve a configuração
   de Auth real; um push aplicaria padrões do CLI e desligaria MFA, confirmação
   de e-mail e a Site URL de produção.

@@ -1585,6 +1585,72 @@ $trava$;
 
 
 -- ---------------------------------------------------------------------------
+-- R. O privilégio de schema do papel de execução — e a janela de `CREATE`.
+--
+-- POR QUE ESTE BLOCO EXISTE. A primeira tentativa de aplicar a 013 em Production
+-- falhou com `42501 / permission denied for schema public`, no primeiro dos
+-- cinco `ALTER FUNCTION ... OWNER TO`: o PostgreSQL exige que o NOVO DONO tenha
+-- `CREATE` no schema onde o objeto vive, porque transferir a posse equivale a
+-- ele criar o objeto ali. O rollback desfez tudo e Production ficou intacta.
+--
+-- O harness local não pegou porque nele as migrations rodam como um `postgres`
+-- SUPERUSUÁRIO, e superusuário pula a verificação. O `postgres` do Supabase não
+-- é superusuário. Reproduzido depois com executor não-superusuário: sem
+-- `CREATE`, recusa com 42501; com ele, passa.
+--
+-- A correção concede `CREATE` imediatamente antes das cinco trocas e o revoga
+-- imediatamente depois. O que este bloco guarda é o ESTADO FINAL — a janela não
+-- pode sobreviver à migration.
+-- ---------------------------------------------------------------------------
+
+do $schema_papel$
+declare _src text; _grants int; _revokes int;
+begin
+  perform pg_temp.registrar('R1. USAGE no schema public', 'true',
+    has_schema_privilege('bslog_rpc_operacional', 'public', 'USAGE')::text);
+
+  perform pg_temp.registrar('R2. CREATE no schema public NAO sobrou', 'false',
+    has_schema_privilege('bslog_rpc_operacional', 'public', 'CREATE')::text);
+
+  perform pg_temp.registrar('R3. e nada no schema auth', 'false',
+    has_schema_privilege('bslog_rpc_operacional', 'auth', 'USAGE')::text);
+
+  -- O papel nao consegue criar objeto em public, que e o que CREATE significa.
+  perform pg_temp.registrar('R4. na pratica, o papel NAO cria objeto em public',
+    'erro 42501', pg_temp.como_rpc('create table public._sonda_r4 (id int)'));
+
+  perform pg_temp.registrar('R5. e nenhuma tabela sonda ficou para tras', '0',
+    (select count(*)::text from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname = '_sonda_r4'));
+
+  -- As 5 RPCs chegaram ao dono certo — que e o que a janela existia para
+  -- permitir. Se a janela sumisse sem a transferencia, isto cairia.
+  perform pg_temp.registrar('R6. as 5 RPCs pertencem ao papel dedicado', '5',
+    (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and pg_get_userbyid(p.proowner) = 'bslog_rpc_operacional'
+        and p.proname in ('listar_operacoes_do_operador', 'listar_turnos_do_operador',
+                          'listar_equipe_do_operador', 'listar_apontamentos_do_operador',
+                          'salvar_apontamento_operacional')));
+
+  perform pg_temp.registrar('R7. e as 5 continuam SECURITY DEFINER', '5',
+    (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prosecdef
+        and pg_get_userbyid(p.proowner) = 'bslog_rpc_operacional'
+        and p.proname in ('listar_operacoes_do_operador', 'listar_turnos_do_operador',
+                          'listar_equipe_do_operador', 'listar_apontamentos_do_operador',
+                          'salvar_apontamento_operacional')));
+
+  -- E a gravacao continua funcionando depois da transferencia.
+  perform pg_temp.registrar('R8. a RPC de escrita segue operando', 'ok',
+    pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1',
+      '0e000000-0000-4000-8000-000000000001', '0b000000-0000-4000-8000-000000000001',
+      '2026-09-27',
+      '[{"employee_id":"05000000-0000-4000-8000-000000000002","status":"present","check_in":"08:00","check_out":"17:00","break_minutes":60}]'::jsonb));
+end;
+$schema_papel$;
+
+
+-- ---------------------------------------------------------------------------
 -- Relatório
 -- ---------------------------------------------------------------------------
 

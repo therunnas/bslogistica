@@ -1094,8 +1094,10 @@ GRANT EXECUTE ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date
 -- SEM DELETE em tabela alguma, SEM TRUNCATE, SEM REFERENCES, SEM TRIGGER.
 -- ---------------------------------------------------------------------------
 
--- `public` e mais nada. Nenhum privilégio no schema `auth`, nem de schema, nem
--- de tabela, nem de função.
+-- `USAGE` em `public` e mais nada. Nenhum privilégio no schema `auth`, nem de
+-- schema, nem de tabela, nem de função. `CREATE` em `public` ele recebe por
+-- dois comandos na seção 8, o tempo de transferir a posse das funções, e perde
+-- em seguida — o estado final é `USAGE` sim, `CREATE` não.
 GRANT USAGE ON SCHEMA public TO bslog_rpc_operacional;
 
 -- LEITURA, COLUNA A COLUNA. `GRANT SELECT ON TABLE` daria ao papel a tabela
@@ -1175,13 +1177,46 @@ GRANT EXECUTE ON FUNCTION public.apontamento_faturado(uuid, uuid)     TO bslog_r
 -- A troca vem DEPOIS dos grants de propósito: `REVOKE`/`GRANT` sobre função
 -- exige ser dono, e assim os comandos acima rodam enquanto `postgres` ainda é.
 -- A ACL sobrevive à transferência; o PostgreSQL apenas reescreve o concedente.
+--
+-- O `CREATE` TEMPORÁRIO, E POR QUE ELE É OBRIGATÓRIO
+--
+-- `ALTER FUNCTION ... OWNER TO` exige que o NOVO DONO tenha `CREATE` no schema
+-- onde o objeto vive: transferir a posse equivale, para o PostgreSQL, a esse
+-- papel criar o objeto ali. Sem isso o comando recusa com
+-- `42501 / permission denied for schema public`.
+--
+-- Isso NÃO é hipótese: a primeira tentativa de aplicar esta migration em
+-- Production falhou exatamente aqui, no primeiro dos cinco `ALTER FUNCTION`, e
+-- o rollback desfez tudo — Production ficou intacta, com 18 migrations.
+--
+-- POR QUE O TESTE LOCAL NÃO PEGOU, que é a parte que interessa para a próxima
+-- vez: no harness local as migrations rodam como um `postgres` SUPERUSUÁRIO, e
+-- superusuário pula essa verificação de privilégio inteira. O `postgres` do
+-- Supabase **não é superusuário** — ele é dono do schema `public` e tem
+-- `CREATEROLE`/`BYPASSRLS`, mas as verificações de ACL valem para ele. Toda
+-- afirmação de privilégio validada só no harness herda essa ressalva.
+--
+-- Reproduzido depois, com executor não-superusuário: sem o `CREATE`, os cinco
+-- `ALTER OWNER` recusam com 42501; com ele, passam; e o `REVOKE` seguinte
+-- devolve o papel ao mínimo.
+--
+-- A JANELA É A MENOR POSSÍVEL. O `CREATE` existe entre duas linhas adjacentes,
+-- dentro da mesma transação da migration — se qualquer um dos `ALTER` falhar, o
+-- rollback leva o `GRANT` junto e o privilégio nunca chega a existir. O papel é
+-- `NOLOGIN` e ninguém se autentica como ele, então não há sessão dele para
+-- aproveitar a janela. O estado FINAL é `USAGE` sim, `CREATE` não — asseverado
+-- na seção 9 e no caso R do teste `009`.
 -- ---------------------------------------------------------------------------
+
+GRANT CREATE ON SCHEMA public TO bslog_rpc_operacional;
 
 ALTER FUNCTION public.listar_operacoes_do_operador()                          OWNER TO bslog_rpc_operacional;
 ALTER FUNCTION public.listar_turnos_do_operador(uuid)                         OWNER TO bslog_rpc_operacional;
 ALTER FUNCTION public.listar_equipe_do_operador(uuid, uuid)                   OWNER TO bslog_rpc_operacional;
 ALTER FUNCTION public.listar_apontamentos_do_operador(uuid, uuid, date)       OWNER TO bslog_rpc_operacional;
 ALTER FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date, jsonb) OWNER TO bslog_rpc_operacional;
+
+REVOKE CREATE ON SCHEMA public FROM bslog_rpc_operacional;
 
 
 -- ---------------------------------------------------------------------------
@@ -1234,6 +1269,15 @@ BEGIN
 
   IF has_schema_privilege('bslog_rpc_operacional', 'auth', 'USAGE') THEN
     RAISE EXCEPTION 'bslog_rpc_operacional nao pode ter USAGE no schema auth.';
+  END IF;
+
+  -- O `CREATE` da seção 8 é temporário: se sobrar, a migration não passa.
+  IF has_schema_privilege('bslog_rpc_operacional', 'public', 'CREATE') THEN
+    RAISE EXCEPTION 'bslog_rpc_operacional ficou com CREATE no schema public.';
+  END IF;
+
+  IF NOT has_schema_privilege('bslog_rpc_operacional', 'public', 'USAGE') THEN
+    RAISE EXCEPTION 'bslog_rpc_operacional precisa de USAGE no schema public.';
   END IF;
 
   IF EXISTS (
