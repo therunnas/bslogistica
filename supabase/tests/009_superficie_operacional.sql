@@ -99,6 +99,25 @@ begin
 end;
 $$;
 
+-- Executa SQL sob o papel dono das RPCs. Depois da 013 esse papel e
+-- `bslog_rpc_operacional`, entao isto reproduz FIELMENTE o contexto de dentro de
+-- uma delas: mesmo `current_user`, mesmos privilegios, mesmo BYPASSRLS.
+create or replace function pg_temp.como_rpc(_sql text)
+returns text language plpgsql as $$
+declare _r text;
+begin
+  execute 'set local role bslog_rpc_operacional';
+  begin
+    execute _sql into _r;
+  exception when others then
+    execute 'set local role postgres';
+    return 'erro ' || sqlstate;
+  end;
+  execute 'set local role postgres';
+  return coalesce(_r, 'nulo');
+end;
+$$;
+
 -- Atalho para a RPC de escrita: devolve `ok` ou `erro <sqlstate>`.
 create or replace function pg_temp.salvar(
   _uid text, _aal text, _op text, _turno text, _data text, _linhas jsonb
@@ -817,37 +836,26 @@ begin
   perform pg_temp.registrar('I2. os 2 helpers nao sao executaveis pela API',
     '(nenhum)', coalesce(nullif(btrim(_internas), ''), '(nenhum)'));
 
-  -- SECURITY DEFINER, dono e search_path nas sete.
+  -- SECURITY DEFINER e search_path nas sete. O DONO e conferido no bloco N,
+  -- porque agora sao dois grupos: as 5 RPCs pertencem ao papel dedicado e os 4
+  -- helpers seguem com postgres.
   _erros := '';
-  for _fn, _args in
-    select p.proname, pg_get_function_identity_arguments(p.oid)
-      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public'
-       and p.proname in ('operador_elegivel_aal1', 'operador_autorizado',
-                         'listar_operacoes_do_operador', 'listar_turnos_do_operador',
-                         'listar_equipe_do_operador', 'listar_apontamentos_do_operador',
-                         'salvar_apontamento_operacional')
-  loop
-    perform 1;
-  end loop;
-
   select string_agg(p.proname || ':' ||
            case when p.prosecdef then 'secdef' else 'INVOKER' end || ':' ||
-           pg_get_userbyid(p.proowner) || ':' ||
            coalesce(array_to_string(p.proconfig, ','), '(nenhum)'), ' ' order by p.proname)
     into _erros
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
-     and p.proname in ('operador_elegivel_aal1', 'operador_autorizado',
-                       'listar_operacoes_do_operador', 'listar_turnos_do_operador',
-                       'listar_equipe_do_operador', 'listar_apontamentos_do_operador',
-                       'salvar_apontamento_operacional')
+     and p.proname in ('operador_elegivel_aal1', 'operador_autorizado', 'uid_do_operador',
+                       'travar_turno_da_operacao', 'listar_operacoes_do_operador',
+                       'listar_turnos_do_operador', 'listar_equipe_do_operador',
+                       'listar_apontamentos_do_operador', 'salvar_apontamento_operacional')
      and not (p.prosecdef
-              and pg_get_userbyid(p.proowner) = 'postgres'
-              and coalesce(array_to_string(p.proconfig, ','), '') = 'search_path=pg_catalog, public');
+              and pg_get_userbyid(p.proowner) in ('postgres', 'bslog_rpc_operacional')
+              and coalesce(array_to_string(p.proconfig, ''), '') = 'search_path=pg_catalog, public');
 
   perform pg_temp.registrar(
-    'I3. as 7 funcoes sao SECURITY DEFINER de postgres com search_path fixo',
+    'I3. as 9 funcoes sao SECURITY DEFINER com search_path fixo',
     '(nenhuma fora do padrao)', coalesce(_erros, '(nenhuma fora do padrao)'));
 
   -- Volatilidade: leitura STABLE, escrita VOLATILE.
@@ -937,23 +945,21 @@ $schema$;
 
 
 -- ---------------------------------------------------------------------------
--- K. O que sobra da CAMADA 2 quando a escrita entra por uma função
---    SECURITY DEFINER de `postgres`.
+-- K. O GATE DAS MIGRATIONS 010/011 — o que vale por dentro da superfície.
 --
 -- POR QUE ESTE BLOCO EXISTE. As guardas de 010 e 011 se dividem em duas
 -- famílias: as que perguntam `current_user NOT IN ('postgres','service_role')`
--- e as que não perguntam nada. Dentro de qualquer função SECURITY DEFINER de
--- `postgres` — `gerar_fatura` desde a 009, as cinco RPCs desde a 013 —
--- `current_user` É `postgres`. Logo a primeira família NÃO dispara ali.
+-- e as que não perguntam nada. Enquanto as RPCs pertenciam a `postgres`, a
+-- primeira família NÃO disparava sobre a escrita do operador — medido, e é o
+-- que motivou o papel dedicado.
 --
--- Cada caso abaixo mede, com `current_user = postgres`, se a proteção ainda
--- existe. Um `erro 42501` significa CAMADA 2 VIVA; um sucesso significa que
--- naquele ponto só resta a CAMADA 1 — o contrato estreito da RPC.
+-- Agora as cinco RPCs pertencem a `bslog_rpc_operacional`. Cada caso abaixo
+-- roda sob ESSE papel, que é exatamente o `current_user` de dentro delas, e
+-- mede se a proteção se aplica.
 --
--- Os casos que registram sucesso NÃO são aprovação da brecha: são o tripwire
--- que documenta onde a rede não está, para que a decisão seja explícita e para
--- que a expectativa mude de lado no dia em que a superfície passar a rodar sob
--- um owner dedicado.
+-- Onde ainda sobrar apenas o contrato da RPC, o caso registra isso
+-- explicitamente — não como aprovação, mas como o tripwire que obriga a
+-- decisão a ser consciente.
 -- ---------------------------------------------------------------------------
 
 do $camada2$
@@ -963,8 +969,8 @@ declare
   _t     constant text := '0b000000-0000-4000-8000-000000000001';
   _t2    constant text := '0b000000-0000-4000-8000-000000000002';
   _dia   constant text := '2026-09-15';
-  _e_fat uuid;   -- linha ja faturada
-  _e_liv uuid;   -- linha ainda nao faturada
+  _e_fat uuid;
+  _e_liv uuid;
   _fatura uuid;
   _folha uuid;
   _folha_vazia uuid;
@@ -982,99 +988,96 @@ begin
    where te.employee_id = '05000000-0000-4000-8000-000000000002'
      and te.work_date = _dia::date;
 
-  -- K1/K2. `bloquear_edicao_financeira` ISENTA postgres — mas o valor nao muda
-  -- assim mesmo, porque quem manda no numero e `derivar_valores_financeiros`,
-  -- que nao tem isencao de papel e, sem coluna motriz alterada, copia os
-  -- valores de OLD por cima do payload. A guarda perdida era a MENSAGEM, nao o
-  -- VALOR.
-  perform pg_temp.registrar('K1. como postgres, UPDATE so de billed_amount NAO levanta erro',
-    '1', pg_temp.como_postgres(format(
+  -- K1. EDICAO FINANCEIRA. Antes do owner dedicado isto passava sem erro
+  -- nenhum, porque `bloquear_edicao_financeira` isenta `postgres`. Agora e
+  -- recusado duas vezes: pelo privilegio de coluna, que o papel nao tem, e pela
+  -- guarda, que voltou a se aplicar.
+  perform pg_temp.registrar('K1. no contexto da RPC, UPDATE de billed_amount e RECUSADO',
+    'erro 42501', pg_temp.como_rpc(format(
       'with u as (update public.timesheet_entries set billed_amount = 9999 where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
 
-  perform pg_temp.registrar('K2. mas a derivacao preservou o valor: nada mudou',
-    '0.00', (select billed_amount::text from public.timesheet_entries where id = _e_liv));
+  perform pg_temp.registrar('K2. e o valor continua o derivado', '0.00',
+    (select billed_amount::text from public.timesheet_entries where id = _e_liv));
 
-  perform pg_temp.registrar('K3. o mesmo UPDATE como admin aal2 e recusado com 42501',
-    'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000003', 'aal2', format(
-      'with u as (update public.timesheet_entries set billed_amount = 9999 where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
+  perform pg_temp.registrar('K3. snapshot idem',
+    'erro 42501', pg_temp.como_rpc(format(
+      'with u as (update public.timesheet_entries set daily_rate_snapshot = 1 where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
 
-  -- K4. Snapshot: mesmo desfecho, e pelo mesmo motivo.
-  perform pg_temp.registrar('K4. como postgres, snapshot tambem volta ao valor derivado',
-    '150.00', pg_temp.como_postgres(format(
-      'with u as (update public.timesheet_entries set daily_rate_snapshot = 1 where id = %L::uuid returning daily_rate_snapshot) select daily_rate_snapshot::text from u', _e_liv)));
+  perform pg_temp.registrar('K4. cost_amount idem',
+    'erro 42501', pg_temp.como_rpc(format(
+      'with u as (update public.timesheet_entries set cost_amount = 1 where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
 
-  -- K5. VINCULO DE FATURA: aqui a rede REALMENTE some. As duas guardas do
-  -- vinculo — `bloquear_vinculo_fora_do_faturamento` (exige postgres) e
-  -- `protect_timesheet_invoice_link` (isenta postgres) — deixam passar. Hoje
-  -- nada na RPC escreve `invoice_id`, e e SO isso que impede: CAMADA 1 sozinha.
-  perform pg_temp.registrar('K5. como postgres, vincular linha livre a uma fatura FUNCIONA (camada 2 ausente)',
-    '1', pg_temp.como_postgres(format(
+  -- K5. VINCULO DE FATURA — o caso central deste gate. Como `postgres` isto
+  -- FUNCIONAVA: `bloquear_vinculo_fora_do_faturamento` exige `postgres` para
+  -- vincular e `protect_timesheet_invoice_link` isenta `postgres`. No contexto
+  -- da RPC, agora, e recusado — e nao por falta de `invoice_id` no contrato
+  -- JSON, mas pelo banco.
+  perform pg_temp.registrar('K5. no contexto da RPC, criar vinculo de fatura e RECUSADO',
+    'erro 42501', pg_temp.como_rpc(format(
       'with u as (update public.timesheet_entries set invoice_id = %L::uuid where id = %L::uuid returning 1) select count(*)::text from u', _fatura, _e_liv)));
 
-  -- Desfaz o vinculo indevido para nao contaminar os casos seguintes — e o
-  -- proprio desfazer mostra que a SAIDA continua fechada para todos.
-  perform pg_temp.registrar('K6. e desvincular e recusado ate como postgres (camada 2 viva)',
-    'erro 42501', pg_temp.como_postgres(format(
-      'with u as (update public.timesheet_entries set invoice_id = null where id = %L::uuid returning 1) select count(*)::text from u', _e_liv)));
+  perform pg_temp.registrar('K5b. e a linha continua sem fatura', 'true',
+    (select (invoice_id is null)::text from public.timesheet_entries where id = _e_liv));
 
-  -- K7. A LINHA FATURADA continua imutavel: `bloquear_edicao_faturada` compara
-  -- a linha inteira e nao isenta ninguem.
-  perform pg_temp.registrar('K7. como postgres, editar linha faturada e recusado (camada 2 viva)',
-    'erro 42501', pg_temp.como_postgres(format(
+  perform pg_temp.registrar('K6. desvincular tambem e recusado',
+    'erro 42501', pg_temp.como_rpc(format(
+      'with u as (update public.timesheet_entries set invoice_id = null where id = %L::uuid returning 1) select count(*)::text from u', _e_fat)));
+
+  -- K7 a K9. A linha faturada continua imutavel: `bloquear_edicao_faturada`
+  -- compara a linha inteira e nunca isentou ninguem.
+  perform pg_temp.registrar('K7. editar linha faturada e recusado',
+    'erro 42501', pg_temp.como_rpc(format(
       'with u as (update public.timesheet_entries set status = ''absent''::public.attendance_status where id = %L::uuid returning 1) select count(*)::text from u', _e_fat)));
 
-  perform pg_temp.registrar('K8. como postgres, apagar linha faturada e recusado (camada 2 viva)',
-    'erro 42501', pg_temp.como_postgres(format(
+  perform pg_temp.registrar('K8. apagar linha faturada e recusado — e o papel nem tem DELETE',
+    'erro 42501', pg_temp.como_rpc(format(
       'with d as (delete from public.timesheet_entries where id = %L::uuid returning 1) select count(*)::text from d', _e_fat)));
 
-  perform pg_temp.registrar('K9. o valor faturado segue intocado depois de K5..K8',
+  perform pg_temp.registrar('K9. o valor faturado segue intocado',
     _antes::text, (select billed_amount::text from public.timesheet_entries where id = _e_fat));
 
-  -- K10. MOVER A FOLHA. `bloquear_fontes_folha` isenta postgres, mas
-  -- `bloquear_mover_folha_com_apontamento` nao isenta ninguem — e e ela que
-  -- vale aqui, porque a folha tem apontamento.
-  perform pg_temp.registrar('K10. como postgres, mover folha COM apontamento e recusado (camada 2 viva)',
-    'erro 42501', pg_temp.como_postgres(format(
+  -- K10 e K11. Mover folha. A guarda de fontes isenta `postgres`, mas o papel
+  -- dedicado nao e isento — e, antes dela, o privilegio de coluna ja recusa:
+  -- ele so tem UPDATE em `timesheets(notes)`.
+  perform pg_temp.registrar('K10. mover folha COM apontamento e recusado',
+    'erro 42501', pg_temp.como_rpc(format(
       'with u as (update public.timesheets set operation_id = %L::uuid, shift_id = null where id = %L::uuid returning 1) select count(*)::text from u', _op2, _folha)));
 
-  -- K11. Folha VAZIA nao tem essa rede: so a guarda de papel, que isenta
-  -- postgres. A RPC nunca faz UPDATE em `timesheets`, entao isto hoje e
-  -- inalcancavel por ela — mas e o que aconteceria se um dia fizesse.
   insert into public.timesheets (operation_id, shift_id, work_date)
   values (_op::uuid, _t2::uuid, '2026-09-19') returning id into _folha_vazia;
 
-  perform pg_temp.registrar('K12. como postgres, mover folha VAZIA para outra operacao FUNCIONA (camada 2 ausente)',
-    '1', pg_temp.como_postgres(format(
-      'with u as (update public.timesheets set operation_id = %L::uuid, shift_id = null where id = %L::uuid returning 1) select count(*)::text from u', _op2, _folha_vazia)));
+  perform pg_temp.registrar('K11. mover folha VAZIA tambem e recusado agora (antes passava)',
+    'erro 42501', pg_temp.como_rpc(format(
+      'with u as (update public.timesheets set operation_id = %L::uuid where id = %L::uuid returning 1) select count(*)::text from u', _op2, _folha_vazia)));
+
+  perform pg_temp.registrar('K12. e reabrir folha fechada tambem, por falta de privilegio na coluna',
+    'erro 42501', pg_temp.como_rpc(format(
+      'with u as (update public.timesheets set status = ''open''::public.timesheet_status where id = %L::uuid returning 1) select count(*)::text from u', _folha_vazia)));
 
   delete from public.timesheets where id = _folha_vazia;
 
-  -- K13. PAR OPERACAO/TURNO: `validar_par_operacao_turno` nao isenta ninguem,
-  -- entao a verificacao que a RPC faz por conta propria tem rede por baixo.
-  perform pg_temp.registrar('K13. como postgres, folha com turno de outra operacao e recusada (camada 2 viva)',
-    'erro 23514', pg_temp.como_postgres(format(
+  -- K13. Par operacao/turno: invariante estrutural, sem isencao de papel.
+  perform pg_temp.registrar('K13. folha com turno de outra operacao e recusada',
+    'erro 23514', pg_temp.como_rpc(format(
       'with i as (insert into public.timesheets (operation_id, shift_id, work_date) values (%L::uuid, ''0b000000-0000-4000-8000-000000000009''::uuid, ''2026-09-21'') returning 1) select count(*)::text from i', _op)));
 
   -- K14. EQUIPE: nao existe invariante de banco nenhuma ligando
-  -- `timesheet_entries` a `operation_team`. A regra e SO da RPC — e vale para o
-  -- admin tambem, que hoje aponta quem quiser pela tela.
+  -- `timesheet_entries` a `operation_team` — nem para o admin. A regra e SO da
+  -- RPC, e este caso existe para que isso nao se esqueca.
   select t.id into _folha from public.timesheets t
    where t.operation_id = _op::uuid and t.shift_id = _t::uuid and t.work_date = _dia::date;
 
-  perform pg_temp.registrar('K14. como postgres, apontar colaborador FORA da equipe FUNCIONA (camada 2 ausente)',
-    '1', pg_temp.como_postgres(format(
+  perform pg_temp.registrar('K14. apontar colaborador FORA da equipe passa no banco (regra e so da RPC)',
+    '1', pg_temp.como_rpc(format(
       'with i as (insert into public.timesheet_entries (timesheet_id, employee_id, status) values (%L::uuid, ''05000000-0000-4000-8000-000000000003''::uuid, ''absent''::public.attendance_status) returning 1) select count(*)::text from i', _folha)));
 
   delete from public.timesheet_entries
    where timesheet_id = _folha and employee_id = '05000000-0000-4000-8000-000000000003';
 
-  -- K15/K16. FOLHA FECHADA: a recusa e regra da RPC, nao invariante do banco.
-  -- Folha propria, de outro dia: a linha do dia 15 ficou vinculada a fatura em
-  -- K5, e ai quem recusaria seria `bloquear_edicao_faturada` — mediria outra
-  -- coisa.
+  -- K15 e K16. Folha fechada: idem — regra da RPC, nao do banco.
   _r := pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1', _op, _t, '2026-09-17',
     '[{"employee_id":"05000000-0000-4000-8000-000000000002","status":"present","check_in":"08:00","check_out":"17:00","break_minutes":60}]'::jsonb);
-  perform pg_temp.registrar('K14b. folha nova do dia 17 gravada pela RPC', 'ok', _r);
+  perform pg_temp.registrar('K15a. folha nova do dia 17 gravada pela RPC', 'ok', _r);
 
   select t.id into _folha_vazia from public.timesheets t
    where t.operation_id = _op::uuid and t.shift_id = _t::uuid and t.work_date = '2026-09-17';
@@ -1084,32 +1087,234 @@ begin
     'erro 42501', pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1', _op, _t, '2026-09-17',
       '[{"employee_id":"05000000-0000-4000-8000-000000000002","status":"absent"}]'::jsonb));
 
-  perform pg_temp.registrar('K16. mas o banco sozinho aceita escrita em folha fechada (camada 2 ausente)',
-    '1', pg_temp.como_postgres(format(
+  perform pg_temp.registrar('K16. mas o banco sozinho aceita escrever linha de folha fechada (regra e so da RPC)',
+    '1', pg_temp.como_rpc(format(
       'with u as (update public.timesheet_entries set notes = ''x'' where timesheet_id = %L::uuid returning 1) select count(*)::text from u', _folha_vazia)));
 
-  -- K17. UNICIDADE DA DIARIA: indice unico nao consulta papel. O cenario e
-  -- real: o admin remaneja o colaborador de turno no meio do dia, e o operador
-  -- tenta lancar a diaria de novo no turno novo. Note que a exclusividade de
-  -- alocacao (`operation_team_um_ativo_por_colaborador`) obriga a desativar a
-  -- alocacao anterior — sao duas invariantes encaixadas, nenhuma delas sensivel
-  -- a papel.
+  -- K17 e K18. Indices unicos nao consultam papel nenhum.
   update public.operation_team set active = false
    where operation_id = _op::uuid and shift_id = _t::uuid
      and employee_id = '05000000-0000-4000-8000-000000000001';
   insert into public.operation_team (operation_id, shift_id, employee_id, active)
   values (_op::uuid, _t2::uuid, '05000000-0000-4000-8000-000000000001', true);
 
-  perform pg_temp.registrar('K17. segunda diaria no mesmo dia pela RPC e recusada pelo indice (camada 2 viva)',
+  perform pg_temp.registrar('K17. segunda diaria no mesmo dia pela RPC e recusada pelo indice',
     'erro 23505', pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1', _op, _t2, _dia,
       '[{"employee_id":"05000000-0000-4000-8000-000000000001","status":"present","check_in":"18:00","check_out":"02:00"}]'::jsonb));
 
-  -- K18. E a exclusividade de alocacao tambem nao depende de papel.
-  perform pg_temp.registrar('K18. segunda alocacao ATIVA do mesmo colaborador e recusada (camada 2 viva)',
+  perform pg_temp.registrar('K18. segunda alocacao ATIVA do mesmo colaborador e recusada',
     'erro 23505', pg_temp.como_postgres(format(
       'with i as (insert into public.operation_team (operation_id, shift_id, employee_id, active) values (%L::uuid, %L::uuid, ''05000000-0000-4000-8000-000000000001''::uuid, true) returning 1) select count(*)::text from i', _op2, '0b000000-0000-4000-8000-000000000009')));
 end;
 $camada2$;
+
+
+-- ---------------------------------------------------------------------------
+-- L. `current_user` MEDIDO pelo caminho real da escrita.
+--
+-- Não é o catálogo dizendo quem é o dono: é um trigger espião instalado sobre
+-- `timesheet_entries` durante uma chamada de verdade da RPC, registrando o
+-- `current_user` que as guardas de 010/011 enxergam naquele instante. Mesmo
+-- método que a 011 usou para provar que dentro de `gerar_fatura` ele era
+-- `postgres`.
+-- ---------------------------------------------------------------------------
+
+-- SECURITY INVOKER, obrigatoriamente: um `security definer` aqui responderia o
+-- dono da propria sonda, e nao quem esta escrevendo. E grava num GUC em vez de
+-- numa tabela porque o papel das RPCs nao tem — nem deve ter — privilegio de
+-- escrita na temporaria do postgres.
+create or replace function pg_temp.registrar_current_user()
+returns trigger language plpgsql security invoker as $$
+begin
+  perform set_config('bslog.espiao_current_user', current_user::text, false);
+  return new;
+end;
+$$;
+
+do $espiao$
+declare _r text; _quem text;
+begin
+  create trigger trg_espiao_current_user
+    before insert on public.timesheet_entries
+    for each row execute function pg_temp.registrar_current_user();
+
+  _r := pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1',
+    '0e000000-0000-4000-8000-000000000001', '0b000000-0000-4000-8000-000000000002',
+    '2026-09-23',
+    '[{"employee_id":"05000000-0000-4000-8000-000000000001","status":"present","check_in":"18:00","check_out":"02:00"}]'::jsonb);
+
+  drop trigger trg_espiao_current_user on public.timesheet_entries;
+
+  perform pg_temp.registrar('L1. a gravacao aconteceu', 'ok', _r);
+
+  _quem := nullif(current_setting('bslog.espiao_current_user', true), '');
+
+  perform pg_temp.registrar('L2. current_user MEDIDO dentro da escrita',
+    'bslog_rpc_operacional', coalesce(_quem, 'nada registrado'));
+
+  perform pg_temp.registrar('L3. e portanto NAO e postgres nem service_role', 'false',
+    (coalesce(_quem, '') in ('postgres', 'service_role'))::text);
+end;
+$espiao$;
+
+
+-- ---------------------------------------------------------------------------
+-- M. O papel de execução — atributos, membership e privilégios.
+-- ---------------------------------------------------------------------------
+
+do $papel$
+declare _r record; _erros text := '';
+begin
+  select rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication,
+         rolbypassrls, rolinherit
+    into _r
+    from pg_roles where rolname = 'bslog_rpc_operacional';
+
+  perform pg_temp.registrar('M1. NOLOGIN', 'false', _r.rolcanlogin::text);
+  perform pg_temp.registrar('M2. NOSUPERUSER', 'false', _r.rolsuper::text);
+  perform pg_temp.registrar('M3. NOCREATEDB', 'false', _r.rolcreatedb::text);
+  perform pg_temp.registrar('M4. NOCREATEROLE', 'false', _r.rolcreaterole::text);
+  perform pg_temp.registrar('M5. NOREPLICATION', 'false', _r.rolreplication::text);
+  perform pg_temp.registrar('M6. NOINHERIT', 'false', _r.rolinherit::text);
+  perform pg_temp.registrar('M7. BYPASSRLS, o unico atributo forte', 'true', _r.rolbypassrls::text);
+
+  perform pg_temp.registrar('M8. nao e membro de anon/authenticated/service_role', 'false|false|false',
+    pg_has_role('bslog_rpc_operacional', 'anon', 'USAGE')::text || '|' ||
+    pg_has_role('bslog_rpc_operacional', 'authenticated', 'USAGE')::text || '|' ||
+    pg_has_role('bslog_rpc_operacional', 'service_role', 'USAGE')::text);
+
+  perform pg_temp.registrar('M9. e nenhum papel da API e membro dele', 'false|false|false',
+    pg_has_role('anon', 'bslog_rpc_operacional', 'USAGE')::text || '|' ||
+    pg_has_role('authenticated', 'bslog_rpc_operacional', 'USAGE')::text || '|' ||
+    pg_has_role('service_role', 'bslog_rpc_operacional', 'USAGE')::text);
+
+  -- Privilegios de tabela: o inventario completo, em uma linha.
+  perform pg_temp.registrar('M10. sem DELETE nas tabelas que a RPC escreve', 'false|false',
+    has_table_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'DELETE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.timesheets', 'DELETE')::text);
+
+  perform pg_temp.registrar('M11. sem TRUNCATE em lugar nenhum', 'false|false|false',
+    has_table_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'TRUNCATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.timesheets', 'TRUNCATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.operations', 'TRUNCATE')::text);
+
+  perform pg_temp.registrar('M12. sem escrita nas tabelas administrativas',
+    'false|false|false|false|false',
+    has_table_privilege('bslog_rpc_operacional', 'public.operations', 'UPDATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.shifts', 'UPDATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.employees', 'UPDATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.clients', 'UPDATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.user_operation_access', 'UPDATE')::text);
+
+  perform pg_temp.registrar('M13. sem acesso nenhum a invoices e invoice_items',
+    'false|false|false|false',
+    has_table_privilege('bslog_rpc_operacional', 'public.invoices', 'SELECT')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.invoices', 'UPDATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.invoice_items', 'SELECT')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.contracts', 'SELECT')::text);
+
+  -- `user_roles` e leitura, e nao e escolha desta superficie: o trigger legado
+  -- `protect_timesheet_invoice_link` (20260909175435) avalia `has_role` como
+  -- SECURITY INVOKER em todo INSERT de apontamento. `profiles` nao entra.
+  perform pg_temp.registrar('M14. le user_roles (exigido pelo trigger legado), nao le profiles',
+    'true|false|false',
+    has_table_privilege('bslog_rpc_operacional', 'public.user_roles', 'SELECT')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.user_roles', 'UPDATE')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'public.profiles', 'SELECT')::text);
+
+  -- Privilegio por COLUNA: e isto que torna estrutural a proibicao de escrever
+  -- valor financeiro ou vinculo de fatura.
+  perform pg_temp.registrar('M15. NENHUM privilegio em invoice_id', 'false|false',
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'INSERT')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'UPDATE')::text);
+
+  perform pg_temp.registrar('M16. NENHUM privilegio nas colunas financeiras',
+    'false|false|false|false|false',
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'billed_amount', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'cost_amount', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'daily_rate_snapshot', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'ot_hour_rate_snapshot', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'daily_cost_snapshot', 'UPDATE')::text);
+
+  perform pg_temp.registrar('M17. e as seis colunas operacionais ele TEM',
+    'true|true|true|true|true|true',
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'employee_id', 'INSERT')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'status', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'check_in', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'check_out', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'break_minutes', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'notes', 'UPDATE')::text);
+
+  -- Em `timesheets` e `shifts` o unico UPDATE e `updated_at`, e existe so para
+  -- satisfazer o privilegio que o PostgreSQL cobra para travar linha com
+  -- FOR SHARE. Nenhuma coluna de negocio esta ao alcance.
+  perform pg_temp.registrar('M18. em timesheets: INSERT das 4 colunas e UPDATE so de updated_at',
+    'true|true|false|false|false|false',
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheets', 'operation_id', 'INSERT')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheets', 'updated_at', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheets', 'status', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheets', 'work_date', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheets', 'notes', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.timesheets', 'operation_id', 'UPDATE')::text);
+
+  perform pg_temp.registrar('M18b. em shifts: nenhum INSERT e UPDATE so de updated_at',
+    'false|true|false|false|false',
+    has_column_privilege('bslog_rpc_operacional', 'public.shifts', 'name', 'INSERT')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.shifts', 'updated_at', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.shifts', 'start_time', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.shifts', 'end_time', 'UPDATE')::text || '|' ||
+    has_column_privilege('bslog_rpc_operacional', 'public.shifts', 'break_minutes', 'UPDATE')::text);
+
+  -- Nenhuma TABELA do schema auth: a identidade vem de `uid_do_operador()`.
+  perform pg_temp.registrar('M19. sem SELECT em auth.users e auth.mfa_factors', 'false|false',
+    has_table_privilege('bslog_rpc_operacional', 'auth.users', 'SELECT')::text || '|' ||
+    has_table_privilege('bslog_rpc_operacional', 'auth.mfa_factors', 'SELECT')::text);
+
+  perform pg_temp.registrar('M20. mas USAGE em auth, exigido pelo trigger legado da 20260909175435',
+    'true', has_schema_privilege('bslog_rpc_operacional', 'auth', 'USAGE')::text);
+end;
+$papel$;
+
+
+-- ---------------------------------------------------------------------------
+-- N. Donos e execução das sete funções.
+-- ---------------------------------------------------------------------------
+
+do $donos$
+declare _r text;
+begin
+  select string_agg(p.proname || '=' || pg_get_userbyid(p.proowner), ' ' order by p.proname)
+    into _r
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('listar_operacoes_do_operador', 'listar_turnos_do_operador',
+                       'listar_equipe_do_operador', 'listar_apontamentos_do_operador',
+                       'salvar_apontamento_operacional');
+  perform pg_temp.registrar('N1. as 5 RPCs pertencem ao papel dedicado',
+    'listar_apontamentos_do_operador=bslog_rpc_operacional listar_equipe_do_operador=bslog_rpc_operacional listar_operacoes_do_operador=bslog_rpc_operacional listar_turnos_do_operador=bslog_rpc_operacional salvar_apontamento_operacional=bslog_rpc_operacional',
+    _r);
+
+  select string_agg(p.proname || '=' || pg_get_userbyid(p.proowner), ' ' order by p.proname)
+    into _r
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('operador_elegivel_aal1', 'operador_autorizado',
+                       'uid_do_operador', 'travar_turno_da_operacao');
+  perform pg_temp.registrar('N2. os 4 helpers seguem com postgres, e nenhum deles escreve',
+    'operador_autorizado=postgres operador_elegivel_aal1=postgres travar_turno_da_operacao=postgres uid_do_operador=postgres',
+    _r);
+
+  -- Nenhum helper escreve: a justificativa do owner postgres depende disso.
+  select coalesce(string_agg(p.proname, ' '), '(nenhum)') into _r
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('operador_elegivel_aal1', 'operador_autorizado',
+                       'uid_do_operador', 'travar_turno_da_operacao')
+     and (p.prosrc ~* '(insert|update|delete|truncate)\s');
+  perform pg_temp.registrar('N3. nenhum helper de postgres contem comando de escrita',
+    '(nenhum)', _r);
+end;
+$donos$;
 
 
 -- ---------------------------------------------------------------------------

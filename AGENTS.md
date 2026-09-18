@@ -100,6 +100,14 @@ tem relação com o TanStack Router.
   atribuição por dentro, sempre sobre `auth.uid()` e nunca sobre um `user_id`
   recebido. Decisão de autorização fecha com `coalesce(..., false)` e
   `IS NOT TRUE`: NULL não é `false`.
+- **As RPCs operacionais não rodam como `postgres`.** Elas pertencem a
+  `bslog_rpc_operacional` — `NOLOGIN`, sem membership nos papéis da API,
+  `BYPASSRLS` e privilégios mínimos por coluna —, porque sete guardas de 010/011
+  isentam `postgres` e a superfície do papel menos privilegiado não pode escrever
+  com as isenções do mais privilegiado. Esse papel **não tem privilégio** em
+  `invoice_id` nem em coluna financeira, não tem DELETE nem TRUNCATE, e em
+  `timesheets`/`shifts` só atualiza `updated_at`, o mínimo que o PostgreSQL exige
+  para travar linha. Não ampliar esses grants, e não trocar o dono das funções.
 - **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
   Operação administrativa privilegiada é server-side, o último admin é
   protegido, e alteração de usuário ou papel é auditada.

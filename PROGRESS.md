@@ -401,9 +401,12 @@ fechado**. O que não está no `RETURNS TABLE` não existe para quem chama.
 
 | Objeto                                                           | Papel                                           |
 | ---------------------------------------------------------------- | ----------------------------------------------- |
+| `bslog_rpc_operacional`                                          | papel de execução das 5 RPCs; não é `postgres`  |
 | `public.user_operation_access`                                   | atribuição usuário → operação; só admin em AAL2 |
 | `public.operador_elegivel_aal1()`                                | a sessão é operador elegível? (interno)         |
 | `public.operador_autorizado(uuid)`                               | ... e tem ESTA operação atribuída? (interno)    |
+| `public.uid_do_operador()`                                       | `auth.uid()` condicionado à elegibilidade       |
+| `public.travar_turno_da_operacao(uuid, uuid)`                    | `FOR SHARE` no turno, sem escrita (interno)     |
 | `public.listar_operacoes_do_operador()`                          | 7 colunas, com `cliente_nome` e sem `client_id` |
 | `public.listar_turnos_do_operador(uuid)`                         | 6 colunas de jornada                            |
 | `public.listar_equipe_do_operador(uuid, uuid)`                   | 4 colunas; sem `daily_cost`, `doc` ou `phone`   |
@@ -441,7 +444,7 @@ um operacional atribuído listou os turnos sem `aal` nenhum. Medido pelo caso A9
 do teste `009`. Corrigido em duas camadas — `coalesce(..., false)` no retorno dos
 helpers e `IS NOT TRUE` nas cinco RPCs.
 
-**Testes:** `009` cobre **112 casos** — acesso (operacional sem MFA atribuído,
+**Testes:** `009` cobre **141 casos** — acesso (operacional sem MFA atribuído,
 operação alheia, UUID inexistente, `operation_id` nulo, operacional com fator
 verificado em aal1 e em aal2, operacional sem MFA em aal2, sem claim `aal`,
 admin em aal1 e em aal2, quem acumula admin+operacional, sem papel, anon, conta
@@ -450,53 +453,105 @@ quatro leituras), dados, escrita aceita com derivação conferida contra a 010,
 dezesseis vetores de escrita recusada, lastro faturado congelado, o que o PR
 **não** relaxou (11 policies, leitura e escrita direta nas tabelas, a própria
 `user_operation_access` nos dois papéis e nos dois AAL), privilégios das sete
-funções, schema/grants da tabela e a auditoria de camada 2 descrita abaixo.
-Escrito **antes** da migration: contra o
+funções, schema/grants da tabela, o inventário completo do papel de execução e o
+gate de camada 2 descrito abaixo. Escrito **antes** da migration: contra o
 schema sem a 013 o arquivo nem monta a fixture —
 `relation "public.user_operation_access" does not exist`.
 
-**Auditoria de camada 2 — gate de segurança pedido antes do PR.** Dentro de
-qualquer função `SECURITY DEFINER` de `postgres`, `current_user` é `postgres`, e
-sete guardas de 010/011 perguntam exatamente isso. Auditado uma a uma, com as
-tentativas executadas **no contexto real da RPC** (bloco K do teste `009`):
+**O papel de execução `bslog_rpc_operacional` — e por que ele existe.**
+`SECURITY DEFINER` roda com os privilégios do DONO. Com dono `postgres`,
+`current_user` dentro das RPCs seria `postgres` — e sete guardas de 010/011
+perguntam exatamente isso (`bloquear_edicao_financeira`,
+`bloquear_vinculo_fora_do_faturamento`, `protect_timesheet_invoice_link`,
+`bloquear_fontes_operacao/turno/folha`). A superfície do papel **menos**
+privilegiado escreveria com as isenções do **mais** privilegiado. Foi medido,
+não suposto: como `postgres`, criar vínculo de fatura FUNCIONAVA.
 
-| Invariante                                       | Por dentro da RPC     |
-| ------------------------------------------------ | --------------------- |
-| linha faturada imutável                          | **viva** (K7)         |
-| `DELETE` de linha faturada                       | **viva** (K8)         |
-| desvínculo de fatura                             | **viva** (K6)         |
-| folha com apontamento não muda de operação/turno | **viva** (K10)        |
-| par operação/turno                               | **viva** (K13)        |
-| valor financeiro derivado pelo banco             | **viva** (K1, K2, K4) |
-| chave diária sincronizada pela folha             | **viva** (E6)         |
-| uma diária por colaborador/operação/dia          | **viva** (K17)        |
-| uma alocação ativa por colaborador               | **viva** (K18)        |
-| **criar vínculo de fatura**                      | **ausente** (K5)      |
-| **mensagem de recusa de coluna financeira**      | **ausente** (K1)      |
-| **mover folha vazia**                            | **ausente** (K12)     |
-| **colaborador fora da equipe**                   | **ausente** (K14)     |
-| **folha fechada**                                | **ausente** (K16)     |
+O papel é `NOLOGIN`, `NOINHERIT`, `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
+`NOREPLICATION`, sem membership em `anon`/`authenticated`/`service_role` e sem
+que nenhum deles seja membro dele. `BYPASSRLS` é o único atributo forte, e é
+estritamente necessário: policy se aplica ao papel corrente, as existentes são
+`TO authenticated`, e sem policy aplicável a RLS nega. A alternativa seria
+escrever policies novas em nove tabelas de negócio — mais superfície, não menos.
 
-Nenhuma das cinco ausências é alcançável pelo operador hoje: a RPC não escreve
-`invoice_id` nem coluna financeira, não faz `UPDATE` em `timesheets`, e a lista
-branca de chaves recusa a chamada inteira. As duas últimas nunca foram
-invariantes de banco — o admin também aponta quem quiser e escreve em folha
-fechada. O risco real é de **edição futura da RPC** perder a rede sem que nada
-avise.
+**Privilégios, por coluna onde faz diferença:** SELECT em `operations`,
+`clients`, `shifts`, `employees`, `operation_team`, `timesheets`,
+`timesheet_entries`, `user_operation_access` e `user_roles`;
+`INSERT (operation_id, shift_id, work_date, created_by)` em `timesheets`;
+`INSERT`/`UPDATE` das seis colunas operacionais em `timesheet_entries`;
+`UPDATE (updated_at)` em `timesheets` e `shifts`. Sem DELETE, sem TRUNCATE, sem
+acesso a `invoices`, `invoice_items`, `contracts` ou `profiles`, e **sem
+privilégio algum em `invoice_id` ou em coluna financeira** — um comando que os
+nomeasse é recusado com `42501` pelo próprio PostgreSQL.
 
-**PR B1.1 — owner dedicado (desenhado e provado, não implementado).** A correção
-estrutural é as cinco funções pertencerem a um papel próprio, que não seja
-`postgres` e portanto não seja isento das guardas. Provado em banco local:
-`ALTER FUNCTION ... OWNER TO bslog_rpc_operacional` mantém leitura, escrita e
-derivação corretas, e as guardas passam a ver `current_user =
-bslog_rpc_operacional`. Requisitos medidos: o papel precisa de `BYPASSRLS` (um
-papel com `CREATEROLE + BYPASSRLS` e **sem** superusuário consegue criá-lo em
-PG16 — confirmar em Production dentro de `BEGIN … ROLLBACK`), `USAGE` em `auth`
-e `SELECT` em `auth.users`, e `UPDATE` em `shifts`/`timesheets` — não para
-escrever, mas porque o PostgreSQL cobra privilégio de `UPDATE` para tomar
-`FOR SHARE`. Esse último ponto merece refinamento antes de implementar: mover os
-dois `FOR SHARE` para helpers `SECURITY DEFINER` de `postgres` evitaria conceder
-`UPDATE` em `shifts`.
+Três grants existem por causa de código já aplicado, e não por escolha:
+`USAGE` em `auth` e `EXECUTE`/`SELECT` de `has_role`/`user_roles`, porque o
+trigger `protect_timesheet_invoice_link` (migration 20260909175435) é SECURITY
+INVOKER, chama `auth.uid()` e `has_role()` e dispara em todo INSERT de
+apontamento; e `UPDATE (updated_at)` em `timesheets`/`shifts`, porque dois
+triggers da 011 tomam `FOR SHARE` e o PostgreSQL cobra privilégio de UPDATE para
+travar linha. `updated_at` é a coluna mais inócua possível: um trigger a
+reescreve com `now()` em qualquer atualização. O `FOR SHARE` que esta migration
+introduziu ficou fora disso, em `travar_turno_da_operacao()`, justamente para
+não conceder `UPDATE` em `shifts` de verdade.
+
+**Aposentar o trigger legado `protect_timesheet_invoice_link` eliminaria três
+desses grants.** Ele é hoje estritamente mais fraco que
+`bloquear_vinculo_fora_do_faturamento`, da 011, que cobre o mesmo evento sem
+isentar admin. Não foi feito aqui: é mexer em proteção financeira já aplicada, e
+merece tarefa de escopo próprio.
+
+**Os quatro helpers seguem com dono `postgres`**, justificados um a um:
+`uid_do_operador`, `operador_elegivel_aal1` e `operador_autorizado` leem o schema
+`auth`, e dar essa leitura ao papel de execução seria pior; `travar_turno_da_operacao`
+existe para tomar o `FOR SHARE` sem exigir `UPDATE` em `shifts`. **Nenhum dos
+quatro escreve** — as isenções de `postgres` são todas sobre escrita, então não
+há o que aproveitar ali. O caso N3 do teste guarda essa propriedade.
+
+**O gate de camada 2, remedido depois da troca de dono.** `current_user` dentro
+da escrita foi medido por trigger espião durante uma chamada real da RPC:
+`bslog_rpc_operacional` (caso L2).
+
+| Tentativa no contexto real da RPC       | Antes (dono postgres) | Agora               |
+| --------------------------------------- | --------------------- | ------------------- |
+| alterar `billed_amount`/`cost_amount`   | passava sem erro      | **42501** (K1–K4)   |
+| **criar vínculo de fatura**             | **vinculava**         | **42501** (K5)      |
+| desvincular fatura                      | bloqueado             | bloqueado (K6)      |
+| editar/apagar linha faturada            | bloqueado             | bloqueado (K7–K8)   |
+| mover folha com apontamento             | bloqueado             | bloqueado (K10)     |
+| **mover folha vazia**                   | **passava**           | **42501** (K11)     |
+| **reabrir folha fechada no banco**      | passava               | **42501** (K12)     |
+| par operação/turno                      | bloqueado             | bloqueado (K13)     |
+| unicidade de diária e de alocação       | bloqueado             | bloqueado (K17–K18) |
+| colaborador fora da equipe              | sem rede              | **sem rede** (K14)  |
+| escrita em folha fechada, linha a linha | sem rede              | **sem rede** (K16)  |
+
+Sobram duas regras que são **só da RPC**: equipe ativa e folha fechada. Nenhuma
+das duas jamais foi invariante de banco, para papel nenhum — o admin também
+aponta quem quiser e escreve em folha fechada. Ficam registradas como regra de
+superfície, não como proteção do banco.
+
+**Pré-requisitos de ambiente — PENDENTES DE VALIDAÇÃO EM PRODUCTION.** Dois, e
+os dois precisam ser conferidos antes de aplicar a 013:
+
+1. `postgres` conseguir criar papel com `BYPASSRLS` sem ser superusuário —
+   medido em PostgreSQL 16: um papel com `CREATEROLE + BYPASSRLS` e sem
+   superusuário consegue;
+2. `postgres` conseguir `GRANT USAGE ON SCHEMA auth` a esse papel.
+
+Script de verificação, que não deixa resíduo:
+
+```sql
+BEGIN;
+  CREATE ROLE bslog_rpc_operacional NOLOGIN NOINHERIT BYPASSRLS;
+  GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional;
+  SELECT rolcanlogin, rolsuper, rolbypassrls
+    FROM pg_roles WHERE rolname = 'bslog_rpc_operacional';
+ROLLBACK;
+```
+
+Se qualquer um dos dois falhar, a 013 não se aplica como está — e a saída não é
+improvisar fallback.
 
 **Validação local.** PostgreSQL 16.13 com um harness que reproduz o que as
 migrations usam do Supabase: papéis (`anon`, `authenticated`, `service_role`,

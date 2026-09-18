@@ -3,16 +3,16 @@
 -- O QUE ESTE PR ENTREGA, E O QUE ELE DELIBERADAMENTE NÃO ENTREGA
 --
 -- Entrega a FUNDAÇÃO de autorização da política aprovada em PROGRESS.md,
--- seções 6 e 7: a tabela de atribuição usuário -> operação, o helper que
--- decide se a sessão atual é um operador autorizado naquela operação, e cinco
--- RPCs de contrato fechado — quatro de leitura e uma de escrita.
+-- seções 6 e 7: um papel de execução dedicado, a tabela de atribuição usuário →
+-- operação, os helpers que decidem se a sessão atual é um operador autorizado
+-- naquela operação, e cinco RPCs de contrato fechado — quatro de leitura e uma
+-- de escrita.
 --
 -- NÃO libera AAL1 nas tabelas. As 11 policies `*_exige_aal2` da migration 009
--- continuam RESTRICTIVE, globais e intactas, e nenhuma linha desta migration
--- as altera. Um `operacional` em AAL1 continua sem enxergar
--- `operations`, `shifts`, `employees`, `timesheets` ou `timesheet_entries`
--- pelo PostgREST: a única porta é a RPC estreita, que devolve colunas
--- escolhidas uma a uma.
+-- continuam RESTRICTIVE, globais e intactas, e nenhuma linha desta migration as
+-- altera. Um `operacional` em AAL1 continua sem enxergar `operations`,
+-- `shifts`, `employees`, `timesheets` ou `timesheet_entries` pelo PostgREST: a
+-- única porta é a RPC estreita, que devolve colunas escolhidas uma a uma.
 --
 -- NÃO altera o frontend. A UI ainda não consome nada disto — é o PR B2 que
 -- adapta `queries.ts`, `painel-apontamentos.tsx`, o guard e o login.
@@ -25,18 +25,10 @@
 -- `operations.agreed_amount`, `timesheet_entries.billed_amount` e os três
 -- snapshots. RLS filtra LINHA, não COLUNA — proteger coluna exigiria view com
 -- `security_invoker`, grants por coluna e uma policy nova por tabela, tudo
--- coordenado. A decisão de produto deste PR é que o operador não recebe
--- NENHUM valor financeiro, nem `client_id`, nem documento ou telefone de
--- ninguém. Um contrato fechado de sete colunas cumpre isso por construção:
--- o que não está no `RETURNS TABLE` não existe para quem chama.
---
--- SECURITY DEFINER IGNORA RLS — e é por isso que cada função revalida tudo
---
--- Toda função abaixo roda como `postgres` e portanto passa por cima das
--- policies. Não há camada por baixo que possa salvar um descuido: papel, AAL,
--- estado de MFA e atribuição são verificados DENTRO de cada função, sempre
--- pelo mesmo helper, antes de qualquer leitura ou escrita. É o mesmo desenho
--- de `gerar_fatura` (migration 009, seção 2).
+-- coordenado. A decisão de produto deste PR é que o operador não recebe NENHUM
+-- valor financeiro, nem `client_id`, nem documento ou telefone de ninguém. Um
+-- contrato fechado de sete colunas cumpre isso por construção: o que não está
+-- no `RETURNS TABLE` não existe para quem chama.
 --
 -- A AUTORIDADE FINANCEIRA CONTINUA SENDO A 010
 --
@@ -46,63 +38,99 @@
 -- calcula `billed_amount`, `cost_amount` e os snapshots — exatamente como no
 -- caminho do admin. E as guardas da 011 continuam valendo: linha faturada
 -- recusa UPDATE, e o vínculo com fatura não nasce aqui.
+
+
+-- ---------------------------------------------------------------------------
+-- 0. O papel de execução — `bslog_rpc_operacional`
 --
--- CUIDADO DOCUMENTADO: dentro de uma função SECURITY DEFINER de `postgres`,
--- `current_user` é `postgres`. As guardas de 010 e 011 que perguntam
--- `current_user NOT IN ('postgres','service_role')` portanto NÃO disparam aqui.
--- O mesmo já valia para `gerar_fatura` desde a 009 — a novidade é que agora
--- existe uma SEGUNDA porta com esse privilégio, e ela é operada por um papel
--- menos confiável.
+-- POR QUE ELE EXISTE, E POR QUE ISTO NÃO É DETALHE
 --
--- ISTO FOI AUDITADO GUARDA POR GUARDA E MEDIDO, não presumido. O bloco K de
--- `supabase/tests/009_superficie_operacional.sql` executa cada tentativa com
--- `current_user = postgres`, que é exatamente o contexto destas funções.
+-- `SECURITY DEFINER` roda com os privilégios do DONO da função. Se o dono fosse
+-- `postgres`, `current_user` dentro das RPCs seria `postgres` — e sete guardas
+-- das migrations 010 e 011 perguntam exatamente isso:
 --
--- CAMADA 2 VIVA — continua valendo mesmo por dentro desta superfície, porque
--- estas guardas não isentam papel nenhum:
+--   bloquear_edicao_financeira            isenta postgres e service_role
+--   bloquear_vinculo_fora_do_faturamento  EXIGE postgres para criar vínculo
+--   protect_timesheet_invoice_link        isenta postgres e service_role
+--   bloquear_fontes_operacao/turno/folha  isentam postgres e service_role
 --
---   bloquear_edicao_faturada        linha faturada é imutável        (K7)
---   bloquear_delete_faturado        linha faturada não se apaga      (K8)
---   bloquear_desvinculo_faturado    vínculo não se desfaz            (K6)
---   bloquear_mover_folha_com_apontamento  folha com apontamento não muda de
---                                   operação nem de turno            (K10)
---   validar_par_operacao_turno      turno tem de ser da operação     (K13)
---   derivar_valores_financeiros     o valor é do banco, não do payload (K1/K2/K4)
---   sincronizar_chave_da_diaria     a chave vem da folha             (E6)
---   índices únicos: uma diária por colaborador/operação/dia e uma alocação
---                                   ativa por colaborador            (K17/K18)
+-- Ou seja: uma superfície operada pelo papel MENOS privilegiado do sistema
+-- escreveria com as isenções do papel MAIS privilegiado. Foi medido antes de
+-- corrigir — o bloco K de `supabase/tests/009_superficie_operacional.sql`
+-- registra que, como `postgres`, criar vínculo de fatura FUNCIONAVA.
 --
--- CAMADA 2 AUSENTE por aqui — onde SÓ o contrato desta RPC protege:
+-- Com dono próprio, `current_user` dentro das RPCs é `bslog_rpc_operacional`,
+-- que não está em nenhuma dessas isenções: as guardas voltam a valer sobre a
+-- escrita do operador, sem duplicar uma linha de regra financeira dentro da
+-- RPC. A defesa continua centralizada no banco, que é onde ela pertence.
 --
---   1. VÍNCULO DE FATURA. `bloquear_vinculo_fora_do_faturamento` exige
---      `current_user = postgres` para criar vínculo, e
---      `protect_timesheet_invoice_link` isenta `postgres`: as duas deixam
---      passar aqui (K5). O que impede é esta RPC nunca nomear `invoice_id` em
---      lista de colunas nenhuma, e a lista branca de chaves do JSON recusar a
---      chamada inteira se ele aparecer (F3). **Nunca escrever `invoice_id`
---      nesta superfície.**
---   2. COLUNA FINANCEIRA EM UPDATE. `bloquear_edicao_financeira` isenta
---      `postgres`, então a MENSAGEM de recusa some (K1). O VALOR continua
---      protegido por `derivar_valores_financeiros`, que não isenta ninguém e
---      sobrescreve ou preserva o payload (K2/K4). Perdeu-se o aviso, não a
---      invariante.
---   3. MOVER FOLHA VAZIA. `bloquear_fontes_folha` isenta `postgres` (K12).
---      Inalcançável hoje: esta RPC não faz `UPDATE` em `timesheets`. **Nunca
---      passar a fazer sem antes reavaliar isto.**
---   4. EQUIPE. Não existe invariante de banco ligando `timesheet_entries` a
---      `operation_team` — para papel nenhum, nem hoje para o admin (K14). A
---      exigência de equipe ativa é regra DESTA RPC.
---   5. FOLHA FECHADA. Também não é invariante de banco (K16). A recusa é regra
---      DESTA RPC.
+-- ATRIBUTOS, E POR QUE CADA UM
 --
--- Por isso a RPC de escrita nunca escreve as colunas que essas guardas
--- protegem, e recusa explicitamente apontamento já faturado antes de tentar:
--- a proteção precisa estar no contrato, não na sorte de um trigger disparar.
+-- `NOLOGIN`   — não é papel de conexão; ninguém autentica como ele.
+-- `NOINHERIT` — quem receber membership não ganha os privilégios por tabela sem
+--               um `SET ROLE` explícito.
+-- `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE` — explícitos, ainda que sejam o
+--               padrão: este arquivo é a documentação do papel.
+-- `BYPASSRLS` — necessário, e é o único atributo forte aqui. Ver abaixo.
+-- Sem membership em `anon`, `authenticated` ou `service_role`, e nenhum desses
+-- recebe membership nele. Ele não é papel de aplicação e não aparece na API.
 --
--- A correção estrutural — dar às cinco funções um OWNER DEDICADO, que não seja
--- `postgres` e portanto não seja isento — está desenhada e provada em banco
--- local, e está registrada em PROGRESS.md, seção 7.2, como PR B1.1. Não entra
--- aqui: mexe em privilégio de papel do Supabase e merece escopo próprio.
+-- POR QUE `BYPASSRLS` É ESTRITAMENTE NECESSÁRIO
+--
+-- As RPCs leem e escrevem tabelas com RLS ativa. Policy se aplica ao papel
+-- corrente: as existentes são `TO authenticated`, e este papel não é membro de
+-- `authenticated` — de propósito. Sem policy aplicável, a RLS NEGA por padrão.
+-- Restariam duas saídas:
+--
+--   (a) `BYPASSRLS` no papel — um atributo, num papel sem login, sem membership
+--       e cujos privilégios de tabela são os mínimos listados na seção 7;
+--   (b) escrever policies novas `TO bslog_rpc_operacional` em NOVE tabelas de
+--       negócio — ampliando justamente a superfície de policy que este projeto
+--       protege, e criando nove lugares onde um erro futuro abre acesso.
+--
+-- (a) é menor e mais auditável, e não altera nenhuma policy existente.
+-- `BYPASSRLS` não concede privilégio de tabela nenhum: o papel só alcança o que
+-- a seção 7 conceder explicitamente, coluna a coluna onde faz diferença.
+--
+-- PRÉ-REQUISITOS DE AMBIENTE — VALIDAR EM PRODUCTION ANTES DE APLICAR
+--
+--   1. `postgres` precisa conseguir criar papel com `BYPASSRLS` sem ser
+--      superusuário. Medido em PostgreSQL 16: um papel com
+--      `CREATEROLE + BYPASSRLS` e SEM superusuário consegue.
+--   2. `postgres` precisa conseguir `GRANT USAGE ON SCHEMA auth` a este papel.
+--      Não é capricho: o trigger `protect_timesheet_invoice_link`, da migration
+--      20260909175435, é `SECURITY INVOKER` e chama `auth.uid()`. Ele dispara em
+--      todo INSERT de `timesheet_entries`, inclusive o desta superfície.
+--
+-- Os dois se verificam em transação descartável, sem deixar resíduo:
+--
+--   BEGIN;
+--     CREATE ROLE bslog_rpc_operacional NOLOGIN NOINHERIT BYPASSRLS;
+--     GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional;
+--     SELECT rolcanlogin, rolsuper, rolbypassrls FROM pg_roles
+--      WHERE rolname = 'bslog_rpc_operacional';
+--   ROLLBACK;
+--
+-- Se qualquer um dos dois falhar, PARAR: esta migration não se aplica como
+-- está, e improvisar fallback é como se perde uma proteção sem perceber.
+-- ---------------------------------------------------------------------------
+
+DO $papel$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bslog_rpc_operacional') THEN
+    CREATE ROLE bslog_rpc_operacional
+      NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION BYPASSRLS;
+  END IF;
+END
+$papel$;
+
+COMMENT ON ROLE bslog_rpc_operacional IS
+  'Papel de execucao das RPCs da superficie operacional AAL1 (migration 013). NOLOGIN, sem membership em anon/authenticated/service_role, privilegios minimos e por coluna. Existe para que essas funcoes NAO rodem como postgres e portanto NAO caiam nas isencoes de current_user das guardas de 010 e 011.';
+
+-- `postgres` precisa ser membro para poder transferir a posse das funções e
+-- para que um `CREATE OR REPLACE` futuro funcione. Membership não transporta
+-- atributo de papel: `postgres` não ganha nada com isso — ele já tem mais.
+GRANT bslog_rpc_operacional TO postgres;
 
 
 -- ---------------------------------------------------------------------------
@@ -118,19 +146,19 @@
 --
 -- `ON DELETE CASCADE` nos dois lados: conta apagada ou operação apagada não
 -- deixam atribuição órfã. Isso importa mais do que parece — `user_roles` NÃO
--- tem FK para `auth.users` e deixa papel órfão, e foi justamente esse órfão
--- que obrigou a 012 a tratar "uid que não existe mais" como bloqueio. Aqui a
--- FK existe, e a atribuição de uma conta apagada some junto com ela.
+-- tem FK para `auth.users` e deixa papel órfão, e foi justamente esse órfão que
+-- obrigou a 012 a tratar "uid que não existe mais" como bloqueio. Aqui a FK
+-- existe, e a atribuição de uma conta apagada some junto com ela.
 --
--- `created_by` com `ON DELETE SET NULL`: quem concedeu é auditoria, e apagar
--- o admin que concedeu não pode apagar a concessão.
+-- `created_by` com `ON DELETE SET NULL`: quem concedeu é auditoria, e apagar o
+-- admin que concedeu não pode apagar a concessão.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.user_operation_access (
-  user_id      uuid NOT NULL REFERENCES auth.users(id)      ON DELETE CASCADE,
+  user_id      uuid NOT NULL REFERENCES auth.users(id)        ON DELETE CASCADE,
   operation_id uuid NOT NULL REFERENCES public.operations(id) ON DELETE CASCADE,
   created_at   timestamptz NOT NULL DEFAULT now(),
-  created_by   uuid NULL REFERENCES auth.users(id)          ON DELETE SET NULL,
+  created_by   uuid NULL REFERENCES auth.users(id)            ON DELETE SET NULL,
   PRIMARY KEY (user_id, operation_id)
 );
 
@@ -165,14 +193,14 @@ ALTER TABLE public.user_operation_access ENABLE ROW LEVEL SECURITY;
 -- sufixo `_exige_aal2` identifica a família de 11 policies da migration 009,
 -- cuja CONTAGEM é asseverada como regressão em
 -- `supabase/tests/008_estado_mfa.sql` (caso J4) e em
--- `009_superficie_operacional.sql`. Entrar nessa família mudaria o número 11
--- e transformaria um guarda-corpo de regressão em ruído. São regras diferentes
+-- `009_superficie_operacional.sql`. Entrar nessa família mudaria o número 11 e
+-- transformaria um guarda-corpo de regressão em ruído. São regras diferentes
 -- com propósitos diferentes: aquelas protegem dado de negócio, esta mantém uma
 -- tabela de autorização fora do alcance de quem ela autoriza.
 --
--- `(SELECT auth.jwt() ...)` em subquery pelo mesmo motivo da 009: avaliação
--- uma vez por comando, não uma vez por linha. Fail-closed sem COALESCE —
--- claim ausente devolve NULL, e NULL não é permissão.
+-- `(SELECT auth.jwt() ...)` em subquery pelo mesmo motivo da 009: avaliação uma
+-- vez por comando, não uma vez por linha. Fail-closed sem COALESCE — claim
+-- ausente devolve NULL, e NULL não é permissão.
 -- ---------------------------------------------------------------------------
 
 DROP POLICY IF EXISTS user_operation_access_admin ON public.user_operation_access;
@@ -224,39 +252,54 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_operation_access TO au
 
 
 -- ---------------------------------------------------------------------------
--- 3. Helpers de autorização
+-- 3. Helpers de autorização e de identidade — dono `postgres`, JUSTIFICADO
 --
--- `operador_elegivel_aal1()` responde pela SESSÃO; `operador_autorizado(op)`
--- responde pela sessão NAQUELA operação. Separados porque a listagem de
--- operações precisa da primeira metade sem ter ainda uma operação em mãos —
--- e não porque a segunda seja opcional.
+-- Os quatro helpers abaixo continuam pertencendo a `postgres`, e a justificativa
+-- é individual, não de conveniência:
 --
--- NENHUM DOS DOIS ACEITA `user_id`. A decisão é sempre sobre `auth.uid()`.
--- Um parâmetro de usuário transformaria um helper de autorização em
--- enumerador: qualquer chamador perguntaria pelo acesso alheio.
+--   `uid_do_operador()`, `operador_elegivel_aal1()` e `operador_autorizado()`
+--   leem `auth.users` e chamam `mfa_bloqueia_excecao_aal1()`, que por sua vez lê
+--   `auth.mfa_factors` — tabela que nega SELECT a anon, authenticated e
+--   service_role. Dar essa leitura ao papel de execução exigiria conceder-lhe
+--   privilégio dentro do schema `auth`, que é justamente o que se quer evitar:
+--   um papel que só aponta presença não precisa poder ler a base de contas.
+--
+--   `travar_turno_da_operacao()` existe para NÃO conceder `UPDATE` em `shifts`.
+--   Ver a justificativa na própria função.
+--
+-- E — o ponto que torna isso seguro — NENHUM DOS QUATRO ESCREVE. As isenções de
+-- `postgres` nas guardas de 010/011 são todas sobre escrita: recusar UPDATE
+-- financeiro, recusar criação de vínculo, recusar mudança de fonte. Um helper
+-- que só lê e trava não tem como aproveitar isenção nenhuma. A escrita, que é
+-- onde a isenção importaria, acontece na RPC — e essa pertence ao papel
+-- dedicado.
+--
+-- NENHUM DOS TRÊS PRIMEIROS ACEITA `user_id`. A decisão é sempre sobre
+-- `auth.uid()`. Um parâmetro de usuário transformaria um helper de autorização
+-- em enumerador: qualquer chamador perguntaria pelo acesso alheio.
 --
 -- AS SEIS CONDIÇÕES, e por que cada uma existe:
 --
 --   1. `auth.uid()` não nulo   — sem sessão não há a quem autorizar;
---   2. o `uid` ainda existe em `auth.users` — o PostgREST valida a ASSINATURA
---      do JWT e não consulta o GoTrue a cada requisição, então um token de
---      conta apagada segue aceito até expirar (~1 h). `user_roles` não tem FK
---      para `auth.users` e o papel sobrevive à conta. A 012 já fecha esse caso
---      por dentro; a verificação é repetida aqui de propósito, para que esta
+--   2. o `uid` ainda existe em `auth.users` — o PostgREST valida a ASSINATURA do
+--      JWT e não consulta o GoTrue a cada requisição, então um token de conta
+--      apagada segue aceito até expirar (~1 h). `user_roles` não tem FK para
+--      `auth.users` e o papel sobrevive à conta. A 012 já fecha esse caso por
+--      dentro; a verificação é repetida aqui de propósito, para que esta
 --      autorização não dependa de um detalhe interno de outra função;
 --   3. papel `operacional`  — esta superfície é do operador;
 --   4. NÃO papel `admin`    — `user_roles` não impede acumular os dois papéis.
---      Um admin não opera em AAL1 (PROGRESS.md, seção 6.1), e sem esta linha
---      um admin que também fosse `operacional` teria em AAL1 uma porta para
---      dados que a policy de AAL2 lhe nega;
+--      Um admin não opera em AAL1 (PROGRESS.md, seção 6.1), e sem esta linha um
+--      admin que também fosse `operacional` teria em AAL1 uma porta para dados
+--      que a policy de AAL2 lhe nega;
 --   5. `aal = aal1`         — esta é a superfície de AAL1 e só dela. Uma sessão
 --      aal2 tem o painel inteiro e não precisa passar por aqui; aceitar aal2
 --      criaria um segundo caminho para os mesmos dados, com regras diferentes;
---   6. `mfa_bloqueia_excecao_aal1() = false` — é a razão de o PR A existir.
---      Uma conta com fator verificado recebe sessão AAL1 logo após a senha,
---      ANTES do TOTP: papel + `aal` sozinhos não distinguem quem nunca ativou
---      MFA de quem ativou e ainda não desafiou. Sem esta linha, quem optou pelo
---      segundo fator o contornaria por aqui.
+--   6. `mfa_bloqueia_excecao_aal1() = false` — é a razão de o PR A existir. Uma
+--      conta com fator verificado recebe sessão AAL1 logo após a senha, ANTES do
+--      TOTP: papel + `aal` sozinhos não distinguem quem nunca ativou MFA de quem
+--      ativou e ainda não desafiou. Sem esta linha, quem optou pelo segundo
+--      fator o contornaria por aqui.
 --
 -- SEM TRATAMENTO DE EXCEÇÃO, como na 012: erro de leitura sobe e a chamada
 -- termina negando. Capturar e devolver `false` é o que transforma falha de
@@ -264,11 +307,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_operation_access TO au
 --
 -- NULL NÃO É `false`, E ISSO QUASE ABRIU A SUPERFÍCIE — medido, não suposto.
 --
--- Na primeira versão os dois helpers eram uma cadeia de `AND` sem `coalesce`, e
--- as RPCs decidiam com `IF NOT helper() THEN RAISE`. Com um JWT SEM o claim
--- `aal`, `auth.jwt() ->> 'aal'` é NULL, a comparação com `'aal1'` é NULL, e a
--- cadeia inteira devolve NULL quando todo o resto é verdadeiro. Aí
--- `NOT NULL` é NULL, `IF NULL` não dispara — e a função SEGUIA. O caso A9 de
+-- Na primeira versão os helpers eram uma cadeia de `AND` sem `coalesce`, e as
+-- RPCs decidiam com `IF NOT helper() THEN RAISE`. Com um JWT SEM o claim `aal`,
+-- `auth.jwt() ->> 'aal'` é NULL, a comparação com `'aal1'` é NULL, e a cadeia
+-- inteira devolve NULL quando todo o resto é verdadeiro. Aí `NOT NULL` é NULL,
+-- `IF NULL` não dispara — e a função SEGUIA. O caso A9 de
 -- `supabase/tests/009_superficie_operacional.sql` pegou isso: um operacional
 -- atribuído, sem MFA, com token sem `aal` LISTOU os turnos.
 --
@@ -277,9 +320,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_operation_access TO au
 -- dia reintroduza um NULL aqui dentro. `IF NOT x` e `IF x IS NOT TRUE` são
 -- idênticos para `true`/`false` e diferentes exatamente no caso que importa.
 --
--- SEM GRANT PARA NINGUÉM. Os dois helpers são peça interna: quem os chama são
--- as RPCs abaixo, que pertencem a `postgres` e por isso os executam como donas.
--- `authenticated` não precisa chamá-los e não pode.
+-- GRANTS: os quatro são peça interna. `authenticated`, `anon`, `service_role` e
+-- `PUBLIC` não executam nenhum deles; quem executa é o papel dedicado, dono das
+-- RPCs que os chamam.
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.operador_elegivel_aal1()
@@ -300,7 +343,7 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.operador_elegivel_aal1() IS
-  'Responde se a SESSAO atual e um operador elegivel a superficie AAL1: uid presente, conta existente, papel operacional, nao admin, claim aal=aal1 e estado de MFA que nao bloqueia. Nao recebe parametro e nao decide operacao. Interna: sem EXECUTE para anon, authenticated ou service_role.';
+  'Responde se a SESSAO atual e um operador elegivel a superficie AAL1: uid presente, conta existente, papel operacional, nao admin, claim aal=aal1 e estado de MFA que nao bloqueia. Nao recebe parametro e nao decide operacao. Interna: executavel apenas por bslog_rpc_operacional.';
 
 CREATE OR REPLACE FUNCTION public.operador_autorizado(p_operation_id uuid)
 RETURNS boolean
@@ -322,17 +365,82 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.operador_autorizado(uuid) IS
-  'Responde se a sessao atual e operador elegivel AAL1 E tem a operacao informada atribuida em user_operation_access. Nao aceita user_id: a decisao e sempre sobre auth.uid(). Interna: sem EXECUTE para anon, authenticated ou service_role.';
+  'Responde se a sessao atual e operador elegivel AAL1 E tem a operacao informada atribuida em user_operation_access. Nao aceita user_id: a decisao e sempre sobre auth.uid(). Interna: executavel apenas por bslog_rpc_operacional.';
 
-REVOKE ALL ON FUNCTION public.operador_elegivel_aal1()      FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.operador_elegivel_aal1()      FROM anon;
-REVOKE ALL ON FUNCTION public.operador_elegivel_aal1()      FROM authenticated;
-REVOKE ALL ON FUNCTION public.operador_elegivel_aal1()      FROM service_role;
+-- A identidade que as RPCs usam. Elas NÃO chamam `auth.uid()` diretamente, e
+-- isso é de desenho: assim o papel dedicado não precisa de privilégio nenhum
+-- para resolver quem é o usuário, e existe um único lugar onde "quem está
+-- apontando" é decidido.
+--
+-- Devolve NULL para quem não é operador elegível. Não é um `auth.uid()` com
+-- outro nome: é `auth.uid()` CONDICIONADO à elegibilidade.
+CREATE OR REPLACE FUNCTION public.uid_do_operador()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT CASE WHEN public.operador_elegivel_aal1() THEN auth.uid() END;
+$$;
 
-REVOKE ALL ON FUNCTION public.operador_autorizado(uuid)     FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.operador_autorizado(uuid)     FROM anon;
-REVOKE ALL ON FUNCTION public.operador_autorizado(uuid)     FROM authenticated;
-REVOKE ALL ON FUNCTION public.operador_autorizado(uuid)     FROM service_role;
+COMMENT ON FUNCTION public.uid_do_operador() IS
+  'Devolve auth.uid() somente quando a sessao e um operador elegivel AAL1, e NULL caso contrario. Existe para que as RPCs da superficie nao precisem alcancar o schema auth. Interna: executavel apenas por bslog_rpc_operacional.';
+
+-- TRAVA DO TURNO — e a razão de ela ser uma função à parte.
+--
+-- A jornada do turno entra no cálculo da hora extra, então ela não pode mudar
+-- entre a verificação e o commit: a 011 resolve esse tipo de corrida com
+-- `FOR SHARE`, que conflita com qualquer alteração da linha e não conflita com
+-- outro `FOR SHARE`.
+--
+-- Só que o PostgreSQL cobra privilégio de UPDATE para travar linha — `SELECT
+-- ... FOR SHARE` com apenas SELECT é recusado com 42501, medido. Manter o
+-- `FOR SHARE` dentro da RPC obrigaria a conceder `UPDATE` em `shifts` ao papel
+-- dedicado, ou seja, poder de ESCRITA numa tabela onde ele não escreve nada.
+-- Concentrar a trava aqui evita isso.
+--
+-- POR QUE ISTO NÃO REABRE O PROBLEMA DO `current_user`: esta função não
+-- escreve. Não faz INSERT, UPDATE nem DELETE em tabela nenhuma — toma um lock
+-- compartilhado e responde um booleano. As isenções de `postgres` nas guardas
+-- de 010/011 só existem em caminhos de escrita; não há escrita aqui para elas
+-- deixarem passar. O contrato é mínimo: dois uuids entram, um booleano sai,
+-- nada além do par informado é alcançado, e a API não executa.
+CREATE OR REPLACE FUNCTION public.travar_turno_da_operacao(
+  p_shift_id     uuid,
+  p_operation_id uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  _pertence boolean;
+BEGIN
+  IF p_shift_id IS NULL OR p_operation_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  PERFORM 1
+     FROM public.shifts s
+    WHERE s.id = p_shift_id
+      AND s.operation_id = p_operation_id
+      FOR SHARE;
+
+  _pertence := FOUND;
+  RETURN _pertence;
+END;
+$$;
+
+COMMENT ON FUNCTION public.travar_turno_da_operacao(uuid, uuid) IS
+  'Trava com FOR SHARE o turno informado se ele pertencer a operacao informada, e responde se pertence. Nao escreve nada. Existe para que o papel de execucao das RPCs nao precise de UPDATE em shifts, que e o privilegio que o PostgreSQL exige para travar linha. Interna: executavel apenas por bslog_rpc_operacional.';
+
+REVOKE ALL ON FUNCTION public.operador_elegivel_aal1()               FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.operador_autorizado(uuid)              FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.uid_do_operador()                      FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.travar_turno_da_operacao(uuid, uuid)   FROM PUBLIC, anon, authenticated, service_role;
 
 
 -- ---------------------------------------------------------------------------
@@ -345,13 +453,19 @@ REVOKE ALL ON FUNCTION public.operador_autorizado(uuid)     FROM service_role;
 -- `daily_cost`, `billed_amount`, `cost_amount`, snapshot ou `invoice_id`.
 --
 -- `cliente_nome` é a única informação de cliente que atravessa, e existe por um
--- motivo operacional: distinguir visualmente duas operações parecidas. Documento,
--- telefone, e-mail e o próprio `client_id` ficam de fora — o `client_id` inclusive
--- porque ele seria a chave para tentar qualquer outra leitura.
+-- motivo operacional: distinguir visualmente duas operações parecidas.
+-- Documento, telefone, e-mail e o próprio `client_id` ficam de fora — o
+-- `client_id` inclusive porque ele seria a chave para tentar qualquer outra
+-- leitura.
 --
 -- A NEGATIVA É SEMPRE 42501 E SEMPRE ANTES DA LEITURA. Devolver zero linhas
 -- para quem não é autorizado seria ambíguo com "autorizado e sem dados", e a
 -- diferença importa para quem for depurar isto em produção.
+--
+-- SECURITY DEFINER IGNORA RLS. É por isso que cada função revalida papel, AAL,
+-- estado de MFA e atribuição por dentro, sempre pelos mesmos helpers, antes de
+-- qualquer leitura ou escrita. O dono é `bslog_rpc_operacional` (seção 7), não
+-- `postgres`.
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.listar_operacoes_do_operador()
@@ -369,8 +483,12 @@ STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
+DECLARE
+  _uid uuid;
 BEGIN
-  IF public.operador_elegivel_aal1() IS NOT TRUE THEN
+  _uid := public.uid_do_operador();
+
+  IF _uid IS NULL THEN
     RAISE EXCEPTION 'Sessão não autorizada à superfície operacional.'
       USING ERRCODE = '42501';
   END IF;
@@ -380,7 +498,7 @@ BEGIN
       FROM public.user_operation_access a
       JOIN public.operations o ON o.id = a.operation_id
       JOIN public.clients    c ON c.id = o.client_id
-     WHERE a.user_id = auth.uid()
+     WHERE a.user_id = _uid
      ORDER BY o.operation_date DESC NULLS LAST, o.name;
 END;
 $$;
@@ -427,8 +545,8 @@ COMMENT ON FUNCTION public.listar_turnos_do_operador(uuid) IS
 -- sumiu da folha do dia anterior.
 --
 -- O par turno/operação é validado mesmo já tendo passado por
--- `operador_autorizado`: a atribuição é por OPERAÇÃO, e sem esta verificação
--- um `p_shift_id` de outra operação devolveria a equipe daquela outra.
+-- `operador_autorizado`: a atribuição é por OPERAÇÃO, e sem esta verificação um
+-- `p_shift_id` de outra operação devolveria a equipe daquela outra.
 CREATE OR REPLACE FUNCTION public.listar_equipe_do_operador(
   p_operation_id uuid,
   p_shift_id     uuid
@@ -473,9 +591,9 @@ COMMENT ON FUNCTION public.listar_equipe_do_operador(uuid, uuid) IS
 
 
 -- LEFT JOIN nas linhas, de propósito: a folha existe antes de ter apontamento,
--- e a tela precisa saber que ela existe e em que estado está. Com folha vazia
--- a resposta é uma linha com os campos de folha preenchidos e os de
--- apontamento nulos.
+-- e a tela precisa saber que ela existe e em que estado está. Com folha vazia a
+-- resposta é uma linha com os campos de folha preenchidos e os de apontamento
+-- nulos.
 --
 -- `faturado` é BOOLEAN DERIVADO — `invoice_id IS NOT NULL`. O id da fatura não
 -- atravessa; o que o operador precisa saber é que aquela linha congelou.
@@ -542,12 +660,22 @@ COMMENT ON FUNCTION public.listar_apontamentos_do_operador(uuid, uuid, date) IS
 -- ser ignorada em silêncio. Ignorar seria pior que aceitar: o cliente acharia
 -- que gravou o que mandou.
 --
+-- TRÊS CAMADAS, E NENHUMA DELAS SOZINHA
+--
+--   1. o contrato: a lista branca de chaves e as colunas nomeadas no INSERT;
+--   2. o PRIVILÉGIO: o papel dono tem INSERT e UPDATE apenas nas COLUNAS
+--      operacionais (seção 7). Mesmo que alguém escreva `invoice_id` ou
+--      `billed_amount` num comando daqui, o PostgreSQL recusa com 42501 —
+--      a proteção não depende de ninguém lembrar da regra;
+--   3. as guardas de 010 e 011, que agora enxergam `current_user =
+--      bslog_rpc_operacional` e portanto VOLTAM a se aplicar a esta escrita.
+--
 -- A recusa acontece ANTES de qualquer escrita, e a função é uma transação
 -- única: ou todas as linhas entram, ou nenhuma entra.
 --
--- DELETE NÃO EXISTE nesta superfície, por decisão de escopo. Linha ausente do
--- payload é linha NÃO TOCADA — nunca apagada. Apagar apontamento continua
--- sendo caminho administrativo, em AAL2.
+-- DELETE NÃO EXISTE nesta superfície, por decisão de escopo — e o papel dono
+-- nem tem o privilégio. Linha ausente do payload é linha NÃO TOCADA, nunca
+-- apagada. Apagar apontamento continua sendo caminho administrativo, em AAL2.
 --
 -- O QUE NÃO SE DERIVA AQUI: nada. A função grava os seis campos operacionais;
 -- `derivar_valores_financeiros()` (migration 010) calcula o resto no mesmo
@@ -569,6 +697,7 @@ AS $$
 DECLARE
   _campos_permitidos constant text[] :=
     ARRAY['employee_id', 'status', 'check_in', 'check_out', 'break_minutes', 'notes'];
+  _uid          uuid;
   _folha_id     uuid;
   _folha_status public.timesheet_status;
   _linha        jsonb;
@@ -584,6 +713,8 @@ BEGIN
     RAISE EXCEPTION 'Operação não autorizada para esta sessão.'
       USING ERRCODE = '42501';
   END IF;
+
+  _uid := public.uid_do_operador();
 
   -- 2. Parâmetros. `p_shift_id` é obrigatório aqui, embora `timesheets.shift_id`
   --    seja anulável: folha sem turno é caso administrativo, e a derivação
@@ -603,26 +734,21 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  -- 3. O turno pertence à operação. `FOR SHARE` porque a jornada do turno
-  --    entra no cálculo da hora extra: ela não pode mudar entre esta
-  --    verificação e o commit.
-  PERFORM 1
-     FROM public.shifts s
-    WHERE s.id = p_shift_id
-      AND s.operation_id = p_operation_id
-      FOR SHARE;
-
-  IF NOT FOUND THEN
+  -- 3. O turno pertence à operação, e fica travado com `FOR SHARE` até o fim da
+  --    transação — a jornada dele entra no cálculo da hora extra e não pode
+  --    mudar no meio. A trava mora numa função à parte para que este papel não
+  --    precise de `UPDATE` em `shifts`; ver a seção 3.
+  IF public.travar_turno_da_operacao(p_shift_id, p_operation_id) IS NOT TRUE THEN
     RAISE EXCEPTION 'Turno informado não pertence à operação.'
       USING ERRCODE = '23514';
   END IF;
 
   -- 4. Folha: reaproveita a existente ou cria. O INSERT direto com captura de
   --    `unique_violation` evita tocar numa folha existente — um
-  --    `ON CONFLICT DO UPDATE` dispararia os triggers de UPDATE de
-  --    `timesheets` e reescreveria `updated_at` de folha já faturada sem
-  --    necessidade. Sob READ COMMITTED, quando a violação acontece a
-  --    transação concorrente já commitou, então o SELECT seguinte a encontra.
+  --    `ON CONFLICT DO UPDATE` dispararia os triggers de UPDATE de `timesheets`
+  --    e reescreveria `updated_at` de folha já faturada sem necessidade. Sob
+  --    READ COMMITTED, quando a violação acontece a transação concorrente já
+  --    commitou, então o SELECT seguinte a encontra.
   SELECT t.id, t.status INTO _folha_id, _folha_status
     FROM public.timesheets t
    WHERE t.operation_id = p_operation_id
@@ -632,7 +758,7 @@ BEGIN
   IF _folha_id IS NULL THEN
     BEGIN
       INSERT INTO public.timesheets (operation_id, shift_id, work_date, created_by)
-      VALUES (p_operation_id, p_shift_id, p_work_date, auth.uid())
+      VALUES (p_operation_id, p_shift_id, p_work_date, _uid)
       RETURNING id, status INTO _folha_id, _folha_status;
     EXCEPTION WHEN unique_violation THEN
       SELECT t.id, t.status INTO _folha_id, _folha_status
@@ -644,7 +770,8 @@ BEGIN
   END IF;
 
   -- Folha fechada é decisão administrativa, tomada em AAL2 na tela de
-  -- apontamentos. O operador não a reabre e não escreve por cima dela.
+  -- apontamentos. O operador não a reabre e não escreve por cima dela. Não é
+  -- invariante de banco — é regra desta superfície, e está registrada como tal.
   IF _folha_status = 'closed'::public.timesheet_status THEN
     RAISE EXCEPTION 'Folha fechada não recebe apontamento.'
       USING ERRCODE = '42501';
@@ -663,8 +790,9 @@ BEGIN
 
     -- Chave inesperada recusa a chamada. É esta verificação — e não uma lista
     -- de colunas proibidas — que impede valor financeiro, `invoice_id`,
-    -- `operation_id` ou `timesheet_id` de entrarem pelo payload: o que não
-    -- está explicitamente permitido está recusado.
+    -- `operation_id` ou `timesheet_id` de entrarem pelo payload: o que não está
+    -- explicitamente permitido está recusado. E, se um dia falhar, o privilégio
+    -- por coluna do papel dono recusa de novo, do lado do PostgreSQL.
     FOR _campo IN SELECT jsonb_object_keys(_linha)
     LOOP
       IF NOT (_campo = ANY (_campos_permitidos)) THEN
@@ -698,7 +826,8 @@ BEGIN
     -- O colaborador precisa estar na equipe ATIVA daquele par operação/turno.
     -- É o mesmo recorte que a tela do admin usa hoje
     -- (`painel-apontamentos.tsx`): alocação sem turno não aparece em todos os
-    -- turnos da operação.
+    -- turnos da operação. Também não é invariante de banco — nenhum trigger
+    -- liga `timesheet_entries` a `operation_team`, para papel nenhum.
     IF NOT EXISTS (
       SELECT 1
         FROM public.operation_team ot
@@ -711,11 +840,9 @@ BEGIN
         USING ERRCODE = '23514';
     END IF;
 
-    -- Apontamento já faturado é imutável (migration 011). A recusa é explícita
-    -- aqui porque, dentro desta função, `current_user` é `postgres` e as
-    -- guardas que isentam `postgres` não disparariam. `bloquear_edicao_faturada`
-    -- não isenta ninguém e continua por baixo — mas a proteção precisa estar
-    -- no contrato, e a mensagem precisa dizer o que aconteceu.
+    -- Apontamento já faturado é imutável (migration 011). A recusa explícita
+    -- aqui existe pela mensagem e por falhar cedo; `bloquear_edicao_faturada`,
+    -- que não isenta papel nenhum, continua por baixo.
     SELECT (te.invoice_id IS NOT NULL) INTO _faturado
       FROM public.timesheet_entries te
      WHERE te.timesheet_id = _folha_id
@@ -729,7 +856,9 @@ BEGIN
     -- Somente os seis campos. Nenhuma coluna financeira, nenhum `invoice_id`,
     -- nenhuma chave desnormalizada: `operation_id` e `work_date` da linha são
     -- escritos por `sincronizar_chave_da_diaria()` a partir da folha, e os
-    -- valores por `derivar_valores_financeiros()`.
+    -- valores por `derivar_valores_financeiros()`. Coluna escrita por trigger
+    -- não passa por verificação de privilégio — só as nomeadas no comando —,
+    -- então o papel dono pode ser mínimo sem quebrar a derivação.
     INSERT INTO public.timesheet_entries (
       timesheet_id, employee_id, status, check_in, check_out, break_minutes, notes
     )
@@ -755,7 +884,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date, jsonb) IS
-  'Grava o apontamento operacional de um par operacao/turno numa data. Aceita por linha somente employee_id, status, check_in, check_out, break_minutes e notes; qualquer outra chave recusa a chamada inteira com 22023. Nao escreve coluna financeira nem invoice_id: os valores continuam sendo derivados pelos triggers da migration 010. Nao apaga linha. Exige operador_autorizado na operacao.';
+  'Grava o apontamento operacional de um par operacao/turno numa data. Aceita por linha somente employee_id, status, check_in, check_out, break_minutes e notes; qualquer outra chave recusa a chamada inteira com 22023. Nao escreve coluna financeira nem invoice_id, e o papel dono nem tem privilegio para isso: os valores continuam sendo derivados pelos triggers da migration 010. Nao apaga linha. Exige operador_autorizado na operacao.';
 
 
 -- ---------------------------------------------------------------------------
@@ -767,18 +896,204 @@ COMMENT ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date, json
 -- deixaria o privilégio chegar por PUBLIC, que foi o defeito registrado como
 -- SEC-011.
 --
--- `service_role` fica de fora das cinco: ela ignora RLS por definição e não
--- tem uso nesta superfície. A aplicação não a usa.
+-- `service_role` fica de fora das cinco: ela ignora RLS por definição e não tem
+-- uso nesta superfície. A aplicação não a usa.
 -- ---------------------------------------------------------------------------
 
-REVOKE ALL ON FUNCTION public.listar_operacoes_do_operador()                        FROM PUBLIC, anon, service_role;
-REVOKE ALL ON FUNCTION public.listar_turnos_do_operador(uuid)                       FROM PUBLIC, anon, service_role;
-REVOKE ALL ON FUNCTION public.listar_equipe_do_operador(uuid, uuid)                 FROM PUBLIC, anon, service_role;
-REVOKE ALL ON FUNCTION public.listar_apontamentos_do_operador(uuid, uuid, date)     FROM PUBLIC, anon, service_role;
+REVOKE ALL ON FUNCTION public.listar_operacoes_do_operador()                          FROM PUBLIC, anon, service_role;
+REVOKE ALL ON FUNCTION public.listar_turnos_do_operador(uuid)                         FROM PUBLIC, anon, service_role;
+REVOKE ALL ON FUNCTION public.listar_equipe_do_operador(uuid, uuid)                   FROM PUBLIC, anon, service_role;
+REVOKE ALL ON FUNCTION public.listar_apontamentos_do_operador(uuid, uuid, date)       FROM PUBLIC, anon, service_role;
 REVOKE ALL ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date, jsonb) FROM PUBLIC, anon, service_role;
 
-GRANT EXECUTE ON FUNCTION public.listar_operacoes_do_operador()                        TO authenticated;
-GRANT EXECUTE ON FUNCTION public.listar_turnos_do_operador(uuid)                       TO authenticated;
-GRANT EXECUTE ON FUNCTION public.listar_equipe_do_operador(uuid, uuid)                 TO authenticated;
-GRANT EXECUTE ON FUNCTION public.listar_apontamentos_do_operador(uuid, uuid, date)     TO authenticated;
+GRANT EXECUTE ON FUNCTION public.listar_operacoes_do_operador()                          TO authenticated;
+GRANT EXECUTE ON FUNCTION public.listar_turnos_do_operador(uuid)                         TO authenticated;
+GRANT EXECUTE ON FUNCTION public.listar_equipe_do_operador(uuid, uuid)                   TO authenticated;
+GRANT EXECUTE ON FUNCTION public.listar_apontamentos_do_operador(uuid, uuid, date)       TO authenticated;
 GRANT EXECUTE ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date, jsonb) TO authenticated;
+
+
+-- ---------------------------------------------------------------------------
+-- 7. Os privilégios do papel de execução — o inventário completo
+--
+-- Cada linha abaixo corresponde a um comando concreto das RPCs. Nada aqui é
+-- especulativo, e o que não está aqui o papel não pode.
+--
+-- LEITURA. As quatro RPCs de leitura tocam `operations`, `clients`, `shifts`,
+-- `employees`, `operation_team`, `timesheets`, `timesheet_entries` e
+-- `user_operation_access`. Só SELECT, e em nenhuma delas o papel escreve.
+--
+-- `auth.users` e `auth.mfa_factors` NÃO aparecem: é `uid_do_operador()` quem
+-- resolve a identidade, e ela pertence a `postgres` e não devolve nada além do
+-- uuid da própria sessão. Nenhuma tabela do schema `auth` é concedida.
+--
+-- `user_roles` aparece, e não por escolha desta superfície. O trigger
+-- `protect_timesheet_invoice_link`, da migration 20260909175435, é SECURITY
+-- INVOKER, dispara em todo INSERT de `timesheet_entries` e avalia
+-- `has_role(auth.uid(), 'admin')` — medido: sem `EXECUTE` em `has_role` e
+-- `SELECT` em `user_roles`, o INSERT falha com "permission denied for function
+-- has_role". É leitura, e só; este papel não escreve em `user_roles`, e as RPCs
+-- não consultam a tabela.
+--
+-- Esse trigger legado é hoje estritamente mais fraco que
+-- `bloquear_vinculo_fora_do_faturamento`, da 011, que cobre o mesmo evento sem
+-- isentar admin. Aposentá-lo eliminaria estes dois grants — mas é mexer em
+-- proteção financeira já aplicada, e isso merece tarefa de escopo próprio, não
+-- uma linha de rodapé neste PR.
+--
+-- ESCRITA, por COLUNA. É aqui que a proteção deixa de depender de alguém
+-- lembrar da regra:
+--
+--   timesheets        INSERT (operation_id, shift_id, work_date, created_by)
+--   timesheet_entries INSERT (timesheet_id, employee_id, status, check_in,
+--                             check_out, break_minutes, notes)
+--                     UPDATE (status, check_in, check_out, break_minutes, notes)
+--
+-- `invoice_id`, `billed_amount`, `cost_amount` e os três snapshots NÃO estão em
+-- nenhuma dessas listas. Um comando desta superfície que os nomeasse seria
+-- recusado pelo PostgreSQL com 42501, independentemente do que o código diga —
+-- medido, e é o que responde ao "não depender apenas do contrato JSON".
+--
+-- Coluna escrita por TRIGGER não passa por essa verificação: só as colunas
+-- nomeadas no comando passam. Por isso `derivar_valores_financeiros()` continua
+-- gravando os valores normalmente, e `sincronizar_chave_da_diaria()` continua
+-- gravando `operation_id` e `work_date` da linha.
+--
+-- `UPDATE (updated_at)` EM `timesheets` E EM `shifts` — e por que não é o que
+-- parece. O papel não atualiza folha nem turno: o PostgreSQL exige privilégio
+-- de UPDATE em ALGUMA coluna para travar linha com `FOR SHARE`, e há DOIS
+-- `FOR SHARE` no caminho desta escrita, ambos de triggers da 011 que rodam como
+-- SECURITY INVOKER:
+--
+--   ancorar_folha_do_apontamento  trava a folha pai a cada INSERT de apontamento
+--   validar_par_operacao_turno    trava o turno a cada INSERT de folha
+--
+-- Medido: sem esse privilégio o INSERT falha com "permission denied for table
+-- shifts". Como os dois triggers vêm de migration já aplicada, que não se
+-- edita, a saída é conceder o MENOR privilégio que satisfaz o lock.
+--
+-- `updated_at` é a escolha certa porque é a única coluna sem significado de
+-- negócio em ambas as tabelas E porque um trigger `BEFORE UPDATE` a reescreve
+-- com `now()` em qualquer atualização: mesmo um comando que a nomeasse não
+-- produziria efeito observável. Nem `status`, nem `work_date`, nem
+-- `operation_id`, nem `shift_id`, nem a jornada do turno — que são as colunas
+-- que importam — ficam ao alcance deste papel.
+--
+-- O `FOR SHARE` que ESTA migration introduziu, sobre `shifts`, continua fora
+-- daqui: ele mora em `travar_turno_da_operacao()`, que pertence a `postgres` e
+-- não escreve. Ver a seção 3.
+--
+-- SEM DELETE em tabela alguma, SEM TRUNCATE, SEM REFERENCES, SEM TRIGGER.
+-- ---------------------------------------------------------------------------
+
+GRANT USAGE ON SCHEMA public TO bslog_rpc_operacional;
+
+-- `USAGE` em `auth` e `EXECUTE` em `auth.uid()` não são para esta superfície
+-- alcançar contas: são para o trigger `protect_timesheet_invoice_link`, da
+-- migration 20260909175435, que é SECURITY INVOKER, chama `auth.uid()` e dispara
+-- em todo INSERT de `timesheet_entries`. Sem isso o INSERT falha com
+-- "permission denied for schema auth" — medido. Nenhuma TABELA de `auth` é
+-- concedida.
+GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional;
+GRANT EXECUTE ON FUNCTION auth.uid() TO bslog_rpc_operacional;
+
+GRANT SELECT ON TABLE
+  public.operations,
+  public.clients,
+  public.shifts,
+  public.employees,
+  public.operation_team,
+  public.timesheets,
+  public.timesheet_entries,
+  public.user_operation_access,
+  public.user_roles
+TO bslog_rpc_operacional;
+
+-- Exigido pelo trigger legado `protect_timesheet_invoice_link`, como explicado
+-- acima. `has_role` é SECURITY INVOKER, então a leitura de `user_roles`
+-- acontece sob este papel.
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO bslog_rpc_operacional;
+
+GRANT INSERT (operation_id, shift_id, work_date, created_by)
+  ON TABLE public.timesheets TO bslog_rpc_operacional;
+GRANT UPDATE (updated_at)
+  ON TABLE public.timesheets TO bslog_rpc_operacional;
+GRANT UPDATE (updated_at)
+  ON TABLE public.shifts TO bslog_rpc_operacional;
+
+GRANT INSERT (timesheet_id, employee_id, status, check_in, check_out, break_minutes, notes)
+  ON TABLE public.timesheet_entries TO bslog_rpc_operacional;
+GRANT UPDATE (status, check_in, check_out, break_minutes, notes)
+  ON TABLE public.timesheet_entries TO bslog_rpc_operacional;
+
+GRANT EXECUTE ON FUNCTION public.operador_elegivel_aal1()             TO bslog_rpc_operacional;
+GRANT EXECUTE ON FUNCTION public.operador_autorizado(uuid)            TO bslog_rpc_operacional;
+GRANT EXECUTE ON FUNCTION public.uid_do_operador()                    TO bslog_rpc_operacional;
+GRANT EXECUTE ON FUNCTION public.travar_turno_da_operacao(uuid, uuid) TO bslog_rpc_operacional;
+
+
+-- ---------------------------------------------------------------------------
+-- 8. A troca de dono — o passo que dá sentido a tudo acima
+--
+-- Depois daqui, `current_user` dentro das cinco RPCs é `bslog_rpc_operacional`,
+-- e as guardas de 010/011 que isentam `postgres` voltam a se aplicar à escrita
+-- do operador. Os quatro helpers continuam com `postgres` pelos motivos da
+-- seção 3 — e nenhum deles escreve.
+--
+-- A troca vem DEPOIS dos grants de propósito: `REVOKE`/`GRANT` sobre função
+-- exige ser dono, e assim os comandos acima rodam enquanto `postgres` ainda é.
+-- A ACL sobrevive à transferência; o PostgreSQL apenas reescreve o concedente.
+-- ---------------------------------------------------------------------------
+
+ALTER FUNCTION public.listar_operacoes_do_operador()                          OWNER TO bslog_rpc_operacional;
+ALTER FUNCTION public.listar_turnos_do_operador(uuid)                         OWNER TO bslog_rpc_operacional;
+ALTER FUNCTION public.listar_equipe_do_operador(uuid, uuid)                   OWNER TO bslog_rpc_operacional;
+ALTER FUNCTION public.listar_apontamentos_do_operador(uuid, uuid, date)       OWNER TO bslog_rpc_operacional;
+ALTER FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date, jsonb) OWNER TO bslog_rpc_operacional;
+
+
+-- ---------------------------------------------------------------------------
+-- 9. Verificação da própria migration
+--
+-- Uma migration que se aplica pela metade em silêncio é pior que uma que falha.
+-- Estas asserções custam nada e recusam o commit se o estado final não for o
+-- descrito acima — em especial a troca de dono, que é a razão de ser deste PR.
+-- ---------------------------------------------------------------------------
+
+DO $verificacao$
+DECLARE
+  _n int;
+BEGIN
+  SELECT count(*) INTO _n
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public'
+     AND p.proname IN ('listar_operacoes_do_operador', 'listar_turnos_do_operador',
+                       'listar_equipe_do_operador', 'listar_apontamentos_do_operador',
+                       'salvar_apontamento_operacional')
+     AND pg_get_userbyid(p.proowner) = 'bslog_rpc_operacional'
+     AND p.prosecdef;
+  IF _n <> 5 THEN
+    RAISE EXCEPTION 'Esperadas 5 RPCs SECURITY DEFINER de bslog_rpc_operacional; encontradas %.', _n;
+  END IF;
+
+  IF has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'UPDATE')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'INSERT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'billed_amount', 'UPDATE')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'cost_amount', 'UPDATE') THEN
+    RAISE EXCEPTION 'bslog_rpc_operacional recebeu privilegio em coluna financeira ou de fatura.';
+  END IF;
+
+  IF pg_has_role('bslog_rpc_operacional', 'authenticated', 'USAGE')
+     OR pg_has_role('bslog_rpc_operacional', 'anon', 'USAGE')
+     OR pg_has_role('bslog_rpc_operacional', 'service_role', 'USAGE') THEN
+    RAISE EXCEPTION 'bslog_rpc_operacional nao pode ser membro de papel da API.';
+  END IF;
+
+  SELECT count(*) INTO _n
+    FROM pg_policies
+   WHERE schemaname = 'public' AND policyname LIKE '%exige_aal2%' AND permissive = 'RESTRICTIVE';
+  IF _n <> 11 THEN
+    RAISE EXCEPTION 'As 11 policies *_exige_aal2 deveriam continuar intactas; encontradas %.', _n;
+  END IF;
+END
+$verificacao$;

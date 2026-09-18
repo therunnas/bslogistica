@@ -221,29 +221,32 @@ linha** de `operations`, `shifts`, `employees`, `contracts`, `timesheets` e
 - **A interface ainda não consome nada disso** — é o PR B2 que adapta
   `queries.ts`, `painel-apontamentos.tsx`, o guard e o login.
 
-**Dentro dessas funções `current_user` é `postgres`**, então as guardas de 010 e
-011 que isentam `postgres` **não disparam ali**. Auditado guarda por guarda e
-medido no bloco K do teste `009`. Continuam valendo por dentro da superfície:
-linha faturada imutável, `DELETE` de linha faturada, desvínculo, folha com
-apontamento que não muda de operação/turno, par operação/turno, derivação
-financeira, sincronização da chave diária e os índices únicos. **Dependem só do
-contrato da RPC**: não escrever `invoice_id` (o vínculo passaria), a mensagem de
-recusa de coluna financeira (o valor segue protegido pela derivação), não fazer
-`UPDATE` em `timesheets` (mover folha vazia passaria), a exigência de equipe
-ativa e a recusa de folha fechada — essas duas últimas não são invariantes de
-banco para papel nenhum. **Nunca escrever `invoice_id` nem coluna financeira
-nesta superfície, e reavaliar esta lista antes de acrescentar qualquer comando
-novo à RPC de escrita.**
+**As cinco RPCs não rodam como `postgres`.** Elas pertencem ao papel
+`bslog_rpc_operacional` — `NOLOGIN`, sem membership em `anon`, `authenticated`
+ou `service_role`, com `BYPASSRLS` e privilégios mínimos **por coluna**. O
+motivo é concreto: sete guardas de 010/011 isentam `postgres`, e com dono
+`postgres` a superfície do papel menos privilegiado escreveria com as isenções
+do mais privilegiado. Com dono próprio, `current_user` dentro da escrita é
+`bslog_rpc_operacional` — medido por trigger espião no caso L2 do teste `009` —
+e as guardas voltam a valer.
 
-**Enquanto isso não acontecer:**
+O papel **não tem privilégio** em `invoice_id` nem em coluna financeira: um
+comando desta superfície que os nomeasse é recusado pelo PostgreSQL com
+`42501`, independentemente do que o código diga. Em `timesheets` e `shifts` ele
+tem `UPDATE` apenas de `updated_at`, e só porque o PostgreSQL exige privilégio
+de UPDATE para travar linha com `FOR SHARE` — dois triggers da 011 fazem isso no
+caminho da escrita. Não ampliar esses grants.
 
-- **nunca simplesmente remover a policy AAL2 global** sem substituição segura.
-  Derrubá-la reabre o P1 que o PR #14 fechou, e que foi reproduzido de verdade
-  em PostgreSQL antes da migration 009;
-- **nunca confiar só no frontend** para essa decisão;
-- **não criar usuário `operacional` real** antes dessa mudança.
+Os quatro helpers (`operador_elegivel_aal1`, `operador_autorizado`,
+`uid_do_operador`, `travar_turno_da_operacao`) continuam com dono `postgres`,
+porque leem o schema `auth` ou tomam lock — e **nenhum deles escreve**, que é o
+que torna isso seguro. Ao criar helper novo aqui, manter essa propriedade ou
+mudar o dono.
 
-O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
+**Ainda dependem só do contrato da RPC**, e não do banco: a exigência de equipe
+ativa e a recusa de folha fechada. Nenhuma das duas é invariante de banco para
+papel nenhum — o admin também aponta quem quiser e escreve em folha fechada.
+Está registrado assim de propósito; se virar invariante, é tarefa própria.
 
 - **Função `SECURITY DEFINER` roda acima da RLS**, então policy não a protege:
   a exigência de `aal2` precisa estar escrita dentro da própria função, como
