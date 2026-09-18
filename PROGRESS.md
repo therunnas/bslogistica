@@ -446,7 +446,7 @@ um operacional atribuído listou os turnos sem `aal` nenhum. Medido pelo caso A9
 do teste `009`. Corrigido em duas camadas — `coalesce(..., false)` no retorno dos
 helpers e `IS NOT TRUE` nas cinco RPCs.
 
-**Testes:** `009` cobre **172 casos** — acesso (operacional sem MFA atribuído,
+**Testes:** `009` cobre **180 casos** — acesso (operacional sem MFA atribuído,
 operação alheia, UUID inexistente, `operation_id` nulo, operacional com fator
 verificado em aal1 e em aal2, operacional sem MFA em aal2, sem claim `aal`,
 admin em aal1 e em aal2, quem acumula admin+operacional, sem papel, anon, conta
@@ -594,6 +594,33 @@ literal.
 O **P2** era furo de cobertura: `apontamento_faturado` tinha ficado de fora das
 listas de I3 e N3, então uma escrita acrescentada àquele helper passaria pela
 suíte sem ninguém notar. Os dois casos agora varrem os cinco helpers.
+
+**A primeira tentativa de deploy falhou, e o que ela ensinou.** Aplicar a 013 em
+Production recusou com `42501 permission denied for schema public`, no primeiro
+dos cinco `ALTER FUNCTION ... OWNER TO`. O rollback foi completo: Production
+ficou com 18 migrations, sem o papel, sem a tabela e sem as RPCs.
+
+A causa é específica: `ALTER ... OWNER TO` exige que o **novo dono** tenha
+`CREATE` no schema do objeto — transferir a posse equivale, para o PostgreSQL, a
+esse papel criar o objeto ali. A correção concede `CREATE ON SCHEMA public` na
+linha imediatamente anterior às cinco trocas e revoga na imediatamente seguinte,
+dentro da mesma transação da migration. Estado final obrigatório e asseverado:
+`USAGE` sim, `CREATE` não.
+
+**Por que o harness não pegou — e essa é a parte que vale guardar.** Localmente
+as migrations rodam como um `postgres` **superusuário**, que pula a verificação
+de ACL inteira. O `postgres` do Supabase não é superusuário. Reproduzido depois
+num experimento isolado com executor não-superusuário dono do schema: sem o
+`CREATE`, `ALTER OWNER` recusa com exatamente `42501 permission denied for schema
+public`; com ele, passa; e o `REVOKE` seguinte deixa `CREATE = false`,
+`USAGE = true` e a posse transferida.
+
+Tentar simular a migration inteira sob executor não-superusuário **não funciona
+neste harness**, e isso está registrado para não se perder tempo de novo: o
+usuário de bootstrap do PostgreSQL não pode perder `SUPERUSER`, e um papel
+substituto esbarra em regras de administração de papel do PG16 que o Supabase
+não aplica (`COMMENT ON ROLE`, `GRANT <papel> TO postgres`). O experimento
+isolado do mecanismo é a prova possível, e é a que bate com o erro real.
 
 **Pré-requisito de ambiente restante: um só, e já confirmado.** Criar o papel com
 `BYPASSRLS`, que Production validou. Nenhum grant no schema `auth` é necessário.
