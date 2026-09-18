@@ -237,6 +237,18 @@ tem `UPDATE` apenas de `updated_at`, e só porque o PostgreSQL exige privilégio
 de UPDATE para travar linha com `FOR SHARE` — dois triggers da 011 fazem isso no
 caminho da escrita. Não ampliar esses grants.
 
+**Ele não tem nada no schema `auth`** — nem `USAGE`, nem tabela, nem função — e
+isso não é folga de desenho: em Production o `postgres` **não consegue** conceder
+`USAGE` em `auth` a outro papel, medido. Identidade e autorização entram pelos
+helpers de `postgres`. Uma RPC desta superfície que passe a referenciar `auth.*`
+quebra em Production; use `uid_do_operador()`.
+
+**O trigger `protect_timesheet_invoice_link` foi aposentado pela 013.** Ele era
+`SECURITY INVOKER`, chamava `auth.uid()` em todo INSERT de apontamento e, por
+isso, forçava aquele privilégio impossível. Não protegia mais nada: as guardas da
+011 cobrem o mesmo evento permitindo estritamente menos — o legado isentava
+`admin` e `service_role`, elas não isentam ninguém. Não recriar.
+
 Os quatro helpers (`operador_elegivel_aal1`, `operador_autorizado`,
 `uid_do_operador`, `travar_turno_da_operacao`) continuam com dono `postgres`,
 porque leem o schema `auth` ou tomam lock — e **nenhum deles escreve**, que é o

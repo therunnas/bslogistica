@@ -406,6 +406,7 @@ fechado**. O que não está no `RETURNS TABLE` não existe para quem chama.
 | `public.operador_elegivel_aal1()`                                | a sessão é operador elegível? (interno)         |
 | `public.operador_autorizado(uuid)`                               | ... e tem ESTA operação atribuída? (interno)    |
 | `public.uid_do_operador()`                                       | `auth.uid()` condicionado à elegibilidade       |
+| trigger `protect_timesheet_invoice_link`                         | **aposentado**: supersedido pela 011            |
 | `public.travar_turno_da_operacao(uuid, uuid)`                    | `FOR SHARE` no turno, sem escrita (interno)     |
 | `public.listar_operacoes_do_operador()`                          | 7 colunas, com `cliente_nome` e sem `client_id` |
 | `public.listar_turnos_do_operador(uuid)`                         | 6 colunas de jornada                            |
@@ -444,7 +445,7 @@ um operacional atribuído listou os turnos sem `aal` nenhum. Medido pelo caso A9
 do teste `009`. Corrigido em duas camadas — `coalesce(..., false)` no retorno dos
 helpers e `IS NOT TRUE` nas cinco RPCs.
 
-**Testes:** `009` cobre **141 casos** — acesso (operacional sem MFA atribuído,
+**Testes:** `009` cobre **154 casos** — acesso (operacional sem MFA atribuído,
 operação alheia, UUID inexistente, `operation_id` nulo, operacional com fator
 verificado em aal1 e em aal2, operacional sem MFA em aal2, sem claim `aal`,
 admin em aal1 e em aal2, quem acumula admin+operacional, sem papel, anon, conta
@@ -460,12 +461,10 @@ schema sem a 013 o arquivo nem monta a fixture —
 
 **O papel de execução `bslog_rpc_operacional` — e por que ele existe.**
 `SECURITY DEFINER` roda com os privilégios do DONO. Com dono `postgres`,
-`current_user` dentro das RPCs seria `postgres` — e sete guardas de 010/011
-perguntam exatamente isso (`bloquear_edicao_financeira`,
-`bloquear_vinculo_fora_do_faturamento`, `protect_timesheet_invoice_link`,
-`bloquear_fontes_operacao/turno/folha`). A superfície do papel **menos**
-privilegiado escreveria com as isenções do **mais** privilegiado. Foi medido,
-não suposto: como `postgres`, criar vínculo de fatura FUNCIONAVA.
+`current_user` dentro das RPCs seria `postgres` — e seis guardas de 010/011
+perguntam exatamente isso. A superfície do papel **menos** privilegiado
+escreveria com as isenções do **mais** privilegiado. Foi medido, não suposto:
+como `postgres`, criar vínculo de fatura FUNCIONAVA.
 
 O papel é `NOLOGIN`, `NOINHERIT`, `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
 `NOREPLICATION`, sem membership em `anon`/`authenticated`/`service_role` e sem
@@ -474,39 +473,62 @@ estritamente necessário: policy se aplica ao papel corrente, as existentes são
 `TO authenticated`, e sem policy aplicável a RLS nega. A alternativa seria
 escrever policies novas em nove tabelas de negócio — mais superfície, não menos.
 
-**Privilégios, por coluna onde faz diferença:** SELECT em `operations`,
+**Privilégios finais, por coluna onde faz diferença:** SELECT em `operations`,
 `clients`, `shifts`, `employees`, `operation_team`, `timesheets`,
-`timesheet_entries`, `user_operation_access` e `user_roles`;
+`timesheet_entries` e `user_operation_access`;
 `INSERT (operation_id, shift_id, work_date, created_by)` em `timesheets`;
 `INSERT`/`UPDATE` das seis colunas operacionais em `timesheet_entries`;
 `UPDATE (updated_at)` em `timesheets` e `shifts`. Sem DELETE, sem TRUNCATE, sem
-acesso a `invoices`, `invoice_items`, `contracts` ou `profiles`, e **sem
-privilégio algum em `invoice_id` ou em coluna financeira** — um comando que os
-nomeasse é recusado com `42501` pelo próprio PostgreSQL.
+`invoices`, `invoice_items`, `contracts`, `profiles` ou `user_roles`, **sem nada
+no schema `auth`**, e **sem privilégio algum em `invoice_id` ou em coluna
+financeira** — um comando que os nomeasse é recusado com `42501` pelo próprio
+PostgreSQL.
 
-Três grants existem por causa de código já aplicado, e não por escolha:
-`USAGE` em `auth` e `EXECUTE`/`SELECT` de `has_role`/`user_roles`, porque o
-trigger `protect_timesheet_invoice_link` (migration 20260909175435) é SECURITY
-INVOKER, chama `auth.uid()` e `has_role()` e dispara em todo INSERT de
-apontamento; e `UPDATE (updated_at)` em `timesheets`/`shifts`, porque dois
-triggers da 011 tomam `FOR SHARE` e o PostgreSQL cobra privilégio de UPDATE para
-travar linha. `updated_at` é a coluna mais inócua possível: um trigger a
-reescreve com `now()` em qualquer atualização. O `FOR SHARE` que esta migration
-introduziu ficou fora disso, em `travar_turno_da_operacao()`, justamente para
-não conceder `UPDATE` em `shifts` de verdade.
+`UPDATE (updated_at)` não é escrita de verdade: o PostgreSQL exige privilégio de
+UPDATE em alguma coluna para travar linha com `FOR SHARE`, e dois triggers da 011
+fazem isso no caminho da escrita. `updated_at` é a coluna mais inócua possível —
+um trigger a reescreve com `now()` em qualquer atualização. O `FOR SHARE` que a
+própria 013 introduziu ficou fora disso, em `travar_turno_da_operacao()`.
 
-**Aposentar o trigger legado `protect_timesheet_invoice_link` eliminaria três
-desses grants.** Ele é hoje estritamente mais fraco que
-`bloquear_vinculo_fora_do_faturamento`, da 011, que cobre o mesmo evento sem
-isentar admin. Não foi feito aqui: é mexer em proteção financeira já aplicada, e
-merece tarefa de escopo próprio.
+**O gate de Production, e o que ele mudou.** Executado no SQL Editor: criar papel
+`NOLOGIN` com `BYPASSRLS` **funciona**; mas
+`GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional` **não tem efeito** —
+`has_schema_privilege(..., 'auth', 'USAGE')` continua `false`, porque o schema
+pertence a `supabase_auth_admin` e o `postgres` do Supabase não repassa aquilo.
+
+Isso não bloqueou o desenho; melhorou. As cinco RPCs **nunca referenciaram
+`auth.*`** — identidade e autorização vêm dos helpers de `postgres`. O único
+acoplamento era um trigger legado, e ele saiu.
+
+**`protect_timesheet_invoice_link` foi aposentado dentro da 013.** Ele é
+`SECURITY INVOKER`, chama `auth.uid()` e `has_role()` e dispara em TODO INSERT de
+`timesheet_entries` — o `OF invoice_id` só restringe o UPDATE. Com ele no
+caminho, qualquer papel que gravasse apontamento precisaria de `USAGE` em `auth`.
+E ele não protegia mais nada:
+
+| transição          | o legado permitia             | a 011 permite |
+| ------------------ | ----------------------------- | ------------- |
+| INSERT com vínculo | postgres, service_role, admin | só `postgres` |
+| UPDATE NULL → X    | postgres, service_role, admin | só `postgres` |
+| UPDATE X → Y       | postgres, service_role, admin | **ninguém**   |
+| UPDATE X → NULL    | postgres, service_role, admin | **ninguém**   |
+
+Permitindo tudo o que a 011 permite e mais, ele nunca recusava algo que ela
+aceitasse — e, pela ordem alfabética dos triggers, nem chegava a ser o recusador.
+Código morto cobrando um privilégio caro. A remoção **endureceu** a regra:
+sumiram as isenções de `admin` e de `service_role`, que só existiam nele. Os
+casos O1–O10 do teste exercitam as quatro transições para os dois papéis depois
+da remoção: todas recusadas com `42501`. As migrations 010, 011 e 012 não foram
+tocadas — o objeto removido é da `20260909175435`, e sai pela 013, que ainda não
+foi publicada. `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` foi
+atualizado no mesmo commit.
 
 **Os quatro helpers seguem com dono `postgres`**, justificados um a um:
 `uid_do_operador`, `operador_elegivel_aal1` e `operador_autorizado` leem o schema
-`auth`, e dar essa leitura ao papel de execução seria pior; `travar_turno_da_operacao`
+`auth`, e é justamente por isso que as RPCs não precisam; `travar_turno_da_operacao`
 existe para tomar o `FOR SHARE` sem exigir `UPDATE` em `shifts`. **Nenhum dos
-quatro escreve** — as isenções de `postgres` são todas sobre escrita, então não
-há o que aproveitar ali. O caso N3 do teste guarda essa propriedade.
+quatro escreve** — as isenções de `postgres` são todas sobre escrita, então não há
+o que aproveitar ali. O caso N3 guarda essa propriedade por regex no `prosrc`.
 
 **O gate de camada 2, remedido depois da troca de dono.** `current_user` dentro
 da escrita foi medido por trigger espião durante uma chamada real da RPC:
@@ -531,27 +553,8 @@ das duas jamais foi invariante de banco, para papel nenhum — o admin também
 aponta quem quiser e escreve em folha fechada. Ficam registradas como regra de
 superfície, não como proteção do banco.
 
-**Pré-requisitos de ambiente — PENDENTES DE VALIDAÇÃO EM PRODUCTION.** Dois, e
-os dois precisam ser conferidos antes de aplicar a 013:
-
-1. `postgres` conseguir criar papel com `BYPASSRLS` sem ser superusuário —
-   medido em PostgreSQL 16: um papel com `CREATEROLE + BYPASSRLS` e sem
-   superusuário consegue;
-2. `postgres` conseguir `GRANT USAGE ON SCHEMA auth` a esse papel.
-
-Script de verificação, que não deixa resíduo:
-
-```sql
-BEGIN;
-  CREATE ROLE bslog_rpc_operacional NOLOGIN NOINHERIT BYPASSRLS;
-  GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional;
-  SELECT rolcanlogin, rolsuper, rolbypassrls
-    FROM pg_roles WHERE rolname = 'bslog_rpc_operacional';
-ROLLBACK;
-```
-
-Se qualquer um dos dois falhar, a 013 não se aplica como está — e a saída não é
-improvisar fallback.
+**Pré-requisito de ambiente restante: um só, e já confirmado.** Criar o papel com
+`BYPASSRLS`, que Production validou. Nenhum grant no schema `auth` é necessário.
 
 **Validação local.** PostgreSQL 16.13 com um harness que reproduz o que as
 migrations usam do Supabase: papéis (`anon`, `authenticated`, `service_role`,

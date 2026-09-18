@@ -108,6 +108,11 @@ tem relação com o TanStack Router.
   `invoice_id` nem em coluna financeira, não tem DELETE nem TRUNCATE, e em
   `timesheets`/`shifts` só atualiza `updated_at`, o mínimo que o PostgreSQL exige
   para travar linha. Não ampliar esses grants, e não trocar o dono das funções.
+  Ele também **não tem nada no schema `auth`**: em Production o `postgres` não
+  consegue conceder `USAGE` ali a outro papel, então RPC que referencie `auth.*`
+  quebra — identidade vem de `public.uid_do_operador()`. O trigger legado
+  `protect_timesheet_invoice_link` foi aposentado pela 013 por forçar esse
+  privilégio e não proteger mais nada; não recriar.
 - **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
   Operação administrativa privilegiada é server-side, o último admin é
   protegido, e alteração de usuário ou papel é auditada.

@@ -51,8 +51,8 @@
 --
 --   bloquear_edicao_financeira            isenta postgres e service_role
 --   bloquear_vinculo_fora_do_faturamento  EXIGE postgres para criar vínculo
---   protect_timesheet_invoice_link        isenta postgres e service_role
 --   bloquear_fontes_operacao/turno/folha  isentam postgres e service_role
+--   protect_timesheet_invoice_link        isentava os dois — aposentado na 2b
 --
 -- Ou seja: uma superfície operada pelo papel MENOS privilegiado do sistema
 -- escreveria com as isenções do papel MAIS privilegiado. Foi medido antes de
@@ -92,27 +92,33 @@
 -- `BYPASSRLS` não concede privilégio de tabela nenhum: o papel só alcança o que
 -- a seção 7 conceder explicitamente, coluna a coluna onde faz diferença.
 --
--- PRÉ-REQUISITOS DE AMBIENTE — VALIDAR EM PRODUCTION ANTES DE APLICAR
+-- PRÉ-REQUISITO DE AMBIENTE — UM SÓ, E JÁ CONFIRMADO EM PRODUCTION
 --
---   1. `postgres` precisa conseguir criar papel com `BYPASSRLS` sem ser
---      superusuário. Medido em PostgreSQL 16: um papel com
---      `CREATEROLE + BYPASSRLS` e SEM superusuário consegue.
---   2. `postgres` precisa conseguir `GRANT USAGE ON SCHEMA auth` a este papel.
---      Não é capricho: o trigger `protect_timesheet_invoice_link`, da migration
---      20260909175435, é `SECURITY INVOKER` e chama `auth.uid()`. Ele dispara em
---      todo INSERT de `timesheet_entries`, inclusive o desta superfície.
---
--- Os dois se verificam em transação descartável, sem deixar resíduo:
+-- `postgres` precisa conseguir criar papel com `BYPASSRLS` sem ser superusuário.
+-- Confirmado no SQL Editor de Production, em transação descartável:
 --
 --   BEGIN;
 --     CREATE ROLE bslog_rpc_operacional NOLOGIN NOINHERIT BYPASSRLS;
---     GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional;
 --     SELECT rolcanlogin, rolsuper, rolbypassrls FROM pg_roles
 --      WHERE rolname = 'bslog_rpc_operacional';
 --   ROLLBACK;
 --
--- Se qualquer um dos dois falhar, PARAR: esta migration não se aplica como
--- está, e improvisar fallback é como se perde uma proteção sem perceber.
+-- O QUE PRODUCTION RECUSOU, E O QUE ISSO MUDOU NO DESENHO
+--
+-- A primeira versão desta migration também concedia `USAGE` no schema `auth` ao
+-- papel. Em Production isso NÃO funciona: mesmo depois de
+-- `GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional`,
+-- `has_schema_privilege(..., 'auth', 'USAGE')` continua `false`. O schema `auth`
+-- pertence a `supabase_auth_admin`, e `postgres` não tem como repassar esse
+-- privilégio ali.
+--
+-- Isso não é obstáculo: é um limite que melhorou o desenho. Esta superfície não
+-- tem por que alcançar a base de contas. Nenhuma das cinco RPCs referencia
+-- `auth.*` — identidade e autorização vêm dos helpers da seção 3, que são de
+-- `postgres`, só leem e devolvem um booleano ou um uuid. O único acoplamento
+-- que restava era um trigger legado, aposentado na seção 2b.
+-- Se a criação do papel falhar, PARAR: esta migration não se aplica como está,
+-- e improvisar fallback é como se perde uma proteção sem perceber.
 -- ---------------------------------------------------------------------------
 
 DO $papel$
@@ -249,6 +255,55 @@ REVOKE ALL ON TABLE public.user_operation_access FROM authenticated;
 REVOKE ALL ON TABLE public.user_operation_access FROM service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_operation_access TO authenticated;
+
+
+-- ---------------------------------------------------------------------------
+-- 2b. Aposentadoria de `protect_timesheet_invoice_link` — o trigger legado
+--
+-- POR QUE ELE SAI AQUI, E NÃO NUM PR SEPARADO
+--
+-- Ele é `SECURITY INVOKER`, chama `auth.uid()` e `public.has_role()`, e dispara
+-- em TODO INSERT de `timesheet_entries` — o `OF invoice_id` restringe apenas o
+-- UPDATE. Com ele no caminho, qualquer papel que escreva apontamento precisa de
+-- `USAGE` no schema `auth` e de leitura de `user_roles`. Production não concede
+-- o primeiro. Ou seja: ou este trigger sai, ou a superfície operacional volta a
+-- rodar como `postgres` — que é exatamente o que este PR existe para evitar.
+--
+-- ELE NÃO PROTEGE MAIS NADA, E ISSO É DEMONSTRÁVEL, NÃO OPINIÃO
+--
+-- Mesma tabela, mesmo evento (`BEFORE INSERT OR UPDATE OF invoice_id`), e o
+-- conjunto de quem ele PERMITE é sempre um superconjunto do que a 011 permite:
+--
+--   transição            legado permite                 011 permite
+--   INSERT com vínculo   postgres, service_role, admin  só postgres
+--   UPDATE NULL -> X     postgres, service_role, admin  só postgres
+--   UPDATE X -> Y        postgres, service_role, admin  ninguém
+--   UPDATE X -> NULL     postgres, service_role, admin  ninguém
+--
+-- As duas primeiras linhas são `bloquear_vinculo_fora_do_faturamento`; as duas
+-- últimas, `bloquear_desvinculo_faturado` somada a `bloquear_edicao_faturada`,
+-- que congela a linha faturada inteira sem exceção de papel.
+--
+-- Como o legado permite tudo o que a 011 permite e mais, ele nunca recusa algo
+-- que a 011 aceite: o conjunto de recusas dele está contido no dela. E a ordem
+-- alfabética dos triggers põe `bloqueia_vinculo_direto` ANTES de
+-- `protect_invoice_link`, então na prática ele nem chega a ser o recusador. É
+-- código morto que cobra um privilégio caro.
+--
+-- REMOVER MELHORA A POSTURA, e não só a simplifica: o legado isenta `admin` e
+-- `service_role`, a 011 não isenta nem um nem outro. Quem sai é a regra mais
+-- fraca. Os casos O1 a O8 de `supabase/tests/009_superficie_operacional.sql`
+-- exercitam as quatro transições para admin em aal2 e para `service_role`
+-- DEPOIS desta remoção, e todas continuam recusadas com 42501.
+--
+-- A 011 e a 010 NÃO são tocadas. O que sai é um objeto criado pela migration
+-- 20260909175435, e sai por esta migration, que ainda não foi publicada —
+-- `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` foi atualizado no
+-- mesmo commit para não seguir apontando um trigger que não existe mais.
+
+DROP TRIGGER IF EXISTS trg_timesheet_entries_protect_invoice_link
+  ON public.timesheet_entries;
+DROP FUNCTION IF EXISTS public.protect_timesheet_invoice_link();
 
 
 -- ---------------------------------------------------------------------------
@@ -923,24 +978,13 @@ GRANT EXECUTE ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date
 -- `employees`, `operation_team`, `timesheets`, `timesheet_entries` e
 -- `user_operation_access`. Só SELECT, e em nenhuma delas o papel escreve.
 --
--- `auth.users` e `auth.mfa_factors` NÃO aparecem: é `uid_do_operador()` quem
--- resolve a identidade, e ela pertence a `postgres` e não devolve nada além do
--- uuid da própria sessão. Nenhuma tabela do schema `auth` é concedida.
---
--- `user_roles` aparece, e não por escolha desta superfície. O trigger
--- `protect_timesheet_invoice_link`, da migration 20260909175435, é SECURITY
--- INVOKER, dispara em todo INSERT de `timesheet_entries` e avalia
--- `has_role(auth.uid(), 'admin')` — medido: sem `EXECUTE` em `has_role` e
--- `SELECT` em `user_roles`, o INSERT falha com "permission denied for function
--- has_role". É leitura, e só; este papel não escreve em `user_roles`, e as RPCs
--- não consultam a tabela.
---
--- Esse trigger legado é hoje estritamente mais fraco que
--- `bloquear_vinculo_fora_do_faturamento`, da 011, que cobre o mesmo evento sem
--- isentar admin. Aposentá-lo eliminaria estes dois grants — mas é mexer em
--- proteção financeira já aplicada, e isso merece tarefa de escopo próprio, não
--- uma linha de rodapé neste PR.
---
+-- NENHUM OBJETO DO SCHEMA `auth`, e nenhum `user_roles`. É `uid_do_operador()`
+-- quem resolve a identidade, e ela pertence a `postgres`, só lê e devolve o uuid
+-- da própria sessão; quem lê papel é `has_role()`, chamada apenas pelos helpers.
+-- Depois da seção 2b não sobrou nenhum trigger no caminho desta escrita que
+-- alcance `auth` ou `user_roles` como invocador — e é por isso que este papel
+-- não precisa de `USAGE` em `auth`, que Production não concede.
+
 -- ESCRITA, por COLUNA. É aqui que a proteção deixa de depender de alguém
 -- lembrar da regra:
 --
@@ -986,16 +1030,9 @@ GRANT EXECUTE ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date
 -- SEM DELETE em tabela alguma, SEM TRUNCATE, SEM REFERENCES, SEM TRIGGER.
 -- ---------------------------------------------------------------------------
 
+-- `public` e mais nada. Nenhum privilégio no schema `auth`, nem de schema, nem
+-- de tabela, nem de função.
 GRANT USAGE ON SCHEMA public TO bslog_rpc_operacional;
-
--- `USAGE` em `auth` e `EXECUTE` em `auth.uid()` não são para esta superfície
--- alcançar contas: são para o trigger `protect_timesheet_invoice_link`, da
--- migration 20260909175435, que é SECURITY INVOKER, chama `auth.uid()` e dispara
--- em todo INSERT de `timesheet_entries`. Sem isso o INSERT falha com
--- "permission denied for schema auth" — medido. Nenhuma TABELA de `auth` é
--- concedida.
-GRANT USAGE ON SCHEMA auth TO bslog_rpc_operacional;
-GRANT EXECUTE ON FUNCTION auth.uid() TO bslog_rpc_operacional;
 
 GRANT SELECT ON TABLE
   public.operations,
@@ -1005,14 +1042,8 @@ GRANT SELECT ON TABLE
   public.operation_team,
   public.timesheets,
   public.timesheet_entries,
-  public.user_operation_access,
-  public.user_roles
+  public.user_operation_access
 TO bslog_rpc_operacional;
-
--- Exigido pelo trigger legado `protect_timesheet_invoice_link`, como explicado
--- acima. `has_role` é SECURITY INVOKER, então a leitura de `user_roles`
--- acontece sob este papel.
-GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO bslog_rpc_operacional;
 
 GRANT INSERT (operation_id, shift_id, work_date, created_by)
   ON TABLE public.timesheets TO bslog_rpc_operacional;
@@ -1087,6 +1118,17 @@ BEGIN
      OR pg_has_role('bslog_rpc_operacional', 'anon', 'USAGE')
      OR pg_has_role('bslog_rpc_operacional', 'service_role', 'USAGE') THEN
     RAISE EXCEPTION 'bslog_rpc_operacional nao pode ser membro de papel da API.';
+  END IF;
+
+  IF has_schema_privilege('bslog_rpc_operacional', 'auth', 'USAGE') THEN
+    RAISE EXCEPTION 'bslog_rpc_operacional nao pode ter USAGE no schema auth.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = 'protect_timesheet_invoice_link'
+  ) THEN
+    RAISE EXCEPTION 'O trigger legado protect_timesheet_invoice_link deveria ter sido aposentado.';
   END IF;
 
   SELECT count(*) INTO _n

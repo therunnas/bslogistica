@@ -118,6 +118,24 @@ begin
 end;
 $$;
 
+-- Executa SQL como `service_role`, que ignora RLS por definicao: o que decide
+-- ali sao as guardas de trigger, nao a policy.
+create or replace function pg_temp.como_service_role(_sql text)
+returns text language plpgsql as $$
+declare _r text;
+begin
+  execute 'set local role service_role';
+  begin
+    execute _sql into _r;
+  exception when others then
+    execute 'set local role postgres';
+    return 'erro ' || sqlstate;
+  end;
+  execute 'set local role postgres';
+  return coalesce(_r, 'nulo');
+end;
+$$;
+
 -- Atalho para a RPC de escrita: devolve `ok` ou `erro <sqlstate>`.
 create or replace function pg_temp.salvar(
   _uid text, _aal text, _op text, _turno text, _data text, _linhas jsonb
@@ -1213,13 +1231,8 @@ begin
     has_table_privilege('bslog_rpc_operacional', 'public.invoice_items', 'SELECT')::text || '|' ||
     has_table_privilege('bslog_rpc_operacional', 'public.contracts', 'SELECT')::text);
 
-  -- `user_roles` e leitura, e nao e escolha desta superficie: o trigger legado
-  -- `protect_timesheet_invoice_link` (20260909175435) avalia `has_role` como
-  -- SECURITY INVOKER em todo INSERT de apontamento. `profiles` nao entra.
-  perform pg_temp.registrar('M14. le user_roles (exigido pelo trigger legado), nao le profiles',
-    'true|false|false',
+  perform pg_temp.registrar('M14. sem leitura de user_roles e de profiles', 'false|false',
     has_table_privilege('bslog_rpc_operacional', 'public.user_roles', 'SELECT')::text || '|' ||
-    has_table_privilege('bslog_rpc_operacional', 'public.user_roles', 'UPDATE')::text || '|' ||
     has_table_privilege('bslog_rpc_operacional', 'public.profiles', 'SELECT')::text);
 
   -- Privilegio por COLUNA: e isto que torna estrutural a proibicao de escrever
@@ -1270,8 +1283,24 @@ begin
     has_table_privilege('bslog_rpc_operacional', 'auth.users', 'SELECT')::text || '|' ||
     has_table_privilege('bslog_rpc_operacional', 'auth.mfa_factors', 'SELECT')::text);
 
-  perform pg_temp.registrar('M20. mas USAGE em auth, exigido pelo trigger legado da 20260909175435',
-    'true', has_schema_privilege('bslog_rpc_operacional', 'auth', 'USAGE')::text);
+  -- ZERO dependencia do schema `auth`. Production nao concede USAGE ali, e o
+  -- desenho nao precisa: identidade e autorizacao vem dos helpers de postgres.
+  perform pg_temp.registrar('M20. SEM usage no schema auth', 'false',
+    has_schema_privilege('bslog_rpc_operacional', 'auth', 'USAGE')::text);
+
+  -- O privilegio de EXECUTE em `auth.uid()` chega por PUBLIC e por isso o
+  -- catalogo responde `true` para qualquer papel — a pergunta util e outra: o
+  -- papel CONSEGUE chamar? Sem USAGE no schema, nao consegue, e e isso que se
+  -- mede. Comportamento, nao ACL.
+  perform pg_temp.registrar('M21. na pratica o papel NAO alcanca auth.uid()',
+    'erro 42501', pg_temp.como_rpc('select auth.uid()::text'));
+
+  perform pg_temp.registrar('M21b. nem le auth.users', 'erro 42501',
+    pg_temp.como_rpc('select count(*)::text from auth.users'));
+
+  perform pg_temp.registrar('M22. nem EXECUTE em has_role', 'false',
+    has_function_privilege('bslog_rpc_operacional',
+      'public.has_role(uuid, public.app_role)', 'EXECUTE')::text);
 end;
 $papel$;
 
@@ -1315,6 +1344,82 @@ begin
     '(nenhum)', _r);
 end;
 $donos$;
+
+
+-- ---------------------------------------------------------------------------
+-- O. A aposentadoria do trigger legado `protect_timesheet_invoice_link`.
+--
+-- Ele saiu porque forçava qualquer papel que escrevesse apontamento a ter
+-- `USAGE` no schema `auth` — privilégio que Production não concede —, e porque
+-- não protegia mais nada: o conjunto de quem ele permitia sempre continha o de
+-- quem a 011 permite.
+--
+-- Este bloco exercita as QUATRO transições de `invoice_id`, para os dois papéis
+-- que o legado isentava e a 011 não isenta. Se a remoção tivesse afrouxado
+-- alguma coisa, é aqui que apareceria.
+-- ---------------------------------------------------------------------------
+
+do $legado$
+declare
+  _dia constant text := '2026-09-15';
+  _e_fat uuid; _e_liv uuid; _fatura uuid; _folha uuid;
+begin
+  perform pg_temp.registrar('O1. a funcao legada nao existe mais', '0',
+    (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'protect_timesheet_invoice_link'));
+
+  perform pg_temp.registrar('O2. e o trigger dela tambem nao', '0',
+    (select count(*)::text from pg_trigger
+      where tgname = 'trg_timesheet_entries_protect_invoice_link'));
+
+  perform pg_temp.registrar('O3. as guardas da 011 continuam todas la', '4',
+    (select count(*)::text from pg_trigger t join pg_class c on c.oid = t.tgrelid
+      where c.relname = 'timesheet_entries' and not t.tgisinternal
+        and t.tgname in ('trg_timesheet_entries_bloqueia_vinculo_direto',
+                         'trg_timesheet_entries_bloqueia_desvinculo',
+                         'trg_timesheet_entries_bloqueia_edicao_faturada',
+                         'trg_timesheet_entries_bloqueia_delete_faturado')));
+
+  select te.id, te.invoice_id, te.timesheet_id into _e_fat, _fatura, _folha
+    from public.timesheet_entries te
+   where te.employee_id = '05000000-0000-4000-8000-000000000001'
+     and te.work_date = _dia::date;
+
+  select te.id into _e_liv
+    from public.timesheet_entries te
+   where te.employee_id = '05000000-0000-4000-8000-000000000002'
+     and te.work_date = _dia::date;
+
+  -- ADMIN em aal2 — o papel que o legado ISENTAVA. As quatro transicoes.
+  perform pg_temp.registrar('O4. admin aal2: UPDATE NULL -> fatura e recusado',
+    'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000003', 'aal2', format(
+      'with u as (update public.timesheet_entries set invoice_id = %L::uuid where id = %L::uuid returning 1) select count(*)::text from u', _fatura, _e_liv)));
+
+  perform pg_temp.registrar('O5. admin aal2: UPDATE fatura -> NULL e recusado',
+    'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000003', 'aal2', format(
+      'with u as (update public.timesheet_entries set invoice_id = null where id = %L::uuid returning 1) select count(*)::text from u', _e_fat)));
+
+  perform pg_temp.registrar('O6. admin aal2: INSERT ja com vinculo e recusado',
+    'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000003', 'aal2', format(
+      'with i as (insert into public.timesheet_entries (timesheet_id, employee_id, status, invoice_id) values (%L::uuid, ''05000000-0000-4000-8000-000000000003''::uuid, ''present''::public.attendance_status, %L::uuid) returning 1) select count(*)::text from i', _folha, _fatura)));
+
+  -- SERVICE_ROLE — o outro papel que o legado isentava. Ela ignora RLS por
+  -- definicao, entao aqui e a guarda que decide, e nao a policy.
+  perform pg_temp.registrar('O7. service_role: UPDATE NULL -> fatura e recusado',
+    'erro 42501', pg_temp.como_service_role(format(
+      'with u as (update public.timesheet_entries set invoice_id = %L::uuid where id = %L::uuid returning 1) select count(*)::text from u', _fatura, _e_liv)));
+
+  perform pg_temp.registrar('O8. service_role: UPDATE fatura -> NULL e recusado',
+    'erro 42501', pg_temp.como_service_role(format(
+      'with u as (update public.timesheet_entries set invoice_id = null where id = %L::uuid returning 1) select count(*)::text from u', _e_fat)));
+
+  perform pg_temp.registrar('O9. e o vinculo original continua exatamente onde estava',
+    _fatura::text, (select invoice_id::text from public.timesheet_entries where id = _e_fat));
+
+  perform pg_temp.registrar('O10. a linha livre continua livre', 'true',
+    (select (invoice_id is null)::text from public.timesheet_entries where id = _e_liv));
+end;
+$legado$;
 
 
 -- ---------------------------------------------------------------------------
