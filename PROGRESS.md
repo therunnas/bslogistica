@@ -408,6 +408,7 @@ fechado**. O que não está no `RETURNS TABLE` não existe para quem chama.
 | `public.uid_do_operador()`                                       | `auth.uid()` condicionado à elegibilidade       |
 | trigger `protect_timesheet_invoice_link`                         | **aposentado**: supersedido pela 011            |
 | `public.travar_turno_da_operacao(uuid, uuid)`                    | `FOR SHARE` no turno, sem escrita (interno)     |
+| `public.apontamento_faturado(uuid, uuid)`                        | booleano derivado, sem expor `invoice_id`       |
 | `public.listar_operacoes_do_operador()`                          | 7 colunas, com `cliente_nome` e sem `client_id` |
 | `public.listar_turnos_do_operador(uuid)`                         | 6 colunas de jornada                            |
 | `public.listar_equipe_do_operador(uuid, uuid)`                   | 4 colunas; sem `daily_cost`, `doc` ou `phone`   |
@@ -445,7 +446,7 @@ um operacional atribuído listou os turnos sem `aal` nenhum. Medido pelo caso A9
 do teste `009`. Corrigido em duas camadas — `coalesce(..., false)` no retorno dos
 helpers e `IS NOT TRUE` nas cinco RPCs.
 
-**Testes:** `009` cobre **154 casos** — acesso (operacional sem MFA atribuído,
+**Testes:** `009` cobre **168 casos** — acesso (operacional sem MFA atribuído,
 operação alheia, UUID inexistente, `operation_id` nulo, operacional com fator
 verificado em aal1 e em aal2, operacional sem MFA em aal2, sem claim `aal`,
 admin em aal1 e em aal2, quem acumula admin+operacional, sem papel, anon, conta
@@ -473,16 +474,38 @@ estritamente necessário: policy se aplica ao papel corrente, as existentes são
 `TO authenticated`, e sem policy aplicável a RLS nega. A alternativa seria
 escrever policies novas em nove tabelas de negócio — mais superfície, não menos.
 
-**Privilégios finais, por coluna onde faz diferença:** SELECT em `operations`,
-`clients`, `shifts`, `employees`, `operation_team`, `timesheets`,
-`timesheet_entries` e `user_operation_access`;
-`INSERT (operation_id, shift_id, work_date, created_by)` em `timesheets`;
-`INSERT`/`UPDATE` das seis colunas operacionais em `timesheet_entries`;
-`UPDATE (updated_at)` em `timesheets` e `shifts`. Sem DELETE, sem TRUNCATE, sem
-`invoices`, `invoice_items`, `contracts`, `profiles` ou `user_roles`, **sem nada
-no schema `auth`**, e **sem privilégio algum em `invoice_id` ou em coluna
-financeira** — um comando que os nomeasse é recusado com `42501` pelo próprio
-PostgreSQL.
+**Privilégios finais — todos por COLUNA, nenhum de tabela.** Lido do banco
+depois de aplicar:
+
+| tabela                  | SELECT                                                                          | INSERT                                          | UPDATE                                              |
+| ----------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------- |
+| `clients`               | `id, name`                                                                      | —                                               | —                                                   |
+| `employees`             | `id, name, role`                                                                | —                                               | —                                                   |
+| `operations`            | `id, name, site, type, operation_date, status, client_id`                       | —                                               | —                                                   |
+| `shifts`                | `id, name, start_time, end_time, break_minutes, crosses_midnight, operation_id` | —                                               | `updated_at`                                        |
+| `operation_team`        | `operation_id, shift_id, employee_id, active`                                   | —                                               | —                                                   |
+| `timesheets`            | `id, operation_id, shift_id, work_date, status`                                 | `operation_id, shift_id, work_date, created_by` | `updated_at`                                        |
+| `timesheet_entries`     | as 7 operacionais                                                               | as 7 operacionais                               | `status, check_in, check_out, break_minutes, notes` |
+| `user_operation_access` | `user_id, operation_id`                                                         | —                                               | —                                                   |
+
+**Fora do alcance do papel, inclusive para LEITURA:** `timesheet_entries.invoice_id`,
+`billed_amount`, `cost_amount`, os três snapshots, `worked_minutes`,
+`overtime_minutes`; `employees.daily_cost`, `doc`, `phone`;
+`operations.agreed_amount`, `contract_id`; `clients.doc`, `phone`, `email`;
+`contracts` inteira; `user_roles`, `profiles`, `invoices`, `invoice_items`; e
+todo o schema `auth`. Sem DELETE e sem TRUNCATE em lugar nenhum.
+
+A primeira versão concedia `GRANT SELECT ON TABLE`, o que dava leitura de toda
+coluna — a afirmação "zero privilégio em coluna financeira" valia só para
+escrita. Levantado em revisão e corrigido: agora o papel **não tem privilégio de
+tabela em nada**, e os casos P1–P14 medem tanto o catálogo quanto a tentativa
+real (`erro 42501` ao ler cada coluna sensível, inclusive por `select *`).
+
+**O booleano `faturado` sem `invoice_id`.** Derivar `faturado` dentro da RPC
+exigiria SELECT em `invoice_id`. Em vez disso, `public.apontamento_faturado(
+timesheet_id, employee_id)` — helper de `postgres`, `STABLE`, sem escrita, sem
+EXECUTE para a API — faz a leitura e devolve só o booleano. O contrato do
+operador não muda; o privilégio some.
 
 `UPDATE (updated_at)` não é escrita de verdade: o PostgreSQL exige privilégio de
 UPDATE em alguma coluna para travar linha com `FOR SHARE`, e dois triggers da 011

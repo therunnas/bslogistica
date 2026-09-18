@@ -831,10 +831,13 @@ begin
   perform pg_temp.registrar('I1. as 5 RPCs: execute so para authenticated',
     '(nenhum)', coalesce(nullif(btrim(_erros), ''), '(nenhum)'));
 
-  -- Os dois helpers sao internos: ninguem da API executa.
+  -- Os helpers sao internos: ninguem da API executa nenhum deles.
   foreach _fn in array array[
     'operador_elegivel_aal1()',
-    'operador_autorizado(uuid)'
+    'operador_autorizado(uuid)',
+    'uid_do_operador()',
+    'travar_turno_da_operacao(uuid, uuid)',
+    'apontamento_faturado(uuid, uuid)'
   ] loop
     _oid := ('public.' || _fn)::regprocedure::oid;
     if has_function_privilege('authenticated', _oid, 'EXECUTE') then
@@ -851,7 +854,7 @@ begin
     end if;
   end loop;
 
-  perform pg_temp.registrar('I2. os 2 helpers nao sao executaveis pela API',
+  perform pg_temp.registrar('I2. os 5 helpers nao sao executaveis pela API',
     '(nenhum)', coalesce(nullif(btrim(_internas), ''), '(nenhum)'));
 
   -- SECURITY DEFINER e search_path nas sete. O DONO e conferido no bloco N,
@@ -1328,9 +1331,10 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and p.proname in ('operador_elegivel_aal1', 'operador_autorizado',
-                       'uid_do_operador', 'travar_turno_da_operacao');
-  perform pg_temp.registrar('N2. os 4 helpers seguem com postgres, e nenhum deles escreve',
-    'operador_autorizado=postgres operador_elegivel_aal1=postgres travar_turno_da_operacao=postgres uid_do_operador=postgres',
+                       'uid_do_operador', 'travar_turno_da_operacao',
+                       'apontamento_faturado');
+  perform pg_temp.registrar('N2. os 5 helpers seguem com postgres',
+    'apontamento_faturado=postgres operador_autorizado=postgres operador_elegivel_aal1=postgres travar_turno_da_operacao=postgres uid_do_operador=postgres',
     _r);
 
   -- Nenhum helper escreve: a justificativa do owner postgres depende disso.
@@ -1420,6 +1424,102 @@ begin
     (select (invoice_id is null)::text from public.timesheet_entries where id = _e_liv));
 end;
 $legado$;
+
+
+-- ---------------------------------------------------------------------------
+-- P. Leitura por COLUNA — o papel não enxerga dinheiro.
+--
+-- `GRANT SELECT ON TABLE` daria ao dono das RPCs a tabela inteira: `daily_cost`,
+-- `agreed_amount`, `billed_amount`, `cost_amount`, os três snapshots e
+-- `invoice_id`. As RPCs não devolvem nada disso — mas "o código não usa" não é
+-- proteção, e era assim que estava até esta rodada. Agora o SELECT é por coluna.
+--
+-- Cada caso aparece duas vezes, de propósito: o que o CATÁLOGO diz, e o que
+-- acontece quando o papel TENTA. Metadado sozinho não prova acesso negado.
+-- ---------------------------------------------------------------------------
+
+do $colunas$
+declare _erros text := '';
+  _t constant text := 'public.timesheet_entries';
+begin
+  -- 1. O catálogo, para as colunas que precisam estar fechadas.
+  if has_column_privilege('bslog_rpc_operacional', _t, 'invoice_id', 'SELECT')            then _erros := _erros || 'invoice_id '; end if;
+  if has_column_privilege('bslog_rpc_operacional', _t, 'billed_amount', 'SELECT')         then _erros := _erros || 'billed_amount '; end if;
+  if has_column_privilege('bslog_rpc_operacional', _t, 'cost_amount', 'SELECT')           then _erros := _erros || 'cost_amount '; end if;
+  if has_column_privilege('bslog_rpc_operacional', _t, 'daily_rate_snapshot', 'SELECT')   then _erros := _erros || 'daily_rate_snapshot '; end if;
+  if has_column_privilege('bslog_rpc_operacional', _t, 'ot_hour_rate_snapshot', 'SELECT') then _erros := _erros || 'ot_hour_rate_snapshot '; end if;
+  if has_column_privilege('bslog_rpc_operacional', _t, 'daily_cost_snapshot', 'SELECT')   then _erros := _erros || 'daily_cost_snapshot '; end if;
+  if has_column_privilege('bslog_rpc_operacional', _t, 'worked_minutes', 'SELECT')        then _erros := _erros || 'worked_minutes '; end if;
+  if has_column_privilege('bslog_rpc_operacional', _t, 'overtime_minutes', 'SELECT')      then _erros := _erros || 'overtime_minutes '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.employees', 'daily_cost', 'SELECT')    then _erros := _erros || 'employees.daily_cost '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.employees', 'doc', 'SELECT')           then _erros := _erros || 'employees.doc '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.employees', 'phone', 'SELECT')         then _erros := _erros || 'employees.phone '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.operations', 'agreed_amount', 'SELECT') then _erros := _erros || 'operations.agreed_amount '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.operations', 'contract_id', 'SELECT')   then _erros := _erros || 'operations.contract_id '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.clients', 'doc', 'SELECT')              then _erros := _erros || 'clients.doc '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.clients', 'phone', 'SELECT')            then _erros := _erros || 'clients.phone '; end if;
+  if has_column_privilege('bslog_rpc_operacional', 'public.clients', 'email', 'SELECT')            then _erros := _erros || 'clients.email '; end if;
+  if has_table_privilege('bslog_rpc_operacional', 'public.contracts', 'SELECT')                    then _erros := _erros || 'contracts '; end if;
+
+  perform pg_temp.registrar('P1. nenhuma coluna financeira ou sensivel e legivel pelo papel',
+    '(nenhuma)', coalesce(nullif(btrim(_erros), ''), '(nenhuma)'));
+
+  -- 2. E as que a superficie precisa continuam legiveis.
+  _erros := '';
+  if not has_column_privilege('bslog_rpc_operacional', _t, 'status', 'SELECT')        then _erros := _erros || 'entries.status '; end if;
+  if not has_column_privilege('bslog_rpc_operacional', _t, 'check_in', 'SELECT')      then _erros := _erros || 'entries.check_in '; end if;
+  if not has_column_privilege('bslog_rpc_operacional', _t, 'notes', 'SELECT')         then _erros := _erros || 'entries.notes '; end if;
+  if not has_column_privilege('bslog_rpc_operacional', 'public.employees', 'name', 'SELECT')      then _erros := _erros || 'employees.name '; end if;
+  if not has_column_privilege('bslog_rpc_operacional', 'public.clients', 'name', 'SELECT')        then _erros := _erros || 'clients.name '; end if;
+  if not has_column_privilege('bslog_rpc_operacional', 'public.shifts', 'start_time', 'SELECT')   then _erros := _erros || 'shifts.start_time '; end if;
+  if not has_column_privilege('bslog_rpc_operacional', 'public.timesheets', 'work_date', 'SELECT') then _erros := _erros || 'timesheets.work_date '; end if;
+
+  perform pg_temp.registrar('P2. e as colunas operacionais continuam legiveis',
+    '(nenhuma faltando)', coalesce(nullif(btrim(_erros), ''), '(nenhuma faltando)'));
+end;
+$colunas$;
+
+do $comportamento$
+begin
+  -- 3. O que acontece quando o papel TENTA ler. Comportamento, nao metadado.
+  perform pg_temp.registrar('P3. o papel NAO le employees.daily_cost', 'erro 42501',
+    pg_temp.como_rpc('select daily_cost::text from public.employees limit 1'));
+
+  perform pg_temp.registrar('P4. NAO le operations.agreed_amount', 'erro 42501',
+    pg_temp.como_rpc('select agreed_amount::text from public.operations limit 1'));
+
+  perform pg_temp.registrar('P5. NAO le timesheet_entries.billed_amount', 'erro 42501',
+    pg_temp.como_rpc('select billed_amount::text from public.timesheet_entries limit 1'));
+
+  perform pg_temp.registrar('P6. NAO le timesheet_entries.cost_amount', 'erro 42501',
+    pg_temp.como_rpc('select cost_amount::text from public.timesheet_entries limit 1'));
+
+  perform pg_temp.registrar('P7. NAO le timesheet_entries.invoice_id', 'erro 42501',
+    pg_temp.como_rpc('select invoice_id::text from public.timesheet_entries limit 1'));
+
+  perform pg_temp.registrar('P8. NAO le os snapshots', 'erro 42501',
+    pg_temp.como_rpc('select daily_rate_snapshot::text from public.timesheet_entries limit 1'));
+
+  perform pg_temp.registrar('P9. NAO le contracts', 'erro 42501',
+    pg_temp.como_rpc('select daily_rate::text from public.contracts limit 1'));
+
+  perform pg_temp.registrar('P10. NAO le documento nem telefone do colaborador', 'erro 42501',
+    pg_temp.como_rpc('select doc from public.employees limit 1'));
+
+  perform pg_temp.registrar('P11. NAO le documento do cliente', 'erro 42501',
+    pg_temp.como_rpc('select doc from public.clients limit 1'));
+
+  perform pg_temp.registrar('P12. nem `select *`, que alcancaria tudo', 'erro 42501',
+    pg_temp.como_rpc('select (t.*)::text from public.timesheet_entries t limit 1'));
+
+  -- 4. E o que ele precisa ler, le.
+  perform pg_temp.registrar('P13. mas LE o nome do colaborador', 'Colab Um',
+    pg_temp.como_rpc('select name from public.employees where id = ''05000000-0000-4000-8000-000000000001''::uuid'));
+
+  perform pg_temp.registrar('P14. e o nome do cliente', 'Cliente Alfa',
+    pg_temp.como_rpc('select name from public.clients limit 1'));
+end;
+$comportamento$;
 
 
 -- ---------------------------------------------------------------------------

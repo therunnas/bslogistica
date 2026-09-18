@@ -492,6 +492,40 @@ $$;
 COMMENT ON FUNCTION public.travar_turno_da_operacao(uuid, uuid) IS
   'Trava com FOR SHARE o turno informado se ele pertencer a operacao informada, e responde se pertence. Nao escreve nada. Existe para que o papel de execucao das RPCs nao precise de UPDATE em shifts, que e o privilegio que o PostgreSQL exige para travar linha. Interna: executavel apenas por bslog_rpc_operacional.';
 
+-- O BOOLEAN `faturado`, SEM DAR `invoice_id` A NINGUÉM.
+--
+-- A superfície precisa dizer ao operador que uma linha congelou. A forma óbvia
+-- seria `te.invoice_id IS NOT NULL` dentro da RPC — só que isso exige que o
+-- papel de execução tenha SELECT em `invoice_id`, e um privilégio de leitura
+-- concedido "só para derivar um booleano" é exatamente o tipo de folga que
+-- depois ninguém lembra por que existe.
+--
+-- Este helper faz a leitura no contexto de `postgres` e devolve apenas o
+-- booleano. Não escreve, recebe dois uuids, e a API não o executa. Com ele, o
+-- papel das RPCs não tem — e não precisa de — nenhum privilégio sobre
+-- `invoice_id`, nem de leitura nem de escrita.
+CREATE OR REPLACE FUNCTION public.apontamento_faturado(
+  p_timesheet_id uuid,
+  p_employee_id  uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT coalesce(
+    (SELECT te.invoice_id IS NOT NULL
+       FROM public.timesheet_entries te
+      WHERE te.timesheet_id = p_timesheet_id
+        AND te.employee_id  = p_employee_id),
+    false);
+$$;
+
+COMMENT ON FUNCTION public.apontamento_faturado(uuid, uuid) IS
+  'Responde se o apontamento daquele par folha/colaborador ja esta vinculado a uma fatura. Devolve so o booleano, nunca o invoice_id, para que o papel de execucao das RPCs nao precise de privilegio de leitura naquela coluna. Nao escreve. Interna: executavel apenas por bslog_rpc_operacional.';
+
+REVOKE ALL ON FUNCTION public.apontamento_faturado(uuid, uuid)       FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.operador_elegivel_aal1()               FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.operador_autorizado(uuid)              FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.uid_do_operador()                      FROM PUBLIC, anon, authenticated, service_role;
@@ -692,7 +726,8 @@ BEGIN
   RETURN QUERY
     SELECT t.id, t.shift_id, t.work_date, t.status,
            te.employee_id, te.status, te.check_in, te.check_out,
-           te.break_minutes, te.notes, (te.invoice_id IS NOT NULL)
+           te.break_minutes, te.notes,
+           public.apontamento_faturado(te.timesheet_id, te.employee_id)
       FROM public.timesheets t
       LEFT JOIN public.timesheet_entries te ON te.timesheet_id = t.id
      WHERE t.operation_id = p_operation_id
@@ -898,12 +933,9 @@ BEGIN
     -- Apontamento já faturado é imutável (migration 011). A recusa explícita
     -- aqui existe pela mensagem e por falhar cedo; `bloquear_edicao_faturada`,
     -- que não isenta papel nenhum, continua por baixo.
-    SELECT (te.invoice_id IS NOT NULL) INTO _faturado
-      FROM public.timesheet_entries te
-     WHERE te.timesheet_id = _folha_id
-       AND te.employee_id  = _employee_id;
+    _faturado := public.apontamento_faturado(_folha_id, _employee_id);
 
-    IF coalesce(_faturado, false) THEN
+    IF _faturado THEN
       RAISE EXCEPTION 'Apontamento já faturado não pode ser alterado.'
         USING ERRCODE = '42501';
     END IF;
@@ -976,7 +1008,8 @@ GRANT EXECUTE ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date
 --
 -- LEITURA. As quatro RPCs de leitura tocam `operations`, `clients`, `shifts`,
 -- `employees`, `operation_team`, `timesheets`, `timesheet_entries` e
--- `user_operation_access`. Só SELECT, e em nenhuma delas o papel escreve.
+-- `user_operation_access` — e o SELECT é concedido **coluna a coluna**, não por
+-- tabela. Nenhuma coluna financeira, nem `invoice_id`, é legível por este papel.
 --
 -- NENHUM OBJETO DO SCHEMA `auth`, e nenhum `user_roles`. É `uid_do_operador()`
 -- quem resolve a identidade, e ela pertence a `postgres`, só lê e devolve o uuid
@@ -1034,16 +1067,52 @@ GRANT EXECUTE ON FUNCTION public.salvar_apontamento_operacional(uuid, uuid, date
 -- de tabela, nem de função.
 GRANT USAGE ON SCHEMA public TO bslog_rpc_operacional;
 
-GRANT SELECT ON TABLE
-  public.operations,
-  public.clients,
-  public.shifts,
-  public.employees,
-  public.operation_team,
-  public.timesheets,
-  public.timesheet_entries,
-  public.user_operation_access
-TO bslog_rpc_operacional;
+-- LEITURA, COLUNA A COLUNA. `GRANT SELECT ON TABLE` daria ao papel a tabela
+-- inteira — inclusive `employees.daily_cost`, `operations.agreed_amount`,
+-- `timesheet_entries.billed_amount`, `cost_amount`, os três snapshots e
+-- `invoice_id`. As RPCs não devolvem nada disso, mas o DONO teria o privilégio,
+-- e defesa em profundidade que depende do código não usar o que pode usar não é
+-- defesa. Cada coluna abaixo corresponde a uma referência real; conferidas uma
+-- a uma contra o corpo das cinco RPCs e dos três triggers que rodam sob este
+-- papel.
+
+-- `client_id` entra porque `listar_operacoes_do_operador` faz o JOIN com
+-- `clients` por ele; ele não atravessa para o operador. `agreed_amount` e
+-- `contract_id` ficam de fora.
+GRANT SELECT (id, name, site, type, operation_date, status, client_id)
+  ON TABLE public.operations TO bslog_rpc_operacional;
+
+-- Do cliente, o nome e a chave do JOIN. Nada de doc, phone, email, contact_name.
+GRANT SELECT (id, name)
+  ON TABLE public.clients TO bslog_rpc_operacional;
+
+-- `operation_id` é lido pela RPC e também por `validar_par_operacao_turno`,
+-- trigger da 011 que roda como invocador no INSERT da folha.
+GRANT SELECT (id, name, start_time, end_time, break_minutes, crosses_midnight, operation_id)
+  ON TABLE public.shifts TO bslog_rpc_operacional;
+
+-- Do colaborador, só o que a tela do operador mostra. `daily_cost`, `doc`,
+-- `phone` e `status` ficam de fora.
+GRANT SELECT (id, name, role)
+  ON TABLE public.employees TO bslog_rpc_operacional;
+
+GRANT SELECT (operation_id, shift_id, employee_id, active)
+  ON TABLE public.operation_team TO bslog_rpc_operacional;
+
+-- `id`, `operation_id` e `work_date` também são lidos por
+-- `sincronizar_chave_da_diaria` e `ancorar_folha_do_apontamento`, triggers da
+-- 008 e da 011 que rodam como invocador. `notes` e `created_by` não são lidos.
+GRANT SELECT (id, operation_id, shift_id, work_date, status)
+  ON TABLE public.timesheets TO bslog_rpc_operacional;
+
+-- As seis colunas operacionais e mais nada. Sem `invoice_id` — o booleano
+-- `faturado` vem de `apontamento_faturado()` —, sem `billed_amount`,
+-- `cost_amount`, `worked_minutes`, `overtime_minutes` e sem os três snapshots.
+GRANT SELECT (timesheet_id, employee_id, status, check_in, check_out, break_minutes, notes)
+  ON TABLE public.timesheet_entries TO bslog_rpc_operacional;
+
+GRANT SELECT (user_id, operation_id)
+  ON TABLE public.user_operation_access TO bslog_rpc_operacional;
 
 GRANT INSERT (operation_id, shift_id, work_date, created_by)
   ON TABLE public.timesheets TO bslog_rpc_operacional;
@@ -1061,6 +1130,7 @@ GRANT EXECUTE ON FUNCTION public.operador_elegivel_aal1()             TO bslog_r
 GRANT EXECUTE ON FUNCTION public.operador_autorizado(uuid)            TO bslog_rpc_operacional;
 GRANT EXECUTE ON FUNCTION public.uid_do_operador()                    TO bslog_rpc_operacional;
 GRANT EXECUTE ON FUNCTION public.travar_turno_da_operacao(uuid, uuid) TO bslog_rpc_operacional;
+GRANT EXECUTE ON FUNCTION public.apontamento_faturado(uuid, uuid)     TO bslog_rpc_operacional;
 
 
 -- ---------------------------------------------------------------------------
@@ -1107,11 +1177,22 @@ BEGIN
     RAISE EXCEPTION 'Esperadas 5 RPCs SECURITY DEFINER de bslog_rpc_operacional; encontradas %.', _n;
   END IF;
 
-  IF has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'UPDATE')
+  -- Financeiro e vínculo: nem escrita NEM LEITURA.
+  IF has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'SELECT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'UPDATE')
      OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'invoice_id', 'INSERT')
-     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'billed_amount', 'UPDATE')
-     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'cost_amount', 'UPDATE') THEN
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'billed_amount', 'SELECT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'cost_amount', 'SELECT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'daily_rate_snapshot', 'SELECT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'ot_hour_rate_snapshot', 'SELECT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'daily_cost_snapshot', 'SELECT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.employees', 'daily_cost', 'SELECT')
+     OR has_column_privilege('bslog_rpc_operacional', 'public.operations', 'agreed_amount', 'SELECT') THEN
     RAISE EXCEPTION 'bslog_rpc_operacional recebeu privilegio em coluna financeira ou de fatura.';
+  END IF;
+
+  IF has_table_privilege('bslog_rpc_operacional', 'public.contracts', 'SELECT') THEN
+    RAISE EXCEPTION 'bslog_rpc_operacional nao pode ler contracts.';
   END IF;
 
   IF pg_has_role('bslog_rpc_operacional', 'authenticated', 'USAGE')

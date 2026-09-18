@@ -230,12 +230,21 @@ do mais privilegiado. Com dono próprio, `current_user` dentro da escrita é
 `bslog_rpc_operacional` — medido por trigger espião no caso L2 do teste `009` —
 e as guardas voltam a valer.
 
-O papel **não tem privilégio** em `invoice_id` nem em coluna financeira: um
-comando desta superfície que os nomeasse é recusado pelo PostgreSQL com
-`42501`, independentemente do que o código diga. Em `timesheets` e `shifts` ele
-tem `UPDATE` apenas de `updated_at`, e só porque o PostgreSQL exige privilégio
-de UPDATE para travar linha com `FOR SHARE` — dois triggers da 011 fazem isso no
-caminho da escrita. Não ampliar esses grants.
+**Todos os grants do papel são por COLUNA — ele não tem privilégio de tabela em
+nada.** Não tem `invoice_id` nem coluna financeira, **nem para ler**: um comando
+desta superfície que nomeasse `billed_amount`, `cost_amount`, um snapshot,
+`employees.daily_cost`, `operations.agreed_amount` ou `invoice_id` é recusado
+pelo PostgreSQL com `42501`, independentemente do que o código diga — e
+`select *` nessas tabelas também. `contracts` ele não alcança de jeito nenhum.
+Em `timesheets` e `shifts` o `UPDATE` é só de `updated_at`, e só porque o
+PostgreSQL exige privilégio de UPDATE para travar linha com `FOR SHARE` — dois
+triggers da 011 fazem isso no caminho da escrita. **Não ampliar esses grants, e
+nunca trocar um grant de coluna por `GRANT ... ON TABLE`.**
+
+O booleano `faturado` vem de `public.apontamento_faturado(timesheet_id,
+employee_id)`, helper de `postgres` que lê `invoice_id` e devolve só o booleano.
+É o que permite ao papel não ter leitura naquela coluna. Ao acrescentar campo
+derivado de dado sensível, seguir esse padrão em vez de conceder a coluna.
 
 **Ele não tem nada no schema `auth`** — nem `USAGE`, nem tabela, nem função — e
 isso não é folga de desenho: em Production o `postgres` **não consegue** conceder
@@ -249,10 +258,11 @@ isso, forçava aquele privilégio impossível. Não protegia mais nada: as guard
 011 cobrem o mesmo evento permitindo estritamente menos — o legado isentava
 `admin` e `service_role`, elas não isentam ninguém. Não recriar.
 
-Os quatro helpers (`operador_elegivel_aal1`, `operador_autorizado`,
-`uid_do_operador`, `travar_turno_da_operacao`) continuam com dono `postgres`,
-porque leem o schema `auth` ou tomam lock — e **nenhum deles escreve**, que é o
-que torna isso seguro. Ao criar helper novo aqui, manter essa propriedade ou
+Os cinco helpers (`operador_elegivel_aal1`, `operador_autorizado`,
+`uid_do_operador`, `travar_turno_da_operacao`, `apontamento_faturado`)
+continuam com dono `postgres`,
+porque leem o schema `auth`, tomam lock ou leem coluna que o papel não alcança —
+e **nenhum deles escreve**, que é o que torna isso seguro. Ao criar helper novo aqui, manter essa propriedade ou
 mudar o dono.
 
 **Ainda dependem só do contrato da RPC**, e não do banco: a exigência de equipe

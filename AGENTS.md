@@ -107,7 +107,11 @@ tem relação com o TanStack Router.
   com as isenções do mais privilegiado. Esse papel **não tem privilégio** em
   `invoice_id` nem em coluna financeira, não tem DELETE nem TRUNCATE, e em
   `timesheets`/`shifts` só atualiza `updated_at`, o mínimo que o PostgreSQL exige
-  para travar linha. Não ampliar esses grants, e não trocar o dono das funções.
+  para travar linha. **Todos os grants dele são por coluna**, nenhum por tabela:
+  ele não lê `billed_amount`, `cost_amount`, snapshot, `invoice_id`,
+  `employees.daily_cost`, `operations.agreed_amount`, documento ou telefone, e
+  não alcança `contracts`. Não ampliar esses grants, não trocar coluna por
+  tabela, e não trocar o dono das funções.
   Ele também **não tem nada no schema `auth`**: em Production o `postgres` não
   consegue conceder `USAGE` ali a outro papel, então RPC que referencie `auth.*`
   quebra — identidade vem de `public.uid_do_operador()`. O trigger legado
