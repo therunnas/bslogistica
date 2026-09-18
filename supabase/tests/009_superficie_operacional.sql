@@ -868,7 +868,8 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and p.proname in ('operador_elegivel_aal1', 'operador_autorizado', 'uid_do_operador',
-                       'travar_turno_da_operacao', 'listar_operacoes_do_operador',
+                       'travar_turno_da_operacao', 'apontamento_faturado',
+                       'listar_operacoes_do_operador',
                        'listar_turnos_do_operador', 'listar_equipe_do_operador',
                        'listar_apontamentos_do_operador', 'salvar_apontamento_operacional')
      and not (p.prosecdef
@@ -876,7 +877,7 @@ begin
               and coalesce(array_to_string(p.proconfig, ''), '') = 'search_path=pg_catalog, public');
 
   perform pg_temp.registrar(
-    'I3. as 9 funcoes sao SECURITY DEFINER com search_path fixo',
+    'I3. as 10 funcoes sao SECURITY DEFINER com search_path fixo',
     '(nenhuma fora do padrao)', coalesce(_erros, '(nenhuma fora do padrao)'));
 
   -- Volatilidade: leitura STABLE, escrita VOLATILE.
@@ -1342,7 +1343,8 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and p.proname in ('operador_elegivel_aal1', 'operador_autorizado',
-                       'uid_do_operador', 'travar_turno_da_operacao')
+                       'uid_do_operador', 'travar_turno_da_operacao',
+                       'apontamento_faturado')
      and (p.prosrc ~* '(insert|update|delete|truncate)\s');
   perform pg_temp.registrar('N3. nenhum helper de postgres contem comando de escrita',
     '(nenhum)', _r);
@@ -1520,6 +1522,66 @@ begin
     pg_temp.como_rpc('select name from public.clients limit 1'));
 end;
 $comportamento$;
+
+
+-- ---------------------------------------------------------------------------
+-- Q. A folha validada fica travada até o fim da gravação.
+--
+-- Levantado na review do Codex no PR #26. Sem `FOR SHARE` nas duas buscas da
+-- folha, existia janela entre validar e gravar: sob READ COMMITTED um admin
+-- podia COMMITAR `status = 'closed'` — e a linha entraria numa folha fechada,
+-- porque a verificação já tinha passado sobre o valor velho — ou, com a folha
+-- ainda vazia, mover `operation_id`, e a linha nasceria numa operação para a
+-- qual o operador nunca foi autorizado, com os valores derivados do contrato
+-- dela.
+--
+-- Concorrência de verdade precisa de duas sessões, e este arquivo roda numa só.
+-- O que dá para guardar aqui é a FORMA LITERAL — as duas buscas terminando em
+-- `FOR SHARE` —, no mesmo espírito das suítes de auth que asseveram a forma do
+-- código e não só o comportamento. A demonstração com duas conexões (a segunda
+-- bloqueando em `lock_timeout`) está registrada no PR.
+-- ---------------------------------------------------------------------------
+
+do $trava$
+declare _src text; _travadas int; _sem_trava int;
+begin
+  select p.prosrc into _src
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'salvar_apontamento_operacional';
+
+  -- Quantas buscas da folha terminam travando a linha.
+  select count(*) into _travadas
+    from regexp_matches(_src, 'work_date\s*=\s*p_work_date\s*FOR SHARE', 'g');
+
+  perform pg_temp.registrar('Q1. as DUAS buscas da folha travam a linha com FOR SHARE',
+    '2', _travadas::text);
+
+  -- E nenhuma ficou para trás.
+  select count(*) into _sem_trava
+    from regexp_matches(_src, 'work_date\s*=\s*p_work_date\s*;', 'g');
+
+  perform pg_temp.registrar('Q2. e nenhuma busca da folha ficou sem trava',
+    '0', _sem_trava::text);
+
+  -- A trava do turno continua fora da RPC, no helper de postgres, para nao
+  -- exigir UPDATE em `shifts` do papel de execucao.
+  select p.prosrc into _src
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'travar_turno_da_operacao';
+
+  perform pg_temp.registrar('Q3. o turno segue travado dentro do helper', 'true',
+    (_src like '%FOR SHARE%')::text);
+
+  -- E a gravacao continua funcionando com as travas no lugar: o papel tem
+  -- UPDATE(updated_at) em `timesheets`, que e o privilegio que o PostgreSQL
+  -- cobra para travar linha.
+  perform pg_temp.registrar('Q4. a RPC grava normalmente com as travas', 'ok',
+    pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1',
+      '0e000000-0000-4000-8000-000000000001', '0b000000-0000-4000-8000-000000000001',
+      '2026-09-25',
+      '[{"employee_id":"05000000-0000-4000-8000-000000000002","status":"present","check_in":"08:00","check_out":"17:00","break_minutes":60}]'::jsonb));
+end;
+$trava$;
 
 
 -- ---------------------------------------------------------------------------

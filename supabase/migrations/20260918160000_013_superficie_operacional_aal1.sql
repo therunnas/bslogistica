@@ -839,11 +839,39 @@ BEGIN
   --    e reescreveria `updated_at` de folha já faturada sem necessidade. Sob
   --    READ COMMITTED, quando a violação acontece a transação concorrente já
   --    commitou, então o SELECT seguinte a encontra.
+  --
+  --    `FOR SHARE` NAS DUAS BUSCAS, e não é zelo decorativo. Sem ele havia uma
+  --    janela real entre validar a folha e gravar a linha, levantada na review
+  --    do Codex no PR #26:
+  --
+  --      o operador lê a folha F de (operação A, turno S, data D), aberta;
+  --      um admin, em aal2, COMMITA no meio:
+  --        - `status = 'closed'`  -> a linha entraria numa folha fechada, porque
+  --          a verificação abaixo já teria passado sobre o valor velho; ou
+  --        - se F ainda estiver VAZIA, `operation_id = B` — movimento que
+  --          `bloquear_mover_folha_com_apontamento` só recusa quando a folha já
+  --          tem apontamento. A linha então nasceria numa operação para a qual
+  --          este operador NUNCA foi autorizado, e `derivar_valores_financeiros`
+  --          calcularia pelo contrato de B.
+  --
+  --    `ancorar_folha_do_apontamento` trava a folha só no INSERT da linha, e
+  --    trava a versão JÁ alterada, sem revalidar chave nem status — por isso
+  --    não fecha nada disso sozinho.
+  --
+  --    `FOR SHARE` conflita com o `FOR NO KEY UPDATE` que aquele UPDATE de admin
+  --    tomaria, então ou ele espera o commit desta transação, ou já commitou e o
+  --    PostgreSQL reavalia o WHERE sobre a versão nova: status fechado cai na
+  --    recusa abaixo, e chave alterada faz a folha simplesmente não casar, o que
+  --    leva ao INSERT de uma folha correta. `FOR SHARE` e não `FOR UPDATE`, pelo
+  --    mesmo motivo da 011: dois operadores gravando a mesma folha não se
+  --    serializam entre si. É o mesmo lock que o trigger já toma depois, tomado
+  --    antes — nenhuma ordem nova entra no grafo de deadlock.
   SELECT t.id, t.status INTO _folha_id, _folha_status
     FROM public.timesheets t
    WHERE t.operation_id = p_operation_id
      AND t.shift_id     = p_shift_id
-     AND t.work_date    = p_work_date;
+     AND t.work_date    = p_work_date
+     FOR SHARE;
 
   IF _folha_id IS NULL THEN
     BEGIN
@@ -855,13 +883,16 @@ BEGIN
         FROM public.timesheets t
        WHERE t.operation_id = p_operation_id
          AND t.shift_id     = p_shift_id
-         AND t.work_date    = p_work_date;
+         AND t.work_date    = p_work_date
+         FOR SHARE;
     END;
   END IF;
 
   -- Folha fechada é decisão administrativa, tomada em AAL2 na tela de
   -- apontamentos. O operador não a reabre e não escreve por cima dela. Não é
   -- invariante de banco — é regra desta superfície, e está registrada como tal.
+  -- Com o `FOR SHARE` acima, este `status` é o valor travado: ou ninguém mexe
+  -- nele até o commit, ou já tinha mexido e é a versão nova que se lê aqui.
   IF _folha_status = 'closed'::public.timesheet_status THEN
     RAISE EXCEPTION 'Folha fechada não recebe apontamento.'
       USING ERRCODE = '42501';

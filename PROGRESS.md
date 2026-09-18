@@ -446,7 +446,7 @@ um operacional atribuído listou os turnos sem `aal` nenhum. Medido pelo caso A9
 do teste `009`. Corrigido em duas camadas — `coalesce(..., false)` no retorno dos
 helpers e `IS NOT TRUE` nas cinco RPCs.
 
-**Testes:** `009` cobre **168 casos** — acesso (operacional sem MFA atribuído,
+**Testes:** `009` cobre **172 casos** — acesso (operacional sem MFA atribuído,
 operação alheia, UUID inexistente, `operation_id` nulo, operacional com fator
 verificado em aal1 e em aal2, operacional sem MFA em aal2, sem claim `aal`,
 admin em aal1 e em aal2, quem acumula admin+operacional, sem papel, anon, conta
@@ -575,6 +575,25 @@ Sobram duas regras que são **só da RPC**: equipe ativa e folha fechada. Nenhum
 das duas jamais foi invariante de banco, para papel nenhum — o admin também
 aponta quem quiser e escreve em folha fechada. Ficam registradas como regra de
 superfície, não como proteção do banco.
+
+**Dois achados da review do Codex (PR #26), corrigidos antes do merge.**
+
+O **P1** era corrida de autorização real: a RPC lia a folha sem travá-la, e sob
+READ COMMITTED um admin podia COMMITAR entre a validação e a gravação —
+fechando a folha, ou, com ela ainda vazia, movendo `operation_id`. No segundo
+caso a linha nasceria numa operação para a qual o operador nunca foi
+autorizado, com os valores derivados do contrato dela;
+`bloquear_mover_folha_com_apontamento` não cobre folha vazia, e
+`ancorar_folha_do_apontamento` trava a versão já alterada, sem revalidar chave
+nem status. Corrigido com `FOR SHARE` nas **duas** buscas da folha — a inicial e
+a que vem depois do `unique_violation`. Reproduzido em duas conexões: sem a
+trava o `UPDATE` do admin passou no meio da leitura; com ela, bloqueia e estoura
+o `lock_timeout`, e a folha fica como estava. Os casos Q1–Q4 guardam a forma
+literal.
+
+O **P2** era furo de cobertura: `apontamento_faturado` tinha ficado de fora das
+listas de I3 e N3, então uma escrita acrescentada àquele helper passaria pela
+suíte sem ninguém notar. Os dois casos agora varrem os cinco helpers.
 
 **Pré-requisito de ambiente restante: um só, e já confirmado.** Criar o papel com
 `BYPASSRLS`, que Production validou. Nenhum grant no schema `auth` é necessário.
