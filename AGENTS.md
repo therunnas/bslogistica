@@ -88,6 +88,35 @@ tem relação com o TanStack Router.
   assinatura do JWT — o próprio SDK chama isso de inseguro. Serve para UX. Para
   autorização, usar `public.mfa_bloqueia_excecao_aal1()` (migration 012), que lê
   `auth.mfa_factors` e falha fechada. Ela **não** libera AAL1 nem decide papel.
+- **A superfície operacional AAL1 entra por RPC, nunca por policy.** A
+  migration 013 criou `public.user_operation_access`, os helpers
+  `operador_elegivel_aal1()`/`operador_autorizado(uuid)` e cinco RPCs de
+  contrato fechado. As 11 policies `*_exige_aal2` **não** foram afrouxadas, e
+  `operacional` em AAL1 continua sem ler tabela de negócio direto. Ao mexer
+  nessa superfície: nenhum valor financeiro atravessa (do cliente só
+  `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
+  por linha e recusa a chamada inteira diante de chave inesperada, não existe
+  DELETE, e toda função `SECURITY DEFINER` revalida papel + AAL + MFA +
+  atribuição por dentro, sempre sobre `auth.uid()` e nunca sobre um `user_id`
+  recebido. Decisão de autorização fecha com `coalesce(..., false)` e
+  `IS NOT TRUE`: NULL não é `false`.
+- **As RPCs operacionais não rodam como `postgres`.** Elas pertencem a
+  `bslog_rpc_operacional` — `NOLOGIN`, sem membership nos papéis da API,
+  `BYPASSRLS` e privilégios mínimos por coluna —, porque sete guardas de 010/011
+  isentam `postgres` e a superfície do papel menos privilegiado não pode escrever
+  com as isenções do mais privilegiado. Esse papel **não tem privilégio** em
+  `invoice_id` nem em coluna financeira, não tem DELETE nem TRUNCATE, e em
+  `timesheets`/`shifts` só atualiza `updated_at`, o mínimo que o PostgreSQL exige
+  para travar linha. **Todos os grants dele são por coluna**, nenhum por tabela:
+  ele não lê `billed_amount`, `cost_amount`, snapshot, `invoice_id`,
+  `employees.daily_cost`, `operations.agreed_amount`, documento ou telefone, e
+  não alcança `contracts`. Não ampliar esses grants, não trocar coluna por
+  tabela, e não trocar o dono das funções.
+  Ele também **não tem nada no schema `auth`**: em Production o `postgres` não
+  consegue conceder `USAGE` ali a outro papel, então RPC que referencie `auth.*`
+  quebra — identidade vem de `public.uid_do_operador()`. O trigger legado
+  `protect_timesheet_invoice_link` foi aposentado pela 013 por forçar esse
+  privilégio e não proteger mais nada; não recriar.
 - **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
   Operação administrativa privilegiada é server-side, o último admin é
   protegido, e alteração de usuário ou papel é auditada.

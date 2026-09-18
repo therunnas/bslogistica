@@ -24,8 +24,34 @@ o lastro de uma já fechada.
 >
 > Trigger instalado e conferido em Production em 12/09/2026.
 >
-> **Não recriar esta proteção.** O texto abaixo é o registro histórico do
-> problema e da análise que levou à correção.
+> ## Atualização — o trigger foi APOSENTADO pela migration 013 (PR B1)
+>
+> `protect_timesheet_invoice_link` **não existe mais**. Quem protege o vínculo
+> hoje são as guardas da migration `011`, que cobrem o mesmo evento e são
+> **estritamente mais restritas**:
+>
+> | transição          | o legado permitia             | a 011 permite |
+> | ------------------ | ----------------------------- | ------------- |
+> | INSERT com vínculo | postgres, service_role, admin | só `postgres` |
+> | UPDATE NULL → X    | postgres, service_role, admin | só `postgres` |
+> | UPDATE X → Y       | postgres, service_role, admin | **ninguém**   |
+> | UPDATE X → NULL    | postgres, service_role, admin | **ninguém**   |
+>
+> Como o legado permitia tudo o que a 011 permite e mais, ele nunca recusava
+> nada que ela aceitasse — e, pela ordem alfabética dos triggers, nem chegava a
+> ser o recusador. Era código morto, e cobrava caro: por ser `SECURITY INVOKER`
+> e chamar `auth.uid()`, obrigava qualquer papel que gravasse apontamento a ter
+> `USAGE` no schema `auth` — privilégio que o `postgres` do Supabase **não
+> consegue conceder** em Production, medido no gate do PR B1.
+>
+> A remoção **endureceu** a regra: sumiram as isenções de `admin` e de
+> `service_role`. Os casos O1–O10 de `supabase/tests/009_superficie_operacional.sql`
+> exercitam as quatro transições para os dois papéis e todas continuam recusadas
+> com `42501`.
+>
+> **Não recriar esta proteção** — nem a versão legada, nem uma nova policy. O
+> texto abaixo é o registro histórico do problema e da análise que levou à
+> correção original.
 >
 > **Esta dívida não cobria `billed_amount` e `cost_amount`.** Essas colunas
 > ficaram desprotegidas até a migration

@@ -51,8 +51,9 @@ src/lib/mfa.ts               decisões de segundo fator, funções puras
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         18 arquivos; 17 em Production, a 012 pendente
-supabase/tests/              8 testes SQL de RLS, invariáveis, fontes e MFA
+supabase/migrations/         19 arquivos; 18 em Production, a 013 pendente
+supabase/tests/              9 testes SQL de RLS, invariáveis, fontes, MFA e
+                             superfície operacional
 ```
 
 **`proxy.ts`, nunca `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
@@ -124,7 +125,8 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 ## RLS e banco
 
 - **A RLS é a proteção real.** Nunca tratar o guard do layout como substituto.
-- 12 tabelas em `public`, todas com RLS ativa.
+- 13 tabelas em `public`, todas com RLS ativa — as 12 de sempre mais
+  `user_operation_access`, criada pela 013.
 - Autorização em SQL usa `public.has_role()` e `public.is_staff()`.
 - **O MFA também é exigido no banco.** 11 tabelas de negócio têm policy
   RESTRICTIVE pedindo `aal2`, porque papel sozinho não distinguia uma sessão
@@ -144,8 +146,10 @@ arquivo. Leia as duas metades antes de agir.
 - o guard do painel exige **AAL2 para qualquer papel**;
 - as **11 tabelas** de negócio exigem `aal2` por policy RESTRICTIVE **global**,
   sem distinguir papel;
-- portanto **`operacional` em AAL1 ainda não usa o sistema**, e isso permanece
-  até que uma migration específica seja criada, testada e aplicada.
+- portanto **`operacional` em AAL1 ainda não alcança tabela nenhuma**, e isso
+  permanece: a exceção de AAL1 NÃO entra por policy;
+- o que existe desde o **PR B1** (migration 013) é uma **superfície estreita de
+  RPC** — descrita mais abaixo — que ainda **não é consumida pela interface**.
 
 **DECISÃO ARQUITETURAL APROVADA — o que ainda vai ser construído:**
 
@@ -171,17 +175,100 @@ quando o `uid` do JWT **não existe mais** em `auth.users` — um token ainda n�
 expirado de conta apagada, cujos fatores o `ON DELETE CASCADE` levou junto,
 enquanto a linha órfã de `user_roles` sobrevive. **Ter o indicador não é ter a
 autorização:** o PR A **não liberou AAL1**, as 11 policies `*_exige_aal2`
-continuam globais, e nenhuma policy chama a função ainda. Quem a usar é o PR B.
+continuam globais, e nenhuma policy chama a função ainda. Quem a usa é o PR B1,
+por dentro de `public.operador_elegivel_aal1()`.
 
-**Enquanto isso não acontecer:**
+### A superfície operacional AAL1 — PR B1, migration 013
 
-- **nunca simplesmente remover a policy AAL2 global** sem substituição segura.
-  Derrubá-la reabre o P1 que o PR #14 fechou, e que foi reproduzido de verdade
-  em PostgreSQL antes da migration 009;
-- **nunca confiar só no frontend** para essa decisão;
-- **não criar usuário `operacional` real** antes dessa mudança.
+**O que existe.** `public.user_operation_access` (atribuição usuário →
+operação), dois helpers internos — `operador_elegivel_aal1()` e
+`operador_autorizado(operation_id)` — e cinco RPCs de contrato fechado:
+`listar_operacoes_do_operador`, `listar_turnos_do_operador`,
+`listar_equipe_do_operador`, `listar_apontamentos_do_operador` e
+`salvar_apontamento_operacional`.
 
-O plano por etapas está em [PROGRESS.md](PROGRESS.md), seções 6 e 7.
+**O que continua fechado, e é o ponto:** nenhuma policy foi afrouxada. As 11
+`*_exige_aal2` seguem RESTRICTIVE e globais, e `operacional` em AAL1 lê **zero
+linha** de `operations`, `shifts`, `employees`, `contracts`, `timesheets` e
+`timesheet_entries` pelo PostgREST. A única porta é a RPC.
+
+**Regras permanentes desta superfície:**
+
+- **O operador não recebe valor financeiro.** Nem `billed_amount`,
+  `cost_amount`, snapshot, `invoice_id`, `daily_cost`, `daily_rate`,
+  `shift_hours`, `ot_factor`, `ot_tolerance_min` ou `agreed_amount`. Do cliente
+  atravessa **apenas `cliente_nome`** — nunca `client_id`, documento, telefone
+  ou e-mail. Quem precisa de número é o admin, em AAL2. "Faturado" chega ao
+  operador como **boolean derivado**, nunca como id de fatura.
+- **A escrita aceita seis campos por linha** — `employee_id`, `status`,
+  `check_in`, `check_out`, `break_minutes`, `notes` — e **recusa a chamada
+  inteira** com `22023` diante de qualquer outra chave no JSON. Não existe
+  DELETE nesta superfície; linha ausente do payload é linha não tocada.
+- **A autoridade financeira continua sendo a 010.** A RPC não escreve coluna
+  derivada: quem calcula é o trigger, igual ao caminho do admin.
+- **`SECURITY DEFINER` ignora RLS**, então cada função revalida tudo por dentro:
+  papel `operacional`, **não** `admin`, `aal = aal1`,
+  `mfa_bloqueia_excecao_aal1() = false`, conta ainda existente e atribuição em
+  `user_operation_access`. Nunca acrescentar RPC aqui sem essa verificação
+  completa — e **nunca** aceitar `user_id` por parâmetro: a decisão é sempre
+  sobre `auth.uid()`.
+- **`NULL` não é `false` nessa decisão.** Os helpers fecham o retorno com
+  `coalesce(..., false)` e as RPCs decidem com `IS NOT TRUE`. Um JWT sem o claim
+  `aal` fazia a cadeia de `AND` devolver NULL, e `IF NOT NULL` não dispara — era
+  fail-open, medido e corrigido antes do merge (caso A9 do teste `009`).
+- **`user_operation_access` é só do admin em AAL2**, por policy permissiva e
+  por RESTRICTIVE de mesmo predicado. O operador não a consulta; ela o autoriza.
+- **A interface ainda não consome nada disso** — é o PR B2 que adapta
+  `queries.ts`, `painel-apontamentos.tsx`, o guard e o login.
+
+**As cinco RPCs não rodam como `postgres`.** Elas pertencem ao papel
+`bslog_rpc_operacional` — `NOLOGIN`, sem membership em `anon`, `authenticated`
+ou `service_role`, com `BYPASSRLS` e privilégios mínimos **por coluna**. O
+motivo é concreto: sete guardas de 010/011 isentam `postgres`, e com dono
+`postgres` a superfície do papel menos privilegiado escreveria com as isenções
+do mais privilegiado. Com dono próprio, `current_user` dentro da escrita é
+`bslog_rpc_operacional` — medido por trigger espião no caso L2 do teste `009` —
+e as guardas voltam a valer.
+
+**Todos os grants do papel são por COLUNA — ele não tem privilégio de tabela em
+nada.** Não tem `invoice_id` nem coluna financeira, **nem para ler**: um comando
+desta superfície que nomeasse `billed_amount`, `cost_amount`, um snapshot,
+`employees.daily_cost`, `operations.agreed_amount` ou `invoice_id` é recusado
+pelo PostgreSQL com `42501`, independentemente do que o código diga — e
+`select *` nessas tabelas também. `contracts` ele não alcança de jeito nenhum.
+Em `timesheets` e `shifts` o `UPDATE` é só de `updated_at`, e só porque o
+PostgreSQL exige privilégio de UPDATE para travar linha com `FOR SHARE` — dois
+triggers da 011 fazem isso no caminho da escrita. **Não ampliar esses grants, e
+nunca trocar um grant de coluna por `GRANT ... ON TABLE`.**
+
+O booleano `faturado` vem de `public.apontamento_faturado(timesheet_id,
+employee_id)`, helper de `postgres` que lê `invoice_id` e devolve só o booleano.
+É o que permite ao papel não ter leitura naquela coluna. Ao acrescentar campo
+derivado de dado sensível, seguir esse padrão em vez de conceder a coluna.
+
+**Ele não tem nada no schema `auth`** — nem `USAGE`, nem tabela, nem função — e
+isso não é folga de desenho: em Production o `postgres` **não consegue** conceder
+`USAGE` em `auth` a outro papel, medido. Identidade e autorização entram pelos
+helpers de `postgres`. Uma RPC desta superfície que passe a referenciar `auth.*`
+quebra em Production; use `uid_do_operador()`.
+
+**O trigger `protect_timesheet_invoice_link` foi aposentado pela 013.** Ele era
+`SECURITY INVOKER`, chamava `auth.uid()` em todo INSERT de apontamento e, por
+isso, forçava aquele privilégio impossível. Não protegia mais nada: as guardas da
+011 cobrem o mesmo evento permitindo estritamente menos — o legado isentava
+`admin` e `service_role`, elas não isentam ninguém. Não recriar.
+
+Os cinco helpers (`operador_elegivel_aal1`, `operador_autorizado`,
+`uid_do_operador`, `travar_turno_da_operacao`, `apontamento_faturado`)
+continuam com dono `postgres`,
+porque leem o schema `auth`, tomam lock ou leem coluna que o papel não alcança —
+e **nenhum deles escreve**, que é o que torna isso seguro. Ao criar helper novo aqui, manter essa propriedade ou
+mudar o dono.
+
+**Ainda dependem só do contrato da RPC**, e não do banco: a exigência de equipe
+ativa e a recusa de folha fechada. Nenhuma das duas é invariante de banco para
+papel nenhum — o admin também aponta quem quiser e escreve em folha fechada.
+Está registrado assim de propósito; se virar invariante, é tarefa própria.
 
 - **Função `SECURITY DEFINER` roda acima da RLS**, então policy não a protege:
   a exigência de `aal2` precisa estar escrita dentro da própria função, como
