@@ -14,8 +14,9 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
-| Etapa atual        | **B2.2** — papel, navegação e bloqueio de rotas                     |
-| B2.3               | próxima, depois do B2.2                                             |
+| B2.2               | **CONCLUÍDO** — PR #32, mergeado                                    |
+| Etapa atual        | **B2.3** — tela operacional, implementada em PR                     |
+| PR C               | próximo, depois do B2.3                                             |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -328,8 +329,8 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**          |
 | **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **CONCLUÍDO** — PR #30     |
 | **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **EM PRODUCTION** — PR #31 |
-| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **ETAPA ATUAL**            |
-| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado     |
+| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **CONCLUÍDO** — PR #32     |
+| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **IMPLEMENTADA em PR**     |
 | **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado     |
 | **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado     |
 | **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
@@ -798,7 +799,36 @@ para rota inexistente seria pior que nenhum.
 
 Suíte `scripts/testar-papel.mjs`, **82 asserções**, por `npm run test:papel`.
 
-#### B2.3 — tela operacional de apontamentos
+#### B2.3 — tela operacional de apontamentos — IMPLEMENTADA em PR
+
+`/operacional`, com guard próprio `exigirOperacional()` — que **bloqueia
+administrador**, porque as cinco RPCs da 013 recusam admin por desenho e a tela
+não teria dado para mostrar. `/dashboard` virou o ponto único de decisão
+pós-login: administrador fica, operacional segue para a área dele; os quatro
+destinos continuam apontando para lá, e o login não precisou saber de papel. A
+navegação do operacional tem **um** item, "Apontamentos" → `/operacional`.
+
+As decisões vivem em `operacional/_dominio.ts`, em função pura: junção da equipe
+com os apontamentos, o que entra no payload, o intervalo e a tradução de erro. A
+tela só monta tela.
+
+**A tradução de erro é por SQLSTATE e deliberadamente genérica dentro de cada
+código**, porque o código sozinho não identifica a causa: `42501` cobre operação
+não autorizada, folha fechada **e** linha faturada; `23514`, turno de outra
+operação, colaborador fora da equipe ativa **e**, desde a `014`, intervalo
+negativo. O que a tela sabe pela leitura — folha fechada, linha faturada — ela
+mostra antes, sem deduzir de erro.
+
+**`min={0}` no intervalo é UX**, não a regra: a autoridade é o
+`CHECK (break_minutes >= 0)` da `014`.
+
+Suíte `scripts/testar-tela-operacional.mjs`, **110 asserções**, por
+`npm run test:tela-operacional`.
+
+**O fluxo operacional ainda NÃO é exercitável ponta a ponta**, e isso é
+esperado: o layout exige AAL2 de todo mundo e a RPC exige `aal = aal1` — são
+mutuamente exclusivos. Conciliar os dois é o **PR C**, e a prova real é a matriz
+do **PR G**.
 
 Fluxo: operação atribuída → turno → data → equipe → apontamentos → salvar.
 

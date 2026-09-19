@@ -21,7 +21,7 @@
  *     suítes de auth, pelo mesmo motivo.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { ehAdmin, resolverPapelEfetivo } from "../src/app/(painel)/_papel.ts";
 
@@ -130,12 +130,27 @@ for (const [rota, componente] of TELAS) {
       fonte.indexOf("await exigirAdmin()") < fonte.indexOf(`<${componente} />`),
     true,
   );
+  // Reimplementar a regra é o que não pode: ler `user_roles` na página ou
+  // decidir por `papeis.includes`. Usar `resolverPapelEfetivo` é o contrário
+  // disso — é consumir a regra central —, e desde o B2.3 é assim que
+  // `/dashboard` roteia o operacional.
   verificar(
     `B4.${rota} — nenhuma cópia local da regra de papel`,
-    /papeis\.includes|resolverPapelEfetivo|user_roles/.test(fonte),
+    /papeis\.includes|user_roles|role === "admin"/.test(fonte),
     false,
   );
 }
+
+// O roteamento por papel mora num lugar só. Se outra tela começar a redirecionar
+// por papel, a decisão terá sido duplicada — que é o que o B2.3 evitou ao não
+// tocar no login.
+verificar(
+  "B5. só o /dashboard roteia por papel",
+  TELAS.filter(([rota]) => paginas[rota].includes("resolverPapelEfetivo"))
+    .map(([rota]) => rota)
+    .join(","),
+  "dashboard",
+);
 
 console.log("\nC. O guard central\n");
 
@@ -208,16 +223,21 @@ verificar(
   true,
 );
 verificar(
-  "E3. a navegação só aparece para admin",
-  /const mostrarNavegacaoAdministrativa = papel === "admin";/.test(fontes.shell),
+  "E3. a navegação vem de um mapa por papel",
+  /const navegacao = NAVEGACAO\[papel\];/.test(fontes.shell),
   true,
 );
 verificar(
-  "E4. e o <nav> sai da árvore quando não é admin",
-  /\{mostrarNavegacaoAdministrativa \? \(\s*<nav/.test(fontes.shell),
+  "E4. e o <nav> sai da árvore quando o papel não tem link",
+  /\{navegacao\.length > 0 \? \(\s*<nav/.test(fontes.shell),
   true,
 );
-verificar("E5. admin mantém os sete links", (fontes.shell.match(/\{ href: "\//g) ?? []).length, 7);
+// Conta dentro do bloco do admin, e não no arquivo todo: desde o B2.3 há
+// também a entrada do operacional, e somar as duas mediria outra coisa.
+{
+  const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";
+  verificar("E5. admin mantém os sete links", (bloco.match(/\{ href: "\//g) ?? []).length, 7);
+}
 for (const [rota] of TELAS) {
   verificar(
     `E6.${rota} — continua na navegação do admin`,
@@ -225,11 +245,17 @@ for (const [rota] of TELAS) {
     true,
   );
 }
-verificar(
-  "E7. nenhum link para rota que não existe",
-  /href: "\/operacional"|href: "\/usuarios"/.test(fontes.shell),
-  false,
-);
+// Toda rota oferecida pela navegação existe no disco. É mais forte que listar
+// rotas proibidas: quando uma rota nova entra na barra, o teste continua
+// valendo, e um link para caminho inexistente falha na hora.
+{
+  const destinos = [...fontes.shell.matchAll(/href: "(\/[a-z-]+)"/g)].map((m) => m[1]);
+  const semRota = destinos.filter(
+    (destino) => !existsSync(new URL(`../src/app/(painel)${destino}/page.tsx`, import.meta.url)),
+  );
+  verificar("E7. toda rota da navegação existe", semRota.join(",") || "nenhuma", "nenhuma");
+  verificar("E7b. e há destino para conferir", destinos.length > 0, true);
+}
 verificar(
   "E8. nenhum link desabilitado como placeholder",
   /disabled.*href|href.*disabled/.test(fontes.shell),
@@ -308,8 +334,8 @@ verificar(
   false,
 );
 verificar(
-  "G10. e não cria a rota operacional do B2.3",
-  /\/operacional"/.test(todasAsFontes),
+  "G10. o núcleo do papel e o guard administrativo não dependem do operacional",
+  /lib\/operacional|_exigir-operacional|painel-operacional/.test(fontes.papel + fontes.guard),
   false,
 );
 verificar(
