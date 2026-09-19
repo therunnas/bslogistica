@@ -1,10 +1,11 @@
 # Segurança
 
 Projeto Supabase **BSLOG** atual: `ehkduqokntemtmqzdrbd`, com banco reconstruído
-e controles de banco revalidados em 10/09/2026. As migrations `012` e `013`
-entraram em Production em 19/09/2026 e acrescentaram o que está descrito em
-"Superfície operacional AAL1"; **as 19 migrations locais estão aplicadas**, e
-nenhuma delas pode ser editada.
+e controles de banco revalidados em 10/09/2026. A migration `012` — o estado de
+MFA verificável pelo banco — **já estava em Production antes deste fechamento**,
+pelo PR #25. A `013`, a superfície operacional AAL1, foi aplicada **em
+18/09/2026**, no fechamento do B1. **As 19 migrations locais estão aplicadas em
+Production**, e nenhuma delas pode ser editada.
 
 As verificações de 04/09/2026 abaixo pertencem ao projeto anterior
 `qaibhlucbpetxrtswulf`. Afirmações datadas sobre configurações do Dashboard,
@@ -55,11 +56,16 @@ se ele tivesse um defeito, as tabelas continuariam protegidas.
 - **13** tabelas no schema `public`, **todas com RLS ativa e ao menos uma
   política** — as 12 originais mais `user_operation_access`, criada pela `013`
 - Um event trigger (`ensure_rls`) habilita RLS automaticamente em tabelas novas
-- **Cinco** funções `SECURITY DEFINER` em `public`, conferidas no banco em
-  13/09/2026: `handle_bslog_auth_user_created`, `provision_bslog_user`,
-  `rls_auto_enable`, `gerar_fatura` e `derivar_valores_financeiros`. A lista
-  dizia três até aqui — omitia `gerar_fatura`, que já existia, e ganhou
-  `derivar_valores_financeiros` com a migration `010`
+- **Snapshot histórico, verificado no banco em 13/09/2026:** cinco funções
+  `SECURITY DEFINER` em `public` — `handle_bslog_auth_user_created`,
+  `provision_bslog_user`, `rls_auto_enable`, `gerar_fatura` e
+  `derivar_valores_financeiros`. A lista dizia três até aquela conferência —
+  omitia `gerar_fatura`, que já existia, e ganhou `derivar_valores_financeiros`
+  com a migration `010`. **Esta contagem não é o estado atual:** as migrations
+  `012` e `013` acrescentaram `mfa_bloqueia_excecao_aal1()`, os cinco helpers e
+  as cinco RPCs da superfície operacional, todos `SECURITY DEFINER`. O estado
+  atual dessas funções, com dono e `EXECUTE` de cada uma, está em "Superfície
+  operacional AAL1" abaixo; o inventário completo, em `PROGRESS.md`, seção 7.2
 - `EXECUTE` conferido em 13/09/2026, papel a papel: **nenhuma** delas é
   executável por `anon`. Só `gerar_fatura` é executável por `authenticated` —
   é a RPC do faturamento, e confere `aal2` **dentro da função**, porque policy
@@ -72,7 +78,7 @@ se ele tivesse um defeito, as tabelas continuariam protegidas.
 
 ## Superfície operacional AAL1 — migration `013`, em Production
 
-Acrescentada em 19/09/2026. **Nenhuma policy foi afrouxada:** as 11
+Acrescentada em 18/09/2026. **Nenhuma policy foi afrouxada:** as 11
 `*_exige_aal2` continuam RESTRICTIVE e globais, e uma sessão `operacional` em
 AAL1 lê **zero linha** de `operations`, `shifts`, `employees`, `contracts`,
 `timesheets` e `timesheet_entries` pelo PostgREST. A única porta é a RPC.
@@ -142,7 +148,8 @@ por natureza; quem protege os dados é a RLS.
 
 ## Vercel
 
-- Projeto do sistema: `bs-logistica-sistema`, sem domínio customizado
+- Projeto do sistema: `bs-logistica-sistema`, com **domínio customizado em
+  Production**: `admin.bslogisticas.com.br`
 - **Preview protegida por Vercel Authentication**: exige login na Vercel, não é
   acessível publicamente
 - Variáveis apenas nos ambientes onde são necessárias
@@ -223,7 +230,8 @@ papel, mas não exige AAL2 — é o que se vem obter ali. Quem não tem fator ca
 o primeiro; quem já tem responde ao desafio. O botão Sair continua disponível nas
 duas situações.
 
-**Fatores hoje:** duas contas admin, **dois fatores TOTP `verified`**, nenhum
+**Fatores no projeto anterior, em 06/09/2026:** duas contas admin, **dois
+fatores TOTP `verified`**, nenhum
 fator pendente e nenhum admin sem segundo fator. Conferido por leitura direta de
 `auth.mfa_factors`, sem tocar na coluna de segredo — evidência independente do
 relato do teste manual.
@@ -231,7 +239,7 @@ relato do teste manual.
 > **Nota de 12/09/2026.** Os números acima são do projeto anterior. No projeto
 > atual `ehkduqokntemtmqzdrbd` existe **um** usuário, admin, com **um** fator
 > TOTP `verified` — conferido por leitura direta em 12/09/2026. Isso **continua
-> valendo em 19/09/2026**: nenhuma conta nova foi criada desde então, e a
+> valendo em 18/09/2026**: nenhuma conta nova foi criada desde então, e a
 > primeira conta `operacional` só nasce depois do gate de ponta a ponta.
 
 **MFA obrigatório é o estado de hoje, não uma regra eterna.** Existe uma decisão
@@ -295,7 +303,13 @@ Executado em 06/09/2026, cobrindo os quatro passos que estavam pendentes:
 autenticador de uma conta admin sem ter a outra disponível deixa o painel
 inacessível para aquela conta — a remoção de um fator verificado exige o painel
 do Supabase. Com duas contas admin cadastradas, uma cobre a outra; manter as duas
-ativas é o que evita esse cenário.
+ativas é o que evitava esse cenário.
+
+> **Nota de 18/09/2026.** O projeto atual tem **uma única conta admin**, com um
+> fator TOTP `verified`. A cobertura descrita acima **não existe hoje**: perder o
+> autenticador dessa conta deixa o painel inacessível, e a recuperação passa pelo
+> painel do Supabase. Não é defeito de código, é o estado real — e é uma das
+> razões para o backend administrativo de usuários (`PR D`).
 
 ## Auditoria final de produção — 06/09/2026
 
@@ -513,26 +527,34 @@ Next.js, Sentry (incluindo o túnel `/monitoring`), Supabase e scripts inline, c
 
 ### SEC-004 — Proteção contra senhas vazadas
 
-**Status:** BLOQUEADO PELO PLANO — risco aceito
-**Severidade:** média
+**Status:** BLOQUEADO PELO PLANO — risco aceito, com controle equivalente em vigor
+**Severidade:** baixa — era média antes da adoção do MFA administrativo
 **Motivo:** a verificação contra o HaveIBeenPwned exige plano **Pro**. O projeto
 está no **Free**. A documentação oficial é explícita: _"Leaked password
 protection is available on the Pro Plan and above."_
 
-**Risco atual:** duas contas admin com acesso total, autenticação por e-mail e
-senha, **sem MFA**. O vetor realista é credential stuffing — uma senha
+**Estado histórico — quando o achado foi levantado (04/09/2026).** Duas contas
+admin com acesso total, autenticação por e-mail e senha, **sem MFA** e com zero
+fatores cadastrados. O vetor realista é credential stuffing: uma senha
 reutilizada e já vazada acerta na primeira tentativa, e o rate limit do Supabase
-não protege nesse caso.
-**Mitigação atual:** signup público desativado (`disable_signup = true`);
-confirmação de e-mail exigida; apenas o provider `email` habilitado.
+não protege nesse caso. A recomendação registrada na época era senha longa e
+exclusiva por gerenciador, mais MFA por TOTP — que o plano Free suporta.
 
-Mitigações recomendadas, **sem custo e disponíveis hoje**: senhas longas e
-exclusivas geradas por gerenciador nas duas contas admin, e MFA por TOTP, que o
-plano Free suporta e que hoje tem zero fatores cadastrados.
+**Estado atual — 18/09/2026.** O controle equivalente **foi adotado**: existe
+**uma** conta admin real, com **fator TOTP `verified`**; o MFA administrativo
+está ativo e o painel exige **AAL2**, no guard e nas 11 policies RESTRICTIVE do
+banco; o signup público segue desativado (`disable_signup = true`), com
+confirmação de e-mail exigida e apenas o provider `email` habilitado. **Não há
+mais conta admin sem segundo fator.**
 
-**Condição para fechamento:** upgrade para Pro com a proteção ativada, **ou**
-adoção de MFA administrativo como controle equivalente, registrado aqui como
-decisão. O upgrade não é obrigatório.
+**Risco que permanece:** a verificação contra senhas vazadas continua indisponível
+no plano Free, então uma senha reutilizada segue aceitável no cadastro e na
+troca. O que mudou é que ela sozinha **não abre o painel** — falta o TOTP.
+
+**Condição para fechamento:** upgrade para Pro com a proteção ativada. A
+alternativa que este próprio achado registrava — "adoção de MFA administrativo
+como controle equivalente" — **está cumprida**, e é o que baixa a severidade de
+média para baixa. O upgrade não é obrigatório.
 
 ### SEC-010 — Bootstrap automático do primeiro admin
 
@@ -552,9 +574,15 @@ END IF;
 `admin` — remoção acidental, limpeza de ambiente, restauração parcial de backup
 —, o próximo usuário criado vira administrador automaticamente. Nada alerta
 quando essa condição é atingida.
-**Mitigação atual:** existem 2 admins, o que mantém a condição falsa; o signup
-está fechado, então só quem acessa o painel do Supabase cria conta; e um
+**Mitigação atual — e ela encolheu.** Em 18/09/2026 existe **uma única** conta
+admin, não as duas de quando este achado foi escrito. É essa linha que mantém a
+condição do `IF NOT EXISTS` falsa, e ela é uma só: apagar `user_roles` dessa
+conta basta para rearmar o bootstrap. O que continua valendo: o signup está
+fechado, então só quem acessa o painel do Supabase cria conta; e um
 `pg_advisory_xact_lock` impede que dois cadastros simultâneos se auto-promovam.
+Nenhuma proteção nova foi acrescentada — **o bootstrap automático segue como
+dívida técnica aberta**, e a redução de dois admins para um **aumentou** a
+chance de a condição latente ser atingida.
 **Condição para fechamento:** restringir o bootstrap por outro critério — variável
 de ambiente, allowlist de e-mail, ou remoção da função após o provisionamento
 inicial. Obrigatório reavaliar antes de reabrir o signup.

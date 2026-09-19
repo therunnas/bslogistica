@@ -6,7 +6,7 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 | Item           | Valor                                              |
 | -------------- | -------------------------------------------------- |
-| Data           | 2026-09-19                                         |
+| Data           | 2026-09-18                                         |
 | Branch atual   | `docs/checkpoint-b1-em-production` — só documentos |
 | `main`         | `f238127281e9eaba7d0a6b81e3448dc3d0f7086f`         |
 | `origin/main`  | `f238127` — idêntico ao `main` local               |
@@ -31,7 +31,7 @@ O trabalho em curso é a **nova política de autorização** (seção 7). O **PR
 está **em Production** — migration `012`, o primitivo de MFA no banco (seção
 7.1), que **não libera AAL1**. O **PR B1 está CONCLUÍDO EM PRODUCTION**:
 migration `013`, a fundação da superfície operacional AAL1 (seção 7.2), aplicada
-em 19/09/2026 com **12/12 checks pós-deploy PASS**. Ele também **não libera AAL1
+em 18/09/2026 com **12/12 checks pós-deploy PASS**. Ele também **não libera AAL1
 em tabela nenhuma** — entrega uma superfície de RPC estreita que **a interface
 ainda não consome**.
 
@@ -283,7 +283,7 @@ cientes de papel, e a tela Configurações → Segurança.
 - portanto **um usuário `operacional` em AAL1 ainda NÃO consegue usar o
   sistema** — ele seria barrado pelo guard e, mesmo contornando o guard, pela
   RLS;
-- o **PR B1** (migration 013, seção 7.2), **em Production desde 19/09/2026**,
+- o **PR B1** (migration 013, seção 7.2), **em Production desde 18/09/2026**,
   acrescentou uma **superfície de RPC** para o operador em AAL1, mas **nenhuma
   policy foi afrouxada** e **a interface não a consome**. O quadro acima
   continua valendo integralmente.
@@ -414,7 +414,7 @@ aqui de propósito, para manter o escopo do PR A.
 ### 7.2 PR B1 — fundação da superfície operacional AAL1
 
 **Estado: CONCLUÍDO EM PRODUCTION** (PRs #26 e #27, merge `f238127`), aplicado
-em 19/09/2026. Migration `20260918160000_013_superficie_operacional_aal1.sql` e
+em 18/09/2026. Migration `20260918160000_013_superficie_operacional_aal1.sql` e
 teste `supabase/tests/009_superficie_operacional.sql`, 180/180 PASS.
 
 **A migration `013` é imutável, como a `010`, a `011` e a `012`.** Qualquer
@@ -681,7 +681,7 @@ tocado: nenhum `db push`, nenhum `--linked`, nenhuma escrita em Production.
 ### 7.3 PR B2 — interface consumindo a superfície (aprovado, não iniciado)
 
 **Nada disto está implementado.** O que segue são as decisões **congeladas** em
-19/09/2026 e o mapa do frontend auditado em leitura, para que a próxima sessão
+18/09/2026 e o mapa do frontend auditado em leitura, para que a próxima sessão
 não reabra o que já foi decidido.
 
 #### Sete decisões congeladas

@@ -1,6 +1,6 @@
 # Estado do projeto
 
-Fotografia em **19/09/2026**. Este documento descreve o **estado atual**; o
+Fotografia em **18/09/2026**. Este documento descreve o **estado atual**; o
 detalhe operacional e o próximo passo ficam em [PROGRESS.md](../PROGRESS.md),
 que é atualizado com mais frequência. Onde os dois divergirem, o `PROGRESS.md`
 vence.
