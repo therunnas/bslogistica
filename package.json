@@ -15,7 +15,8 @@
     "test:prova": "node --experimental-strip-types scripts/testar-prova-recuperacao.mjs",
     "test:troca": "node --experimental-strip-types scripts/testar-troca-de-senha.mjs",
     "test:operacional": "node --experimental-strip-types scripts/testar-operacional.mjs",
-    "test:papel": "node --experimental-strip-types scripts/testar-papel.mjs"
+    "test:papel": "node --experimental-strip-types scripts/testar-papel.mjs",
+    "test:tela-operacional": "node --experimental-strip-types scripts/testar-tela-operacional.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

@@ -23,25 +23,31 @@ import { sair } from "../_acoes";
 import type { PapelEfetivo } from "../_papel";
 
 /**
- * As sete telas administrativas.
+ * A navegação de cada papel.
  *
- * Todas são administrativas de fato, não por rótulo: dashboard, relatórios e
- * faturamento mostram receita, custo e margem; clientes traz as regras de
- * cobrança; colaboradores, o custo por diária; operações administra a estrutura;
- * e apontamentos é a tela administrativa atual, com o financeiro junto.
+ * As sete telas administrativas são administrativas de fato, não por rótulo:
+ * dashboard, relatórios e faturamento mostram receita, custo e margem; clientes
+ * traz as regras de cobrança; colaboradores, o custo por diária; operações
+ * administra a estrutura; e apontamentos é a tela administrativa, com o
+ * financeiro junto. Por isso a lista inteira troca por papel, em vez de ser
+ * filtrada item a item — nenhuma delas serve ao operacional.
  *
- * Por isso a lista inteira some para quem não é admin, em vez de ser filtrada
- * item a item: não há nenhum item aqui que sirva ao operacional.
+ * O operacional tem uma tela, e é a dele: `/operacional`, separada da
+ * administrativa e alimentada só pelas RPCs da migration 013.
  */
-const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/apontamentos", label: "Apontamentos", icon: CalendarCheck },
-  { href: "/operacoes", label: "Operações", icon: Wrench },
-  { href: "/clientes", label: "Clientes e contratos", icon: Building2 },
-  { href: "/colaboradores", label: "Colaboradores", icon: Users },
-  { href: "/faturamento", label: "Faturamento", icon: FileText },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
-] as const;
+const NAVEGACAO = {
+  admin: [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/apontamentos", label: "Apontamentos", icon: CalendarCheck },
+    { href: "/operacoes", label: "Operações", icon: Wrench },
+    { href: "/clientes", label: "Clientes e contratos", icon: Building2 },
+    { href: "/colaboradores", label: "Colaboradores", icon: Users },
+    { href: "/faturamento", label: "Faturamento", icon: FileText },
+    { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  ],
+  operacional: [{ href: "/operacional", label: "Apontamentos", icon: CalendarCheck }],
+  "sem-papel": [],
+} as const;
 
 export function AppShell({
   children,
@@ -52,7 +58,7 @@ export function AppShell({
   email: string;
   papel: PapelEfetivo;
 }) {
-  const mostrarNavegacaoAdministrativa = papel === "admin";
+  const navegacao = NAVEGACAO[papel];
 
   const caminho = usePathname();
   const queryClient = useQueryClient();
@@ -92,15 +98,13 @@ export function AppShell({
             BS Soluções Logísticas
           </span>
         </div>
-        {/* Sem navegação administrativa, o `<nav>` inteiro sai da árvore: uma
-            lista vazia com a mesma altura só pareceria um menu quebrado. O
-            `flex-1` migra para este espaçador, para que o rodapé com e-mail e
-            Sair continue no pé da barra. A tela operacional chega no B2.3;
-            até lá não existe link a oferecer, e link para rota inexistente é
-            pior que nenhum. */}
-        {mostrarNavegacaoAdministrativa ? (
+        {/* Sem link nenhum, o `<nav>` inteiro sai da árvore: uma lista vazia
+            com a mesma altura só pareceria um menu quebrado. O `flex-1` migra
+            para o espaçador, e o rodapé com e-mail e Sair continua no pé da
+            barra. */}
+        {navegacao.length > 0 ? (
           <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-            {nav.map(({ href, label, icon: Icon }) => (
+            {navegacao.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
