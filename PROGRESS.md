@@ -45,8 +45,8 @@ está **em Production** — migration `012`, o primitivo de MFA no banco (seçã
 7.1), que **não libera AAL1**. O **PR B1 está CONCLUÍDO EM PRODUCTION**:
 migration `013`, a fundação da superfície operacional AAL1 (seção 7.2), aplicada
 em 18/09/2026 com **12/12 checks pós-deploy PASS**. Ele também **não libera AAL1
-em tabela nenhuma** — entrega uma superfície de RPC estreita que **a interface
-ainda não consome**.
+em tabela nenhuma** — entrega uma superfície de RPC estreita, hoje **consumida
+pela interface** (B2.1 e B2.3).
 
 **As migrations aplicadas são imutáveis — a `013` inclusive.** Qualquer mudança
 de banco daqui para frente exige migration nova.
@@ -54,12 +54,13 @@ de banco daqui para frente exige migration nova.
 O **B2.1** — a camada de dados operacional — está **concluído**, pelo PR #30. A
 **migration `014`**, que fecha a invariante de sinal de `break_minutes` (seção
 7.4), está **CONCLUÍDA EM PRODUCTION** pelo PR #31, com auditoria pós-deploy
-PASS. **A etapa atual é o B2.2** — papel, navegação e bloqueio server-side de
-rotas.
+PASS. O **B2.2** (PR #32), o **B2.3** (PR #33), a **migration `015`** (PR #34,
+em Production) e o **PR C** — o guard role-aware (PR #37, seção 7.6) — também
+estão **concluídos**.
 
-Seguem **aprovados e não implementados**: **B2.2** e **B2.3** (seção 7.3) e
-**PR C** (guard role-aware). Leia a seção 6 antes de tocar em guard, policy ou
-usuário.
+**A etapa atual é o PR D** — backend administrativo de usuários, exclusivamente
+server-side. Seguem **aprovados e não iniciados**: **PR D**, **PR E**, **PR F** e
+**PR G**. Leia a seção 6 antes de tocar em guard, policy ou usuário.
 
 ## 2. Ambiente
 
@@ -285,26 +286,26 @@ reinstrumentar como no PR #19, não adivinhar.
 
 ### 6.2 ESTADO ATUAL — o que vale hoje, no código e no banco
 
-**A divisão por papel descrita na seção 6.1 ainda NÃO está implementada.**
+**A divisão por papel descrita na seção 6.1 está implementada no guard e na
+superfície de RPC — e NÃO por afrouxamento de policy.** O que segue é o que vale
+hoje, depois do B2.1, do B2.2, do B2.3, da `015` e do **PR C**.
 
-As proteções atuais do admin **já existem e permanecem ativas** — MFA
-obrigatório, painel exigindo AAL2, um TOTP no recovery e nenhum admin operando
-em AAL1. O painel e as 11 tabelas continuam exigindo AAL2.
+As proteções do admin **permanecem intactas** — MFA obrigatório, AAL2 no painel,
+um TOTP no recovery e nenhum admin operando em AAL1.
 
-O que falta implementar é a **exceção segura para o papel `operacional`** e a
-**autorização coordenada por papel + AAL**: `operacional` com MFA opcional,
-`operacional` em AAL1 nas permissões expressamente autorizadas, o guard e a RLS
-cientes de papel, e a tela Configurações → Segurança.
-
-- o guard de `(painel)` **ainda exige AAL2** para qualquer papel;
-- **11 tabelas de negócio ainda têm policy RESTRICTIVE global exigindo `aal2`**;
-- portanto **um usuário `operacional` em AAL1 ainda NÃO consegue usar o
-  sistema** — ele seria barrado pelo guard e, mesmo contornando o guard, pela
-  RLS;
-- o **PR B1** (migration 013, seção 7.2), **em Production desde 18/09/2026**,
-  acrescentou uma **superfície de RPC** para o operador em AAL1, mas **nenhuma
-  policy foi afrouxada** e **a interface não a consome**. O quadro acima
-  continua valendo integralmente.
+- o guard de `(painel)` é **role-aware** desde o **PR C** (seção 7.6): admin
+  sempre em AAL2; `operacional` **sem** fator verificado pode trabalhar em AAL1;
+  `operacional` **com** fator verificado é barrado em AAL1 até concluir o TOTP;
+  `admin`+`operacional` é tratado como admin; erro ou estado indeterminado fecha;
+- **as 11 tabelas de negócio continuam com policy RESTRICTIVE global exigindo
+  `aal2`** — isso **não** mudou, e não deve mudar sem tarefa de escopo próprio;
+- portanto **um `operacional` em AAL1 continua lendo zero linha pelo PostgREST**.
+  A única porta é a **superfície de RPC** da `013`, hoje **consumida pela
+  interface** (B2.1, seção 7.3, e a tela do B2.3);
+- a **migration `015`** (seção 7.5) estendeu essa mesma superfície estreita ao
+  operador em **AAL2**, sem ampliar dado nenhum;
+- o que **falta** é a tela **Configurações → Segurança** (**PR F**), por onde o
+  `operacional` ativaria MFA por vontade própria, e a matriz E2E do **PR G**.
 
 ### 6.3 Proibições enquanto a refatoração não acontecer
 
@@ -427,11 +428,13 @@ falha que documentou o furo da conta apagada.
 `public.operador_elegivel_aal1()` (seção 7.2). Nenhuma **policy** a chama, e
 isso continua verdadeiro.
 
-**Pendência registrada para o PR C:** o comentário em
-`src/app/(painel)/_autorizacao.ts:47-51` afirma que
-`getAuthenticatorAssuranceLevel()` valida o token chamando `getUser(jwt)`. **É
-falso** — descreve o ramo `if (jwt)`, que o projeto nunca usa. Não foi corrigido
-aqui de propósito, para manter o escopo do PR A.
+**Pendência registrada para o PR C — RESOLVIDA pelo PR #37.** O comentário em
+`src/app/(painel)/_autorizacao.ts` afirmava que
+`getAuthenticatorAssuranceLevel()` valida o token chamando `getUser(jwt)`. Era
+**falso** — descrevia o ramo `if (jwt)`, que o projeto nunca usa. Não foi
+corrigido no PR A de propósito, para manter aquele escopo; o **PR C** trocou o
+texto pelo motivo real de não usar `nextLevel` e deixou asserção que impede a
+afirmação de voltar.
 
 ### 7.2 PR B1 — fundação da superfície operacional AAL1
 
@@ -490,7 +493,8 @@ segundo fator por esta porta.
 **O que o PR B1 NÃO faz:** não altera nenhuma das 11 policies `*_exige_aal2`,
 que seguem RESTRICTIVE e globais; não concede SELECT/UPDATE direto em tabela
 nenhuma para AAL1; não cria usuário; não toca em uma linha de frontend, guard,
-login ou `/mfa`. **A interface ainda não consome a superfície** — isso é o PR B2.
+login ou `/mfa`. **Ele não tocou uma linha de interface** — quem passou a
+consumir a superfície foi o **PR B2** (seção 7.3), depois dele.
 
 **Decisões de produto congeladas neste PR** (do enunciado da tarefa):
 
@@ -700,11 +704,12 @@ migrations usam do Supabase: papéis (`anon`, `authenticated`, `service_role`,
 suítes anteriores passarem sem alteração** no mesmo harness. Nada remoto foi
 tocado: nenhum `db push`, nenhum `--linked`, nenhuma escrita em Production.
 
-### 7.3 PR B2 — interface consumindo a superfície (aprovado, não iniciado)
+### 7.3 PR B2 — interface consumindo a superfície (CONCLUÍDO)
 
-**Nada disto está implementado.** O que segue são as decisões **congeladas** em
-18/09/2026 e o mapa do frontend auditado em leitura, para que a próxima sessão
-não reabra o que já foi decidido.
+**B2.1 (PR #30), B2.2 (PR #32) e B2.3 (PR #33) estão implementados e
+mergeados.** O que segue são as decisões **congeladas** em 18/09/2026 — mantidas
+como registro do que foi decidido e por quê — seguidas do que cada etapa
+entregou de fato.
 
 #### Sete decisões congeladas
 
@@ -733,6 +738,9 @@ não reabra o que já foi decidido.
    `mfa_bloqueia_excecao_aal1()`. O guard **não pode** decidir segurança por
    `getAuthenticatorAssuranceLevel().nextLevel`: esse campo vem do cookie, fora
    da assinatura do JWT, e não é fonte de enforcement (seção 7.1).
+   **Desfecho:** o **PR C** cumpriu isso (seção 7.6) — a decisão passou a ler a
+   RPC da `012` e `nextLevel` saiu do enforcement do painel. A **ativação** do
+   MFA pelo próprio operacional continua sendo o **PR F**.
 7. **Types das RPCs: não decidir no escuro.** `src/integrations/supabase/types.ts`
    ainda não contém as cinco RPCs. Antes de escrever tipo à mão: gerar os tipos
    atuais do Supabase de forma **read-only**, comparar o diff e **não
@@ -741,9 +749,13 @@ não reabra o que já foi decidido.
    relacionado, **parar e justificar**, e aí considerar um módulo dedicado e
    estrito para os contratos das cinco RPCs.
 
-#### Mapa do frontend, auditado em leitura
+#### Mapa do frontend, auditado em leitura **antes do B2**
 
-| Arquivo                                                 | Estado hoje                                                         |
+Fotografia de 18/09/2026, preservada como registro do ponto de partida. O que
+cada arquivo virou está nas subseções do B2.1, B2.2 e B2.3, logo abaixo, e no
+**PR C** (seção 7.6) para o guard.
+
+| Arquivo                                                 | Estado **antes do B2**                                              |
 | ------------------------------------------------------- | ------------------------------------------------------------------- |
 | `src/app/(painel)/layout.tsx`                           | roteia por `situacao`; **ainda não usa os papéis** de fato          |
 | `src/app/(painel)/_autorizacao.ts`                      | já lê `user_roles` e devolve `papeis` — o consumidor é que não usa  |
@@ -778,7 +790,7 @@ própria de quem tiver o token.
 isso na forma dos arquivos, junto com a ausência de importação de cálculo
 financeiro e de qualquer nome de coluna proibida.
 
-#### B2.2 — papel, navegação e bloqueio de rotas — IMPLEMENTADO em PR
+#### B2.2 — papel, navegação e bloqueio de rotas — CONCLUÍDO (PR #32)
 
 - `_papel.ts` — `resolverPapelEfetivo()`, função pura: **`admin` + `operacional`
   é ADMIN**, igual ao que a `013` decidiu no banco, onde
@@ -837,10 +849,12 @@ escopo a que pertence e é inicializado uma vez por escopo.
 Suíte `scripts/testar-tela-operacional.mjs`, **170 asserções**, por
 `npm run test:tela-operacional`.
 
-**O fluxo operacional ainda NÃO é exercitável ponta a ponta**, e isso é
-esperado: o layout exige AAL2 de todo mundo e a RPC exige `aal = aal1` — são
-mutuamente exclusivos. Conciliar os dois é o **PR C**, e a prova real é a matriz
-do **PR G**.
+**Aquela incompatibilidade foi resolvida.** Quando esta seção foi escrita, o
+layout exigia AAL2 de todo mundo e a RPC exigia `aal = aal1` — mutuamente
+exclusivos. A **`015`** estendeu a superfície ao operador em AAL2 e o **PR C**
+tornou o guard role-aware, então os dois lados concordam. O que **ainda** não
+aconteceu é o exercício ponta a ponta com conta real: isso é a matriz do
+**PR G**, e criar um `operacional` real antes dela continua proibido.
 
 Fluxo: operação atribuída → turno → data → equipe → apontamentos → salvar.
 
@@ -1164,10 +1178,12 @@ mecanismo — tudo isso fica para a auditoria da ETAPA 1, depois de avaliar
 segurança, sincronização, revogação e impossibilidade de spoofing. **Este
 checkpoint registra o REQUISITO, não inventa a solução.**
 
-### ETAPA 2 — o que resta dela é o PR C
+### ETAPA 2 — histórico: concluída pelas migrations `012`/`013`/`015` e pelo PR C
 
-As **migrations** desta etapa estão feitas (`012` e `013`). O que falta é o
-**guard**, e ele é o **PR C**.
+As **migrations** desta etapa estão feitas (`012`, `013` e `015`) e o **guard**
+role-aware foi entregue pelo **PR C** (seção 7.6). O que segue é o registro do
+requisito desta etapa — em especial os testes de RLS abaixo, que continuam
+**por fazer no banco** e são a matriz do **PR G**.
 
 **Testes reais de RLS obrigatórios**, exercitados no banco — não no guard:
 
@@ -1581,15 +1597,18 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 - Não modificar DNS sem confirmação.
 - Não adicionar enforcement AAL2 em `user_roles`.
 - **Não remover a policy AAL2 global sem substituição segura** (seção 6.3).
-- **Não criar usuário `operacional` real** antes de B2.1, B2.2, B2.3, PR C, PR
-  D, PR E, PR F e da matriz E2E do **PR G** (seções 6.3, 7 e 7.3).
+- **Não criar usuário `operacional` real** antes do **PR D**, do **PR E**, do
+  **PR F** e da matriz E2E do **PR G** (seções 6.3, 7 e 7.3). B2.1, B2.2, B2.3 e
+  PR C já estão fechados; a proibição continua valendo pelos que faltam.
 - **Não afrouxar a superfície do PR B1** (seção 7.2): não acrescentar coluna
   financeira, `client_id`, documento ou telefone ao retorno das RPCs; não
   aceitar campo novo no JSON da escrita sem decisão de produto; não criar RPC de
   exclusão; não conceder `EXECUTE` dos helpers a `authenticated`; não abrir
   `user_operation_access` a quem não é admin em AAL2.
-- **Não iniciar B2.2 antes da migration `014`** (seção 7.4): `break_minutes`
-  negativo atravessa e infla `billed_amount`, medido.
+- **Cumprido, mantido como registro:** o B2.2 não podia começar antes da
+  migration `014` (seção 7.4), porque `break_minutes` negativo atravessava e
+  inflava `billed_amount` — medido. A `014` está em Production e o B2.2,
+  concluído.
 - **Não corrigir isso no frontend** e dar por resolvido: a autoridade da regra é
   o banco.
 - **Não reabrir as sete decisões congeladas do B2** (seção 7.3): fonte de dados
