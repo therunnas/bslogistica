@@ -4,22 +4,24 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 ## 1. Checkpoint
 
-| Item          | Valor                                         |
-| ------------- | --------------------------------------------- |
-| Data          | 2026-09-18                                    |
-| Branch atual  | `claude/laughing-archimedes-cq6a4z` — PR B1   |
-| `main`        | `3ec924269ff98df8e63af688faf386142671c222`    |
-| `origin/main` | `3ec9242` — idêntico ao `main` local          |
-| Production    | **verde** no commit `3ec9242`                 |
-| Migrations    | **18 em Production**; a 013 do PR B1 pendente |
+| Item           | Valor                                              |
+| -------------- | -------------------------------------------------- |
+| Data           | 2026-09-19                                         |
+| Branch atual   | `docs/checkpoint-b1-em-production` — só documentos |
+| `main`         | `f238127281e9eaba7d0a6b81e3448dc3d0f7086f`         |
+| `origin/main`  | `f238127` — idêntico ao `main` local               |
+| Production     | **verde** no commit `f238127`                      |
+| Migrations     | **19 locais = 19 em Production**, zero pendentes   |
+| Usuários reais | **um**: o administrador, com TOTP verificado       |
 
-| Frente                               | Merge     | Estado                                |
-| ------------------------------------ | --------- | ------------------------------------- |
-| Enforcement AAL2                     | `359dd90` | **CONCLUÍDO** — PR #14, em Production |
-| Password recovery                    | `8149a4d` | **CONCLUÍDO** — PRs #13, #17 a #20    |
-| A₀ — valores derivados no banco      | `83ed1f3` | **CONCLUÍDO** — PR #22, em Production |
-| A₀.1 — fontes financeiras protegidas | `c019e42` | **CONCLUÍDO** — PR #23, em Production |
-| PR A — estado de MFA no banco        | `3ec9242` | **CONCLUÍDO** — PR #25, em Production |
+| Frente                               | Merge     | Estado                                       |
+| ------------------------------------ | --------- | -------------------------------------------- |
+| Enforcement AAL2                     | `359dd90` | **CONCLUÍDO** — PR #14, em Production        |
+| Password recovery                    | `8149a4d` | **CONCLUÍDO** — PRs #13, #17 a #20           |
+| A₀ — valores derivados no banco      | `83ed1f3` | **CONCLUÍDO** — PR #22, em Production        |
+| A₀.1 — fontes financeiras protegidas | `c019e42` | **CONCLUÍDO** — PR #23, em Production        |
+| PR A — estado de MFA no banco        | `3ec9242` | **CONCLUÍDO** — PR #25, em Production        |
+| PR B1 — superfície operacional AAL1  | `f238127` | **CONCLUÍDO** — PRs #26 e #27, em Production |
 
 **A₀ e A₀.1 estão concluídos e implantados** — migrations `010` e `011`
 aplicadas em Production em 13/09/2026, com validação read-only completa. O
@@ -27,13 +29,18 @@ detalhe está na **seção 9**.
 
 O trabalho em curso é a **nova política de autorização** (seção 7). O **PR A**
 está **em Production** — migration `012`, o primitivo de MFA no banco (seção
-7.1), que **não libera AAL1**. O **PR B1** está **implementado e ainda não em
-Production**: migration `013`, a fundação da superfície operacional AAL1 (seção
-7.2). Ele também **não libera AAL1 em tabela nenhuma** — entrega uma superfície
-de RPC estreita que **a interface ainda não consome**.
+7.1), que **não libera AAL1**. O **PR B1 está CONCLUÍDO EM PRODUCTION**:
+migration `013`, a fundação da superfície operacional AAL1 (seção 7.2), aplicada
+em 19/09/2026 com **12/12 checks pós-deploy PASS**. Ele também **não libera AAL1
+em tabela nenhuma** — entrega uma superfície de RPC estreita que **a interface
+ainda não consome**.
+
+**As migrations aplicadas são imutáveis — a `013` inclusive.** Qualquer mudança
+de banco daqui para frente exige migration nova.
 
 Seguem **aprovados e não implementados**: **PR B2** (adaptar a interface à
-superfície) e **PR C** (guard role-aware). Leia a seção 6 antes de tocar em
+superfície, quebrado em B2.1/B2.2/B2.3 — seção 7.3) e **PR C** (guard
+role-aware). O próximo passo é o **B2.1**. Leia a seção 6 antes de tocar em
 guard, policy ou usuário.
 
 ## 2. Ambiente
@@ -276,9 +283,10 @@ cientes de papel, e a tela Configurações → Segurança.
 - portanto **um usuário `operacional` em AAL1 ainda NÃO consegue usar o
   sistema** — ele seria barrado pelo guard e, mesmo contornando o guard, pela
   RLS;
-- o **PR B1** (migration 013, seção 7.2) acrescentou uma **superfície de RPC**
-  para o operador em AAL1, mas **nenhuma policy foi afrouxada** e **a interface
-  não a consome**. O quadro acima continua valendo integralmente.
+- o **PR B1** (migration 013, seção 7.2), **em Production desde 19/09/2026**,
+  acrescentou uma **superfície de RPC** para o operador em AAL1, mas **nenhuma
+  policy foi afrouxada** e **a interface não a consome**. O quadro acima
+  continua valendo integralmente.
 
 ### 6.3 Proibições enquanto a refatoração não acontecer
 
@@ -299,17 +307,39 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR        | Entrega                                                                                                                                                                                        | Cabe em |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| **PR A**  | estado de MFA **verificável no banco** — indicador confiável, não forjável pelo próprio usuário e fail-closed. **IMPLEMENTADO** na migration 012, ainda não em Production. Ver 7.1             | ETAPA 1 |
-| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers de autorização e RPCs estreitas, sem afrouxar policy. **IMPLEMENTADO** na migration 013, ainda não em Production. Ver 7.2 | ETAPA 2 |
-| **PR B2** | **interface** consumindo a superfície: `queries.ts`, `painel-apontamentos.tsx` e o caminho de login do operador                                                                                | ETAPA 2 |
-| **PR C**  | **guard role-aware** no `(painel)`, mais o `nextLevel` e o comentário errado em `_autorizacao.ts`                                                                                              | ETAPA 2 |
+| PR        | Entrega                                                                                                                               | Estado                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**      |
+| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**      |
+| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **PRÓXIMO PASSO**      |
+| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | aprovado, não iniciado |
+| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado |
+| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado |
+| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado |
+| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado |
+
+Sequência obrigatória: **B2.1 → B2.2 → B2.3 → PR C → PR D → PR E → PR F → PR G**.
 
 **O primeiro usuário `operacional` real só existe depois de todos**, e depois da
-matriz E2E da ETAPA 6. PR A é pré-requisito de PR B1: sem um indicador confiável
-de MFA no banco, a exceção de AAL1 vira bypass para a conta que optou pelo
-segundo fator.
+matriz E2E do **PR G**. PR A era pré-requisito de PR B1: sem um indicador
+confiável de MFA no banco, a exceção de AAL1 vira bypass para a conta que optou
+pelo segundo fator.
+
+### 7.0 MVP para apresentação ao cliente
+
+O MVP está pronto quando for possível demonstrar as duas trilhas de ponta a
+ponta:
+
+**Admin** — login · MFA · clientes · operações · turnos · equipe · apontamentos
+administrativos · a estrutura financeira já existente · acessar Usuários ·
+convidar um usuário · definir papel `operacional` · atribuir operações.
+
+**Operacional** — receber convite · acessar a conta · entrar no sistema · ver
+**somente** as operações atribuídas · selecionar turno · selecionar data · ver a
+equipe · registrar presença e horários · salvar · **não** ver financeiro ·
+**não** ver telas administrativas · **não** alcançar operação não atribuída.
 
 ### 7.1 PR A — primitivo de MFA no banco
 
@@ -383,9 +413,23 @@ aqui de propósito, para manter o escopo do PR A.
 
 ### 7.2 PR B1 — fundação da superfície operacional AAL1
 
-**Estado: implementado, testado localmente, ainda NÃO em Production.** Migration
-`20260918160000_013_superficie_operacional_aal1.sql` e teste
-`supabase/tests/009_superficie_operacional.sql`.
+**Estado: CONCLUÍDO EM PRODUCTION** (PRs #26 e #27, merge `f238127`), aplicado
+em 19/09/2026. Migration `20260918160000_013_superficie_operacional_aal1.sql` e
+teste `supabase/tests/009_superficie_operacional.sql`, 180/180 PASS.
+
+**A migration `013` é imutável, como a `010`, a `011` e a `012`.** Qualquer
+ajuste nesta superfície exige migration nova.
+
+**Validação pós-deploy em Production — 12/12 PASS**, conferida por leitura: 19
+migrations com a `013` registrada · atributos do papel (`NOLOGIN`, `NOINHERIT`,
+`NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOREPLICATION`, `BYPASSRLS`) ·
+zero membership com `anon`, `authenticated` ou `service_role` · `public` com
+`USAGE = true` e **`CREATE = false`** · `auth` com `USAGE = false` · as 5 RPCs
+pertencendo a `bslog_rpc_operacional` e ainda `SECURITY DEFINER` · os 5 helpers
+ainda de `postgres` · `EXECUTE` só para `authenticated` · `user_operation_access`
+existente e com RLS ativa · trigger e função legados removidos · as 11 policies
+`*_exige_aal2` intactas · e o papel sem leitura de `invoice_id`,
+`billed_amount`, `cost_amount`, `daily_cost`, `agreed_amount` ou `contracts`.
 
 **A pergunta que o PR B1 respondeu.** A ETAPA 1 previa "RLS seletiva": afrouxar
 a policy de AAL2 para `operacional` e deixar a RLS filtrar. Ao desenhar, isso
@@ -542,15 +586,15 @@ Código morto cobrando um privilégio caro. A remoção **endureceu** a regra:
 sumiram as isenções de `admin` e de `service_role`, que só existiam nele. Os
 casos O1–O10 do teste exercitam as quatro transições para os dois papéis depois
 da remoção: todas recusadas com `42501`. As migrations 010, 011 e 012 não foram
-tocadas — o objeto removido é da `20260909175435`, e sai pela 013, que ainda não
-foi publicada. `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` foi
+tocadas — o objeto removido é da `20260909175435`, e saiu pela 013. `docs/divida-tecnica/rls-vinculo-de-fatura-permissivo.md` foi
 atualizado no mesmo commit.
 
-**Os quatro helpers seguem com dono `postgres`**, justificados um a um:
+**Os cinco helpers seguem com dono `postgres`**, justificados um a um:
 `uid_do_operador`, `operador_elegivel_aal1` e `operador_autorizado` leem o schema
 `auth`, e é justamente por isso que as RPCs não precisam; `travar_turno_da_operacao`
-existe para tomar o `FOR SHARE` sem exigir `UPDATE` em `shifts`. **Nenhum dos
-quatro escreve** — as isenções de `postgres` são todas sobre escrita, então não há
+existe para tomar o `FOR SHARE` sem exigir `UPDATE` em `shifts`; e
+`apontamento_faturado` lê `invoice_id`, coluna que o papel não alcança. **Nenhum
+dos cinco escreve** — as isenções de `postgres` são todas sobre escrita, então não há
 o que aproveitar ali. O caso N3 guarda essa propriedade por regex no `prosrc`.
 
 **O gate de camada 2, remedido depois da troca de dono.** `current_user` dentro
@@ -622,8 +666,9 @@ substituto esbarra em regras de administração de papel do PG16 que o Supabase
 não aplica (`COMMENT ON ROLE`, `GRANT <papel> TO postgres`). O experimento
 isolado do mecanismo é a prova possível, e é a que bate com o erro real.
 
-**Pré-requisito de ambiente restante: um só, e já confirmado.** Criar o papel com
-`BYPASSRLS`, que Production validou. Nenhum grant no schema `auth` é necessário.
+**O deploy final.** Com o PR #27 mergeado, a segunda tentativa aplicou a 013 sem
+incidente, e Production ficou com `CREATE ON SCHEMA public = false` para o papel,
+como a migration assevera. Nenhum grant no schema `auth` foi necessário.
 
 **Validação local.** PostgreSQL 16.13 com um harness que reproduz o que as
 migrations usam do Supabase: papéis (`anon`, `authenticated`, `service_role`,
@@ -633,14 +678,98 @@ migrations usam do Supabase: papéis (`anon`, `authenticated`, `service_role`,
 suítes anteriores passarem sem alteração** no mesmo harness. Nada remoto foi
 tocado: nenhum `db push`, nenhum `--linked`, nenhuma escrita em Production.
 
-### ETAPA 1 — próxima
+### 7.3 PR B2 — interface consumindo a superfície (aprovado, não iniciado)
+
+**Nada disto está implementado.** O que segue são as decisões **congeladas** em
+19/09/2026 e o mapa do frontend auditado em leitura, para que a próxima sessão
+não reabra o que já foi decidido.
+
+#### Sete decisões congeladas
+
+1. **O papel decide a FONTE DE DADOS da tela**, não quais campos ela esconde.
+   Admin continua no caminho administrativo atual; `operacional` ganha caminho
+   próprio consumindo **somente** as RPCs AAL1. Esconder coluna de uma query
+   administrativa não é aceitável.
+2. **Tela operacional separada.** Nada de encher `painel-apontamentos.tsx` de
+   `if (ehOperacional)`. A tela administrativa mistura cálculo financeiro,
+   ledger, regras de contrato, `billed_amount`, `cost_amount`, `daily_cost`,
+   `agreed_amount` e `invoice_id` — a separação existe para **reduzir superfície
+   de vazamento**, não por estética.
+3. **Fechar e reabrir folha é ato administrativo, só de admin.** Não criar uma
+   sexta RPC operacional agora. O operador registra e salva apontamento; não
+   fecha nem reabre.
+4. **Operação sem turno não entra no fluxo.** A RPC exige `shift_id`. Não
+   inventar fallback: a operação pode aparecer na listagem, e a interface mostra
+   estado explícito — "Nenhum turno configurado para esta operação" —, nunca um
+   `22023` cru.
+5. **`admin` + `operacional` na mesma conta é tratado como admin.** Acumular o
+   papel operacional nunca pode abrir rota AAL1 para um admin. Isso já é o
+   comportamento do banco (`operador_elegivel_aal1()` exige **não** admin) e a
+   interface precisa ficar coerente com ele.
+6. **MFA opcional do operacional não é parte do B2.** É o **PR C**, um PR de
+   segurança próprio. O banco já tem a fonte confiável,
+   `mfa_bloqueia_excecao_aal1()`. O guard **não pode** decidir segurança por
+   `getAuthenticatorAssuranceLevel().nextLevel`: esse campo vem do cookie, fora
+   da assinatura do JWT, e não é fonte de enforcement (seção 7.1).
+7. **Types das RPCs: não decidir no escuro.** `src/integrations/supabase/types.ts`
+   ainda não contém as cinco RPCs. Antes de escrever tipo à mão: gerar os tipos
+   atuais do Supabase de forma **read-only**, comparar o diff e **não
+   sobrescrever de imediato**. Se o diff refletir só as migrations legítimas,
+   preferir atualizar o tipo canônico gerado; se vier ruído grande e não
+   relacionado, **parar e justificar**, e aí considerar um módulo dedicado e
+   estrito para os contratos das cinco RPCs.
+
+#### Mapa do frontend, auditado em leitura
+
+| Arquivo                                                 | Estado hoje                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| `src/app/(painel)/layout.tsx`                           | roteia por `situacao`; **ainda não usa os papéis** de fato          |
+| `src/app/(painel)/_autorizacao.ts`                      | já lê `user_roles` e devolve `papeis` — o consumidor é que não usa  |
+| `src/app/(painel)/_components/app-shell.tsx`            | itens de navegação fixos, sem diferenciar papel                     |
+| `src/lib/queries.ts`                                    | hooks com acesso direto às tabelas                                  |
+| `src/app/(painel)/apontamentos/painel-apontamentos.tsx` | tela administrativa grande, operacional **misturado** ao financeiro |
+
+O fluxo operacional **não deve reutilizar** a fonte de dados dessa última.
+
+#### B2.1 — camada de dados operacional (próximo passo)
+
+Sem UI, sem guard, sem mudança de segurança, sem tocar em Production. Criar
+contratos e wrappers para as cinco RPCs. Estrutura preferida, sujeita à
+auditoria de tipos da decisão 7: `src/lib/operacional/` com `tipos.ts`,
+`queries.ts` e `mutations.ts`. **Nenhum acesso direto a tabela protegida no
+caminho AAL1.**
+
+#### B2.2 — papel, navegação e bloqueio de rotas
+
+Distinguir admin × operacional; navegação diferente por papel; operacional não
+vê área administrativa. **O bloqueio é server-side** — esconder link não é
+bloqueio. Criar um helper server-side central (algo conceitualmente equivalente
+a `exigirAdmin()`) e chamá-lo nas telas administrativas, em vez de copiar lógica
+página a página. Admin mantém o acesso atual.
+
+#### B2.3 — tela operacional de apontamentos
+
+Fluxo: operação atribuída → turno → data → equipe → apontamentos → salvar.
+
+**Sem** `billed_amount`, `cost_amount`, `daily_cost`, `daily_rate`,
+`agreed_amount`, `invoice_id`, contratos, totais financeiros, "a faturar", custo
+ou qualquer prévia financeira. **Não usar** `src/lib/billing.ts`,
+`src/lib/ledger.ts`, os hooks administrativos nem `select("*")` nas tabelas
+protegidas. A escrita passa **exclusivamente** por
+`salvar_apontamento_operacional(...)`, com os seis campos que a RPC aceita.
+
+### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
 **Auditoria e desenho da autorização** por **papel + AAL + RLS + guards**.
-
 Objetivo: permitir `operacional` em AAL1 **apenas onde for expressamente
 autorizado**, mantendo admin e ações administrativas em AAL2.
 
-Entrar nesta etapa com estes pontos já mapeados:
+O desenho está **fechado e implantado**: o indicador confiável de MFA veio no PR
+A (7.1) e a autorização veio como **superfície de RPC**, não como policy
+afrouxada, no PR B1 (7.2). O que segue nesta subseção é o registro de como se
+chegou lá — **e o requisito obrigatório abaixo continua valendo para o PR C**.
+
+Os pontos mapeados na época, todos ainda verdadeiros:
 
 - a policy RESTRICTIVE hoje é idêntica nas 11 tabelas e não distingue papel;
 - `user_roles` está **de propósito** fora do enforcement AAL2 — bloqueá-la cria
@@ -695,9 +824,10 @@ mecanismo — tudo isso fica para a auditoria da ETAPA 1, depois de avaliar
 segurança, sincronização, revogação e impossibilidade de spoofing. **Este
 checkpoint registra o REQUISITO, não inventa a solução.**
 
-### ETAPA 2
+### ETAPA 2 — o que resta dela é o PR C
 
-Implementar **migrations / policies / guards** da nova política.
+As **migrations** desta etapa estão feitas (`012` e `013`). O que falta é o
+**guard**, e ele é o **PR C**.
 
 **Testes reais de RLS obrigatórios**, exercitados no banco — não no guard:
 
@@ -710,29 +840,48 @@ Implementar **migrations / policies / guards** da nova política.
 | `admin` + AAL2                              | permite conforme o papel                                       |
 
 A segunda linha é a que prova o requisito da ETAPA 1. Sem ela, a exigência de
-MFA para quem optou por ele fica só no guard.
+MFA para quem optou por ele fica só no guard. No banco, essa linha já está
+coberta: `operador_elegivel_aal1()` exige `mfa_bloqueia_excecao_aal1() = false`,
+e o caso correspondente do teste `009` a exercita.
 
-### ETAPA 3
+### ETAPA 3 → **PR D**
 
 **Backend administrativo de usuários:** listar · convidar por e-mail · atribuir
 papel · alterar papel · remover acesso · **impedir remoção ou rebaixamento do
 último admin** · auditoria.
 
-Operações privilegiadas **exclusivamente server-side**.
+Mais **atribuir e remover operações do `operacional`** e **consultar as
+atribuições** — é a escrita em `user_operation_access`, que hoje só existe por
+SQL. Operações privilegiadas **exclusivamente server-side**; nunca expor
+`service_role` no navegador; nunca autorizar por parâmetro vindo do browser;
+convite por e-mail, sem self-signup. **Isto faz parte do MVP** (seção 7.0).
 
-### ETAPA 4
+### ETAPA 4 → **PR E**
 
-Tela **`/usuarios`**, somente para admin.
+Tela **`/usuarios`**, somente para admin: visualizar, convidar, definir
+admin/operacional, alterar papel, remover acesso e atribuir operações ao
+operacional. **Bloqueio server-side obrigatório.**
 
-### ETAPA 5
+### ETAPA 5 → **PR F**
 
 **Configurações → Segurança:** estado do MFA · `operacional` pode ativar · admin
 permanece obrigatório · política de desativação protegida **no backend**.
 
-### ETAPA 6
+### ETAPA 6 → **PR G**
 
 **Matriz E2E completa** antes do segundo usuário real — incluindo a variante de
 recovery **sem MFA**, que ainda não foi exercitada (seção 4.3).
+
+A matriz aprovada: admin em AAL1 bloqueado · admin em AAL2 permitido ·
+`operacional` sem MFA em AAL1 · `operacional` com fator verificado em AAL1
+**bloqueado** · `operacional` com MFA em AAL2 · conta sem papel ·
+`admin`+`operacional` · operação atribuída · operação não atribuída · operação
+sem turno · apontamento · folha fechada · financeiro inacessível · rotas
+administrativas bloqueadas · convite · papel · último admin · recuperação de
+acesso · logout/login · MFA · auditoria.
+
+**Não criar o segundo usuário real — o primeiro `operacional` — antes deste
+gate.**
 
 ## 8. AAL2 / RLS — estado em vigor
 
@@ -1078,8 +1227,10 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 ## 11. Não fazer
 
 - Não reconstruir o Supabase de novo.
-- Não reaplicar migrations já aplicadas — Production tem **18 aplicadas**, e a
-  **013 do PR B1 ainda não foi implantada**.
+- Não reaplicar migrations já aplicadas — Production tem as **19**, a `013`
+  inclusive.
+- **Não editar migration aplicada, em nenhuma hipótese.** `010`, `011`, `012` e
+  `013` são **imutáveis**; mudança de banco exige migration nova.
 - **Não afrouxar as proteções de `010`/`011`** (seção 9): não devolver
   autoridade de cálculo ao payload, não reabrir `UPDATE`/`DELETE` de linha
   faturada, não devolver `TRUNCATE` a `anon`, `authenticated` ou `service_role`.
@@ -1090,13 +1241,19 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 - Não modificar DNS sem confirmação.
 - Não adicionar enforcement AAL2 em `user_roles`.
 - **Não remover a policy AAL2 global sem substituição segura** (seção 6.3).
-- **Não criar usuário `operacional` real** antes dos PRs A, B1, B2 e C e da
-  matriz E2E da ETAPA 6 (seções 6.3 e 7).
+- **Não criar usuário `operacional` real** antes de B2.1, B2.2, B2.3, PR C, PR
+  D, PR E, PR F e da matriz E2E do **PR G** (seções 6.3, 7 e 7.3).
 - **Não afrouxar a superfície do PR B1** (seção 7.2): não acrescentar coluna
   financeira, `client_id`, documento ou telefone ao retorno das RPCs; não
   aceitar campo novo no JSON da escrita sem decisão de produto; não criar RPC de
   exclusão; não conceder `EXECUTE` dos helpers a `authenticated`; não abrir
   `user_operation_access` a quem não é admin em AAL2.
+- **Não reabrir as sete decisões congeladas do B2** (seção 7.3): fonte de dados
+  por papel, tela operacional separada, fechar/reabrir só de admin, nada de
+  fallback para operação sem turno, `admin`+`operacional` tratado como admin,
+  MFA opcional só no PR C, e os types gerados conferidos antes de sobrescrever.
+- **Não transformar o frontend em autoridade de segurança**, no B2 ou depois: o
+  banco continua sendo a fonte de verdade, e `nextLevel` não é enforcement.
 - Não alterar as quatro linhas `if (…) return falharDepoisDeVerificar()` sem
   entender o guardrail que elas sustentam (seção 4.2).
 - Não reabrir a hipótese PKCE do recovery — foi refutada pelo fonte (seção 5).
@@ -1109,7 +1266,7 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
    autorização;
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
-5. continue da seção **7 — Próximas etapas oficiais**: o **PR A** está em
-   Production, o **PR B1** está implementado e pendente de deploy, e o próximo
-   passo é o **PR B2** (interface consumindo a superfície);
+5. continue da seção **7 — Próximas etapas oficiais**: **PR A** e **PR B1**
+   estão em Production, e o próximo passo é o **B2.1** — a camada de dados
+   operacional da seção 7.3, sem UI, sem guard e sem tocar no banco;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.
