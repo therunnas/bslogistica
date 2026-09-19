@@ -14,8 +14,8 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | Próximo passo      | **migration `014`** — dívida bloqueante da seção 7.4                |
-| `014`              | **EM PREFLIGHT**, não implementada                                  |
-| B2.2               | não iniciado                                                        |
+| `014`              | **IMPLEMENTADA em PR** — ainda não aplicada em Production           |
+| B2.2               | próximo, depois do deploy da `014`                                  |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -317,19 +317,19 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR        | Entrega                                                                                                                               | Estado                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**            |
-| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**            |
-| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **PRÓXIMO PASSO**            |
-| **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **BLOQUEANTE**, em preflight |
-| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | aprovado, não iniciado       |
-| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado       |
-| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado       |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado       |
-| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado       |
-| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado       |
-| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado       |
+| PR        | Entrega                                                                                                                               | Estado                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**      |
+| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**      |
+| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **PRÓXIMO PASSO**      |
+| **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **BLOQUEANTE**, em PR  |
+| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | aprovado, não iniciado |
+| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado |
+| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado |
+| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado |
+| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado |
 
 Sequência obrigatória: **B2.1 → 014 → B2.2 → B2.3 → PR C → PR D → PR E → PR F →
 PR G**. A `014` entrou no meio depois do achado da seção 7.4: ela é **PR
@@ -829,16 +829,40 @@ menos em vez de a mais, e por isso é menos urgente, mas é o mesmo defeito.
 **Nada foi corrigido no PR do B2.1, de propósito.** A `013` está em Production e
 é imutável, como a `010`, a `011` e a `012`.
 
-#### Escopo proposto da migration `014`
+#### A migration `014` — IMPLEMENTADA em PR, não aplicada em Production
 
-**Não implementada. Estado: EM PREFLIGHT.** PR próprio, logo após o merge do
-B2.1 — já feito — e **antes** do B2.2.
+Arquivo: `supabase/migrations/20260918180000_014_hardening_break_minutes.sql`.
+Teste: `supabase/tests/010_hardening_break_minutes.sql`, 44 casos.
 
-O preflight vive em `supabase/preflight/014_break_minutes_preflight.sql`. **Não
-é migration**: o CLI só aplica `supabase/migrations/`, e o arquivo abre
-transação `READ ONLY` e termina em `rollback`. Ele mede quantas linhas já
-violariam cada constraint candidata, porque um `CHECK` sobre tabela com linha
-violando falha na aplicação — e linha faturada é imutável desde a `011`.
+**O preflight foi rodado contra Production em 18/09/2026**, em transação
+`READ ONLY`, pelo arquivo `supabase/preflight/014_break_minutes_preflight.sql`
+— que **não é migration**: o CLI só aplica `supabase/migrations/`. Resultado:
+
+| Tabela              | linhas | negativos | faturados afetados |
+| ------------------- | ------ | --------- | ------------------ |
+| `timesheet_entries` | **0**  | 0         | 0                  |
+| `shifts`            | **0**  | 0         | 0                  |
+
+**Production não tem dado incompatível.** Sem legado, não há saneamento a
+fazer, não há histórico faturado a proteger e `NOT VALID` seguido de
+`VALIDATE CONSTRAINT` só acrescentaria cerimônia — a `014` usa
+`ADD CONSTRAINT` simples.
+
+**O que ela faz:** duas constraints nomeadas,
+`timesheet_entries_break_minutes_nao_negativo` e
+`shifts_break_minutes_nao_negativo`, ambas `CHECK (break_minutes >= 0)`, mais um
+bloco de autoverificação que recusa a aplicação se alguma delas não ficar de pé.
+
+**O que ela NÃO faz, de propósito:** não impõe teto — nem 1440 nem "maior que a
+jornada" —, não cria trigger, não altera `salvar_apontamento_operacional`, não
+toca em policy, grant, ownership nem na fórmula financeira. A violação sobe como
+`23514`, e a camada de dados do B2.1 já preserva `code`, `details` e `hint`; a
+mensagem amigável é UX de etapa posterior, não a autoridade da regra.
+
+**O teto continua aberto** como decisão separada: teto estrutural (`break_minutes`
+maior que a duração bruta) exigiria trigger, porque um `CHECK` de
+`timesheet_entries` não enxerga o turno; teto comercial depende de decisão
+humana. Nenhum dos dois foi inventado aqui.
 
 1. `CHECK (break_minutes >= 0)` em `timesheet_entries`, e a decisão sobre
    `shifts` — provavelmente o mesmo CHECK, pelo efeito inverso acima;
