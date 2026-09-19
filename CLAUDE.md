@@ -52,7 +52,7 @@ src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
 supabase/migrations/         21 arquivos, todos em Production e imutáveis
-supabase/tests/              9 testes SQL de RLS, invariáveis, fontes, MFA e
+supabase/tests/              11 testes SQL de RLS, invariáveis, fontes, MFA e
                              superfície operacional
 ```
 
