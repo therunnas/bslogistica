@@ -4,15 +4,23 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 ## 1. Checkpoint
 
-| Item           | Valor                                              |
-| -------------- | -------------------------------------------------- |
-| Data           | 2026-09-18                                         |
-| Branch atual   | `docs/checkpoint-b1-em-production` — só documentos |
-| `main`         | `f238127281e9eaba7d0a6b81e3448dc3d0f7086f`         |
-| `origin/main`  | `f238127` — idêntico ao `main` local               |
-| Production     | **verde** no commit `f238127`                      |
-| Migrations     | **19 locais = 19 em Production**, zero pendentes   |
-| Usuários reais | **um**: o administrador, com TOTP verificado       |
+| Item               | Valor                                                               |
+| ------------------ | ------------------------------------------------------------------- |
+| Data do checkpoint | 2026-09-18                                                          |
+| Último marco       | **PR #28** — checkpoint documental do B1                            |
+| Merge do marco     | `a4b8ed73867b1d0c7492bc1a418b633f80ef05d6` — merge commit do PR #28 |
+| B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
+| Migrations         | **19 locais = 19 em Production**, zero pendentes                    |
+| Usuários reais     | **um**: o administrador, com TOTP verificado                        |
+| Próximo passo      | **B2.1** — camada de dados operacional (seção 7.3)                  |
+| B2.1               | **NÃO INICIADO**                                                    |
+
+O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
+atual da `main`", e não deve ser lido como tal.
+
+> **Branch e HEAD atuais são estado do Git** e devem ser consultados com
+> `git status` e `git rev-parse`; não são persistidos neste checkpoint para
+> evitar autorreferência obsoleta.
 
 | Frente                               | Merge     | Estado                                       |
 | ------------------------------------ | --------- | -------------------------------------------- |
