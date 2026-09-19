@@ -17,7 +17,8 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | B2.2               | **CONCLUÍDO** — PR #32, mergeado                                    |
 | B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
 | `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS               |
-| Etapa atual        | **PR C** — guard role-aware, **EM REVISÃO** (ver 7.6)               |
+| PR C               | **CONCLUÍDO** — PR #37, mergeado. Ver 7.6                           |
+| Etapa atual        | **PR D** — backend administrativo de usuários, não iniciado         |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -333,8 +334,8 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **CONCLUÍDO** — PR #32     |
 | **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **CONCLUÍDO** — PR #33     |
 | **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **EM PRODUCTION** — PR #34 |
-| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **EM REVISÃO** — ver 7.6   |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado     |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **CONCLUÍDO** — PR #37     |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | **PRÓXIMA ETAPA**          |
 | **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
 | **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
 | **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado     |
@@ -1015,9 +1016,11 @@ direta de tabela, e **nenhuma superfície financeira foi ampliada**.
 
 ### 7.6 PR C — o guard role-aware
 
-**Em revisão. Não mergeado, não implantado.** Sem migration: a `012` já dá o
+**CONCLUÍDO — PR #37, mergeado.** Sem migration: a `012` já dá o
 indicador confiável de MFA e a `015` já aceita o operador elegível em AAL1 ou
-AAL2. Este PR só ensina o servidor Next a decidir igual.
+AAL2. Este PR só ensinou o servidor Next a decidir igual. **Vai a Production no
+próximo deploy da `main` pela Vercel** — não depende de migration nem de
+alteração de banco.
 
 **A política, como ficou escrita em `decidirAcesso`:**
 
@@ -1081,13 +1084,15 @@ trigger, tela operacional nem regra financeira, e não abre caminho para o PR D.
 O operador em AAL1 continua alcançando **zero linha** pelo PostgREST: a única
 porta segue sendo a RPC, e quem a governa é o banco.
 
-**Duas notas para a revisão:**
+**Duas notas registradas na revisão, e aprovadas:**
 
-1. a matriz enviada dizia `admin + aal1 -> mfa-pendente` sem distinguir o estado
-   do fator. Aplicar isso ao pé da letra quebraria o cadastro do primeiro fator
-   de um admin novo: `decidirFluxoMfa` recusa cadastrar quando a etapa é
-   `mfa-pendente` e não há fator verificado. Por isso o admin sem fator recebe
-   `mfa-ausente` — que também **não** libera, e também vai para `/mfa`;
+1. **`admin` + `aal1` sem fator devolve `mfa-ausente`** — decisão **aprovada**
+   na revisão do PR #37, e que não deve ser alterada. As duas situações fecham
+   o painel e mandam para `/mfa`; o que muda é o fluxo que a tela abre:
+   `mfa-ausente` cadastra o primeiro fator, `mfa-pendente` desafia um fator já
+   verificado. Forçar `mfa-pendente` quebraria o cadastro inicial de um admin
+   novo, porque `decidirFluxoMfa` trata esse caso como `sem-fator-esperado`. A
+   política continua intacta: **admin nunca é liberado em AAL1**;
 2. um `operacional` sem fator agora é `liberado`, e `/mfa` devolve quem está
    `liberado` para o painel. Ou seja: **ainda não existe caminho para ele
    ativar MFA por vontade própria** — isso é o **PR F** (Configurações →
@@ -1607,6 +1612,6 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 4. não reaudite todo o projeto sem necessidade;
 5. continue da seção **7 — Próximas etapas oficiais**: **PR A**, **PR B1**,
    **B2.1**, **`014`**, **B2.2**, **B2.3** e a **`015`** estão fechados e em
-   Production; o **PR C** — guard role-aware, seção 7.6 — está **em revisão**,
-   e depois dele vêm **PR D → PR E → PR F → PR G**;
+   Production, e o **PR C** — guard role-aware, seção 7.6 — está mergeado; o
+   próximo passo é o **PR D**, seguido de **PR E → PR F → PR G**;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.
