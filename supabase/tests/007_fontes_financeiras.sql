@@ -244,7 +244,17 @@ insert into public.operation_team (operation_id, shift_id, employee_id) values
 
 
 -- ---------------------------------------------------------------------------
--- J1..J13. OPERACIONAL — colunas e autorização
+-- J1..J13. OPERACIONAL — a RLS impede antes do trigger (migration 016)
+--
+-- CONTRATO ATUALIZADO. Antes da `016`, o operador ALCANÇAVA estas linhas — pela
+-- permissiva por `is_staff()`, verdadeira para qualquer papel — e era o
+-- TRIGGER quem o recusava, com 42501. A `016` acrescentou a exigência de
+-- `admin` para acesso direto, então agora ele nem chega lá: o UPDATE não
+-- encontra linha e o INSERT morre na WITH CHECK.
+--
+-- A proteção do trigger NÃO foi perdida nesta suíte: o bloco seguinte,
+-- `J1a..J11a`, repete cada tentativa como ADMIN — que alcança a linha — e mede
+-- que a recusa com 42501 continua de pé. Duas camadas, medidas separadamente.
 -- ---------------------------------------------------------------------------
 
 do $operacional_bloqueios$
@@ -262,7 +272,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J1. operacional altera agreed_amount', 'recusou 42501', _e);
+  perform pg_temp.registrar('J1. operacional nao alcanca agreed_amount', 'sem efeito', _e);
 
   begin
     update public.operations set contract_id = '33333333-3333-4333-8333-333333333335'
@@ -270,7 +280,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J2. operacional altera contract_id', 'recusou 42501', _e);
+  perform pg_temp.registrar('J2. operacional nao alcanca contract_id', 'sem efeito', _e);
 
   begin
     update public.shifts set start_time = '04:00:00'
@@ -278,7 +288,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J3. operacional altera shifts.start_time', 'recusou 42501', _e);
+  perform pg_temp.registrar('J3. operacional nao alcanca shifts.start_time', 'sem efeito', _e);
 
   begin
     update public.shifts set end_time = '08:00:00'
@@ -286,7 +296,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J4. operacional altera shifts.end_time', 'recusou 42501', _e);
+  perform pg_temp.registrar('J4. operacional nao alcanca shifts.end_time', 'sem efeito', _e);
 
   begin
     update public.shifts set break_minutes = 0
@@ -294,7 +304,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J5. operacional altera shifts.break_minutes', 'recusou 42501', _e);
+  perform pg_temp.registrar('J5. operacional nao alcanca shifts.break_minutes', 'sem efeito', _e);
 
   begin
     update public.shifts set crosses_midnight = true
@@ -302,7 +312,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J6. operacional altera crosses_midnight', 'recusou 42501', _e);
+  perform pg_temp.registrar('J6. operacional nao alcanca crosses_midnight', 'sem efeito', _e);
 
   begin
     update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444a1'
@@ -310,7 +320,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J7. operacional altera shifts.operation_id', 'recusou 42501', _e);
+  perform pg_temp.registrar('J7. operacional nao alcanca shifts.operation_id', 'sem efeito', _e);
 
   begin
     update public.timesheets set operation_id = '44444444-4444-4444-8444-4444444444a1'
@@ -318,7 +328,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J8. operacional altera timesheets.operation_id', 'recusou 42501', _e);
+  perform pg_temp.registrar('J8. operacional nao alcanca timesheets.operation_id', 'sem efeito', _e);
 
   begin
     update public.timesheets set shift_id = null
@@ -326,7 +336,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J9. operacional altera timesheets.shift_id', 'recusou 42501', _e);
+  perform pg_temp.registrar('J9. operacional nao alcanca timesheets.shift_id', 'sem efeito', _e);
 
   -- INSERT/DELETE barrados pela RLS não levantam erro no DELETE: a cláusula
   -- USING apenas remove as linhas. Por isso o DELETE confere linhas afetadas.
@@ -361,11 +371,82 @@ end;
 $operacional_bloqueios$;
 
 
+
+
 -- ---------------------------------------------------------------------------
--- J14..J21. OPERACIONAL — o que tem de continuar funcionando
+-- J7a..J9a. ADMIN — o congelamento real, medido em quem alcança a linha
+--
+-- Este bloco existe por causa da `016`. Os casos J1..J9 acima mediam o
+-- operador chegando ao trigger e sendo recusado; agora a RLS o impede antes, e
+-- a recusa dele virou "sem efeito". Isso NÃO perde cobertura de trigger:
+--
+--   - J1..J6 (agreed_amount, contract_id, jornada do turno) nunca foram
+--     congelamento, e sim autorização por papel — o guard isenta admin de
+--     propósito, porque aí se perde proveniência e não dinheiro. O lado do
+--     admin já é medido em J29 e J30, que continuam onde estavam;
+--   - o que era congelamento de verdade é o que segue aqui: remapear turno de
+--     operação, e mexer no vínculo de uma folha COM apontamento faturado.
+--     Nenhum dos três estava medido para o admin antes.
 -- ---------------------------------------------------------------------------
 
-do $operacional_permitido$
+do $admin_congelamento$
+declare
+  _e text;
+  _n integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  -- Remapear o turno para outra operação é recusado por CHECK, não por guard:
+  -- o SQLSTATE é `23514` e vale para qualquer papel que alcance a linha.
+  begin
+    update public.shifts set operation_id = '44444444-4444-4444-8444-4444444444c1'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J7a. admin remapeia turno de operação', 'erro 23514', _e);
+
+  begin
+    update public.timesheets set operation_id = '44444444-4444-4444-8444-4444444444c1'
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J8a. admin altera operation_id de folha faturada', 'recusou 42501', _e);
+
+  begin
+    update public.timesheets set shift_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'
+     where id = '66666666-6666-4666-8666-6666666666a1';
+    get diagnostics _n = row_count; _e := case when _n > 0 then 'alterou' else 'sem efeito' end;
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J9a. admin altera shift_id de folha faturada', 'recusou 42501', _e);
+end;
+$admin_congelamento$;
+
+-- ---------------------------------------------------------------------------
+-- J14..J21. OPERACIONAL — o que ele fazia direto, e não faz mais
+--
+-- CONTRATO REVOGADO PELA MIGRATION 016. Este bloco media o caminho direto do
+-- operador na tabela: renomear operação e turno, criar e fechar folha, apagar
+-- apontamento não faturado, mexer em `operation_team`. Nada disso vinha do
+-- papel `operacional` — vinha da permissiva por `is_staff()`, verdadeira para
+-- qualquer papel atribuído, de quando `admin` era o único papel existente.
+--
+-- Desde a `013`/`015` o caminho do operador é a superfície estreita de RPC, e
+-- a `016` fecha a porta larga: acesso direto exige `aal2` E `admin`. O que ele
+-- de fato precisa fazer — apontar presença, entrada, saída e intervalo —
+-- continua funcionando por `salvar_apontamento_operacional`, medido em `009`,
+-- `011` e `012`.
+--
+-- O que era comportamento LEGÍTIMO aqui não se perdeu: os casos J14a..J18a,
+-- logo abaixo, repetem como ADMIN o que não estava coberto em J28..J33 — em
+-- especial o J18, que guarda um falso positivo real do guard financeiro.
+-- ---------------------------------------------------------------------------
+
+do $operacional_sem_acesso_direto$
 declare
   _e text;
   _n integer;
@@ -379,33 +460,31 @@ begin
      where id = '44444444-4444-4444-8444-4444444444b1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J14. operacional edita name/site/notes da operação', '1 linhas', _e);
+  perform pg_temp.registrar('J14. operacional NAO edita name/site/notes da operação', '0 linhas', _e);
 
   begin
     update public.shifts set name = 'Turno renomeado'
      where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J15. operacional edita name do turno', '1 linhas', _e);
+  perform pg_temp.registrar('J15. operacional NAO edita name do turno', '0 linhas', _e);
 
-  -- O fluxo diário: a tela de apontamento cria a folha quando não existe.
   begin
     insert into public.timesheets (id, operation_id, shift_id, work_date, status)
     values ('66666666-6666-4666-8666-6666666666c1', '44444444-4444-4444-8444-4444444444b1',
             'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date - 1, 'open');
     _e := 'criou';
-  exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J16. operacional cria folha (fluxo diário)', 'criou', _e);
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J16. operacional NAO cria folha direto', 'recusou 42501', _e);
 
   begin
     update public.timesheets set status = 'closed'
      where id = '66666666-6666-4666-8666-6666666666c1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J17. operacional muda status da folha', '1 linhas', _e);
+  perform pg_temp.registrar('J17. operacional NAO muda status da folha', '0 linhas', _e);
 
-  -- Falso positivo: a tela reenvia o objeto inteiro a cada gravação, então
-  -- campo protegido IGUAL ao OLD não pode ser recusado.
   begin
     update public.operations
        set name = 'OP-B v2',
@@ -414,19 +493,104 @@ begin
      where id = '44444444-4444-4444-8444-4444444444b1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J18. reenvio de protegidos IGUAIS ao OLD é aceito', '1 linhas', _e);
+  perform pg_temp.registrar('J18. operacional NAO reenvia o objeto da operação', '0 linhas', _e);
 
   begin
     delete from public.timesheet_entries where id = '77777777-7777-4777-8777-7777777777c1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J19. operacional apaga apontamento NÃO faturado', '1 linhas', _e);
+  perform pg_temp.registrar('J19. operacional NAO apaga apontamento não faturado', '0 linhas', _e);
 
   begin
     delete from public.timesheets where id = '66666666-6666-4666-8666-6666666666c1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J20. operacional apaga folha SEM faturamento', '1 linhas', _e);
+  perform pg_temp.registrar('J20. operacional NAO apaga folha sem faturamento', '0 linhas', _e);
+
+  begin
+    insert into public.operation_team (operation_id, employee_id)
+    values ('44444444-4444-4444-8444-4444444444b1', '55555555-5555-4555-8555-5555555555d1');
+    _e := 'inseriu';
+  exception when insufficient_privilege then _e := 'recusou 42501';
+            when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J21. operation_team deixou de ser livre para staff', 'recusou 42501', _e);
+end;
+$operacional_sem_acesso_direto$;
+
+
+-- ---------------------------------------------------------------------------
+-- J14a..J18a. ADMIN — o comportamento legítimo que estava só no bloco acima
+--
+-- Os casos J28..J33 já cobrem o admin criando operação, alterando
+-- contract_id/agreed_amount e jornada, e apagando o que não tem histórico
+-- faturado. O que NÃO estava coberto e vinha do bloco do operador vem para cá:
+-- renomear operação e turno, o fluxo diário de criar e fechar folha, apagar
+-- apontamento não faturado, `operation_team`, e — o mais importante — o falso
+-- positivo do guard: a tela reenvia o objeto inteiro a cada gravação, então
+-- campo protegido IGUAL ao OLD não pode ser recusado.
+-- ---------------------------------------------------------------------------
+
+do $admin_permitido$
+declare
+  _e text;
+  _n integer;
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+  execute 'set local role authenticated';
+
+  begin
+    update public.operations set name = 'OP-B renomeada', site = 'Pátio 2', notes = 'obs'
+     where id = '44444444-4444-4444-8444-4444444444b1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J14a. admin edita name/site/notes da operação', '1 linhas', _e);
+
+  begin
+    update public.shifts set name = 'Turno renomeado'
+     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J15a. admin edita name do turno', '1 linhas', _e);
+
+  begin
+    insert into public.timesheets (id, operation_id, shift_id, work_date, status)
+    values ('66666666-6666-4666-8666-6666666666c1', '44444444-4444-4444-8444-4444444444b1',
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date - 1, 'open');
+    _e := 'criou';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J16a. admin cria folha (fluxo diário)', 'criou', _e);
+
+  begin
+    update public.timesheets set status = 'closed'
+     where id = '66666666-6666-4666-8666-6666666666c1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J17a. admin muda status da folha', '1 linhas', _e);
+
+  -- O falso positivo que não pode voltar: reenviar campo protegido com o mesmo
+  -- valor do OLD é gravação normal da tela, não tentativa de fraude.
+  begin
+    update public.operations
+       set name = 'OP-B v2',
+           contract_id = '33333333-3333-4333-8333-333333333334',
+           agreed_amount = 250
+     where id = '44444444-4444-4444-8444-4444444444b1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J18a. reenvio de protegidos IGUAIS ao OLD é aceito', '1 linhas', _e);
+
+  begin
+    delete from public.timesheet_entries where id = '77777777-7777-4777-8777-7777777777c1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J19a. admin apaga apontamento NÃO faturado', '1 linhas', _e);
+
+  begin
+    delete from public.timesheets where id = '66666666-6666-4666-8666-6666666666c1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J20a. admin apaga folha SEM faturamento', '1 linhas', _e);
 
   begin
     insert into public.operation_team (operation_id, employee_id)
@@ -435,10 +599,9 @@ begin
      where operation_id = '44444444-4444-4444-8444-4444444444b1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J21. operation_team segue livre para staff', '1 linhas', _e);
+  perform pg_temp.registrar('J21a. operation_team segue livre para o admin', '1 linhas', _e);
 end;
-$operacional_permitido$;
-
+$admin_permitido$;
 
 -- ---------------------------------------------------------------------------
 -- J22..J27, J37, J38. LASTRO FATURADO — absoluto, para todos os papéis
@@ -458,14 +621,14 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas (RLS)' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J22. operacional apaga apontamento FATURADO', 'recusou 42501', _e);
+  perform pg_temp.registrar('J22. operacional apaga apontamento FATURADO', '0 linhas (RLS)', _e);
 
   begin
     delete from public.timesheets where id = '66666666-6666-4666-8666-6666666666a1';
     get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas (RLS)' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J24. operacional apaga folha com apontamento faturado', 'recusou 42501', _e);
+  perform pg_temp.registrar('J24. operacional apaga folha com apontamento faturado', '0 linhas (RLS)', _e);
 
   -- J23, J25, J26, J27. ADMIN também não pode
   perform set_config('request.jwt.claims', json_build_object(
@@ -683,6 +846,7 @@ declare
   _total   numeric;
   _e       text;
   _billed  numeric;
+  _n integer;
 begin
   execute 'reset role';
 
@@ -705,7 +869,8 @@ begin
   begin
     update public.operations set agreed_amount = 999999
      where id = '44444444-4444-4444-8444-4444444444a1';
-    _e := 'passo 1 passou';
+    get diagnostics _n = row_count;
+    _e := case when _n > 0 then 'passo 1 passou' else 'bloqueado no passo 1' end;
   exception when insufficient_privilege then _e := 'bloqueado no passo 1';
             when others then _e := 'erro ' || sqlstate; end;
   perform pg_temp.registrar('J35. ataque via agreed_amount', 'bloqueado no passo 1', _e);
@@ -713,7 +878,8 @@ begin
   begin
     update public.shifts set end_time = '08:00:00', break_minutes = 0
      where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
-    _e := 'passo 1 passou';
+    get diagnostics _n = row_count;
+    _e := case when _n > 0 then 'passo 1 passou' else 'bloqueado no passo 1' end;
   exception when insufficient_privilege then _e := 'bloqueado no passo 1';
             when others then _e := 'erro ' || sqlstate; end;
   perform pg_temp.registrar('J36. ataque via jornada do turno', 'bloqueado no passo 1', _e);
@@ -781,16 +947,26 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
+  -- J49 continua sendo sobre o OPERADOR, e o motivo mudou de lugar: o `42501`
+  -- que ele recebia aqui vinha do guard recusando quem não é admin, e não de
+  -- congelamento — OP-B não tem histórico faturado (a faturada é OP-A, medida
+  -- em J52). Desde a `016` ele nem alcança a linha. O congelamento de verdade,
+  -- para o admin, é J52; o lado administrativo legítimo é J51.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   begin
     update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
      where id = '44444444-4444-4444-8444-4444444444b1';
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J49. operacional muda operations.client_id', 'recusou 42501', _e);
+  perform pg_temp.registrar('J49. operacional NAO muda operations.client_id', '0 linhas', _e);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
 
   -- Mesmo falso positivo de J18: a tela reenvia o objeto inteiro, e reenviar
   -- `client_id` IGUAL ao OLD junto de uma edição legítima não pode ser recusado.
@@ -842,7 +1018,7 @@ declare
   _e text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J53. Par VÁLIDO: é o fluxo diário e continua livre.
@@ -852,7 +1028,7 @@ begin
             'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', current_date - 2, 'open');
     _e := 'criou';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J53. operacional cria folha com par VÁLIDO', 'criou', _e);
+  perform pg_temp.registrar('J53. admin cria folha com par VÁLIDO', 'criou', _e);
 
   -- J54. Par INVÁLIDO: operação B com o turno da operação A.
   begin
@@ -863,7 +1039,7 @@ begin
   exception when check_violation then _e := 'recusou 23514';
             when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J54. operacional cria folha com par INVÁLIDO', 'recusou 23514', _e);
+  perform pg_temp.registrar('J54. admin cria folha com par INVÁLIDO', 'recusou 23514', _e);
 
   -- J55. Sem turno segue válido: a coluna é anulável no modelo atual e o
   -- painel cria folha sem turno. Esta migration não inventa proibição nova.
@@ -920,7 +1096,7 @@ declare
   _c numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -929,7 +1105,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J59. operacional muda status de entry faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J59. admin muda status de entry faturada', 'recusou 42501', _e);
 
   begin
     update public.timesheet_entries set check_in = '04:00:00'
@@ -937,7 +1113,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J60. operacional muda check_in de entry faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J60. admin muda check_in de entry faturada', 'recusou 42501', _e);
 
   begin
     update public.timesheet_entries set check_out = '23:00:00'
@@ -945,7 +1121,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J61. operacional muda check_out de entry faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J61. admin muda check_out de entry faturada', 'recusou 42501', _e);
 
   begin
     update public.timesheet_entries set break_minutes = 0
@@ -953,7 +1129,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J62. operacional muda break_minutes de entry faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J62. admin muda break_minutes de entry faturada', 'recusou 42501', _e);
 
   begin
     update public.timesheet_entries set employee_id = '55555555-5555-4555-8555-5555555555d1'
@@ -961,7 +1137,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J63. operacional muda employee_id de entry faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J63. admin muda employee_id de entry faturada', 'recusou 42501', _e);
 
   begin
     update public.timesheet_entries set timesheet_id = '66666666-6666-4666-8666-6666666666b1'
@@ -969,7 +1145,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J64. operacional muda timesheet_id de entry faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J64. admin muda timesheet_id de entry faturada', 'recusou 42501', _e);
 
   -- Descritivo também: um histórico faturado não muda de narrativa em silêncio.
   begin
@@ -978,7 +1154,7 @@ begin
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J65. operacional muda notes de entry faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J65. admin muda notes de entry faturada', 'recusou 42501', _e);
 
   -- J66..J68. E não é questão de papel.
   perform set_config('request.jwt.claims', json_build_object(
@@ -1023,7 +1199,7 @@ begin
   -- J69. Falso positivo: a tela reenvia o objeto inteiro. Reenviar os MESMOS
   -- valores não pode virar 42501, nem em linha faturada.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries
@@ -1087,14 +1263,14 @@ begin
 
   -- J73. operacional
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   begin
     update public.timesheets set work_date = current_date - 41
      where id = '66666666-6666-4666-8666-6666666666a1';
     get diagnostics _n = row_count; _e := case when _n > 0 then 'ALTEROU' else '0 linhas' end;
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J73. operacional muda work_date de folha faturada', 'recusou 42501', _e);
+  perform pg_temp.registrar('J73. admin muda work_date de folha faturada', 'recusou 42501', _e);
 
   -- J75, J76. service_role e postgres
   execute 'reset role';
@@ -1402,7 +1578,7 @@ begin
   -- J96. operacional continua barrado, como já era.
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999991'
@@ -1410,7 +1586,7 @@ begin
     _e := 'VINCULOU';
   exception when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J96. operacional cria vínculo direto', 'recusou 42501', _e);
+  perform pg_temp.registrar('J96. admin cria vínculo direto', 'recusou 42501', _e);
 
   -- J97. A fronteira é `current_user`, não papel. Como `postgres` — o mesmo
   -- contexto de `gerar_fatura` — o vínculo passa. Sem este caso a proteção
@@ -1525,7 +1701,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J105. Par VÁLIDO: alocação na OP-F com turno da OP-F.
@@ -1539,7 +1715,7 @@ begin
             '55555555-5555-4555-8555-5555555555a1');
     _e := 'criou';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J105. operacional cria alocação com par VÁLIDO', 'criou', _e);
+  perform pg_temp.registrar('J105. admin cria alocação com par VÁLIDO', 'criou', _e);
 
   -- J106. Par INVÁLIDO no INSERT.
   begin
@@ -1551,7 +1727,7 @@ begin
   exception when check_violation then _e := 'recusou 23514';
             when insufficient_privilege then _e := 'recusou 42501';
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J106. operacional cria alocação com par INVÁLIDO', 'recusou 23514', _e);
+  perform pg_temp.registrar('J106. admin cria alocação com par INVÁLIDO', 'recusou 23514', _e);
 
   -- J107. E o UPDATE que produziria par inválido, também para o ADMIN.
   perform set_config('request.jwt.claims', json_build_object(
@@ -1869,7 +2045,7 @@ begin
   -- UPDATE que muda só `notes` e reenvia o resto igual continua recusado —
   -- é a comparação da linha inteira funcionando sob o payload real.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries

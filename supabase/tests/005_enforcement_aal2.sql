@@ -265,38 +265,69 @@ $oper_aal1$;
 
 
 -- ---------------------------------------------------------------------------
--- D. OPERACIONAL EM AAL2 — comportamento atual preservado.
+-- D. OPERACIONAL EM AAL2 — barrado por FALTA DE ADMIN, não por AAL.
+--
+-- CONTRATO ATUALIZADO PELA MIGRATION 016. Antes dela este bloco media o
+-- oposto — que em aal2 o operador escrevia apontamento direto —, e aquilo não
+-- vinha do papel: vinha da permissiva por `public.is_staff()`, verdadeira para
+-- qualquer papel atribuído. A `016` acrescentou uma RESTRICTIVE por tabela
+-- exigindo `admin`, e acesso direto passou a ser `aal2` E `admin`.
+--
+-- O ponto desta suíte continua o mesmo: medir o enforcement de **garantia**
+-- somado ao de **autorização**. O bloco C, logo acima, prova que em aal1 ele é
+-- barrado pelo AAL; este prova que em aal2, com o AAL satisfeito, ele continua
+-- barrado — agora pelo papel. Os dois juntos são a diferença entre "falta
+-- segundo fator" e "não é administrador".
+--
+-- O caminho legítimo do operador é a superfície de RPC da `013`/`015`, medida
+-- em `009`, `011` e `012`. Nenhuma linha dela passa por policy.
 -- ---------------------------------------------------------------------------
 
 do $oper_aal2$
 declare
   _n bigint;
   _afetadas integer;
+  _bloqueou boolean;
 begin
   perform set_config('request.jwt.claims', json_build_object(
     'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   select count(*) into _n from public.timesheet_entries;
-  perform pg_temp.registrar('D. operacional aal2 SELECT timesheet_entries', 've linhas',
+  perform pg_temp.registrar('D. operacional aal2 SELECT timesheet_entries', 've 0',
                             case when _n > 0 then 've linhas' else 've 0' end);
 
-  insert into public.timesheet_entries (id, timesheet_id, employee_id, notes)
-  values ('77777777-7777-4777-8777-77777777777b',
-          '66666666-6666-4666-8666-666666666666',
-          '55555555-5555-4555-8555-555555555558', 'criado em aal2');
-  perform pg_temp.registrar('D2. operacional aal2 INSERT timesheet_entries', 'inseriu', 'inseriu');
+  -- INSERT sobe 42501 pela WITH CHECK da RESTRICTIVE; UPDATE e DELETE não
+  -- levantam, simplesmente não encontram linha. São recusas de formas
+  -- diferentes, e as duas contam.
+  _bloqueou := false;
+  begin
+    insert into public.timesheet_entries (id, timesheet_id, employee_id, notes)
+    values ('77777777-7777-4777-8777-77777777777b',
+            '66666666-6666-4666-8666-666666666666',
+            '55555555-5555-4555-8555-555555555558', 'criado em aal2');
+  exception when others then _bloqueou := true;
+  end;
+  perform pg_temp.registrar('D2. operacional aal2 INSERT timesheet_entries', 'recusado',
+                            case when _bloqueou then 'recusado' else 'inseriu' end);
 
   update public.timesheet_entries set notes = 'editado em aal2'
-   where id = '77777777-7777-4777-8777-77777777777b';
+   where id = '77777777-7777-4777-8777-777777777777';
   get diagnostics _afetadas = row_count;
-  perform pg_temp.registrar('D3. operacional aal2 UPDATE timesheet_entries', '1 linha', _afetadas || ' linha');
+  perform pg_temp.registrar('D3. operacional aal2 UPDATE timesheet_entries', '0 linhas', _afetadas || ' linhas');
 
-  delete from public.timesheet_entries where id = '77777777-7777-4777-8777-77777777777b';
+  delete from public.timesheet_entries where id = '77777777-7777-4777-8777-777777777777';
   get diagnostics _afetadas = row_count;
-  perform pg_temp.registrar('D4. operacional aal2 DELETE timesheet_entries', '1 linha', _afetadas || ' linha');
+  perform pg_temp.registrar('D4. operacional aal2 DELETE timesheet_entries', '0 linhas', _afetadas || ' linhas');
+
+  -- E o que distingue esta recusa da do bloco C: aqui o AAL está satisfeito.
+  -- Quem barra é o papel.
+  perform pg_temp.registrar('D5. o aal do operador em aal2 e aal2 mesmo', 'aal2',
+                            coalesce(auth.jwt() ->> 'aal', 'sem claim'));
+  perform pg_temp.registrar('D6. e ele nao e admin', 'false',
+                            public.has_role(auth.uid(), 'admin'::public.app_role)::text);
 exception when others then
-  perform pg_temp.registrar('D. operacional aal2 caminho feliz', 'sem erro',
+  perform pg_temp.registrar('D. operacional aal2 caminho medido', 'sem erro inesperado',
                             'erro ' || sqlstate || ': ' || sqlerrm);
 end
 $oper_aal2$;
