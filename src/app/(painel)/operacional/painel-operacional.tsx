@@ -34,11 +34,15 @@ import {
 import { PageHeader } from "../_components/app-shell";
 import {
   escolhaAutomatica,
+  faseDaTela,
   folhaEstaFechada,
+  leituraConcluida,
   linhasAlteradas,
   mensagemDeErro,
   montarRascunho,
   normalizarIntervalo,
+  podeSalvar,
+  type Leitura,
   type LinhaDoRascunho,
 } from "./_dominio";
 
@@ -55,6 +59,34 @@ function Aviso({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+/**
+ * Falha de leitura, com a saída óbvia.
+ *
+ * Erro nunca vira estado vazio: dizer "nenhum turno configurado" porque a rede
+ * caiu manda a pessoa procurar o administrador por um problema que não existe.
+ */
+function FalhaDeLeitura({ oQue, tentarDeNovo }: { oQue: string; tentarDeNovo: () => void }) {
+  return (
+    <Aviso>
+      <p>Não foi possível carregar {oQue}.</p>
+      <Button variant="outline" className="mt-4" onClick={tentarDeNovo}>
+        Tentar novamente
+      </Button>
+    </Aviso>
+  );
+}
+
+/** Traduz uma query do TanStack Query para o que a fase precisa saber. */
+const comoLeitura = <T,>(query: {
+  isPending: boolean;
+  isError: boolean;
+  data: T[] | undefined;
+}): Leitura => ({
+  pendente: query.isPending,
+  erro: query.isError,
+  quantidade: query.data?.length,
+});
 
 /**
  * Apontamento do operador.
@@ -76,7 +108,19 @@ export function PainelOperacional() {
   const [operationId, setOperationId] = useState<string | null>(null);
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [workDate, setWorkDate] = useState(todayISO());
-  const [rascunho, setRascunho] = useState<LinhaDoRascunho[] | null>(null);
+
+  /**
+   * O rascunho carrega o escopo a que pertence.
+   *
+   * Sem isso, a troca de operação, turno ou data poderia deixar linhas editadas
+   * de um dia aparecerem no outro, dependendo da ordem em que as consultas
+   * respondessem. Com o escopo junto, a pergunta "este rascunho é deste
+   * contexto?" é respondida pelo próprio dado, e não por sincronia de efeito.
+   */
+  const [rascunho, setRascunho] = useState<{
+    escopo: string;
+    linhas: LinhaDoRascunho[];
+  } | null>(null);
 
   const operacoes = useOperacoesDoOperador();
   const turnos = useTurnosDoOperador(operationId);
@@ -99,20 +143,40 @@ export function PainelOperacional() {
     [turnos.data, shiftId],
   );
 
-  const fechada = folhaEstaFechada(apontamentos.data);
+  const fase = faseDaTela({
+    operationId,
+    shiftId,
+    turnos: comoLeitura(turnos),
+    equipe: comoLeitura(equipe),
+    apontamentos: comoLeitura(apontamentos),
+  });
 
-  // O rascunho nasce do servidor e só é reconstruído quando a base muda. Sem
-  // isto, cada refetch em segundo plano apagaria o que a pessoa está digitando.
+  const pronto = leituraConcluida(fase);
+  const fechada = folhaEstaFechada(apontamentos.data);
+  const escopo = `${operationId ?? ""}|${shiftId ?? ""}|${workDate}`;
+
   const base = useMemo(
     () => montarRascunho(equipe.data, apontamentos.data, turno?.break_minutes ?? 0),
     [equipe.data, apontamentos.data, turno],
   );
 
+  /**
+   * O rascunho nasce UMA vez por escopo, e só depois que as leituras daquele
+   * escopo concluíram.
+   *
+   * As duas condições importam. Inicializar antes de a folha chegar montaria
+   * todo mundo como linha nova e deixaria salvar por cima de um estado do
+   * servidor desconhecido. E reinicializar a cada nova referência de `base`
+   * apagaria o que a pessoa está digitando toda vez que uma revalidação em
+   * segundo plano respondesse — que é exatamente o que a versão anterior fazia,
+   * apesar do comentário em contrário.
+   */
   useEffect(() => {
-    setRascunho(base);
-  }, [base]);
+    if (!pronto) return;
+    setRascunho((atual) => (atual?.escopo === escopo ? atual : { escopo, linhas: base }));
+  }, [pronto, escopo, base]);
 
-  const linhas = rascunho ?? base;
+  const linhas = rascunho?.escopo === escopo ? rascunho.linhas : base;
 
   function trocarOperacao(valor: string) {
     setOperationId(valor);
@@ -131,17 +195,20 @@ export function PainelOperacional() {
   }
 
   function editar(employeeId: string, mudanca: Partial<LinhaDoRascunho>) {
-    setRascunho((atual) =>
-      (atual ?? base).map((linha) =>
+    setRascunho((atual) => ({
+      escopo,
+      linhas: (atual?.escopo === escopo ? atual.linhas : base).map((linha) =>
         linha.employee_id === employeeId ? { ...linha, ...mudanca } : linha,
       ),
-    );
+    }));
   }
 
-  const pendentes = linhasAlteradas(linhas, apontamentos.data);
+  // Fora da fase pronta não existe payload: sem saber o que o servidor tem, não
+  // há "alterado" a calcular.
+  const pendentes = pronto ? linhasAlteradas(linhas, apontamentos.data) : [];
 
   function enviar() {
-    if (!operationId || !shiftId) return;
+    if (!operationId || !shiftId || !pronto) return;
     if (pendentes.length === 0) {
       toast.info("Nenhuma alteração para salvar.");
       return;
@@ -159,24 +226,18 @@ export function PainelOperacional() {
     );
   }
 
-  if (operacoes.isPending) return <Aviso>Carregando suas operações...</Aviso>;
+  // As três causas de "sem dados" são separadas em toda leitura: ainda não
+  // chegou, falhou, ou chegou vazio. A ordem é sempre a mesma — erro primeiro,
+  // porque erro tratado como vazio é o defeito que dá a resposta errada.
   if (operacoes.isError) {
-    return (
-      <Aviso>
-        <p>Não foi possível carregar suas operações.</p>
-        <Button variant="outline" className="mt-4" onClick={() => void operacoes.refetch()}>
-          Tentar novamente
-        </Button>
-      </Aviso>
-    );
+    return <FalhaDeLeitura oQue="suas operações" tentarDeNovo={() => void operacoes.refetch()} />;
   }
-
-  if ((operacoes.data ?? []).length === 0) {
+  if (operacoes.isPending || !operacoes.data) {
+    return <Aviso>Carregando suas operações...</Aviso>;
+  }
+  if (operacoes.data.length === 0) {
     return <Aviso>Nenhuma operação atribuída a você. Procure o administrador.</Aviso>;
   }
-
-  const semTurno = Boolean(operationId) && !turnos.isPending && (turnos.data ?? []).length === 0;
-  const semEquipe = Boolean(shiftId) && !equipe.isPending && (equipe.data ?? []).length === 0;
 
   return (
     <>
@@ -224,14 +285,31 @@ export function PainelOperacional() {
         </div>
       </div>
 
+      {fase === "erro-turnos" ? (
+        <FalhaDeLeitura oQue="os turnos" tentarDeNovo={() => void turnos.refetch()} />
+      ) : null}
+
+      {fase === "erro-equipe" ? (
+        <FalhaDeLeitura oQue="a equipe" tentarDeNovo={() => void equipe.refetch()} />
+      ) : null}
+
+      {/* A leitura da folha é a que diz o que já existe no servidor. Falhou, a
+          tela não monta tabela editável nem calcula payload: montar todo mundo
+          como linha nova permitiria gravar por cima de um estado desconhecido. */}
+      {fase === "erro-apontamentos" ? (
+        <FalhaDeLeitura oQue="os apontamentos" tentarDeNovo={() => void apontamentos.refetch()} />
+      ) : null}
+
+      {fase === "carregando" ? <Aviso>Carregando...</Aviso> : null}
+
       {/* A RPC de escrita exige turno, então operação sem turno não entra no
-          fluxo. Dizer isso é melhor que deixar a pessoa procurando o que
-          selecionar. */}
-      {semTurno ? <Aviso>Nenhum turno configurado para esta operação.</Aviso> : null}
+          fluxo. Só aparece com a leitura concluída SEM erro e com zero turnos —
+          nunca por falha de rede. */}
+      {fase === "sem-turno" ? <Aviso>Nenhum turno configurado para esta operação.</Aviso> : null}
 
-      {semEquipe ? <Aviso>Nenhum colaborador alocado neste turno.</Aviso> : null}
+      {fase === "sem-equipe" ? <Aviso>Nenhum colaborador alocado neste turno.</Aviso> : null}
 
-      {shiftId && !semTurno && !semEquipe ? (
+      {pronto ? (
         <div className="space-y-4">
           {fechada ? (
             <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
@@ -356,7 +434,14 @@ export function PainelOperacional() {
             </span>
             <Button
               onClick={enviar}
-              disabled={fechada || salvar.isPending || pendentes.length === 0}
+              disabled={
+                !podeSalvar({
+                  fase,
+                  fechada,
+                  pendentes: pendentes.length,
+                  salvando: salvar.isPending,
+                })
+              }
             >
               {salvar.isPending ? "Salvando..." : "Salvar apontamento"}
             </Button>

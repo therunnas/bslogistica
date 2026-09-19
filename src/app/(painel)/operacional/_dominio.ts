@@ -16,6 +16,97 @@ import type {
   MembroDaEquipeDoOperador,
 } from "@/lib/operacional/tipos";
 
+/**
+ * O que a tela sabe de uma leitura.
+ *
+ * `pendente` é a leitura INICIAL, aquela em que ainda não há resposta nenhuma
+ * do servidor — e não o `isFetching`, que também fica verdadeiro durante um
+ * refetch em segundo plano com dados válidos na tela. Confundir os dois
+ * desmontaria a tabela a cada revalidação.
+ */
+export interface Leitura {
+  pendente: boolean;
+  erro: boolean;
+  /** `undefined` enquanto não houver snapshot do servidor. */
+  quantidade: number | undefined;
+}
+
+/**
+ * Em que ponto do fluxo a tela está.
+ *
+ * Existe porque "sem dados" tem TRÊS causas que não podem se confundir:
+ * ainda não chegou, falhou, ou chegou vazio. Tratar erro como lista vazia
+ * diria "nenhum turno configurado" quando a rede caiu — e, pior, no caso dos
+ * apontamentos faria toda a equipe parecer linha nova, liberando um salvamento
+ * por cima de um estado do servidor que a tela não conhece.
+ *
+ * A ordem das perguntas é a do fluxo: sem operação não se pergunta por turno,
+ * sem turno não se pergunta por equipe, e sem equipe não se pergunta pela
+ * folha.
+ */
+export type FaseDaTela =
+  | "selecionar"
+  | "carregando"
+  | "erro-turnos"
+  | "erro-equipe"
+  | "erro-apontamentos"
+  | "sem-turno"
+  | "sem-equipe"
+  | "pronto";
+
+const semSnapshot = (leitura: Leitura): boolean =>
+  leitura.pendente || leitura.quantidade === undefined;
+
+export function faseDaTela(entrada: {
+  operationId: string | null;
+  shiftId: string | null;
+  turnos: Leitura;
+  equipe: Leitura;
+  apontamentos: Leitura;
+}): FaseDaTela {
+  const { operationId, shiftId, turnos, equipe, apontamentos } = entrada;
+
+  if (!operationId) return "selecionar";
+
+  if (turnos.erro) return "erro-turnos";
+  if (semSnapshot(turnos)) return "carregando";
+  if (turnos.quantidade === 0) return "sem-turno";
+
+  if (!shiftId) return "selecionar";
+
+  if (equipe.erro) return "erro-equipe";
+  if (semSnapshot(equipe)) return "carregando";
+  if (equipe.quantidade === 0) return "sem-equipe";
+
+  // A folha é a última pergunta e a mais importante: é ela que diz o que já
+  // existe no servidor. Sem a resposta, nada é editável.
+  if (apontamentos.erro) return "erro-apontamentos";
+  if (semSnapshot(apontamentos)) return "carregando";
+
+  return "pronto";
+}
+
+/**
+ * A tabela só é editável — e o payload só existe — na fase `pronto`.
+ *
+ * É a regra que impede gravar sobre estado desconhecido do servidor: enquanto a
+ * leitura dos apontamentos não concluiu, ou falhou, não há o que comparar, e
+ * toda linha pareceria nova.
+ */
+export const leituraConcluida = (fase: FaseDaTela): boolean => fase === "pronto";
+
+/** O salvar exige tudo: fase pronta, folha aberta e alteração de verdade. */
+export function podeSalvar(entrada: {
+  fase: FaseDaTela;
+  fechada: boolean;
+  pendentes: number;
+  salvando: boolean;
+}): boolean {
+  return (
+    leituraConcluida(entrada.fase) && !entrada.fechada && !entrada.salvando && entrada.pendentes > 0
+  );
+}
+
 /** Uma linha da tabela da tela, já pronta para edição. */
 export interface LinhaDoRascunho {
   employee_id: string;

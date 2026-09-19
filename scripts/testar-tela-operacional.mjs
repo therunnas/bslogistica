@@ -29,11 +29,14 @@ import { readFileSync } from "node:fs";
 import {
   apontamentosPorColaborador,
   escolhaAutomatica,
+  faseDaTela,
   folhaEstaFechada,
+  leituraConcluida,
   linhasAlteradas,
   mensagemDeErro,
   montarRascunho,
   normalizarIntervalo,
+  podeSalvar,
 } from "../src/app/(painel)/operacional/_dominio.ts";
 
 let passou = 0;
@@ -458,9 +461,11 @@ console.log("\nG. Folha fechada e linha faturada travam a edição\n");
   const gravados = [folha({ employee_id: "e1", status: "present", folha_status: "closed" })];
   const rascunho = montarRascunho(EQUIPE, gravados, 60);
   verificar("G1. folha fechada é detectada pela leitura", folhaEstaFechada(gravados), true);
+  // A forma do botão é conferida em K2; aqui o que importa é que a folha
+  // fechada chega até a decisão, e o comportamento dela está em J4.
   verificar(
-    "G2. e a tela desabilita o salvar pela folha fechada",
-    /disabled=\{fechada \|\| salvar\.isPending \|\| pendentes\.length === 0\}/.test(fontes.tela),
+    "G2. e a folha fechada alimenta a decisão de salvar",
+    /podeSalvar\(\{\s*fase,\s*fechada,/.test(fontes.tela),
     true,
   );
   verificar(
@@ -583,6 +588,273 @@ verificar(
   /onError:[^}]*setRascunho/.test(fontes.tela),
   false,
 );
+
+console.log("\nI. Carregando, erro e vazio são três estados diferentes\n");
+
+const OK = (quantidade) => ({ pendente: false, erro: false, quantidade });
+const PENDENTE = { pendente: true, erro: false, quantidade: undefined };
+const ERRO = { pendente: false, erro: true, quantidade: undefined };
+/** Revalidação em segundo plano: já existe snapshot, `isPending` é falso. */
+const REFETCH = (quantidade) => ({ pendente: false, erro: false, quantidade });
+
+const fase = (parcial) =>
+  faseDaTela({
+    operationId: "op",
+    shiftId: "turno",
+    turnos: OK(1),
+    equipe: OK(2),
+    apontamentos: OK(0),
+    ...parcial,
+  });
+
+verificar("I1. sem operação, nada a fazer", fase({ operationId: null }), "selecionar");
+verificar("I2. sem turno escolhido, nada a fazer", fase({ shiftId: null }), "selecionar");
+
+verificar(
+  "I3. turnos carregando NÃO é turno inexistente",
+  fase({ turnos: PENDENTE }),
+  "carregando",
+);
+verificar("I4. turnos com erro NÃO é turno inexistente", fase({ turnos: ERRO }), "erro-turnos");
+verificar("I5. turnos ok e vazio é turno inexistente", fase({ turnos: OK(0) }), "sem-turno");
+
+verificar("I6. equipe carregando NÃO é equipe vazia", fase({ equipe: PENDENTE }), "carregando");
+verificar("I7. equipe com erro NÃO é equipe vazia", fase({ equipe: ERRO }), "erro-equipe");
+verificar("I8. equipe ok e vazia é equipe vazia", fase({ equipe: OK(0) }), "sem-equipe");
+
+// O caso que motivou a correção: com a folha ainda não lida, toda a equipe
+// pareceria linha nova e o salvar ficaria disponível sobre estado desconhecido.
+verificar(
+  "I9. apontamentos carregando trava a tela",
+  fase({ apontamentos: PENDENTE }),
+  "carregando",
+);
+verificar(
+  "I10. apontamentos com erro trava a tela",
+  fase({ apontamentos: ERRO }),
+  "erro-apontamentos",
+);
+verificar(
+  "I11. sem snapshot da folha, ainda que sem pendência, trava",
+  fase({ apontamentos: { pendente: false, erro: false, quantidade: undefined } }),
+  "carregando",
+);
+verificar("I12. folha vazia é fase pronta, não erro", fase({ apontamentos: OK(0) }), "pronto");
+verificar("I13. tudo lido é pronto", fase({}), "pronto");
+
+verificar(
+  "I14. refetch em segundo plano NÃO desmonta a tela",
+  fase({ turnos: REFETCH(1), equipe: REFETCH(2), apontamentos: REFETCH(3) }),
+  "pronto",
+);
+
+verificar(
+  "I15. erro do turno vem antes de qualquer outra pergunta",
+  fase({ turnos: ERRO, equipe: ERRO, apontamentos: ERRO }),
+  "erro-turnos",
+);
+verificar(
+  "I16. e o da equipe antes do da folha",
+  fase({ equipe: ERRO, apontamentos: ERRO }),
+  "erro-equipe",
+);
+
+for (const [rotulo, f] of [
+  ["carregando", "carregando"],
+  ["erro-turnos", "erro-turnos"],
+  ["erro-equipe", "erro-equipe"],
+  ["erro-apontamentos", "erro-apontamentos"],
+  ["sem-turno", "sem-turno"],
+  ["sem-equipe", "sem-equipe"],
+  ["selecionar", "selecionar"],
+]) {
+  verificar(`I17.${rotulo} — não é leitura concluída`, leituraConcluida(f), false);
+}
+verificar("I18. só pronto é leitura concluída", leituraConcluida("pronto"), true);
+
+console.log("\nJ. Nada é salvável antes de a folha ser lida\n");
+
+for (const [rotulo, f] of [
+  ["carregando", "carregando"],
+  ["erro-apontamentos", "erro-apontamentos"],
+  ["erro-equipe", "erro-equipe"],
+  ["erro-turnos", "erro-turnos"],
+  ["sem-turno", "sem-turno"],
+  ["sem-equipe", "sem-equipe"],
+  ["selecionar", "selecionar"],
+]) {
+  verificar(
+    `J1.${rotulo} — salvar indisponível mesmo com pendências`,
+    podeSalvar({ fase: f, fechada: false, pendentes: 3, salvando: false }),
+    false,
+  );
+}
+verificar(
+  "J2. pronto com pendência habilita o salvar",
+  podeSalvar({ fase: "pronto", fechada: false, pendentes: 1, salvando: false }),
+  true,
+);
+verificar(
+  "J3. pronto sem pendência não habilita",
+  podeSalvar({ fase: "pronto", fechada: false, pendentes: 0, salvando: false }),
+  false,
+);
+verificar(
+  "J4. folha fechada não habilita",
+  podeSalvar({ fase: "pronto", fechada: true, pendentes: 2, salvando: false }),
+  false,
+);
+verificar(
+  "J5. salvando em curso não habilita de novo",
+  podeSalvar({ fase: "pronto", fechada: false, pendentes: 2, salvando: true }),
+  false,
+);
+
+console.log("\nK. A tela amarra a fase ao que renderiza\n");
+
+verificar(
+  "K1. a fase vem do domínio, não de contas locais",
+  /const fase = faseDaTela\(\{/.test(fontes.tela),
+  true,
+);
+verificar(
+  "K2. o botão salvar pergunta ao domínio",
+  /disabled=\{\s*!podeSalvar\(\{/.test(fontes.tela),
+  true,
+);
+verificar(
+  "K3. o payload só é calculado na fase pronta",
+  /const pendentes = pronto \? linhasAlteradas\(linhas, apontamentos\.data\) : \[\];/.test(
+    fontes.tela,
+  ),
+  true,
+);
+verificar(
+  "K4. e o envio confere a fase antes de chamar a RPC",
+  /if \(!operationId \|\| !shiftId \|\| !pronto\) return;/.test(fontes.tela),
+  true,
+);
+verificar("K5. a tabela só existe na fase pronta", /\{pronto \? \(/.test(fontes.tela), true);
+for (const [rotulo, marcador] of [
+  ["turnos", 'fase === "erro-turnos"'],
+  ["equipe", 'fase === "erro-equipe"'],
+  ["apontamentos", 'fase === "erro-apontamentos"'],
+]) {
+  verificar(`K6.${rotulo} — tem tela de falha própria`, fontes.tela.includes(marcador), true);
+}
+verificar(
+  "K7. cada falha oferece refetch da própria leitura",
+  ["turnos.refetch()", "equipe.refetch()", "apontamentos.refetch()", "operacoes.refetch()"].filter(
+    (chamada) => fontes.tela.includes(chamada),
+  ).length,
+  4,
+);
+verificar(
+  "K8. o texto de turno inexistente depende da fase, não de data vazia",
+  /fase === "sem-turno" \? <Aviso>Nenhum turno configurado para esta operação\.<\/Aviso>/.test(
+    fontes.tela,
+  ),
+  true,
+);
+verificar(
+  "K9. e o de equipe vazia também",
+  /fase === "sem-equipe" \? <Aviso>Nenhum colaborador alocado neste turno\.<\/Aviso>/.test(
+    fontes.tela,
+  ),
+  true,
+);
+verificar(
+  "K10. nenhum estado vazio é decidido por (data ?? []).length",
+  /\(\w+\.data \?\? \[\]\)\.length === 0/.test(fontes.tela),
+  false,
+);
+verificar(
+  "K11. isFetching não é usado para desmontar a tela",
+  /isFetching/.test(fontes.tela),
+  false,
+);
+
+console.log("\nL. O rascunho sobrevive ao refetch e morre com o escopo\n");
+
+verificar(
+  "L1. o rascunho guarda o escopo a que pertence",
+  /useState<\{\s*escopo: string;\s*linhas: LinhaDoRascunho\[\];\s*\} \| null>\(null\)/.test(
+    fontes.tela,
+  ),
+  true,
+);
+verificar(
+  "L2. a inicialização só acontece com a leitura concluída",
+  /if \(!pronto\) return;\s*\n\s*setRascunho\(/.test(fontes.tela),
+  true,
+);
+verificar(
+  "L3. e preserva o rascunho do mesmo escopo",
+  /setRascunho\(\(atual\) => \(atual\?\.escopo === escopo \? atual : \{ escopo, linhas: base \}\)\)/.test(
+    fontes.tela,
+  ),
+  true,
+);
+verificar(
+  "L4. não existe mais substituição incondicional por `base`",
+  /setRascunho\(base\)/.test(fontes.tela),
+  false,
+);
+verificar(
+  "L5. trocar operação limpa turno e rascunho",
+  /function trocarOperacao[\s\S]{0,160}setShiftId\(null\);[\s\S]{0,60}setRascunho\(null\)/.test(
+    fontes.tela,
+  ),
+  true,
+);
+verificar(
+  "L6. trocar turno limpa o rascunho",
+  /function trocarTurno[\s\S]{0,120}setRascunho\(null\)/.test(fontes.tela),
+  true,
+);
+verificar(
+  "L7. trocar data limpa o rascunho",
+  /function trocarData[\s\S]{0,120}setRascunho\(null\)/.test(fontes.tela),
+  true,
+);
+verificar(
+  "L8. as linhas exibidas pertencem ao escopo atual",
+  /const linhas = rascunho\?\.escopo === escopo \? rascunho\.linhas : base;/.test(fontes.tela),
+  true,
+);
+verificar(
+  "L9. nenhum cache global de rascunho",
+  /localStorage|sessionStorage|globalThis/.test(fontes.tela),
+  false,
+);
+verificar(
+  "L10. o erro do salvar não limpa o rascunho",
+  /onError:[^}]*setRascunho/.test(fontes.tela),
+  false,
+);
+verificar(
+  "L11. o sucesso também não o descarta à mão",
+  /onSuccess:[^}]*setRascunho/.test(fontes.tela),
+  false,
+);
+
+// Depois de salvar, a camada B2.1 invalida só a chave daquele contexto. O
+// rascunho permanece, e a comparação com o snapshot novo é o que zera as
+// pendências — sem nenhum segundo caminho de escrita.
+{
+  const gravadosDepois = [
+    folha({ employee_id: "e1", status: "absent", check_in: null, break_minutes: 0 }),
+    folha({ employee_id: "e2", status: "present", check_in: null, break_minutes: 0 }),
+  ];
+  const rascunhoEditado = montarRascunho(EQUIPE, [], 0).map((l) =>
+    l.employee_id === "e1" ? { ...l, status: "absent" } : l,
+  );
+  verificar(
+    "L12. com o servidor já refletindo o salvo, as pendências zeram",
+    linhasAlteradas(rascunhoEditado, gravadosDepois).length,
+    0,
+  );
+}
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);
 

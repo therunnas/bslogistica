@@ -822,7 +822,16 @@ mostra antes, sem deduzir de erro.
 **`min={0}` no intervalo é UX**, não a regra: a autoridade é o
 `CHECK (break_minutes >= 0)` da `014`.
 
-Suíte `scripts/testar-tela-operacional.mjs`, **110 asserções**, por
+**Carregando, erro e vazio são três estados distintos em cada leitura**, e a
+distinção mora em `faseDaTela()`, no domínio. Erro tratado como lista vazia
+diria "nenhum turno configurado" quando a rede caiu — e, na folha, faria toda a
+equipe parecer linha nova, liberando gravação sobre um estado do servidor que a
+tela não conhece. Por isso a tabela só é editável, e o payload só existe, depois
+que a leitura da folha concluiu **com sucesso**. Revalidação em segundo plano
+não desmonta a tela nem apaga o que está sendo digitado: o rascunho carrega o
+escopo a que pertence e é inicializado uma vez por escopo.
+
+Suíte `scripts/testar-tela-operacional.mjs`, **170 asserções**, por
 `npm run test:tela-operacional`.
 
 **O fluxo operacional ainda NÃO é exercitável ponta a ponta**, e isso é
