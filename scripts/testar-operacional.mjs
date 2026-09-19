@@ -32,6 +32,8 @@ import {
   buscarOperacoesDoOperador,
   buscarTurnosDoOperador,
   CAMPOS_DA_LINHA,
+  ErroDeContratoOperacional,
+  ErroRpcOperacional,
   montarLinhasDoApontamento,
   podeListarApontamentos,
   podeListarEquipe,
@@ -55,11 +57,18 @@ function verificar(caso, obtido, esperado) {
 
 /** Executa e devolve a mensagem do erro, ou `null` se não levantou. */
 async function erroDe(acao) {
+  const erro = await objetoDoErro(acao);
+  if (erro === null) return null;
+  return erro instanceof Error ? erro.message : String(erro);
+}
+
+/** Executa e devolve o erro em si, para inspecionar código, classe e detalhes. */
+async function objetoDoErro(acao) {
   try {
     await acao();
     return null;
   } catch (erro) {
-    return erro instanceof Error ? erro.message : String(erro);
+    return erro;
   }
 }
 
@@ -88,6 +97,7 @@ const TURNO = "22222222-2222-2222-2222-222222222222";
 const OUTRO_TURNO = "33333333-3333-3333-3333-333333333333";
 const COLABORADOR = "44444444-4444-4444-4444-444444444444";
 const DATA = "2026-09-18";
+const FOLHA = "55555555-5555-5555-5555-555555555555";
 
 const fontes = Object.fromEntries(
   ["tipos", "chaves", "rpc", "queries", "mutations"].map((nome) => [
@@ -149,6 +159,20 @@ verificar(
   "A9. e cada nome de RPC vem da constante, nunca escrito à mão",
   /cliente\.rpc\("/.test(todasAsFontes),
   false,
+);
+
+// `faturado` não vem de `timesheet_entries`: é computado por
+// `public.apontamento_faturado()`, que fecha com `coalesce(..., false)`. Nem na
+// linha vazia do LEFT JOIN ele chega nulo, então tipá-lo como anulável
+// inventaria um terceiro estado que o banco não produz. Tipo é apagado em
+// tempo de execução, então esta é a única forma de guardar a propriedade.
+verificar("A10. faturado é booleano no contrato", /faturado:\s*boolean;/.test(fontes.tipos), true);
+verificar("A11. e não é anulável", /faturado:\s*boolean\s*\|\s*null/.test(fontes.tipos), false);
+verificar(
+  "A12. o que vem da linha, esse sim, continua anulável",
+  /check_in:\s*string\s*\|\s*null;/.test(fontes.tipos) &&
+    /notes:\s*string\s*\|\s*null;/.test(fontes.tipos),
+  true,
 );
 
 console.log("\nB. Os hooks travam a chamada e invalidam o contexto certo\n");
@@ -265,15 +289,50 @@ console.log("\nC. As quatro leituras falam por RPC, e só por RPC\n");
 }
 
 {
-  const cliente = clienteFalso({ data: null, error: null });
+  const cliente = clienteFalso({ data: [], error: null });
   const lista = await buscarOperacoesDoOperador(cliente);
-  verificar("C12. resposta nula vira lista vazia, não explode", lista.length, 0);
+  verificar("C12. lista vazia é resposta legítima, e passa", lista.length, 0);
+}
+
+// `RETURNS TABLE` sem erro junto só produz array. Qualquer outra coisa é
+// contrato quebrado, e virar `[]` esconderia isso atrás de uma tela vazia —
+// indistinguível de "não há dados".
+for (const [rotulo, invalida] of [
+  ["nula", null],
+  ["objeto", { id: OPERACAO }],
+  ["texto", "operacoes"],
+  ["indefinida", undefined],
+]) {
+  const cliente = clienteFalso({ data: invalida, error: null });
+  const erro = await objetoDoErro(() => buscarOperacoesDoOperador(cliente));
+  verificar(
+    `C13.${rotulo} — resposta ${rotulo} sem erro é quebra de contrato`,
+    erro?.message,
+    `Resposta inválida da RPC ${RPC_OPERACIONAL.operacoes}.`,
+  );
+  verificar(
+    `C14.${rotulo} — e é erro de contrato, não do banco`,
+    erro instanceof ErroDeContratoOperacional,
+    true,
+  );
+}
+
+{
+  const cliente = clienteFalso({ data: null, error: null });
+  const erro = await objetoDoErro(() =>
+    buscarApontamentosDoOperador(cliente, OPERACAO, TURNO, DATA),
+  );
+  verificar(
+    "C15. a recusa vale para as quatro leituras, não só a primeira",
+    erro instanceof ErroDeContratoOperacional,
+    true,
+  );
 }
 
 console.log("\nD. A escrita usa salvar_apontamento_operacional\n");
 
 {
-  const cliente = clienteFalso({ data: "folha-1", error: null });
+  const cliente = clienteFalso({ data: FOLHA, error: null });
   const folha = await salvarApontamentoOperacional(cliente, {
     operationId: OPERACAO,
     shiftId: TURNO,
@@ -290,8 +349,47 @@ console.log("\nD. A escrita usa salvar_apontamento_operacional\n");
     Object.keys(cliente.chamadas[0].parametros).join(","),
     "p_operation_id,p_shift_id,p_work_date,p_linhas",
   );
-  verificar("D3. devolve o id da folha que a RPC retornou", folha, "folha-1");
+  verificar("D3. devolve o id da folha que a RPC retornou", folha, FOLHA);
   verificar("D4. nenhuma segunda chamada acontece", cliente.chamadas.length, 1);
+}
+
+// O retorno é conferido, não afirmado. Um `as string` convence o TypeScript e
+// não olha o valor: com resposta fora do contrato a tela invalidaria o cache e
+// diria "salvo" sem ter id nenhum.
+for (const [rotulo, invalido] of [
+  ["nulo", null],
+  ["objeto", { id: FOLHA }],
+  ["lista", [FOLHA]],
+  ["texto vazio", ""],
+  ["texto que não é uuid", "folha-1"],
+  ["número", 7],
+]) {
+  const cliente = clienteFalso({ data: invalido, error: null });
+  const erro = await objetoDoErro(() =>
+    salvarApontamentoOperacional(cliente, {
+      operationId: OPERACAO,
+      shiftId: TURNO,
+      workDate: DATA,
+      linhas: [{ employee_id: COLABORADOR, status: "present" }],
+    }),
+  );
+  verificar(
+    `D5.${rotulo} — retorno ${rotulo} não conta como gravação bem-sucedida`,
+    erro?.message,
+    `A RPC ${RPC_OPERACIONAL.salvar} devia devolver o identificador da folha.`,
+  );
+  verificar(`D6.${rotulo} — e é erro de contrato`, erro instanceof ErroDeContratoOperacional, true);
+}
+
+{
+  const cliente = clienteFalso({ data: FOLHA.toUpperCase(), error: null });
+  const folha = await salvarApontamentoOperacional(cliente, {
+    operationId: OPERACAO,
+    shiftId: TURNO,
+    workDate: DATA,
+    linhas: [{ employee_id: COLABORADOR, status: "present" }],
+  });
+  verificar("D7. uuid em maiúsculas continua válido", folha, FOLHA.toUpperCase());
 }
 
 console.log("\nE. Parâmetro obrigatório impede chamada incompleta\n");
@@ -428,7 +526,7 @@ for (const proibido of [
 }
 
 {
-  const cliente = clienteFalso({ data: "folha-1", error: null });
+  const cliente = clienteFalso({ data: FOLHA, error: null });
   await salvarApontamentoOperacional(cliente, {
     operationId: OPERACAO,
     shiftId: TURNO,
@@ -500,6 +598,70 @@ console.log("\nG. Erro da RPC é erro, nunca sucesso silencioso\n");
     erro,
     `Falha na chamada ${RPC_OPERACIONAL.operacoes}.`,
   );
+}
+
+// O SQLSTATE sobe junto. As RPCs da 013 usam os códigos de propósito, e
+// classificar erro por substring da mensagem seria frágil — ainda mais em texto
+// que pode ser traduzido.
+{
+  const cliente = clienteFalso({
+    data: null,
+    error: { message: "Operação não autorizada para esta sessão.", code: "42501" },
+  });
+  const erro = await objetoDoErro(() => buscarTurnosDoOperador(cliente, OPERACAO));
+  verificar("G5. 42501 chega à tela como código", erro?.code, "42501");
+  verificar(
+    "G6. e a mensagem continua disponível",
+    erro?.message,
+    "Operação não autorizada para esta sessão.",
+  );
+  verificar("G7. é erro de RPC, não de contrato", erro instanceof ErroRpcOperacional, true);
+}
+
+{
+  const cliente = clienteFalso({
+    data: null,
+    error: {
+      message: "duplicate key value violates unique constraint",
+      code: "23505",
+      details: "Key (timesheet_id, employee_id) already exists.",
+      hint: "Confira se o colaborador não foi lançado duas vezes.",
+    },
+  });
+  const erro = await objetoDoErro(() =>
+    salvarApontamentoOperacional(cliente, {
+      operationId: OPERACAO,
+      shiftId: TURNO,
+      workDate: DATA,
+      linhas: [{ employee_id: COLABORADOR, status: "present" }],
+    }),
+  );
+  verificar("G8. 23505 chega à tela como código", erro?.code, "23505");
+  verificar(
+    "G9. details é preservado",
+    erro?.details,
+    "Key (timesheet_id, employee_id) already exists.",
+  );
+  verificar(
+    "G10. hint é preservado",
+    erro?.hint,
+    "Confira se o colaborador não foi lançado duas vezes.",
+  );
+}
+
+for (const codigo of ["22023", "23514"]) {
+  const cliente = clienteFalso({ data: null, error: { message: "recusado", code: codigo } });
+  const erro = await objetoDoErro(() =>
+    buscarApontamentosDoOperador(cliente, OPERACAO, TURNO, DATA),
+  );
+  verificar(`G11.${codigo} — o código sobe intacto`, erro?.code, codigo);
+}
+
+{
+  const cliente = clienteFalso({ data: null, error: { message: "sem código" } });
+  const erro = await objetoDoErro(() => buscarOperacoesDoOperador(cliente));
+  verificar("G12. erro sem código não inventa um", erro?.code, undefined);
+  verificar("G13. e ainda assim é erro de RPC", erro instanceof ErroRpcOperacional, true);
 }
 
 console.log("\nH. As chaves de cache isolam operação, turno e data\n");

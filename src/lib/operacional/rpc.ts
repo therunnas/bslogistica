@@ -61,9 +61,16 @@ export const CAMPOS_DA_LINHA: readonly CampoDaLinha[] = [
  * funções da migration 013, então o `.rpc()` tipado recusaria os nomes. Ver a
  * nota do PR sobre o gate de tipos.
  */
+export interface ErroDaResposta {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+}
+
 export interface RespostaRpc {
   data: unknown;
-  error: { message: string } | null;
+  error: ErroDaResposta | null;
 }
 
 export interface ClienteOperacional {
@@ -79,6 +86,44 @@ export interface ClienteOperacional {
  */
 export function comoClienteOperacional(cliente: unknown): ClienteOperacional {
   return cliente as ClienteOperacional;
+}
+
+/**
+ * Erro de uma chamada da superfície, com o SQLSTATE preservado.
+ *
+ * `supabase-js` devolve `code`, `details` e `hint` junto da mensagem, e jogar
+ * tudo fora para ficar só com o texto obrigaria a tela a classificar erro por
+ * substring — frágil, e ainda por cima em mensagem traduzível. As RPCs da 013
+ * usam os códigos deliberadamente: `42501` é recusa de autorização ou folha
+ * fechada, `23514` é turno que não pertence à operação ou colaborador fora da
+ * equipe ativa, `22023` é parâmetro ou campo não permitido, `23505` é violação
+ * de unicidade. O B2.3 precisa distinguir esses casos.
+ */
+export class ErroRpcOperacional extends Error {
+  readonly code?: string | undefined;
+  readonly details?: string | undefined;
+  readonly hint?: string | undefined;
+
+  constructor(erro: ErroDaResposta, chamada: string) {
+    super(erro.message || `Falha na chamada ${chamada}.`);
+    this.name = "ErroRpcOperacional";
+    this.code = erro.code;
+    this.details = erro.details;
+    this.hint = erro.hint;
+  }
+}
+
+/**
+ * Resposta que não respeita o contrato da RPC.
+ *
+ * Separado do erro do banco de propósito: aqui o banco não reclamou de nada, e
+ * ainda assim veio coisa que o `RETURNS TABLE` não produz.
+ */
+export class ErroDeContratoOperacional extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = "ErroDeContratoOperacional";
+  }
 }
 
 function exigirTexto(valor: string | null | undefined, nome: string): string {
@@ -104,17 +149,47 @@ function exigirData(valor: string | null | undefined, nome: string): string {
  * `supabase-js` não lança: devolve `{ data, error }`. Ignorar o `error` faria
  * uma recusa de autorização (`42501`), um turno de outra operação (`23514`) ou
  * um campo não permitido (`22023`) chegarem à tela como lista vazia — falha
- * silenciosa exatamente onde ela é mais cara.
+ * silenciosa exatamente onde ela é mais cara. O código do erro sobe junto.
  */
 function exigirSucesso(resposta: RespostaRpc, chamada: string): unknown {
   if (resposta.error) {
-    throw new Error(resposta.error.message || `Falha na chamada ${chamada}.`);
+    throw new ErroRpcOperacional(resposta.error, chamada);
   }
   return resposta.data;
 }
 
-function comoLista<T>(dados: unknown): T[] {
-  return Array.isArray(dados) ? (dados as T[]) : [];
+/**
+ * As quatro leituras são `RETURNS TABLE`: ou vem array, ou o contrato quebrou.
+ *
+ * Lista vazia é resposta legítima — operação sem turno, folha sem linha — e
+ * passa direto. O que não passa é `null`, objeto ou texto **sem erro junto**:
+ * transformar isso em `[]` esconderia quebra de contrato atrás de uma tela
+ * vazia, que é indistinguível de "não há dados". Falhar aqui é o que faz o
+ * problema aparecer onde ele é.
+ */
+function exigirLista<T>(dados: unknown, chamada: string): T[] {
+  if (!Array.isArray(dados)) {
+    throw new ErroDeContratoOperacional(`Resposta inválida da RPC ${chamada}.`);
+  }
+  return dados as T[];
+}
+
+const FORMATO_DE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * A escrita devolve o id da folha, e isso é verificado, não afirmado.
+ *
+ * Um `as string` convence o TypeScript e não olha o valor. Se a resposta vier
+ * nula, vazia ou de outra forma, a mutation não pode ser dada como bem
+ * sucedida: a tela invalidaria o cache e mostraria "salvo" sem ter id nenhum.
+ */
+function exigirIdentificadorDaFolha(dados: unknown, chamada: string): string {
+  if (typeof dados !== "string" || !FORMATO_DE_UUID.test(dados)) {
+    throw new ErroDeContratoOperacional(
+      `A RPC ${chamada} devia devolver o identificador da folha.`,
+    );
+  }
+  return dados;
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +229,10 @@ export async function buscarOperacoesDoOperador(
   cliente: ClienteOperacional,
 ): Promise<OperacaoDoOperador[]> {
   const resposta = await cliente.rpc(RPC_OPERACIONAL.operacoes);
-  return comoLista<OperacaoDoOperador>(exigirSucesso(resposta, RPC_OPERACIONAL.operacoes));
+  return exigirLista<OperacaoDoOperador>(
+    exigirSucesso(resposta, RPC_OPERACIONAL.operacoes),
+    RPC_OPERACIONAL.operacoes,
+  );
 }
 
 export async function buscarTurnosDoOperador(
@@ -164,7 +242,10 @@ export async function buscarTurnosDoOperador(
   const resposta = await cliente.rpc(RPC_OPERACIONAL.turnos, {
     p_operation_id: exigirTexto(operationId, "operationId"),
   });
-  return comoLista<TurnoDoOperador>(exigirSucesso(resposta, RPC_OPERACIONAL.turnos));
+  return exigirLista<TurnoDoOperador>(
+    exigirSucesso(resposta, RPC_OPERACIONAL.turnos),
+    RPC_OPERACIONAL.turnos,
+  );
 }
 
 export async function buscarEquipeDoOperador(
@@ -176,7 +257,10 @@ export async function buscarEquipeDoOperador(
     p_operation_id: exigirTexto(operationId, "operationId"),
     p_shift_id: exigirTexto(shiftId, "shiftId"),
   });
-  return comoLista<MembroDaEquipeDoOperador>(exigirSucesso(resposta, RPC_OPERACIONAL.equipe));
+  return exigirLista<MembroDaEquipeDoOperador>(
+    exigirSucesso(resposta, RPC_OPERACIONAL.equipe),
+    RPC_OPERACIONAL.equipe,
+  );
 }
 
 export async function buscarApontamentosDoOperador(
@@ -190,7 +274,10 @@ export async function buscarApontamentosDoOperador(
     p_shift_id: exigirTexto(shiftId, "shiftId"),
     p_work_date: exigirData(workDate, "workDate"),
   });
-  return comoLista<ApontamentoDoOperador>(exigirSucesso(resposta, RPC_OPERACIONAL.apontamentos));
+  return exigirLista<ApontamentoDoOperador>(
+    exigirSucesso(resposta, RPC_OPERACIONAL.apontamentos),
+    RPC_OPERACIONAL.apontamentos,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -258,5 +345,8 @@ export async function salvarApontamentoOperacional(
     p_work_date: exigirData(workDate, "workDate"),
     p_linhas: montarLinhasDoApontamento(linhas),
   });
-  return exigirSucesso(resposta, RPC_OPERACIONAL.salvar) as string;
+  return exigirIdentificadorDaFolha(
+    exigirSucesso(resposta, RPC_OPERACIONAL.salvar),
+    RPC_OPERACIONAL.salvar,
+  );
 }

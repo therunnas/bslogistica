@@ -14,8 +14,13 @@
  *     interno, então `cliente_nome` sempre vem preenchido;
  *   - em `listar_apontamentos_do_operador` o JOIN com as linhas é LEFT, de
  *     propósito: a folha existe antes de ter apontamento. Com folha vazia
- *     chega uma linha com os campos de folha preenchidos e os de apontamento
- *     nulos — por isso tudo que vem da linha é anulável aqui.
+ *     chega uma linha com os campos de folha preenchidos e os da linha nulos —
+ *     por isso tudo que vem de `timesheet_entries` é anulável aqui;
+ *   - **`faturado` é a exceção, e não por acaso.** Ele não vem da linha: é
+ *     computado por `public.apontamento_faturado()`, que fecha o retorno com
+ *     `coalesce(..., false)`. Na folha vazia a subconsulta não casa com nada e
+ *     a resposta é `false`, nunca nulo. Tipar como anulável obrigaria a tela a
+ *     tratar um terceiro estado que o banco não produz.
  *
  * Nenhum valor monetário atravessa esta superfície, em nenhuma direção. O que
  * o operador sabe sobre faturamento é o booleano `faturado`, derivado no banco.
@@ -75,7 +80,8 @@ export interface ApontamentoDoOperador {
   check_out: string | null;
   break_minutes: number | null;
   notes: string | null;
-  faturado: boolean | null;
+  /** Nunca nulo: o helper do banco fecha com `coalesce(..., false)`. */
+  faturado: boolean;
 }
 
 /** Os seis campos que a RPC de escrita aceita por linha. Ver `rpc.ts`. */
