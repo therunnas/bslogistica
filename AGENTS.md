@@ -77,31 +77,57 @@ tem relação com o TanStack Router.
 - **MFA é exigido também no banco.** 11 tabelas de negócio têm policy
   RESTRICTIVE pedindo `aal2`; `user_roles` fica de fora de propósito, porque é
   lida antes do MFA. Não adicionar AAL2 nela.
-- **Não remover a policy AAL2 global sem substituição segura.** Existe uma
-  decisão aprovada de tornar o MFA opcional para o papel `operacional`, mas ela
-  **ainda não foi implementada**: hoje o guard e as 11 tabelas exigem AAL2 para
-  qualquer papel. A mudança é coordenada — guard + papel + RLS no mesmo desenho.
-  Derrubar a policy sozinha reabre uma vulnerabilidade já corrigida. Enquanto
-  isso, **não criar usuário `operacional` real**. Ver `CLAUDE.md`, seção
+- **O guard do painel é role-aware desde o PR C** (PR #37), e a decisão é uma
+  só, em `lerAcesso()`: **admin** nunca é liberado em AAL1 — sem fator vai
+  cadastrar (`mfa-ausente`), com fator vai desafiar (`mfa-pendente`), e só AAL2
+  libera; **`operacional` sem fator verificado** pode trabalhar em AAL1, e
+  **com** fator verificado é barrado até concluir o TOTP, voltando em AAL2;
+  **`admin`+`operacional` é admin**, com AAL2 obrigatório; sem papel bloqueia; e
+  falha de leitura ou claim `aal` ausente/desconhecida **fecha**. Não recriar
+  essa decisão no layout, em `/mfa`, no dashboard ou nos guards — duas
+  definições de "liberado" produzem laço entre as rotas.
+- **Não remover a policy AAL2 global sem substituição segura.** As **11 tabelas**
+  de negócio continuam exigindo `aal2` por policy RESTRICTIVE **global**, e a
+  exceção do `operacional` **não** entra por policy: ela é a superfície de RPC
+  abaixo. Derrubar a policy reabre uma vulnerabilidade já corrigida.
+- **O que ainda não existe é o autosserviço de MFA do `operacional`** — ativar
+  ou desativar o próprio fator. O _enforcement_ por papel já está implementado;
+  o que falta é a tela Configurações → Segurança, que é o **PR F**. Não escrever
+  que "MFA por papel não foi implementado".
+- **Não criar usuário `operacional` real** antes de concluir o **PR D**, o
+  **PR E**, o **PR F** e a matriz E2E do **PR G**. B2.1, B2.2, B2.3 e o PR C já
+  estão fechados; a proibição continua pelos que faltam. Ver `CLAUDE.md`, seção
   "AAL por papel", e `PROGRESS.md`, seções 6 e 7.
-- **MFA optativo precisa valer no banco.** Se a conta `operacional` tiver fator
-  verificado, a futura exceção de AAL1 não pode deixar bypass direto por
+- **MFA optativo vale no banco, não só no guard.** Se a conta `operacional`
+  tiver fator verificado, a exceção de AAL1 não pode deixar bypass direto por
   PostgREST/RPC — papel + `aal` sozinhos não distinguem quem nunca ativou MFA de
-  quem ativou e ainda não fez o TOTP. A decisão precisa ser enforceable no
-  banco, não só no guard.
+  quem ativou e ainda não fez o TOTP. É por isso que as RPCs revalidam o estado
+  de MFA por dentro e o guard consulta o banco em vez do cookie.
 - **Estado de MFA vindo da sessão não vale para enforcement.**
   `getAuthenticatorAssuranceLevel()` sem argumento não fala com o servidor:
   `nextLevel` sai de `session.user.factors`, que é campo do cookie fora da
   assinatura do JWT — o próprio SDK chama isso de inseguro. Serve para UX. Para
   autorização, usar `public.mfa_bloqueia_excecao_aal1()` (migration 012), que lê
   `auth.mfa_factors` e falha fechada. Ela **não** libera AAL1 nem decide papel.
-- **A superfície operacional AAL1 entra por RPC, nunca por policy.** A
-  migration 013 criou `public.user_operation_access`, os helpers
+  É exatamente o que o guard faz desde o PR C: `currentLevel` (claim `aal` do
+  token já validado) mais essa RPC; `nextLevel` **não participa do enforcement
+  do painel**. Ele sobrevive só na recuperação de senha, onde não concede acesso
+  a dado nenhum e quem recusa a troca sem AAL2 é o próprio GoTrue.
+- **A superfície operacional entra por RPC, nunca por policy.** A migration 013
+  criou `public.user_operation_access`, os helpers
   `operador_elegivel_aal1()`/`operador_autorizado(uuid)` e cinco RPCs de
-  contrato fechado. As 11 policies `*_exige_aal2` **não** foram afrouxadas, e
-  `operacional` em AAL1 continua sem ler tabela de negócio direto — e a
-  interface ainda **não consome** nenhuma dessas RPCs. Ao mexer
-  nessa superfície: nenhum valor financeiro atravessa (do cliente só
+  contrato fechado; a migration **015** acrescentou
+  `operador_elegivel_operacional()` — `aal1` sem MFA bloqueando **ou** `aal2` —
+  e reapontou os helpers centrais para ela, **sem** ampliar dado, coluna ou
+  grant. As 11 policies `*_exige_aal2` **não** foram afrouxadas por nenhuma das
+  duas, e **em AAL1** `operacional` lê zero linha de tabela de negócio pelo
+  PostgREST — ali a RPC é a única porta. **Em AAL2 não é assim:** as policies
+  permissivas originais liberam por `public.is_staff()`, que é verdadeiro para
+  qualquer papel, então o operador em AAL2 alcança essas tabelas direto — e
+  escreve naquelas cuja policy é `FOR ALL`. Isso é anterior à `013` e à `015`, e
+  não se conserta no guard; separar `is_staff()` por papel é tarefa própria, com
+  migration e teste. A interface **consome** as RPCs desde o B2.1
+  (`src/lib/operacional/`) e o B2.3 (tela `/operacional`), e só elas. Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
   `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
   por linha e recusa a chamada inteira diante de chave inesperada, não existe
   DELETE, e toda função `SECURITY DEFINER` revalida papel + AAL + MFA +
@@ -127,7 +153,11 @@ tem relação com o TanStack Router.
   privilégio e não proteger mais nada; não recriar.
 - **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
   Operação administrativa privilegiada é server-side, o último admin é
-  protegido, e alteração de usuário ou papel é auditada.
+  protegido, e alteração de usuário ou papel é auditada. **O backend que
+  implementa isso é o PR D — a próxima etapa oficial**: convite, atribuição e
+  troca de papel, atribuição de operações via `user_operation_access`, proteção
+  do último admin e auditoria, tudo **exclusivamente server-side**, com
+  `service_role` nunca no navegador e o frontend jamais como barreira.
 
 ## Antes de entregar
 

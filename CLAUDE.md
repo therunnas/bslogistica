@@ -31,9 +31,13 @@ Wrangler, Lovable. Foram removidos de propósito. `@tanstack/react-query`
 ## Arquitetura
 
 ```
-src/app/(painel)/            área protegida — 7 telas
+src/app/(painel)/            área protegida — 7 telas de admin + /operacional
   layout.tsx                 guard de acesso (sessão → papel → MFA)
-  _autorizacao.ts            decisão de acesso, no servidor
+  _autorizacao.ts            decisão de acesso role-aware, no servidor
+  _papel.ts                  papel efetivo: admin + operacional = ADMIN
+  _exigir-admin.tsx          guard das telas administrativas
+  _exigir-operacional.tsx    guard da tela operacional
+  operacional/               apontamento do operador, só pelas RPCs
 
 as rotas abaixo são irmãs de (painel)/ e ficam fora do guard, de propósito:
 
@@ -47,7 +51,8 @@ src/app/redefinir-senha/     troca da senha, com a prova revalidada
 
 src/lib/billing.ts           cálculo de diária, hora extra, custo
 src/lib/ledger.ts            consolidação apontamento → cliente
-src/lib/mfa.ts               decisões de segundo fator, funções puras
+src/lib/mfa.ts               decisões de segundo fator e de acesso, puras
+src/lib/operacional/         contratos e hooks das 5 RPCs — sem tabela direta
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
@@ -96,8 +101,10 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 - **O último admin é protegido.** Nenhum caminho pode remover ou rebaixar o
   único administrador restante.
 - **Alteração de usuário ou papel é auditada.**
-- **MFA TOTP é obrigatório** para o painel. O guard exige AAL2; sem ele a rota
-  redireciona para `/mfa`.
+- **MFA TOTP é obrigatório para o admin**, sempre em AAL2; sem ele a rota
+  redireciona para `/mfa`. Para o papel `operacional` o guard é **role-aware**
+  desde o PR C — ver "AAL por papel", abaixo. Nenhum papel entra no painel com
+  estado de MFA desconhecido.
 - **Conta com MFA ativo exige TOTP no login.** Não existe caminho que aceite só
   a senha para uma conta com fator verificado.
 - **Recovery de conta com MFA exige um TOTP** — e **apenas um**. Depois de uma
@@ -136,61 +143,104 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   deadlock — seria preciso AAL2 para chegar à tela que concede AAL2. Não
   adicionar policy de AAL2 nela.
 
-### AAL por papel — decisão aprovada, ainda NÃO implementada
+### AAL por papel — IMPLEMENTADO (PR C), com uma parte ainda por vir
 
 Separar as duas coisas importa mais aqui do que em qualquer outro ponto deste
 arquivo. Leia as duas metades antes de agir.
 
 **ESTADO ATUAL — o que vale hoje:**
 
-- o guard do painel exige **AAL2 para qualquer papel**;
-- as **11 tabelas** de negócio exigem `aal2` por policy RESTRICTIVE **global**,
-  sem distinguir papel;
-- portanto **`operacional` em AAL1 ainda não alcança tabela nenhuma**, e isso
-  permanece: a exceção de AAL1 NÃO entra por policy;
-- o que existe desde o **PR B1** (migration 013) é uma **superfície estreita de
-  RPC** — descrita mais abaixo — que ainda **não é consumida pela interface**.
+- o guard do painel é **role-aware** desde o **PR C** (PR #37). A decisão mora
+  em `lerAcesso()`, é uma só, e layout, `/mfa`, `/dashboard` e os dois guards
+  apenas a leem:
 
-**DECISÃO ARQUITETURAL APROVADA — o que ainda vai ser construído:**
+  | Papel efetivo         | Nível  | Estado do fator | Decisão            |
+  | --------------------- | ------ | --------------- | ------------------ |
+  | `admin`               | `aal2` | qualquer        | liberado           |
+  | `admin`               | `aal1` | com fator       | `mfa-pendente`     |
+  | `admin`               | `aal1` | sem fator       | `mfa-ausente`      |
+  | `operacional`         | `aal1` | sem fator       | liberado           |
+  | `operacional`         | `aal1` | com fator       | `mfa-pendente`     |
+  | `operacional`         | `aal2` | qualquer        | liberado           |
+  | `admin`+`operacional` | —      | —               | decide como admin  |
+  | sem papel             | —      | —               | bloqueado          |
+  | qualquer              | outro  | qualquer        | `mfa-indisponivel` |
+  | qualquer              | `aal1` | indeterminado   | `mfa-indisponivel` |
 
-- **admin:** MFA obrigatório, sempre em AAL2;
-- **operacional:** MFA opcional, ativável pelo próprio usuário;
-- a implementação é **mudança coordenada de guard + papel + RLS**, num mesmo
-  desenho — nunca em pedaços soltos.
+  **`admin` nunca é liberado em AAL1.** `mfa-ausente` e `mfa-pendente` fecham o
+  painel do mesmo jeito e mandam para `/mfa`; a diferença é o fluxo que a tela
+  abre — cadastrar o primeiro fator ou desafiar um já verificado. Trocar um pelo
+  outro quebra o cadastro inicial do admin, que é o motivo de existirem dois;
 
-**MFA opcional NÃO é MFA dispensável.** Uma conta `operacional` que **já optou
-por MFA** não pode continuar acessando dados em AAL1. Uma conta com fator
-verificado recebe sessão AAL1 logo após o login por senha, então **papel + `aal`
-isoladamente não distinguem** quem nunca ativou MFA de quem ativou e ainda não
-fez o TOTP. A futura autorização precisa exigir o segundo fator **também no
-enforcement do banco** para os acessos protegidos, com um indicador confiável e
-**não manipulável pelo usuário** do estado de MFA, ou mecanismo equivalente.
-**Nunca implementar isso só no guard ou no frontend.**
+- as **11 tabelas** de negócio continuam exigindo `aal2` por policy RESTRICTIVE
+  **global**, sem distinguir papel. Isso **não** mudou e não deve mudar: a
+  exceção de AAL1 **não** entra por policy;
+- portanto **`operacional` em AAL1 lê zero linha de tabela de negócio pelo
+  PostgREST**. O que ele alcança é a **superfície estreita de RPC** do **PR B1**
+  (migration 013), descrita mais abaixo — hoje **consumida pela interface**, por
+  `src/lib/operacional/` e pela tela `/operacional`;
+- o estado do fator que o guard usa **não vem do cookie**: vem de
+  `public.mfa_bloqueia_excecao_aal1()`, consultada no servidor. `nextLevel` não
+  participa do enforcement do painel.
 
-**Esse indicador passou a existir** — `public.mfa_bloqueia_excecao_aal1()`,
-migration 012, PR A. Ela lê `auth.mfa_factors` por `SECURITY DEFINER` e responde
-se o estado de MFA da conta **impede** a futura exceção de AAL1. Responde que
-impede em três casos além do fator verificado: sem sessão, com erro de leitura, e
-quando o `uid` do JWT **não existe mais** em `auth.users` — um token ainda não
-expirado de conta apagada, cujos fatores o `ON DELETE CASCADE` levou junto,
-enquanto a linha órfã de `user_roles` sobrevive. **Ter o indicador não é ter a
-autorização:** o PR A **não liberou AAL1**, as 11 policies `*_exige_aal2`
-continuam globais, e nenhuma policy chama a função ainda. Quem a usa é o PR B1,
-por dentro de `public.operador_elegivel_aal1()`.
+**O QUE AINDA NÃO EXISTE:**
 
-### A superfície operacional AAL1 — PR B1, migration 013
+- **o autosserviço de MFA do `operacional`** — ativar ou desativar o próprio
+  segundo fator. O _enforcement_ por papel já existe; o que falta é a tela
+  **Configurações → Segurança**, que é o **PR F**;
+- a **matriz E2E** com conta real, que é o **PR G**.
+
+**MFA opcional NÃO é MFA dispensável**, e é isso que o guard implementa: uma
+conta `operacional` que **já optou por MFA** não continua acessando dados em
+AAL1. Uma conta com fator verificado recebe sessão AAL1 logo após o login por
+senha, então **papel + `aal` isoladamente não distinguem** quem nunca ativou MFA
+de quem ativou e ainda não fez o TOTP — por isso a decisão consulta o banco.
+**Nunca implementar isso só no guard ou no frontend:** o enforcement do banco
+continua sendo o que vale, e as RPCs revalidam tudo por dentro.
+
+**O indicador é `public.mfa_bloqueia_excecao_aal1()`**, migration 012, PR A. Ela
+lê `auth.mfa_factors` por `SECURITY DEFINER` e responde se o estado de MFA da
+conta **impede** a exceção de AAL1. Responde que impede em três casos além do
+fator verificado: sem sessão, com erro de leitura, e quando o `uid` do JWT **não
+existe mais** em `auth.users` — um token ainda não expirado de conta apagada,
+cujos fatores o `ON DELETE CASCADE` levou junto, enquanto a linha órfã de
+`user_roles` sobrevive. **Ter o indicador não é ter a autorização:** o PR A não
+liberou AAL1, as 11 policies `*_exige_aal2` continuam globais, e **nenhuma
+policy chama a função**. Quem a usa é o PR B1, por dentro de
+`public.operador_elegivel_aal1()`, a `015` por dentro de
+`public.operador_elegivel_operacional()`, e o guard do painel, no servidor.
+
+### A superfície operacional — PR B1 (migration 013) e migration 015
 
 **O que existe.** `public.user_operation_access` (atribuição usuário →
-operação), dois helpers internos — `operador_elegivel_aal1()` e
-`operador_autorizado(operation_id)` — e cinco RPCs de contrato fechado:
+operação), os helpers internos — `operador_elegivel_aal1()`,
+`operador_elegivel_operacional()` (a elegibilidade geral, da `015`: `aal1` sem
+MFA bloqueando **ou** `aal2`) e `operador_autorizado(operation_id)` — e cinco
+RPCs de contrato fechado:
 `listar_operacoes_do_operador`, `listar_turnos_do_operador`,
 `listar_equipe_do_operador`, `listar_apontamentos_do_operador` e
 `salvar_apontamento_operacional`.
 
-**O que continua fechado, e é o ponto:** nenhuma policy foi afrouxada. As 11
-`*_exige_aal2` seguem RESTRICTIVE e globais, e `operacional` em AAL1 lê **zero
-linha** de `operations`, `shifts`, `employees`, `contracts`, `timesheets` e
-`timesheet_entries` pelo PostgREST. A única porta é a RPC.
+**O que continua fechado, e é o ponto:** nenhuma policy foi afrouxada — nem
+pela `013`, nem pela `015`. As 11 `*_exige_aal2` seguem RESTRICTIVE e globais, e
+**em AAL1** `operacional` lê **zero linha** de `operations`, `shifts`,
+`employees`, `contracts`, `timesheets` e `timesheet_entries` pelo PostgREST. Em
+AAL1 a única porta é a RPC. A `015` só estendeu **quem** é aceito na mesma
+superfície estreita; não ampliou dado, coluna, grant ou tabela.
+
+**Em AAL2 a garantia é outra, e é anterior a tudo isto.** Ali o operador é
+`authenticated` como qualquer outro: a RESTRICTIVE `*_exige_aal2` passa, e as
+policies **permissivas** originais liberam pelo `public.is_staff()`, que é
+`EXISTS` de linha em `user_roles` — **verdadeiro para qualquer papel**. Ou seja,
+um `operacional` em AAL2 alcança essas tabelas direto pelo PostgREST, com
+SELECT, e onde a policy é `FOR ALL` (`operations`, `shifts`, `timesheets`,
+`timesheet_entries`, `operation_team`) também com escrita. Isso **não** foi
+introduzido pela `013` nem pela `015` — vem das policies originais, em que
+"staff" nunca distinguiu papel —, e o caso J do teste `011` registra o
+comportamento. A superfície estreita é o que a **interface** usa e o que
+governa o AAL1; ela **não** é, hoje, um limite de banco para o operador em
+AAL2. Separar `is_staff()` por papel é tarefa de escopo próprio, com migration
+e testes — não se resolve no guard nem na documentação.
 
 **Regras permanentes desta superfície:**
 
@@ -207,8 +257,9 @@ linha** de `operations`, `shifts`, `employees`, `contracts`, `timesheets` e
 - **A autoridade financeira continua sendo a 010.** A RPC não escreve coluna
   derivada: quem calcula é o trigger, igual ao caminho do admin.
 - **`SECURITY DEFINER` ignora RLS**, então cada função revalida tudo por dentro:
-  papel `operacional`, **não** `admin`, `aal = aal1`,
-  `mfa_bloqueia_excecao_aal1() = false`, conta ainda existente e atribuição em
+  papel `operacional`, **não** `admin`, nível de garantia aceito —
+  `aal1` com `mfa_bloqueia_excecao_aal1() = false` **ou** `aal2`, desde a
+  migration `015` —, conta ainda existente e atribuição em
   `user_operation_access`. Nunca acrescentar RPC aqui sem essa verificação
   completa — e **nunca** aceitar `user_id` por parâmetro: a decisão é sempre
   sobre `auth.uid()`.
@@ -218,8 +269,9 @@ linha** de `operations`, `shifts`, `employees`, `contracts`, `timesheets` e
   fail-open, medido e corrigido antes do merge (caso A9 do teste `009`).
 - **`user_operation_access` é só do admin em AAL2**, por policy permissiva e
   por RESTRICTIVE de mesmo predicado. O operador não a consulta; ela o autoriza.
-- **A interface ainda não consome nada disso** — é o PR B2 que adapta
-  `queries.ts`, `painel-apontamentos.tsx`, o guard e o login.
+- **A interface consome esta superfície** desde o B2.1 (`src/lib/operacional/`,
+  só RPC) e o B2.3 (a tela `/operacional`). Nenhum dos dois lê tabela de negócio
+  direto, e a suíte assevera isso na forma dos arquivos.
 
 **As cinco RPCs não rodam como `postgres`.** Elas pertencem ao papel
 `bslog_rpc_operacional` — `NOLOGIN`, sem membership em `anon`, `authenticated`
@@ -258,9 +310,9 @@ isso, forçava aquele privilégio impossível. Não protegia mais nada: as guard
 011 cobrem o mesmo evento permitindo estritamente menos — o legado isentava
 `admin` e `service_role`, elas não isentam ninguém. Não recriar.
 
-Os cinco helpers (`operador_elegivel_aal1`, `operador_autorizado`,
-`uid_do_operador`, `travar_turno_da_operacao`, `apontamento_faturado`)
-continuam com dono `postgres`,
+Os helpers (`operador_elegivel_aal1`, `operador_elegivel_operacional`,
+`operador_autorizado`, `uid_do_operador`, `travar_turno_da_operacao`,
+`apontamento_faturado`) continuam com dono `postgres`,
 porque leem o schema `auth`, tomam lock ou leem coluna que o papel não alcança —
 e **nenhum deles escreve**, que é o que torna isso seguro. Ao criar helper novo aqui, manter essa propriedade ou
 mudar o dono.
