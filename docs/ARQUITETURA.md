@@ -120,9 +120,17 @@ RLS** — se este arquivo tivesse um defeito, as tabelas continuariam protegidas
 | timesheets · timesheet_entries       | ler e escrever     | **ler e escrever** |
 | profiles                             | vê todos           | só o próprio       |
 | user_roles                           | só a própria linha | só a própria linha |
+| user_operation_access                | ler e escrever     | **nenhum acesso**  |
 
 Um usuário operacional não altera cadastro nem gera fatura, mas **define o que
 será faturado** — cria e altera apontamentos, que viram diária e hora extra.
+
+**Este quadro descreve o acesso em AAL2.** Toda tabela de negócio tem policy
+RESTRICTIVE exigindo `aal2`, então nenhuma linha dele vale para uma sessão AAL1,
+de qualquer papel. Para `operacional` em AAL1 existe uma superfície separada —
+cinco RPCs de contrato fechado criadas pela migration `013`, sem nenhum valor
+financeiro e sem leitura direta de tabela. Ela está no banco e **a interface
+ainda não a consome**; ver `docs/SEGURANCA.md` e `PROGRESS.md`, seção 7.2.
 
 ## Fluxo de dados
 
@@ -271,6 +279,7 @@ operações sem turno cadastrado.
 Projeto Supabase **BSLOG**. RLS ativa em todas as tabelas do schema `public`, e
 um event trigger (`ensure_rls`) a habilita automaticamente em tabelas novas.
 
-Migrations em `supabase/migrations/`. **Nunca editar migration já aplicada** —
-criar nova com `supabase migration new <nome>`. Antes de commitar mudança de
+Migrations em `supabase/migrations/`: **19 arquivos, todos aplicados em
+Production**. **Nunca editar migration já aplicada** — criar nova com
+`supabase migration new <nome>`. Antes de commitar mudança de
 esquema, rodar `supabase db advisors --linked --type security`.

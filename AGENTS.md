@@ -24,7 +24,8 @@ tem relação com o TanStack Router.
 - **A chave `service_role` nunca vai para o cliente.** Nenhuma variável
   `NEXT_PUBLIC_*` pode conter segredo — o prefixo embute o valor no bundle.
 - **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`.
+  `supabase migration new <nome>`. As 19 migrations do repositório estão em
+  Production, a `013` inclusive: **nenhuma delas se edita**, nem para corrigir.
 - **Não alterar regras financeiras** — cálculo de diária, hora extra, custo ou
   faturamento — fora de tarefa com esse escopo explícito.
 - **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
@@ -97,7 +98,8 @@ tem relação com o TanStack Router.
   migration 013 criou `public.user_operation_access`, os helpers
   `operador_elegivel_aal1()`/`operador_autorizado(uuid)` e cinco RPCs de
   contrato fechado. As 11 policies `*_exige_aal2` **não** foram afrouxadas, e
-  `operacional` em AAL1 continua sem ler tabela de negócio direto. Ao mexer
+  `operacional` em AAL1 continua sem ler tabela de negócio direto — e a
+  interface ainda **não consome** nenhuma dessas RPCs. Ao mexer
   nessa superfície: nenhum valor financeiro atravessa (do cliente só
   `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
   por linha e recusa a chamada inteira diante de chave inesperada, não existe
