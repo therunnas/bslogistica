@@ -10,7 +10,7 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Último marco       | **PR #28** — checkpoint documental do B1                            |
 | Merge do marco     | `a4b8ed73867b1d0c7492bc1a418b633f80ef05d6` — merge commit do PR #28 |
 | B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
-| Migrations         | **19 locais = 19 em Production**, zero pendentes                    |
+| Migrations         | **19 em Production**; a `014` existe no repositório e está pendente |
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | Próximo passo      | **migration `014`** — dívida bloqueante da seção 7.4                |
@@ -48,10 +48,15 @@ ainda não consome**.
 **As migrations aplicadas são imutáveis — a `013` inclusive.** Qualquer mudança
 de banco daqui para frente exige migration nova.
 
-Seguem **aprovados e não implementados**: **PR B2** (adaptar a interface à
-superfície, quebrado em B2.1/B2.2/B2.3 — seção 7.3) e **PR C** (guard
-role-aware). O próximo passo é o **B2.1**. Leia a seção 6 antes de tocar em
-guard, policy ou usuário.
+O **B2.1** — a camada de dados operacional — está **concluído**, pelo PR #30. A
+**migration `014`**, que fecha a invariante de sinal de `break_minutes` (seção
+7.4), está **implementada no PR #31 e ainda NÃO aplicada em Production**: é a
+única migration pendente de deploy. **B2.2 não foi iniciado**, e só começa
+depois do deploy e da validação da `014`.
+
+Seguem **aprovados e não implementados**: **B2.2** e **B2.3** (seção 7.3) e
+**PR C** (guard role-aware). Leia a seção 6 antes de tocar em guard, policy ou
+usuário.
 
 ## 2. Ambiente
 
@@ -317,19 +322,19 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR        | Entrega                                                                                                                               | Estado                 |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**      |
-| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**      |
-| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **PRÓXIMO PASSO**      |
-| **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **BLOQUEANTE**, em PR  |
-| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | aprovado, não iniciado |
-| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado |
-| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado |
-| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado |
-| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado |
-| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado |
+| PR        | Entrega                                                                                                                               | Estado                                                |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**                                     |
+| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**                                     |
+| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **CONCLUÍDO** — PR #30                                |
+| **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **IMPLEMENTADA** — PR #31, deploy pendente            |
+| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **PRÓXIMO**, depois do deploy e da validação da `014` |
+| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado                                |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado                                |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado                                |
+| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado                                |
+| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado                                |
+| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado                                |
 
 Sequência obrigatória: **B2.1 → 014 → B2.2 → B2.3 → PR C → PR D → PR E → PR F →
 PR G**. A `014` entrou no meio depois do achado da seção 7.4: ela é **PR
@@ -864,30 +869,28 @@ maior que a duração bruta) exigiria trigger, porque um `CHECK` de
 `timesheet_entries` não enxerga o turno; teto comercial depende de decisão
 humana. Nenhum dos dois foi inventado aqui.
 
-1. `CHECK (break_minutes >= 0)` em `timesheet_entries`, e a decisão sobre
-   `shifts` — provavelmente o mesmo CHECK, pelo efeito inverso acima;
-2. **antes de adicionar o CHECK, medir os dados existentes em Production.** Um
-   `CHECK` sobre tabela com linha violando falha na aplicação, e linha faturada
-   é imutável — não dá para corrigir o histórico por `UPDATE`. Se houver
-   violação, é preciso decidir entre `NOT VALID` e correção prévia. **Essa
-   contagem não foi feita: o container da sessão não alcança Production;**
-3. validação explícita de sinal dentro de uma **RPC nova** — a `013` não se
-   edita. Vale decidir se a `014` publica uma `salvar_apontamento_operacional`
-   corrigida sob outra assinatura, ou se o CHECK do banco basta e a RPC só ganha
-   mensagem melhor;
-4. conferir se o teto também merece regra: `break_minutes` maior que a jornada
-   já é absorvido pelo `GREATEST(0, …)`, mas convém registrar a decisão;
-5. compatibilidade com o fluxo administrativo atual, que hoje grava direto na
-   tabela e passaria a receber recusa;
-6. teste SQL próprio com valores negativos pelos **dois** caminhos — RPC
-   operacional e escrita administrativa —, e a paridade com
-   `src/lib/billing.ts`;
+As sete perguntas do escopo, e como cada uma foi fechada:
+
+1. `CHECK (break_minutes >= 0)` — **nas duas tabelas**, pelo efeito inverso
+   descrito acima;
+2. **medir Production antes do CHECK** — feito, em transação `READ ONLY`: as
+   duas tabelas estão **vazias**. Sem legado, `ADD CONSTRAINT` simples, sem
+   `NOT VALID` e sem saneamento;
+3. validação de sinal dentro da RPC — **descartada**. Duplicar a função para
+   acrescentar um `IF` criaria duas cópias para divergir e repetiria a janela de
+   `CREATE`/`REVOKE` no schema que derrubou o primeiro deploy da 013. O `23514`
+   sobe intacto pelo `SECURITY DEFINER`, e a camada do B2.1 já o propaga;
+4. teto — **fora da `014`**, como registrado logo acima;
+5. compatibilidade com o fluxo administrativo — o admin passa a receber recusa,
+   que é o objetivo; a mensagem crua é UX de etapa posterior;
+6. teste SQL próprio pelos **dois** caminhos — entregue em
+   `supabase/tests/010_hardening_break_minutes.sql`, 44 casos;
 7. **a validação do frontend não conta como correção.** Ela pode existir como
    UX, depois; a autoridade da regra é o banco, como em todo o resto deste
    projeto.
 
-**Enquanto a `014` não existir:** não conectar a interface operacional (B2.3) e
-não criar o primeiro usuário `operacional` real.
+**Enquanto a `014` não estiver aplicada em Production:** não conectar a
+interface operacional (B2.3) e não criar o primeiro usuário `operacional` real.
 
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
@@ -1401,7 +1404,8 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
    autorização;
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
-5. continue da seção **7 — Próximas etapas oficiais**: **PR A** e **PR B1**
-   estão em Production, e o próximo passo é o **B2.1** — a camada de dados
-   operacional da seção 7.3, sem UI, sem guard e sem tocar no banco;
+5. continue da seção **7 — Próximas etapas oficiais**: **PR A**, **PR B1** e o
+   **B2.1** estão fechados; a **migration `014`** (seção 7.4) está no
+   repositório e **pendente de deploy**, e é o próximo passo. **B2.2** só
+   começa depois dela;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.
