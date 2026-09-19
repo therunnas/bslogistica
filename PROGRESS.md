@@ -10,12 +10,12 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Último marco       | **PR #28** — checkpoint documental do B1                            |
 | Merge do marco     | `a4b8ed73867b1d0c7492bc1a418b633f80ef05d6` — merge commit do PR #28 |
 | B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
-| Migrations         | **19 em Production**; a `014` existe no repositório e está pendente |
+| Migrations         | **20 locais = 20 em Production**, zero pendentes                    |
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
-| Próximo passo      | **migration `014`** — dívida bloqueante da seção 7.4                |
-| `014`              | **IMPLEMENTADA em PR** — ainda não aplicada em Production           |
-| B2.2               | próximo, depois do deploy da `014`                                  |
+| `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
+| Etapa atual        | **B2.2** — papel, navegação e bloqueio de rotas                     |
+| B2.3               | próxima, depois do B2.2                                             |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -50,9 +50,9 @@ de banco daqui para frente exige migration nova.
 
 O **B2.1** — a camada de dados operacional — está **concluído**, pelo PR #30. A
 **migration `014`**, que fecha a invariante de sinal de `break_minutes` (seção
-7.4), está **implementada no PR #31 e ainda NÃO aplicada em Production**: é a
-única migration pendente de deploy. **B2.2 não foi iniciado**, e só começa
-depois do deploy e da validação da `014`.
+7.4), está **CONCLUÍDA EM PRODUCTION** pelo PR #31, com auditoria pós-deploy
+PASS. **A etapa atual é o B2.2** — papel, navegação e bloqueio server-side de
+rotas.
 
 Seguem **aprovados e não implementados**: **B2.2** e **B2.3** (seção 7.3) e
 **PR C** (guard role-aware). Leia a seção 6 antes de tocar em guard, policy ou
@@ -322,19 +322,19 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR        | Entrega                                                                                                                               | Estado                                                |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**                                     |
-| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**                                     |
-| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **CONCLUÍDO** — PR #30                                |
-| **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **IMPLEMENTADA** — PR #31, deploy pendente            |
-| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **PRÓXIMO**, depois do deploy e da validação da `014` |
-| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado                                |
-| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado                                |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado                                |
-| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado                                |
-| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado                                |
-| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado                                |
+| PR        | Entrega                                                                                                                               | Estado                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**          |
+| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**          |
+| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **CONCLUÍDO** — PR #30     |
+| **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **EM PRODUCTION** — PR #31 |
+| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **ETAPA ATUAL**            |
+| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado     |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado     |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado     |
+| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
+| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
+| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado     |
 
 Sequência obrigatória: **B2.1 → 014 → B2.2 → B2.3 → PR C → PR D → PR E → PR F →
 PR G**. A `014` entrou no meio depois do achado da seção 7.4: ela é **PR
@@ -774,13 +774,29 @@ própria de quem tiver o token.
 isso na forma dos arquivos, junto com a ausência de importação de cálculo
 financeiro e de qualquer nome de coluna proibida.
 
-#### B2.2 — papel, navegação e bloqueio de rotas
+#### B2.2 — papel, navegação e bloqueio de rotas — IMPLEMENTADO em PR
 
-Distinguir admin × operacional; navegação diferente por papel; operacional não
-vê área administrativa. **O bloqueio é server-side** — esconder link não é
-bloqueio. Criar um helper server-side central (algo conceitualmente equivalente
-a `exigirAdmin()`) e chamá-lo nas telas administrativas, em vez de copiar lógica
-página a página. Admin mantém o acesso atual.
+- `_papel.ts` — `resolverPapelEfetivo()`, função pura: **`admin` + `operacional`
+  é ADMIN**, igual ao que a `013` decidiu no banco, onde
+  `operador_elegivel_aal1()` exige **não** ser admin;
+- `_exigir-admin.tsx` — guard server-side central. Devolve a tela de restrição
+  em qualquer situação que não seja `liberado` **com** papel admin, e as **sete**
+  telas administrativas o chamam **antes** de renderizar o painel. Esconder o
+  link nunca foi a proteção;
+- `_components/acesso-administrativo-restrito.tsx` — tela nova, e **não** a de
+  conta sem papel: quem é `operacional` tem papel e tem uso legítimo do sistema,
+  só não daquela área;
+- `AppShell` passa a receber o papel do servidor e **omite o `<nav>` inteiro**
+  para quem não é admin. Admin mantém os sete links;
+- `lerAcesso()` ficou memoizada com o `cache` do React — uma requisição, uma
+  consulta —, sem estado global e sem mudar a fonte de verdade.
+
+**Nada de MFA ou AAL mudou**, e os quatro destinos pós-login seguem em
+`/dashboard`: hoje o `operacional` cai lá e recebe a tela de restrição. Tornar o
+destino dependente de papel é do **B2.3**, junto com a rota operacional — link
+para rota inexistente seria pior que nenhum.
+
+Suíte `scripts/testar-papel.mjs`, **82 asserções**, por `npm run test:papel`.
 
 #### B2.3 — tela operacional de apontamentos
 
@@ -834,7 +850,7 @@ menos em vez de a mais, e por isso é menos urgente, mas é o mesmo defeito.
 **Nada foi corrigido no PR do B2.1, de propósito.** A `013` está em Production e
 é imutável, como a `010`, a `011` e a `012`.
 
-#### A migration `014` — IMPLEMENTADA em PR, não aplicada em Production
+#### A migration `014` — CONCLUÍDA EM PRODUCTION (PR #31)
 
 Arquivo: `supabase/migrations/20260918180000_014_hardening_break_minutes.sql`.
 Teste: `supabase/tests/010_hardening_break_minutes.sql`, 44 casos.
@@ -889,8 +905,13 @@ As sete perguntas do escopo, e como cada uma foi fechada:
    UX, depois; a autoridade da regra é o banco, como em todo o resto deste
    projeto.
 
-**Enquanto a `014` não estiver aplicada em Production:** não conectar a
-interface operacional (B2.3) e não criar o primeiro usuário `operacional` real.
+**Auditoria pós-deploy em Production — PASS.** 20 migrations locais = 20
+remotas, a `014` registrada, as duas constraints existindo com
+`CHECK ((break_minutes >= 0))`, e as duas tabelas ainda com zero linhas e zero
+negativos.
+
+O primeiro usuário `operacional` real continua dependendo do gate do **PR G**, e
+a interface operacional, do **B2.3**.
 
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 

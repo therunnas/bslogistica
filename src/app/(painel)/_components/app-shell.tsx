@@ -20,7 +20,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { sair } from "../_acoes";
+import type { PapelEfetivo } from "../_papel";
 
+/**
+ * As sete telas administrativas.
+ *
+ * Todas são administrativas de fato, não por rótulo: dashboard, relatórios e
+ * faturamento mostram receita, custo e margem; clientes traz as regras de
+ * cobrança; colaboradores, o custo por diária; operações administra a estrutura;
+ * e apontamentos é a tela administrativa atual, com o financeiro junto.
+ *
+ * Por isso a lista inteira some para quem não é admin, em vez de ser filtrada
+ * item a item: não há nenhum item aqui que sirva ao operacional.
+ */
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/apontamentos", label: "Apontamentos", icon: CalendarCheck },
@@ -31,7 +43,17 @@ const nav = [
   { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
 ] as const;
 
-export function AppShell({ children, email }: { children: ReactNode; email: string }) {
+export function AppShell({
+  children,
+  email,
+  papel,
+}: {
+  children: ReactNode;
+  email: string;
+  papel: PapelEfetivo;
+}) {
+  const mostrarNavegacaoAdministrativa = papel === "admin";
+
   const caminho = usePathname();
   const queryClient = useQueryClient();
   const [aberto, setAberto] = useState(false);
@@ -70,24 +92,34 @@ export function AppShell({ children, email }: { children: ReactNode; email: stri
             BS Soluções Logísticas
           </span>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setAberto(false)}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                caminho === href
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4" />
-              {label}
-            </Link>
-          ))}
-        </nav>
+        {/* Sem navegação administrativa, o `<nav>` inteiro sai da árvore: uma
+            lista vazia com a mesma altura só pareceria um menu quebrado. O
+            `flex-1` migra para este espaçador, para que o rodapé com e-mail e
+            Sair continue no pé da barra. A tela operacional chega no B2.3;
+            até lá não existe link a oferecer, e link para rota inexistente é
+            pior que nenhum. */}
+        {mostrarNavegacaoAdministrativa ? (
+          <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+            {nav.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setAberto(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  caminho === href
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4" />
+                {label}
+              </Link>
+            ))}
+          </nav>
+        ) : (
+          <div className="flex-1" />
+        )}
         <div className="border-t border-border p-3">
           <p className="truncate px-3 pb-2 text-xs text-muted-foreground" title={email}>
             {email}

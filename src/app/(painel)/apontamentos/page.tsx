@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { exigirAdmin } from "../_exigir-admin";
 import { PainelApontamentos } from "./painel-apontamentos";
 
 export const metadata: Metadata = {
@@ -12,6 +13,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Apontamentos() {
+export default async function Apontamentos() {
+  // Bloqueio server-side: o painel administrativo nem chega a existir na
+  // árvore quando a sessão não é de administrador.
+  const bloqueio = await exigirAdmin();
+  if (bloqueio) return bloqueio;
+
   return <PainelApontamentos />;
 }

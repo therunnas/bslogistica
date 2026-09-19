@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { lerAcesso } from "./_autorizacao";
+import { resolverPapelEfetivo } from "./_papel";
 import { AppShell } from "./_components/app-shell";
 import { AcessoNaoLiberado } from "./_components/acesso-nao-liberado";
 import { VerificacaoIndisponivel } from "./_components/verificacao-indisponivel";
@@ -32,5 +33,12 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   // que fica fora deste layout justamente para não ser barrada por ele.
   if (acesso.situacao === "mfa-ausente" || acesso.situacao === "mfa-pendente") redirect("/mfa");
 
-  return <AppShell email={acesso.email}>{children}</AppShell>;
+  // O papel decide o que a navegação oferece. O que ela NÃO oferece continua
+  // alcançável por URL, e é `exigirAdmin()`, em cada tela administrativa, que
+  // fecha esse caminho no servidor.
+  return (
+    <AppShell email={acesso.email} papel={resolverPapelEfetivo(acesso.papeis)}>
+      {children}
+    </AppShell>
+  );
 }
