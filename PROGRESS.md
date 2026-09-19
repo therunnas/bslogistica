@@ -14,6 +14,7 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | Próximo passo      | **B2.1** — camada de dados operacional (seção 7.3)                  |
 | B2.1               | **IMPLEMENTADO**, em PR aberto — ainda não mergeado                 |
+| Depois do B2.1     | **migration `014`**, dívida bloqueante da seção 7.4                 |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -315,20 +316,23 @@ cientes de papel, e a tela Configurações → Segurança.
 Com A₀ e A₀.1 fechados (seção 9), a fila volta a ser a autorização. Ela foi
 quebrada em três PRs, **nesta ordem obrigatória**:
 
-| PR        | Entrega                                                                                                                               | Estado                 |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**      |
-| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**      |
-| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **PRÓXIMO PASSO**      |
-| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | aprovado, não iniciado |
-| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado |
-| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado |
-| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado |
-| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado |
-| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado |
+| PR        | Entrega                                                                                                                               | Estado                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| **PR A**  | estado de MFA **verificável no banco** — indicador fail-closed e não forjável pelo usuário. Migration `012`. Ver 7.1                  | **EM PRODUCTION**         |
+| **PR B1** | **superfície AAL1 no banco**: atribuição usuário → operação, helpers, RPCs estreitas, papel dedicado. Migration `013`. Ver 7.2        | **EM PRODUCTION**         |
+| **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **PRÓXIMO PASSO**         |
+| **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **BLOQUEANTE**, planejado |
+| **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | aprovado, não iniciado    |
+| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | aprovado, não iniciado    |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado    |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado    |
+| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado    |
+| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado    |
+| **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado    |
 
-Sequência obrigatória: **B2.1 → B2.2 → B2.3 → PR C → PR D → PR E → PR F → PR G**.
+Sequência obrigatória: **B2.1 → 014 → B2.2 → B2.3 → PR C → PR D → PR E → PR F →
+PR G**. A `014` entrou no meio depois do achado da seção 7.4: ela é **PR
+próprio, logo depois do merge do B2.1 e antes do B2.2**.
 
 **O primeiro usuário `operacional` real só existe depois de todos**, e depois da
 matriz E2E do **PR G**. PR A era pré-requisito de PR B1: sem um indicador
@@ -746,7 +750,7 @@ em `src/lib/operacional/`: `tipos.ts` (só tipos, transcritos dos `RETURNS
 TABLE` da 013), `rpc.ts` (as cinco chamadas, os predicados de parâmetro e a
 normalização do payload), `chaves.ts` (chaves de cache), `queries.ts` (quatro
 hooks de leitura) e `mutations.ts` (a única escrita). Suíte
-`scripts/testar-operacional.mjs`, **87 asserções**, rodada por
+`scripts/testar-operacional.mjs`, **122 asserções**, rodada por
 `npm run test:operacional`.
 
 **O gate de tipos da decisão 7 não pôde ser fechado aqui**, e isso está
@@ -782,6 +786,76 @@ ou qualquer prévia financeira. **Não usar** `src/lib/billing.ts`,
 `src/lib/ledger.ts`, os hooks administrativos nem `select("*")` nas tabelas
 protegidas. A escrita passa **exclusivamente** por
 `salvar_apontamento_operacional(...)`, com os seis campos que a RPC aceita.
+
+### 7.4 Dívida BLOQUEANTE — `break_minutes` negativo infla o valor derivado
+
+**Achado na revisão do PR #30 (B2.1), CONFIRMADO por medição local em
+18/09/2026.** Não é defeito do B2.1 nem da superfície operacional: é invariante
+que **nunca existiu no banco**, e o caminho administrativo tem exatamente o
+mesmo furo desde sempre.
+
+**O que foi medido**, num PostgreSQL local com as 19 migrations aplicadas, tudo
+em transação com `rollback`:
+
+- **não existe nenhum CHECK** em `public.timesheet_entries` nem em
+  `public.shifts` — a consulta a `pg_constraint` com `contype = 'c'` devolve
+  **zero linhas** para as duas tabelas. As colunas são só
+  `integer NOT NULL DEFAULT 0`;
+- **`salvar_apontamento_operacional` não valida o sinal.** A `013` faz
+  `coalesce((_linha ->> 'break_minutes')::integer, 0)` — o `coalesce` cobre
+  ausência, não negativo;
+- **a derivação da `010` subtrai o valor**:
+  `_worked := GREATEST(0, _fim - _inicio - COALESCE(NEW.break_minutes, 0))`.
+  Subtrair um negativo **soma**, e o `GREATEST(0, …)` protege o piso, não o
+  teto.
+
+**O efeito, medido pela RPC, com turno 08:00–17:00 e contrato de R$ 150,00:**
+
+| `break_minutes` enviado | `worked_minutes` | `overtime_minutes` | `billed_amount`  |
+| ----------------------- | ---------------- | ------------------ | ---------------- |
+| `0`                     | 540              | 60                 | R$ 178,13        |
+| `-120`                  | 660              | 180                | R$ 234,38        |
+| `-100000`               | 100540           | 100060             | **R$ 47.053,13** |
+
+**O mesmo vale para o admin em AAL2**, medido: `INSERT` direto com `-120` é
+aceito e produz os mesmos R$ 234,38. A superfície operacional só herdou o furo.
+
+**`shifts.break_minutes` tem a mesma ausência de invariante**, com efeito
+inverso: `-120` no turno eleva a jornada prevista de 480 para 660 minutos, e a
+hora extra do exemplo **cai a zero** — R$ 150,00 em vez de R$ 178,13. Fatura a
+menos em vez de a mais, e por isso é menos urgente, mas é o mesmo defeito.
+
+**Nada foi corrigido no PR do B2.1, de propósito.** A `013` está em Production e
+é imutável, como a `010`, a `011` e a `012`.
+
+#### Escopo proposto da migration `014`
+
+**Não implementada.** PR próprio, logo após o merge do B2.1 e **antes** do B2.2.
+
+1. `CHECK (break_minutes >= 0)` em `timesheet_entries`, e a decisão sobre
+   `shifts` — provavelmente o mesmo CHECK, pelo efeito inverso acima;
+2. **antes de adicionar o CHECK, medir os dados existentes em Production.** Um
+   `CHECK` sobre tabela com linha violando falha na aplicação, e linha faturada
+   é imutável — não dá para corrigir o histórico por `UPDATE`. Se houver
+   violação, é preciso decidir entre `NOT VALID` e correção prévia. **Essa
+   contagem não foi feita: o container da sessão não alcança Production;**
+3. validação explícita de sinal dentro de uma **RPC nova** — a `013` não se
+   edita. Vale decidir se a `014` publica uma `salvar_apontamento_operacional`
+   corrigida sob outra assinatura, ou se o CHECK do banco basta e a RPC só ganha
+   mensagem melhor;
+4. conferir se o teto também merece regra: `break_minutes` maior que a jornada
+   já é absorvido pelo `GREATEST(0, …)`, mas convém registrar a decisão;
+5. compatibilidade com o fluxo administrativo atual, que hoje grava direto na
+   tabela e passaria a receber recusa;
+6. teste SQL próprio com valores negativos pelos **dois** caminhos — RPC
+   operacional e escrita administrativa —, e a paridade com
+   `src/lib/billing.ts`;
+7. **a validação do frontend não conta como correção.** Ela pode existir como
+   UX, depois; a autoridade da regra é o banco, como em todo o resto deste
+   projeto.
+
+**Enquanto a `014` não existir:** não conectar a interface operacional (B2.3) e
+não criar o primeiro usuário `operacional` real.
 
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
@@ -1273,6 +1347,10 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
   aceitar campo novo no JSON da escrita sem decisão de produto; não criar RPC de
   exclusão; não conceder `EXECUTE` dos helpers a `authenticated`; não abrir
   `user_operation_access` a quem não é admin em AAL2.
+- **Não iniciar B2.2 antes da migration `014`** (seção 7.4): `break_minutes`
+  negativo atravessa e infla `billed_amount`, medido.
+- **Não corrigir isso no frontend** e dar por resolvido: a autoridade da regra é
+  o banco.
 - **Não reabrir as sete decisões congeladas do B2** (seção 7.3): fonte de dados
   por papel, tela operacional separada, fechar/reabrir só de admin, nada de
   fallback para operação sem turno, `admin`+`operacional` tratado como admin,
