@@ -56,8 +56,8 @@ src/lib/operacional/         contratos e hooks das 5 RPCs — sem tabela direta
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         21 arquivos, todos em Production e imutáveis
-supabase/tests/              11 testes SQL de RLS, invariáveis, fontes, MFA e
+supabase/migrations/         22 arquivos — 21 em Production, a `016` em PR
+supabase/tests/              12 testes SQL de RLS, invariáveis, fontes, MFA e
                              superfície operacional
 ```
 
@@ -228,19 +228,30 @@ pela `013`, nem pela `015`. As 11 `*_exige_aal2` seguem RESTRICTIVE e globais, e
 AAL1 a única porta é a RPC. A `015` só estendeu **quem** é aceito na mesma
 superfície estreita; não ampliou dado, coluna, grant ou tabela.
 
-**Em AAL2 a garantia é outra, e é anterior a tudo isto.** Ali o operador é
+**Em AAL2 havia um buraco, e a `016` o fecha.** Ali o operador é
 `authenticated` como qualquer outro: a RESTRICTIVE `*_exige_aal2` passa, e as
 policies **permissivas** originais liberam pelo `public.is_staff()`, que é
-`EXISTS` de linha em `user_roles` — **verdadeiro para qualquer papel**. Ou seja,
-um `operacional` em AAL2 alcança essas tabelas direto pelo PostgREST, com
-SELECT, e onde a policy é `FOR ALL` (`operations`, `shifts`, `timesheets`,
-`timesheet_entries`, `operation_team`) também com escrita. Isso **não** foi
-introduzido pela `013` nem pela `015` — vem das policies originais, em que
-"staff" nunca distinguiu papel —, e o caso J do teste `011` registra o
-comportamento. A superfície estreita é o que a **interface** usa e o que
-governa o AAL1; ela **não** é, hoje, um limite de banco para o operador em
-AAL2. Separar `is_staff()` por papel é tarefa de escopo próprio, com migration
-e testes — não se resolve no guard nem na documentação.
+`EXISTS` de linha em `user_roles` — **verdadeiro para qualquer papel**. Um
+`operacional` que concluísse o TOTP alcançava as dez tabelas direto pelo
+PostgREST, com SELECT e, onde a permissiva é `FOR ALL`, com escrita. Medido no
+harness: atravessavam `clients.doc`, `contact_name`, `email`, `phone`, as taxas
+do contrato, `employees.doc`, `phone`, `daily_cost`, `operations.agreed_amount`,
+`billed_amount`, `cost_amount`, os snapshots e `invoice_id`. Não foi a `013` nem
+a `015` que abriram isso — vem das policies originais, em que "staff" nunca
+distinguiu papel.
+
+**A `016` acrescenta uma RESTRICTIVE `*_exige_admin` por tabela**, de modo que
+acesso direto de `authenticated` passa a ser **`aal2` E `admin`**. Ela não toca
+permissiva, grant, trigger, RPC nem `is_staff()` — redefinir a função mudaria o
+significado de policies de várias migrations de uma vez, sem que nenhuma delas
+dissesse o que passou a valer. Ficam de fora, de propósito: `profiles` (cada
+conta lê a própria linha), `user_roles` (lida em AAL1, antes do MFA) e
+`user_operation_access` (já é admin + AAL2). As cinco RPCs não são afetadas:
+`bslog_rpc_operacional` tem `BYPASSRLS`, então policy nenhuma o alcança — é o
+que torna a superfície estreita, agora, a **única** porta do operador.
+Medido em `supabase/tests/012_restringir_postgrest_operacional.sql`.
+
+**A `016` está no repositório e ainda NÃO foi aplicada em Production.**
 
 **Regras permanentes desta superfície:**
 
