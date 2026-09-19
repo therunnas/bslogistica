@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import type { Database } from "@/integrations/supabase/types";
 import { decidirSituacaoMfa } from "@/lib/mfa";
@@ -22,8 +24,14 @@ export type Acesso =
  * Isto decide o que a interface mostra. Quem impede o acesso aos dados é a
  * RLS no banco — se este arquivo tivesse um bug, as tabelas continuariam
  * protegidas.
+ *
+ * Memoizada com o `cache` do React, que dura **uma requisição**: o layout e a
+ * página administrativa perguntam a mesma coisa na mesma passada, e sem isso
+ * seriam duas idas ao Supabase para a mesma resposta. Não é estado global nem
+ * cache entre usuários — a cada requisição a pergunta é feita de novo, à fonte
+ * de sempre.
  */
-export async function lerAcesso(): Promise<Acesso> {
+export const lerAcesso = cache(async (): Promise<Acesso> => {
   const supabase = await criarClienteServidor();
 
   // getUser valida o token contra o servidor do Supabase. getSession leria
@@ -62,4 +70,4 @@ export async function lerAcesso(): Promise<Acesso> {
   return situacao === "liberado"
     ? { situacao: "liberado", email, papeis }
     : { situacao, email, papeis };
-}
+});

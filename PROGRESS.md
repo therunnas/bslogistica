@@ -774,13 +774,29 @@ própria de quem tiver o token.
 isso na forma dos arquivos, junto com a ausência de importação de cálculo
 financeiro e de qualquer nome de coluna proibida.
 
-#### B2.2 — papel, navegação e bloqueio de rotas
+#### B2.2 — papel, navegação e bloqueio de rotas — IMPLEMENTADO em PR
 
-Distinguir admin × operacional; navegação diferente por papel; operacional não
-vê área administrativa. **O bloqueio é server-side** — esconder link não é
-bloqueio. Criar um helper server-side central (algo conceitualmente equivalente
-a `exigirAdmin()`) e chamá-lo nas telas administrativas, em vez de copiar lógica
-página a página. Admin mantém o acesso atual.
+- `_papel.ts` — `resolverPapelEfetivo()`, função pura: **`admin` + `operacional`
+  é ADMIN**, igual ao que a `013` decidiu no banco, onde
+  `operador_elegivel_aal1()` exige **não** ser admin;
+- `_exigir-admin.tsx` — guard server-side central. Devolve a tela de restrição
+  em qualquer situação que não seja `liberado` **com** papel admin, e as **sete**
+  telas administrativas o chamam **antes** de renderizar o painel. Esconder o
+  link nunca foi a proteção;
+- `_components/acesso-administrativo-restrito.tsx` — tela nova, e **não** a de
+  conta sem papel: quem é `operacional` tem papel e tem uso legítimo do sistema,
+  só não daquela área;
+- `AppShell` passa a receber o papel do servidor e **omite o `<nav>` inteiro**
+  para quem não é admin. Admin mantém os sete links;
+- `lerAcesso()` ficou memoizada com o `cache` do React — uma requisição, uma
+  consulta —, sem estado global e sem mudar a fonte de verdade.
+
+**Nada de MFA ou AAL mudou**, e os quatro destinos pós-login seguem em
+`/dashboard`: hoje o `operacional` cai lá e recebe a tela de restrição. Tornar o
+destino dependente de papel é do **B2.3**, junto com a rota operacional — link
+para rota inexistente seria pior que nenhum.
+
+Suíte `scripts/testar-papel.mjs`, **82 asserções**, por `npm run test:papel`.
 
 #### B2.3 — tela operacional de apontamentos
 
