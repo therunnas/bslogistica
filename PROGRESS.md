@@ -6,18 +6,18 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 | Item               | Valor                                                               |
 | ------------------ | ------------------------------------------------------------------- |
-| Data do checkpoint | 2026-09-18                                                          |
+| Data do checkpoint | 2026-09-19                                                          |
 | Último marco       | **PR #28** — checkpoint documental do B1                            |
 | Merge do marco     | `a4b8ed73867b1d0c7492bc1a418b633f80ef05d6` — merge commit do PR #28 |
 | B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
-| Migrations         | **20 locais = 20 em Production**, zero pendentes                    |
+| Migrations         | **21 locais = 21 em Production**, zero pendentes                    |
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
 | B2.2               | **CONCLUÍDO** — PR #32, mergeado                                    |
 | B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
-| Etapa atual        | **migration `015`** — descoberta pela auditoria do PR C             |
-| PR C               | próximo, depois da `015`                                            |
+| `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS               |
+| Etapa atual        | **PR C** — guard role-aware, aprovado e ainda não iniciado          |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -332,8 +332,8 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **EM PRODUCTION** — PR #31 |
 | **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **CONCLUÍDO** — PR #32     |
 | **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **CONCLUÍDO** — PR #33     |
-| **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **IMPLEMENTADA em PR**     |
-| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado     |
+| **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **EM PRODUCTION** — PR #34 |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **PRÓXIMA ETAPA**          |
 | **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado     |
 | **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
 | **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
@@ -994,7 +994,24 @@ superfície é exclusiva de AAL1. Não é inversão para fabricar verde: é o
 contrato que mudou, por decisão aprovada, e a mudança está anotada no próprio
 arquivo.
 
-**Ainda NÃO aplicada em Production.**
+**Aplicada em Production em 19/09/2026 — PR #34.** Auditoria pós-deploy
+**PASS**, item a item:
+
+| Verificação                                       | Resultado                                                                                 |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| migrations                                        | **21 locais = 21 em Production**, zero pendentes                                          |
+| `operador_elegivel_operacional()`                 | existe, dono `postgres`, `SECURITY DEFINER`                                               |
+| `operador_elegivel_aal1()`                        | **preservada** — aceita `aal1`, recusa `aal2`                                             |
+| `operador_autorizado(uuid)` e `uid_do_operador()` | ambos apontam para o helper novo                                                          |
+| ACL do helper novo                                | `authenticated`, `anon` e `service_role` **sem** EXECUTE; `bslog_rpc_operacional` **com** |
+| as cinco RPCs                                     | íntegras, mesmo dono, mesmo contrato                                                      |
+| as 11 policies `*_exige_aal2`                     | intactas                                                                                  |
+| as duas constraints da `014`                      | intactas                                                                                  |
+| colunas financeiras para `bslog_rpc_operacional`  | continuam inacessíveis                                                                    |
+
+O que a `015` mudou, em uma frase: o `operacional` **em AAL2** passou a usar
+**a mesma superfície estreita de RPC** já usada em AAL1 — não ganhou leitura
+direta de tabela, e **nenhuma superfície financeira foi ampliada**.
 
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
@@ -1508,8 +1525,8 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
    autorização;
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
-5. continue da seção **7 — Próximas etapas oficiais**: **PR A**, **PR B1** e o
-   **B2.1** estão fechados; a **migration `014`** (seção 7.4) está no
-   repositório e **pendente de deploy**, e é o próximo passo. **B2.2** só
-   começa depois dela;
+5. continue da seção **7 — Próximas etapas oficiais**: **PR A**, **PR B1**,
+   **B2.1**, **`014`**, **B2.2**, **B2.3** e a **`015`** estão fechados e em
+   Production; o próximo passo é o **PR C** — guard role-aware —, seguido de
+   **PR D → PR E → PR F → PR G**;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.
