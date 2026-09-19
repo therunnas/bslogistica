@@ -120,9 +120,14 @@ tem relação com o TanStack Router.
   `operador_elegivel_operacional()` — `aal1` sem MFA bloqueando **ou** `aal2` —
   e reapontou os helpers centrais para ela, **sem** ampliar dado, coluna ou
   grant. As 11 policies `*_exige_aal2` **não** foram afrouxadas por nenhuma das
-  duas, e `operacional` continua sem ler tabela de negócio direto, em AAL1 e em
-  AAL2. A interface **consome** essas RPCs desde o B2.1 (`src/lib/operacional/`)
-  e o B2.3 (tela `/operacional`), e só elas. Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
+  duas, e **em AAL1** `operacional` lê zero linha de tabela de negócio pelo
+  PostgREST — ali a RPC é a única porta. **Em AAL2 não é assim:** as policies
+  permissivas originais liberam por `public.is_staff()`, que é verdadeiro para
+  qualquer papel, então o operador em AAL2 alcança essas tabelas direto — e
+  escreve naquelas cuja policy é `FOR ALL`. Isso é anterior à `013` e à `015`, e
+  não se conserta no guard; separar `is_staff()` por papel é tarefa própria, com
+  migration e teste. A interface **consome** as RPCs desde o B2.1
+  (`src/lib/operacional/`) e o B2.3 (tela `/operacional`), e só elas. Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
   `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
   por linha e recusa a chamada inteira diante de chave inesperada, não existe
   DELETE, e toda função `SECURITY DEFINER` revalida papel + AAL + MFA +

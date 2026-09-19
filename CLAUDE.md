@@ -223,10 +223,24 @@ RPCs de contrato fechado:
 
 **O que continua fechado, e é o ponto:** nenhuma policy foi afrouxada — nem
 pela `013`, nem pela `015`. As 11 `*_exige_aal2` seguem RESTRICTIVE e globais, e
-`operacional` lê **zero linha** de `operations`, `shifts`, `employees`,
-`contracts`, `timesheets` e `timesheet_entries` pelo PostgREST, em AAL1 **e** em
-AAL2. A única porta é a RPC. A `015` só estendeu **quem** é aceito na mesma
+**em AAL1** `operacional` lê **zero linha** de `operations`, `shifts`,
+`employees`, `contracts`, `timesheets` e `timesheet_entries` pelo PostgREST. Em
+AAL1 a única porta é a RPC. A `015` só estendeu **quem** é aceito na mesma
 superfície estreita; não ampliou dado, coluna, grant ou tabela.
+
+**Em AAL2 a garantia é outra, e é anterior a tudo isto.** Ali o operador é
+`authenticated` como qualquer outro: a RESTRICTIVE `*_exige_aal2` passa, e as
+policies **permissivas** originais liberam pelo `public.is_staff()`, que é
+`EXISTS` de linha em `user_roles` — **verdadeiro para qualquer papel**. Ou seja,
+um `operacional` em AAL2 alcança essas tabelas direto pelo PostgREST, com
+SELECT, e onde a policy é `FOR ALL` (`operations`, `shifts`, `timesheets`,
+`timesheet_entries`, `operation_team`) também com escrita. Isso **não** foi
+introduzido pela `013` nem pela `015` — vem das policies originais, em que
+"staff" nunca distinguiu papel —, e o caso J do teste `011` registra o
+comportamento. A superfície estreita é o que a **interface** usa e o que
+governa o AAL1; ela **não** é, hoje, um limite de banco para o operador em
+AAL2. Separar `is_staff()` por papel é tarefa de escopo próprio, com migration
+e testes — não se resolve no guard nem na documentação.
 
 **Regras permanentes desta superfície:**
 
