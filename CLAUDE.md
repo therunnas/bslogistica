@@ -51,8 +51,8 @@ src/lib/mfa.ts               decisões de segundo fator, funções puras
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         19 arquivos, todos em Production e imutáveis
-supabase/tests/              9 testes SQL de RLS, invariáveis, fontes, MFA e
+supabase/migrations/         21 arquivos, todos em Production e imutáveis
+supabase/tests/              11 testes SQL de RLS, invariáveis, fontes, MFA e
                              superfície operacional
 ```
 
@@ -314,8 +314,9 @@ Está registrado assim de propósito; se virar invariante, é tarefa própria.
   Há trigger `BEFORE TRUNCATE` sobre `timesheet_entries` e `invoice_items`. Não
   afrouxar nada disso sem tarefa de escopo próprio.
 - **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`. As 19 estão aplicadas, a `013` inclusive:
-  **nenhuma delas se edita**, nem para corrigir.
+  `supabase migration new <nome>`. As 21 migrations do repositório estão
+  aplicadas em Production — a `014` e a `015` inclusive —, e **nenhuma
+  migration aplicada se edita**, nem para corrigir.
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse
   escopo explícito.
 - **Não alterar regras financeiras** — diária, hora extra, custo, faturamento —
