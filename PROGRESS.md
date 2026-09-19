@@ -13,7 +13,7 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Migrations         | **19 locais = 19 em Production**, zero pendentes                    |
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | Próximo passo      | **B2.1** — camada de dados operacional (seção 7.3)                  |
-| B2.1               | **NÃO INICIADO**                                                    |
+| B2.1               | **IMPLEMENTADO**, em PR aberto — ainda não mergeado                 |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -739,13 +739,30 @@ não reabra o que já foi decidido.
 
 O fluxo operacional **não deve reutilizar** a fonte de dados dessa última.
 
-#### B2.1 — camada de dados operacional (próximo passo)
+#### B2.1 — camada de dados operacional — IMPLEMENTADO, em PR aberto
 
-Sem UI, sem guard, sem mudança de segurança, sem tocar em Production. Criar
-contratos e wrappers para as cinco RPCs. Estrutura preferida, sujeita à
-auditoria de tipos da decisão 7: `src/lib/operacional/` com `tipos.ts`,
-`queries.ts` e `mutations.ts`. **Nenhum acesso direto a tabela protegida no
-caminho AAL1.**
+Sem UI, sem guard, sem mudança de segurança, sem tocar em Production. Entregue
+em `src/lib/operacional/`: `tipos.ts` (só tipos, transcritos dos `RETURNS
+TABLE` da 013), `rpc.ts` (as cinco chamadas, os predicados de parâmetro e a
+normalização do payload), `chaves.ts` (chaves de cache), `queries.ts` (quatro
+hooks de leitura) e `mutations.ts` (a única escrita). Suíte
+`scripts/testar-operacional.mjs`, **87 asserções**, rodada por
+`npm run test:operacional`.
+
+**O gate de tipos da decisão 7 não pôde ser fechado aqui**, e isso está
+registrado de propósito: este ambiente não gera os tipos do Supabase — sem
+token de acesso o caminho `--project-id` é recusado, e o caminho `--db-url`
+depende de uma imagem Docker cuja baixa a política de rede bloqueia. Sem
+geração não há diff para comparar, então valeu o **cenário B**: tipos locais
+estritos, derivados da migration 013, sem sobrescrever o arquivo canônico. A
+assinatura das cinco funções foi lida do catálogo (`pg_get_function_result`) de
+um banco local com as 19 migrations aplicadas, não do texto do arquivo.
+Atualizar `src/integrations/supabase/types.ts` continua pendente, como tarefa
+própria de quem tiver o token.
+
+**Nenhum acesso direto a tabela protegida no caminho AAL1** — a suíte assevera
+isso na forma dos arquivos, junto com a ausência de importação de cálculo
+financeiro e de qualquer nome de coluna proibida.
 
 #### B2.2 — papel, navegação e bloqueio de rotas
 
