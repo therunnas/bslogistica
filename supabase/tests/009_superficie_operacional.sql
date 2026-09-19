@@ -279,12 +279,24 @@ begin
     'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000002', 'aal1',
       format('select count(*)::text from public.listar_turnos_do_operador(%L::uuid)', _op)));
 
-  perform pg_temp.registrar('A7. operacional com fator verificado em aal2 tambem nega',
-    'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000002', 'aal2',
+  -- A7 e A8 MUDARAM DE RESPOSTA NA MIGRATION 015, e a mudanca e deliberada.
+  --
+  -- Ate a 014 estes dois casos esperavam 42501, porque a superficie aceitava
+  -- SOMENTE aal1. Isso se revelou um defeito na auditoria do PR C: um
+  -- operacional que ativa o segundo fator e conclui o TOTP chega em aal2 e era
+  -- recusado pela propria superficie — a tela ficava inutil exatamente para
+  -- quem seguiu a politica de seguranca. A 015 passou a aceitar o nivel MAIOR
+  -- na MESMA superficie estreita, sem ampliar dado nenhum.
+  --
+  -- A expectativa nao foi invertida para fabricar PASS: o contrato mudou, e o
+  -- teste 011 mede a mudanca inteira, inclusive a prova de que
+  -- `operador_elegivel_aal1()` continua respondendo exatamente o que respondia.
+  perform pg_temp.registrar('A7. operacional com fator verificado em aal2 e aceito (015)',
+    '2', pg_temp.medir('0a000000-0000-4000-8000-000000000002', 'aal2',
       format('select count(*)::text from public.listar_turnos_do_operador(%L::uuid)', _op)));
 
-  perform pg_temp.registrar('A8. operacional sem MFA em aal2 nega (superficie e so de aal1)',
-    'erro 42501', pg_temp.medir('0a000000-0000-4000-8000-000000000001', 'aal2',
+  perform pg_temp.registrar('A8. operacional sem MFA em aal2 tambem e aceito (015)',
+    '2', pg_temp.medir('0a000000-0000-4000-8000-000000000001', 'aal2',
       format('select count(*)::text from public.listar_turnos_do_operador(%L::uuid)', _op)));
 
   perform pg_temp.registrar('A9. sem claim aal nega',
