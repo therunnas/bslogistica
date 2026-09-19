@@ -17,7 +17,7 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | B2.2               | **CONCLUÍDO** — PR #32, mergeado                                    |
 | B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
 | `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS               |
-| Etapa atual        | **PR C** — guard role-aware, aprovado e ainda não iniciado          |
+| Etapa atual        | **PR C** — guard role-aware, **EM REVISÃO** (ver 7.6)               |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -333,7 +333,7 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **CONCLUÍDO** — PR #32     |
 | **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **CONCLUÍDO** — PR #33     |
 | **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **EM PRODUCTION** — PR #34 |
-| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **PRÓXIMA ETAPA**          |
+| **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **EM REVISÃO** — ver 7.6   |
 | **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado     |
 | **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
 | **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
@@ -1013,6 +1013,86 @@ O que a `015` mudou, em uma frase: o `operacional` **em AAL2** passou a usar
 **a mesma superfície estreita de RPC** já usada em AAL1 — não ganhou leitura
 direta de tabela, e **nenhuma superfície financeira foi ampliada**.
 
+### 7.6 PR C — o guard role-aware
+
+**Em revisão. Não mergeado, não implantado.** Sem migration: a `012` já dá o
+indicador confiável de MFA e a `015` já aceita o operador elegível em AAL1 ou
+AAL2. Este PR só ensina o servidor Next a decidir igual.
+
+**A política, como ficou escrita em `decidirAcesso`:**
+
+| Papel efetivo         | Nível  | Estado do fator (banco) | Decisão            |
+| --------------------- | ------ | ----------------------- | ------------------ |
+| `admin`               | `aal2` | qualquer                | `liberado`         |
+| `admin`               | `aal1` | com fator               | `mfa-pendente`     |
+| `admin`               | `aal1` | sem fator               | `mfa-ausente`      |
+| `operacional`         | `aal1` | sem fator               | `liberado`         |
+| `operacional`         | `aal1` | com fator               | `mfa-pendente`     |
+| `operacional`         | `aal2` | qualquer                | `liberado`         |
+| `admin`+`operacional` | —      | —                       | decide como admin  |
+| sem papel             | —      | —                       | `sem-papel`        |
+| sem sessão            | —      | —                       | `sem-sessao`       |
+| qualquer              | outro  | qualquer                | `mfa-indisponivel` |
+| qualquer              | `aal1` | indeterminado           | `mfa-indisponivel` |
+
+A única assimetria entre os papéis é a linha do `aal1` sem fator: o admin vai
+cadastrar, o operacional trabalha. Tudo o mais é igual para os dois.
+
+**A fonte de verdade deixou de ser o cookie.** O que distingue "nunca ativou
+MFA" de "ativou e ainda não fez o TOTP" é `public.mfa_bloqueia_excecao_aal1()`,
+da `012`, chamada pelo cliente Supabase da sessão — `SECURITY DEFINER` sobre
+`auth.mfa_factors`, que o usuário não alcança nem forja. `nextLevel` saiu do
+caminho de enforcement do painel: ele é derivado de `session.user.factors`, isto
+é, do cookie. `currentLevel` continua, e pode: é a claim `aal` do token que o
+`getUser()` já validou contra o servidor.
+
+**`nextLevel` ainda existe em um lugar, de propósito:** `decidirSituacaoMfa`, no
+fluxo de recuperação de senha. Ali a decisão não concede acesso a dado nenhum —
+escolhe se o TOTP é desafiado antes do `updateUser` —, e quem recusa de verdade
+a troca sem AAL2 é o GoTrue, com 401. Está documentado nas duas funções.
+
+**Falha é sempre fechada.** `interpretarBloqueioDeExcecao` só aceita os
+booleanos literais: `true` exige fator, `false` libera a exceção, e **todo o
+resto** — `null`, `undefined`, string, erro de rede — é `indeterminado`, que
+vira `mfa-indisponivel`. A armadilha concreta que isso evita é `Boolean(null)`,
+que daria `false`, que é justamente o valor que abre a exceção de AAL1.
+
+**A decisão continua centralizada em `lerAcesso()`.** Layout, `/mfa`,
+`/dashboard` e os dois guards leem dali e não recalculam nível, papel nem
+estado de fator — há asserção de forma literal para cada um desses cinco
+arquivos. Duas definições de "liberado" é o que produziria laço entre `/mfa`,
+`/dashboard` e `/operacional`.
+
+**Correção de documentação junto:** o comentário de `_autorizacao.ts` afirmava
+que `getAuthenticatorAssuranceLevel()` sem argumento validava `nextLevel` no
+servidor. Era falso. O texto foi substituído pelo motivo real de não usá-lo, e
+há asserção que impede a afirmação de voltar.
+
+**Testes:** `npm run test:mfa` passou de 23 para **86 asserções** — a matriz
+inteira, uma varredura exaustiva de 54 combinações que recusa qualquer
+liberação fora da regra, e forma literal dos cinco arquivos dependentes. As
+sete suítes somam **796 asserções**, todas verdes. Cinco regressões foram
+injetadas e detectadas antes de o PR existir: concessão por `nextLevel`, admin
+liberado em AAL1, operacional com MFA liberado em AAL1, operacional sem MFA
+recusado em AAL1, e falha da RPC tratada como liberação.
+
+**O que este PR NÃO faz:** não cria migration, não toca RPC, RLS, grant,
+trigger, tela operacional nem regra financeira, e não abre caminho para o PR D.
+O operador em AAL1 continua alcançando **zero linha** pelo PostgREST: a única
+porta segue sendo a RPC, e quem a governa é o banco.
+
+**Duas notas para a revisão:**
+
+1. a matriz enviada dizia `admin + aal1 -> mfa-pendente` sem distinguir o estado
+   do fator. Aplicar isso ao pé da letra quebraria o cadastro do primeiro fator
+   de um admin novo: `decidirFluxoMfa` recusa cadastrar quando a etapa é
+   `mfa-pendente` e não há fator verificado. Por isso o admin sem fator recebe
+   `mfa-ausente` — que também **não** libera, e também vai para `/mfa`;
+2. um `operacional` sem fator agora é `liberado`, e `/mfa` devolve quem está
+   `liberado` para o painel. Ou seja: **ainda não existe caminho para ele
+   ativar MFA por vontade própria** — isso é o **PR F** (Configurações →
+   Segurança), como já estava previsto.
+
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
 **Auditoria e desenho da autorização** por **papel + AAL + RLS + guards**.
@@ -1527,6 +1607,6 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 4. não reaudite todo o projeto sem necessidade;
 5. continue da seção **7 — Próximas etapas oficiais**: **PR A**, **PR B1**,
    **B2.1**, **`014`**, **B2.2**, **B2.3** e a **`015`** estão fechados e em
-   Production; o próximo passo é o **PR C** — guard role-aware —, seguido de
-   **PR D → PR E → PR F → PR G**;
+   Production; o **PR C** — guard role-aware, seção 7.6 — está **em revisão**,
+   e depois dele vêm **PR D → PR E → PR F → PR G**;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.

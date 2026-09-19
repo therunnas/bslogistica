@@ -2,7 +2,9 @@ import { cache } from "react";
 
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import type { Database } from "@/integrations/supabase/types";
-import { decidirSituacaoMfa } from "@/lib/mfa";
+import type { EstadoDoFator } from "@/lib/mfa";
+import { decidirAcesso, interpretarBloqueioDeExcecao } from "@/lib/mfa";
+import { resolverPapelEfetivo } from "./_papel";
 
 export type Papel = Database["public"]["Enums"]["app_role"];
 
@@ -14,6 +16,48 @@ export type Acesso =
   | { situacao: "mfa-pendente"; email: string; papeis: Papel[] }
   | { situacao: "liberado"; email: string; papeis: Papel[] };
 
+/** Nome da função da migration 012, como o PostgREST a expõe. */
+export const RPC_ESTADO_DE_MFA = "mfa_bloqueia_excecao_aal1";
+
+/**
+ * O mínimo que este módulo precisa de um cliente Supabase para chamar a RPC.
+ *
+ * Mesmo motivo do molde que a camada de dados do B2.1 já usa: o `Database`
+ * gerado conhece apenas `gerar_fatura`, `has_role` e `is_staff`, então o
+ * `.rpc()` tipado recusaria o nome da função da 012. A afirmação de
+ * compatibilidade fica num lugar só, com o motivo escrito — e este arquivo
+ * continua sem importar nada daquela camada.
+ */
+interface ClienteComRpc {
+  rpc(nome: string): PromiseLike<{ data: unknown; error: unknown }>;
+}
+
+/**
+ * Estado do fator, direto do banco.
+ *
+ * `public.mfa_bloqueia_excecao_aal1()` é `SECURITY DEFINER` e lê
+ * `auth.mfa_factors`, tabela que `authenticated` não enxerga. O usuário não tem
+ * como forjar essa resposta, que é exatamente o que faltava para distinguir
+ * quem nunca ativou MFA de quem ativou e ainda não fez o TOTP — e o que
+ * `nextLevel`, vindo do cookie, não podia responder.
+ *
+ * Só é chamada quando a resposta depende dela, isto é, em `aal1`: em `aal2` a
+ * decisão já está tomada para os dois papéis, e perguntar seria uma ida à rede
+ * por página renderizada; com nível desconhecido, a decisão já fecha.
+ *
+ * Qualquer falha vira `indeterminado`, nunca `sem-fator`: a resposta segura é a
+ * que exige o segundo fator. O `try` cobre o que o `error` da resposta não
+ * cobre — rede fora, timeout, corpo ilegível.
+ */
+async function lerEstadoDoFator(supabase: unknown): Promise<EstadoDoFator> {
+  try {
+    const { data, error } = await (supabase as ClienteComRpc).rpc(RPC_ESTADO_DE_MFA);
+    return interpretarBloqueioDeExcecao(data, Boolean(error));
+  } catch {
+    return interpretarBloqueioDeExcecao(null, true);
+  }
+}
+
 /**
  * Descobre a situação de acesso de quem está requisitando, no servidor.
  *
@@ -24,6 +68,11 @@ export type Acesso =
  * Isto decide o que a interface mostra. Quem impede o acesso aos dados é a
  * RLS no banco — se este arquivo tivesse um bug, as tabelas continuariam
  * protegidas.
+ *
+ * **É o único lugar que decide `liberado`.** Layout, `/mfa`, dashboard e os
+ * dois guards leem daqui; nenhum deles recalcula papel, nível ou estado de
+ * fator por conta própria. Duas definições de "liberado" é como se produz laço
+ * entre `/mfa`, `/dashboard` e `/operacional`.
  *
  * Memoizada com o `cache` do React, que dura **uma requisição**: o layout e a
  * página administrativa perguntam a mesma coisa na mesma passada, e sem isso
@@ -48,26 +97,32 @@ export const lerAcesso = cache(async (): Promise<Acesso> => {
   if (error || !data || data.length === 0) return { situacao: "sem-papel", email };
 
   const papeis = data.map((linha) => linha.role);
+  const papel = resolverPapelEfetivo(papeis);
 
   /**
-   * Segundo fator.
+   * Nível de garantia da sessão.
    *
-   * getAuthenticatorAssuranceLevel serve como verificação de servidor e não
-   * como enfeite de interface: por dentro ela chama getUser(jwt), que valida o
-   * token contra o Supabase, e calcula `nextLevel` a partir de `user.factors`
-   * filtrados por `status === 'verified'` — dado que vem do servidor, não do
-   * cookie. `currentLevel` sai da claim `aal` do mesmo token já validado.
+   * Desta chamada usamos **somente `currentLevel`**, que sai da claim `aal` do
+   * token — o mesmo token que o `getUser()` acima já validou contra o servidor
+   * do Supabase, e que é assinado.
    *
-   * A tradução do resultado está em `decidirSituacaoMfa`, testável à parte. As
-   * quatro saídas: falha na consulta, sem fator, com fator mas sessão em aal1,
-   * e tudo em aal2. Só a última abre o painel.
+   * `nextLevel` é ignorado de propósito. Ele é calculado a partir de
+   * `session.user.factors`, isto é, do conteúdo do cookie, e por isso não é
+   * fonte confiável para **conceder** acesso. Uma versão anterior deste arquivo
+   * afirmava aqui que `getAuthenticatorAssuranceLevel()` sem argumento validava
+   * `nextLevel` contra o servidor: isso era falso, e a afirmação não deve
+   * voltar. Quem responde sobre o estado do fator agora é o banco, logo abaixo.
    */
   const { data: nivel, error: erroNivel } =
     await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
-  const situacao = decidirSituacaoMfa(nivel, Boolean(erroNivel));
+  const nivelAtual = erroNivel ? null : (nivel?.currentLevel ?? null);
 
-  return situacao === "liberado"
-    ? { situacao: "liberado", email, papeis }
-    : { situacao, email, papeis };
+  const estadoDoFator = nivelAtual === "aal1" ? await lerEstadoDoFator(supabase) : "indeterminado";
+
+  const decisao = decidirAcesso(papel, nivelAtual, estadoDoFator);
+
+  return decisao === "sem-papel"
+    ? { situacao: "sem-papel", email }
+    : { situacao: decisao, email, papeis };
 });

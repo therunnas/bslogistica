@@ -19,8 +19,17 @@
  */
 
 import type { Papel } from "./_autorizacao";
+import type { PapelDoAcesso } from "@/lib/mfa";
 
-export type PapelEfetivo = "admin" | "operacional" | "sem-papel";
+/**
+ * Apelido de `PapelDoAcesso`, e não uma segunda lista de papéis.
+ *
+ * A decisão de acesso do PR C vive em `src/lib/mfa.ts`, que não importa de
+ * `src/app/`; o tipo nasce lá e é reexportado aqui com o nome que o painel já
+ * usava. Uma definição só — duas divergiriam no dia em que um papel novo
+ * entrasse.
+ */
+export type PapelEfetivo = PapelDoAcesso;
 
 export function resolverPapelEfetivo(papeis: readonly Papel[] | null | undefined): PapelEfetivo {
   if (!Array.isArray(papeis) || papeis.length === 0) return "sem-papel";
