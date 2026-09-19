@@ -15,8 +15,9 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
 | B2.2               | **CONCLUÍDO** — PR #32, mergeado                                    |
-| Etapa atual        | **B2.3** — tela operacional, implementada em PR                     |
-| PR C               | próximo, depois do B2.3                                             |
+| B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
+| Etapa atual        | **migration `015`** — descoberta pela auditoria do PR C             |
+| PR C               | próximo, depois da `015`                                            |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -330,15 +331,16 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **B2.1**  | camada de dados operacional: contratos e hooks das 5 RPCs, sem UI, sem guard, sem banco. Ver 7.3                                      | **CONCLUÍDO** — PR #30     |
 | **014**   | **hardening dos dados operacionais que alimentam cálculo financeiro** — `break_minutes` negativo. Ver 7.4                             | **EM PRODUCTION** — PR #31 |
 | **B2.2**  | papel, navegação e **bloqueio de rotas server-side**, com helper central de admin. Ver 7.3                                            | **CONCLUÍDO** — PR #32     |
-| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **IMPLEMENTADA em PR**     |
+| **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **CONCLUÍDO** — PR #33     |
+| **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **IMPLEMENTADA em PR**     |
 | **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | aprovado, não iniciado     |
 | **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | aprovado, não iniciado     |
 | **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
 | **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
 | **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado     |
 
-Sequência obrigatória: **B2.1 → 014 → B2.2 → B2.3 → PR C → PR D → PR E → PR F →
-PR G**. A `014` entrou no meio depois do achado da seção 7.4: ela é **PR
+Sequência obrigatória: **B2.1 → 014 → B2.2 → B2.3 → 015 → PR C → PR D → PR E →
+PR F → PR G**. A `015` entrou antes do PR C pelo achado da seção 7.5. A `014` entrou no meio depois do achado da seção 7.4: ela é **PR
 próprio, logo depois do merge do B2.1 e antes do B2.2**.
 
 **O primeiro usuário `operacional` real só existe depois de todos**, e depois da
@@ -799,7 +801,7 @@ para rota inexistente seria pior que nenhum.
 
 Suíte `scripts/testar-papel.mjs`, **82 asserções**, por `npm run test:papel`.
 
-#### B2.3 — tela operacional de apontamentos — IMPLEMENTADA em PR
+#### B2.3 — tela operacional de apontamentos — CONCLUÍDO (PR #33)
 
 `/operacional`, com guard próprio `exigirOperacional()` — que **bloqueia
 administrador**, porque as cinco RPCs da 013 recusam admin por desenho e a tela
@@ -951,6 +953,48 @@ negativos.
 
 O primeiro usuário `operacional` real continua dependendo do gate do **PR G**, e
 a interface operacional, do **B2.3**.
+
+### 7.5 Migration `015` — o operador em AAL2 também é operador
+
+**Achado na auditoria do PR C, não em produção — não existe conta
+`operacional`.** `operador_elegivel_aal1()`, da 013, exige literalmente
+`(auth.jwt() ->> 'aal') = 'aal1'`, e os dois helpers que governam as cinco RPCs
+foram amarrados nela. Consequência medida: um `operacional` que ativa o segundo
+fator e conclui o TOTP chega em `aal2` e **era recusado com `42501` pelas cinco
+RPCs** — a tela ficava inútil exatamente para quem seguiu a política de
+segurança.
+
+Ler as tabelas direto em AAL2 não era saída: as policies permissivas o
+deixariam alcançar `employees.daily_cost`, `timesheet_entries.billed_amount` e o
+resto, que é precisamente o que o B1 existe para impedir.
+
+**O que a `015` faz:** acrescenta `public.operador_elegivel_operacional()` — a
+elegibilidade **geral** da superfície, `aal1` sem MFA bloqueando **ou** `aal2` —
+e reaponta `operador_autorizado(uuid)` e `uid_do_operador()` para ela. As cinco
+RPCs **não** foram reescritas: nenhuma verifica `aal` por conta própria, o que
+foi conferido função a função antes de a migration existir.
+
+**`operador_elegivel_aal1()` fica INTACTA.** O nome e o contrato dela dizem
+"elegível à exceção de AAL1", e transformá-la em "aal1 ou aal2" corromperia um
+primitivo que outras decisões podem consultar. O bloco A do teste `011` mede o
+contrato antigo caso a caso, e ele passa nos dois schemas — com e sem a `015`.
+
+**Nenhum dado novo atravessa.** Mesmas cinco RPCs, mesmo papel dono, mesmas
+colunas, mesmos grants por coluna, mesmos triggers, mesma derivação financeira,
+mesmas 11 policies. A única diferença é o nível de garantia aceito pela mesma
+superfície estreita — e o bloco H do `011` prova que o papel continua sem
+privilégio em coluna financeira, em `contracts` e em `invoice_id`.
+
+Teste `supabase/tests/011_operacional_aal2.sql`, **80 casos**. Contra o schema
+sem a `015` a suíte dá **28 FAIL**, com o operador em `aal2` recebendo `42501`
+nas cinco RPCs.
+
+**Dois casos da suíte `009` mudaram de expectativa** — os que afirmavam que a
+superfície é exclusiva de AAL1. Não é inversão para fabricar verde: é o
+contrato que mudou, por decisão aprovada, e a mudança está anotada no próprio
+arquivo.
+
+**Ainda NÃO aplicada em Production.**
 
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
