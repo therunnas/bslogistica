@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "therunnas/dev-control-plane",
+    "commit": "4f6f8bfceeca638b89942655f31abe92321d4694"
+  },
+  "skills": {
+    "plan-task": {
+      "digest": "sha256:883e6b5bdfa8dd72257fe5bce2199840e6c8c51f957a9dca93389c383a474975"
+    },
+    "project-preflight": {
+      "digest": "sha256:b974eb46e817b8c30258d17648e19e6321ec90b25e42b6689d68783bd585c865"
+    },
+    "verify-change": {
+      "digest": "sha256:f937f0811369f7fcab5b5d86912a3304bf617dd503de5834ae7d03bfe51ededa"
+    }
+  }
+}
