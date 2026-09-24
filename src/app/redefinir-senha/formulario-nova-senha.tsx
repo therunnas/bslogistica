@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { KeyRound, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,35 +11,20 @@ import { validarNovaSenha } from "@/lib/recuperacao-senha";
 
 import { redefinirSenha } from "./actions";
 
-/**
- * Formulário da nova senha.
- *
- * Ele não fala mais com o Supabase. Coleta os campos, faz a validação de UX e
- * entrega para a Server Action, que é quem revalida a prova de recuperação e
- * troca a senha.
- *
- * A mudança veio de um achado de revisão: enquanto o `updateUser` era chamado
- * daqui, a prova só era conferida na renderização da página. Uma aba deixada
- * aberta continuava trocando a senha depois que a prova expirava, porque a
- * chamada ia direto ao Supabase com a sessão ainda válida.
- *
- * A validação daqui é conveniência, não garantia: a action revalida tudo por
- * conta própria. Nada de token, segredo ou conteúdo da prova é enviado por
- * este componente — o cookie httpOnly viaja sozinho, pelo navegador.
- *
- * A senha vive apenas no estado do componente e some com ele: não vai para
- * log, URL, armazenamento local nem para o toast de erro.
- */
 export function FormularioNovaSenha() {
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  async function redefinir(evento: React.FormEvent) {
+  async function redefinir(evento: FormEvent) {
     evento.preventDefault();
-    if (enviando) return;
+
+    if (enviando) {
+      return;
+    }
 
     const validacao = validarNovaSenha(senha, confirmacao);
+
     if (!validacao.valida) {
       toast.error(validacao.mensagem);
       return;
@@ -46,13 +32,11 @@ export function FormularioNovaSenha() {
 
     setEnviando(true);
 
-    // No sucesso a action redireciona para o login e esta promessa não
-    // devolve estado — só o caminho de erro chega de volta aqui.
-    const estado = await redefinirSenha({ senha, confirmacao });
+    const estado = await redefinirSenha({
+      senha,
+      confirmacao,
+    });
 
-    // Só o erro volta para cá. Os dois desfechos em que a senha muda — com ou
-    // sem as demais sessões encerradas — redirecionam para o login, então este
-    // formulário nunca fica montado depois de a senha já ter mudado.
     if (estado?.situacao === "erro") {
       toast.error(estado.mensagem);
       setEnviando(false);
@@ -60,32 +44,54 @@ export function FormularioNovaSenha() {
   }
 
   return (
-    <form onSubmit={redefinir} className="space-y-3">
-      <div className="space-y-1.5">
+    <form onSubmit={redefinir} className="space-y-5">
+      <div className="space-y-2">
         <Label htmlFor="senha">Nova senha</Label>
-        <Input
-          id="senha"
-          type="password"
-          autoComplete="new-password"
-          value={senha}
-          onChange={(e) => setSenha(e.target.value)}
-          required
-        />
+
+        <div className="relative">
+          <KeyRound className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+          <Input
+            id="senha"
+            type="password"
+            autoComplete="new-password"
+            value={senha}
+            onChange={(event) => setSenha(event.target.value)}
+            required
+            className="h-11 rounded-xl border-input bg-secondary/50 pl-10 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20"
+          />
+        </div>
       </div>
-      <div className="space-y-1.5">
+
+      <div className="space-y-2">
         <Label htmlFor="confirmacao">Confirmar nova senha</Label>
-        <Input
-          id="confirmacao"
-          type="password"
-          autoComplete="new-password"
-          value={confirmacao}
-          onChange={(e) => setConfirmacao(e.target.value)}
-          required
-        />
+
+        <div className="relative">
+          <ShieldCheck className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+          <Input
+            id="confirmacao"
+            type="password"
+            autoComplete="new-password"
+            value={confirmacao}
+            onChange={(event) => setConfirmacao(event.target.value)}
+            required
+            className="h-11 rounded-xl border-input bg-secondary/50 pl-10 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20"
+          />
+        </div>
       </div>
-      <Button type="submit" className="w-full" disabled={enviando}>
+
+      <Button type="submit" className="h-11 w-full rounded-xl" disabled={enviando}>
+        <ShieldCheck className="h-4 w-4" />
+
         {enviando ? "Aguarde..." : "Redefinir senha"}
       </Button>
+
+      <div className="rounded-xl border border-border bg-secondary/35 px-4 py-3">
+        <p className="text-xs leading-5 text-muted-foreground">
+          Após concluir a redefinição, você precisará entrar novamente no sistema.
+        </p>
+      </div>
     </form>
   );
 }

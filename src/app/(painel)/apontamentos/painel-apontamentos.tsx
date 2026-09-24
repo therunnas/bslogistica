@@ -2,16 +2,25 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "@/lib/notificacoes";
-import { Lock, LockOpen, Save } from "lucide-react";
+import {
+  BadgeDollarSign,
+  CalendarCheck,
+  Clock3,
+  Lock,
+  LockOpen,
+  Save,
+  Users,
+  WalletCards,
+  type LucideIcon,
+} from "lucide-react";
+
 import { PageHeader } from "../_components/app-shell";
-import { criarClienteNavegador } from "@/integrations/supabase/browser";
-import { exigirLinhaAfetada } from "@/lib/mutations";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -27,6 +36,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import {
+  attendanceLabel,
+  calcEntry,
+  shiftPlannedMinutes,
+  type AttendanceStatus,
+} from "@/lib/billing";
+import { brl, minutesToLabel, todayISO } from "@/lib/format";
+import { useContractRules } from "@/lib/ledger";
+import { exigirLinhaAfetada } from "@/lib/mutations";
+import { toast } from "@/lib/notificacoes";
 import {
   useClients,
   useEmployees,
@@ -36,14 +57,6 @@ import {
   useTeam,
   useTimesheets,
 } from "@/lib/queries";
-import { useContractRules } from "@/lib/ledger";
-import {
-  attendanceLabel,
-  calcEntry,
-  shiftPlannedMinutes,
-  type AttendanceStatus,
-} from "@/lib/billing";
-import { brl, minutesToLabel, todayISO } from "@/lib/format";
 
 interface DraftEntry {
   employeeId: string;
@@ -72,6 +85,12 @@ interface DraftState {
 /** Índice que garante a invariável de diária, em public.timesheet_entries. */
 const INDICE_DA_DIARIA = "timesheet_entries_uma_diaria_por_operacao_dia";
 
+const INPUT_CLASS =
+  "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
+
+const SELECT_CLASS =
+  "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus:ring-primary/20";
+
 /**
  * O erro é mesmo violação da invariável de diária?
  *
@@ -83,17 +102,27 @@ const INDICE_DA_DIARIA = "timesheet_entries_uma_diaria_por_operacao_dia";
  * unique_violation.
  */
 function ehViolacaoDeDiaria(erro: unknown): boolean {
-  if (typeof erro !== "object" || erro === null) return false;
-  const e = erro as { code?: string; message?: string; details?: string; hint?: string };
-  if (e.code !== "23505") return false;
+  if (typeof erro !== "object" || erro === null) {
+    return false;
+  }
+
+  const e = erro as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+
+  if (e.code !== "23505") {
+    return false;
+  }
+
   return `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`.includes(INDICE_DA_DIARIA);
 }
 
 /**
  * Mensagem única para a violação da invariável de diária, venha ela da
- * checagem local ou do 23505 do banco. O texto é o mesmo de propósito: para
- * quem aponta, é o mesmo problema, e a diferença entre "detectado antes" e
- * "recusado pelo banco" não muda o que precisa ser feito.
+ * checagem local ou do 23505 do banco.
  */
 function mensagemDeDiariaDuplicada(detalhe?: string) {
   return (
@@ -109,6 +138,7 @@ const contextoDe = (operationId: string, turnoId: string, date: string) =>
 
 export function PainelApontamentos() {
   const queryClient = useQueryClient();
+
   const clients = useClients();
   const operations = useOperations();
   const shifts = useShifts();
@@ -118,10 +148,10 @@ export function PainelApontamentos() {
   const entries = useEntries();
 
   const [operationId, setOperationId] = useState("");
+
   // null = ainda não escolhido; "" = "sem turno" escolhido de propósito.
-  // A distinção evita que a seleção deliberada de "sem turno" seja tratada
-  // como ausência de escolha e substituída pelo primeiro turno da operação.
   const [shiftId, setShiftId] = useState<string | null>(null);
+
   const [date, setDate] = useState(todayISO());
   const [draft, setDraft] = useState<DraftState | null>(null);
 
@@ -129,67 +159,68 @@ export function PainelApontamentos() {
 
   /**
    * Enquanto qualquer uma dessas consultas não terminou, o rascunho não pode
-   * ser montado nem salvo: sem `entries` uma linha já gravada pareceria nova, e
-   * o Salvar tentaria inserir por cima de uma que já existe.
-   *
-   * Usa `isLoading` (primeira carga), não `isFetching`: um refetch em segundo
-   * plano não pode bloquear a tela nem desmontar o rascunho.
+   * ser montado nem salvo.
    */
   const carregando =
     shifts.isLoading || team.isLoading || timesheets.isLoading || entries.isLoading;
 
-  const operationList = operations.data ?? [];
+  /**
+   * Memoizado para manter referência estável e não disparar o efeito abaixo em
+   * toda renderização.
+   */
+  const operationList = useMemo(() => operations.data ?? [], [operations.data]);
+
   useEffect(() => {
-    if (!operationId && operationList[0]) setOperationId(operationList[0].id);
+    if (!operationId && operationList[0]) {
+      setOperationId(operationList[0].id);
+    }
   }, [operationId, operationList]);
 
   const operationShifts = useMemo(
-    () => (shifts.data ?? []).filter((s) => s.operation_id === operationId),
+    () => (shifts.data ?? []).filter((shift) => shift.operation_id === operationId),
     [shifts.data, operationId],
   );
-  // Só escolhe um turno quando não há escolha válida para a operação atual.
-  // Antes este efeito forçava o primeiro turno sempre que `operationShifts`
-  // mudava de identidade, desfazendo a seleção do usuário a cada refetch.
+
   useEffect(() => {
     setShiftId((atual) => {
-      if (atual === "") return atual;
-      if (atual !== null && operationShifts.some((s) => s.id === atual)) return atual;
-      // Sem turno disponível, continua `null` (não escolhido) em vez de "" —
-      // assim um turno cadastrado depois ainda é selecionado automaticamente.
+      if (atual === "") {
+        return atual;
+      }
+
+      if (atual !== null && operationShifts.some((shift) => shift.id === atual)) {
+        return atual;
+      }
+
       return operationShifts[0]?.id ?? null;
     });
   }, [operationShifts]);
 
-  const shift = operationShifts.find((s) => s.id === turnoId) ?? null;
+  const shift = operationShifts.find((item) => item.id === turnoId) ?? null;
+
   const plannedMinutes = shiftPlannedMinutes(shift);
   const rules = useContractRules(operationId);
 
   const timesheet = useMemo(
     () =>
       (timesheets.data ?? []).find(
-        (t) =>
-          t.operation_id === operationId && t.work_date === date && (t.shift_id ?? "") === turnoId,
+        (item) =>
+          item.operation_id === operationId &&
+          item.work_date === date &&
+          (item.shift_id ?? "") === turnoId,
       ),
     [timesheets.data, operationId, date, turnoId],
   );
 
   const existingEntries = useMemo(
-    () => (entries.data ?? []).filter((e) => e.timesheet_id === timesheet?.id),
+    () => (entries.data ?? []).filter((entry) => entry.timesheet_id === timesheet?.id),
     [entries.data, timesheet?.id],
   );
 
-  /**
-   * Correspondência exata de operação e turno.
-   *
-   * Antes um vínculo sem `shift_id` aparecia em todos os turnos da operação.
-   * Com a alocação passando a ser sempre operação + turno, isso trazia gente de
-   * fora do turno para a folha. Vínculo sem turno agora só aparece quando o
-   * turno selecionado também é "sem turno" — caso das operações avulsas.
-   */
   const teamMembers = useMemo(
     () =>
       (team.data ?? []).filter(
-        (t) => t.operation_id === operationId && t.active && (t.shift_id ?? "") === turnoId,
+        (item) =>
+          item.operation_id === operationId && item.active && (item.shift_id ?? "") === turnoId,
       ),
     [team.data, operationId, turnoId],
   );
@@ -197,10 +228,13 @@ export function PainelApontamentos() {
   const contextKey = contextoDe(operationId, turnoId, date);
 
   useEffect(() => {
-    if (carregando) return;
+    if (carregando) {
+      return;
+    }
 
     const base = teamMembers.map((member) => {
-      const existing = existingEntries.find((e) => e.employee_id === member.employee_id);
+      const existing = existingEntries.find((entry) => entry.employee_id === member.employee_id);
+
       return {
         employeeId: member.employee_id,
         entryId: existing?.id,
@@ -211,46 +245,54 @@ export function PainelApontamentos() {
         notes: existing?.notes ?? "",
       } satisfies DraftEntry;
     });
+
     const extras = existingEntries
-      .filter((e) => !teamMembers.some((m) => m.employee_id === e.employee_id))
-      .map((e) => ({
-        employeeId: e.employee_id,
-        entryId: e.id,
-        status: e.status,
-        checkIn: e.check_in?.slice(0, 5) ?? "",
-        checkOut: e.check_out?.slice(0, 5) ?? "",
-        breakMinutes: e.break_minutes,
-        notes: e.notes ?? "",
+      .filter((entry) => !teamMembers.some((member) => member.employee_id === entry.employee_id))
+      .map((entry) => ({
+        employeeId: entry.employee_id,
+        entryId: entry.id,
+        status: entry.status,
+        checkIn: entry.check_in?.slice(0, 5) ?? "",
+        checkOut: entry.check_out?.slice(0, 5) ?? "",
+        breakMinutes: entry.break_minutes,
+        notes: entry.notes ?? "",
       }));
+
     const servidor = [...base, ...extras];
 
     setDraft((atual) => {
-      // Contexto novo (outra operação, turno ou data): o rascunho anterior não
-      // se aplica mais. Reconstrói inteiro e zera o que estava marcado.
       if (!atual || atual.key !== contextKey) {
-        return { key: contextKey, rows: servidor, dirty: new Set<string>() };
+        return {
+          key: contextKey,
+          rows: servidor,
+          dirty: new Set<string>(),
+        };
       }
 
-      // Mesmo contexto: os dados chegaram por carga ou refetch. As linhas que o
-      // usuário tocou são preservadas; só o `entryId` é atualizado, para que uma
-      // linha recém-gravada em outra aba não volte a ser tratada como nova.
       const anteriores = new Map(atual.rows.map((row) => [row.employeeId, row]));
+
       const mescladas = servidor.map((linha) => {
         const anterior = anteriores.get(linha.employeeId);
+
         return atual.dirty.has(linha.employeeId) && anterior
-          ? { ...anterior, entryId: linha.entryId }
+          ? {
+              ...anterior,
+              entryId: linha.entryId,
+            }
           : linha;
       });
 
-      // Linha tocada que sumiu da equipe no servidor continua visível até salvar
-      // ou trocar de contexto — senão a digitação desapareceria da tela.
       const pendentes = atual.rows.filter(
         (row) =>
           atual.dirty.has(row.employeeId) &&
           !servidor.some((linha) => linha.employeeId === row.employeeId),
       );
 
-      return { key: contextKey, rows: [...mescladas, ...pendentes], dirty: atual.dirty };
+      return {
+        key: contextKey,
+        rows: [...mescladas, ...pendentes],
+        dirty: atual.dirty,
+      };
     });
   }, [
     contextKey,
@@ -265,12 +307,13 @@ export function PainelApontamentos() {
   const linhas = draft?.rows ?? [];
 
   const employeeMap = useMemo(
-    () => new Map((employees.data ?? []).map((e) => [e.id, e])),
+    () => new Map((employees.data ?? []).map((employee) => [employee.id, employee])),
     [employees.data],
   );
 
   const computed = linhas.map((row) => {
     const employee = employeeMap.get(row.employeeId);
+
     const calc = calcEntry({
       status: row.status,
       checkIn: row.checkIn || null,
@@ -280,7 +323,12 @@ export function PainelApontamentos() {
       rules,
       employeeDailyCost: Number(employee?.daily_cost ?? 0),
     });
-    return { row, employee, calc };
+
+    return {
+      row,
+      employee,
+      calc,
+    };
   });
 
   const totals = computed.reduce(
@@ -290,84 +338,92 @@ export function PainelApontamentos() {
       billed: acc.billed + calc.billedAmount,
       cost: acc.cost + calc.costAmount,
     }),
-    { dailies: 0, overtime: 0, billed: 0, cost: 0 },
+    {
+      dailies: 0,
+      overtime: 0,
+      billed: 0,
+      cost: 0,
+    },
   );
 
-  /**
-   * Colaboradores que já têm diária faturável nesta operação e data, em outra
-   * folha — outro turno, ou a folha sem turno.
-   *
-   * Serve só para a interface avisar antes e nomear onde a diária está. A
-   * garantia é o índice único no banco: esta leitura é do cache do navegador e
-   * não enxerga o que outra aba acabou de gravar.
-   */
   const diariaEmOutraFolha = useMemo(() => {
     const outrasFolhas = new Map(
       (timesheets.data ?? [])
         .filter(
-          (t) => t.operation_id === operationId && t.work_date === date && t.id !== timesheet?.id,
+          (item) =>
+            item.operation_id === operationId &&
+            item.work_date === date &&
+            item.id !== timesheet?.id,
         )
-        .map((t) => [t.id, t] as const),
+        .map((item) => [item.id, item] as const),
     );
-    const nomeDoTurno = (shiftId: string | null) =>
-      (shifts.data ?? []).find((s) => s.id === shiftId)?.name ?? "sem turno";
+
+    const nomeDoTurno = (outroShiftId: string | null) =>
+      (shifts.data ?? []).find((item) => item.id === outroShiftId)?.name ?? "sem turno";
 
     const mapa = new Map<string, string>();
+
     for (const entrada of entries.data ?? []) {
-      if (entrada.status === "absent") continue;
+      if (entrada.status === "absent") {
+        continue;
+      }
+
       const folha = outrasFolhas.get(entrada.timesheet_id);
-      if (folha) mapa.set(entrada.employee_id, nomeDoTurno(folha.shift_id));
+
+      if (folha) {
+        mapa.set(entrada.employee_id, nomeDoTurno(folha.shift_id));
+      }
     }
+
     return mapa;
   }, [timesheets.data, entries.data, shifts.data, operationId, date, timesheet?.id]);
 
-  /**
-   * "Sem turno" só é oferecido quando faz sentido: operação avulsa, ou quando
-   * já existe contexto sem turno herdado — vínculo antigo ou folha já gravada.
-   * Nesses casos a opção precisa continuar alcançável para que o histórico
-   * possa ser visto e remanejado; some-la apagaria o caminho, não o problema.
-   */
   const ofereceSemTurno =
     operationShifts.length === 0 ||
     turnoId === "" ||
     (team.data ?? []).some(
-      (t) => t.operation_id === operationId && t.active && t.shift_id === null,
+      (item) => item.operation_id === operationId && item.active && item.shift_id === null,
     ) ||
     (timesheets.data ?? []).some(
-      (t) => t.operation_id === operationId && t.work_date === date && t.shift_id === null,
+      (item) =>
+        item.operation_id === operationId && item.work_date === date && item.shift_id === null,
     );
 
   const isClosed = timesheet?.status === "closed";
 
-  // Uma linha só é gravada se o usuário a tocou ou se ela ainda não existe no
-  // banco. É isso que impede um Salvar destinado a um colaborador de regravar
-  // os demais com valores recalculados no navegador.
   const aSalvar = computed.filter(
     ({ row }) => !row.entryId || (draft?.dirty.has(row.employeeId) ?? false),
   );
 
-  // Só conta como conflito o que geraria diária: falta não entra, e linha já
-  // gravada nesta folha também não — ela é a própria diária do dia.
   const conflitos = aSalvar.filter(
     ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
   );
 
   const saveAll = useMutation({
     mutationFn: async () => {
-      if (!aSalvar.length) return { gravadas: 0 };
+      if (!aSalvar.length) {
+        return {
+          gravadas: 0,
+        };
+      }
 
       if (conflitos.length) {
         const primeiro = conflitos[0]!;
         const nome = employeeMap.get(primeiro.row.employeeId)?.name ?? "colaborador";
+
         const turno = diariaEmOutraFolha.get(primeiro.row.employeeId);
+
         throw new Error(
           mensagemDeDiariaDuplicada(
-            `${nome} — turno ${turno}${conflitos.length > 1 ? ` e mais ${conflitos.length - 1}` : ""}`,
+            `${nome} — turno ${turno}${
+              conflitos.length > 1 ? ` e mais ${conflitos.length - 1}` : ""
+            }`,
           ),
         );
       }
 
       let timesheetId = timesheet?.id;
+
       if (!timesheetId) {
         const { data, error } = await criarClienteNavegador()
           .from("timesheets")
@@ -379,11 +435,20 @@ export function PainelApontamentos() {
           })
           .select("id")
           .single();
-        if (error) throw error;
+
+        if (error) {
+          throw error;
+        }
+
         timesheetId = data.id;
       }
+
       const payload = aSalvar.map(({ row, calc }) => ({
-        ...(row.entryId ? { id: row.entryId } : {}),
+        ...(row.entryId
+          ? {
+              id: row.entryId,
+            }
+          : {}),
         timesheet_id: timesheetId!,
         employee_id: row.employeeId,
         operation_id: operationId,
@@ -401,44 +466,64 @@ export function PainelApontamentos() {
         cost_amount: calc.costAmount,
         notes: row.notes || null,
       }));
+
       const { error } = await criarClienteNavegador().from("timesheet_entries").upsert(payload);
-      if (error) throw error;
-      return { gravadas: payload.length };
+
+      if (error) {
+        throw error;
+      }
+
+      return {
+        gravadas: payload.length,
+      };
     },
+
     onSuccess: async ({ gravadas }) => {
       if (!gravadas) {
         toast.info("Nenhuma alteração para salvar.");
         return;
       }
-      // Espera o refetch terminar antes de limpar `dirty`. Se limpasse antes, a
-      // reconstrução seguinte poderia rodar sobre dados ainda anteriores ao
-      // save e devolver ao rascunho os valores que acabaram de ser trocados.
+
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["timesheets"] }),
-        queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["timesheets"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["timesheet_entries"],
+        }),
       ]);
-      setDraft((atual) => (atual ? { ...atual, dirty: new Set<string>() } : atual));
+
+      setDraft((atual) =>
+        atual
+          ? {
+              ...atual,
+              dirty: new Set<string>(),
+            }
+          : atual,
+      );
+
       toast.success("Apontamento salvo.");
     },
+
     onError: (error: unknown) => {
-      // A corrida que a checagem local não pega: outra aba gravou no intervalo.
       if (ehViolacaoDeDiaria(error)) {
         toast.error(mensagemDeDiariaDuplicada());
         return;
       }
+
       const codigo =
         typeof error === "object" && error && "code" in error
           ? (error as { code?: string }).code
           : undefined;
-      // Outro 23505 existe — `(timesheet_id, employee_id)`, por exemplo. Aqui a
-      // mensagem é neutra de propósito: não se afirma qual regra foi violada, e
-      // `details` não é exibido porque carrega os valores da chave.
+
       if (codigo === "23505") {
         toast.error(
           "Já existe um registro conflitante para estes dados. Recarregue a página e confira antes de salvar de novo.",
         );
+
         return;
       }
+
       toast.error(
         error instanceof Error ? error.message : "Não foi possível salvar o apontamento.",
       );
@@ -447,238 +532,502 @@ export function PainelApontamentos() {
 
   const toggleStatus = useMutation({
     mutationFn: async (status: "open" | "closed") => {
-      if (!timesheet) throw new Error("Salve o apontamento antes de fechar.");
+      if (!timesheet) {
+        throw new Error("Salve o apontamento antes de fechar.");
+      }
+
       const { error, count } = await criarClienteNavegador()
         .from("timesheets")
-        .update({ status }, { count: "exact" })
+        .update(
+          {
+            status,
+          },
+          {
+            count: "exact",
+          },
+        )
         .eq("id", timesheet.id);
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
+
       exigirLinhaAfetada(count, "atualizar o status do apontamento");
     },
+
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["timesheets"] });
+      queryClient.invalidateQueries({
+        queryKey: ["timesheets"],
+      });
+
       toast.success("Status do apontamento atualizado.");
     },
+
     onError: (error: Error) => toast.error(error.message),
   });
 
   function update(employeeId: string, patch: Partial<DraftEntry>) {
     setDraft((atual) => {
-      if (!atual) return atual;
-      // Set novo a cada edição: mutar o atual não mudaria a referência e a
-      // precedência da linha editada poderia não ser vista pela renderização.
+      if (!atual) {
+        return atual;
+      }
+
       const dirty = new Set(atual.dirty);
       dirty.add(employeeId);
+
       return {
         key: atual.key,
-        rows: atual.rows.map((row) => (row.employeeId === employeeId ? { ...row, ...patch } : row)),
+        rows: atual.rows.map((row) =>
+          row.employeeId === employeeId
+            ? {
+                ...row,
+                ...patch,
+              }
+            : row,
+        ),
         dirty,
       };
     });
   }
 
+  const operation = operationList.find((item) => item.id === operationId) ?? null;
+
   const clientName =
-    clients.data?.find((c) => c.id === operationList.find((o) => o.id === operationId)?.client_id)
-      ?.name ?? "—";
+    clients.data?.find((client) => client.id === operation?.client_id)?.name ?? "—";
 
   return (
     <div>
       <PageHeader
         title="Apontamento diário"
-        description="Cada colaborador presente gera uma diária; o excedente da jornada vira hora extra."
+        description="Registre presença, horários e excedentes de jornada da equipe alocada."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
+              type="button"
               variant="outline"
+              className="h-10 rounded-xl"
               onClick={() => toggleStatus.mutate(isClosed ? "open" : "closed")}
               disabled={!timesheet}
             >
-              {isClosed ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
+              {isClosed ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+
               {isClosed ? "Reabrir" : "Fechar dia"}
             </Button>
+
             <Button
+              type="button"
+              className="h-10 rounded-xl"
               onClick={() => saveAll.mutate()}
               disabled={
                 isClosed || carregando || saveAll.isPending || !linhas.length || !!conflitos.length
               }
             >
-              <Save className="size-4" /> Salvar
+              <Save className="h-4 w-4" />
+
+              {saveAll.isPending ? "Salvando..." : "Salvar"}
             </Button>
           </div>
         }
       />
 
-      <Card className="mb-4">
-        <CardContent className="grid gap-3 p-5 md:grid-cols-4">
-          <div className="space-y-1.5">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Resumo
+          label="Diárias"
+          value={String(totals.dailies)}
+          description="Presenças faturáveis"
+          icon={Users}
+        />
+
+        <Resumo
+          label="Hora extra"
+          value={minutesToLabel(totals.overtime)}
+          description="Excedente acumulado"
+          icon={Clock3}
+        />
+
+        <Resumo
+          label="A faturar"
+          value={brl(totals.billed)}
+          description="Valor calculado"
+          icon={BadgeDollarSign}
+        />
+
+        <Resumo
+          label="Custo"
+          value={brl(totals.cost)}
+          description="Mão de obra calculada"
+          icon={WalletCards}
+        />
+      </div>
+
+      <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+        <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-2">
             <Label>Operação</Label>
+
             <Select value={operationId} onValueChange={setOperationId}>
-              <SelectTrigger>
+              <SelectTrigger className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
+
               <SelectContent>
-                {operationList.map((operation) => (
-                  <SelectItem key={operation.id} value={operation.id}>
-                    {operation.name}
+                {operationList.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+
+          <div className="space-y-2">
             <Label>Turno</Label>
+
             <Select
               value={turnoId || "none"}
-              onValueChange={(v) => setShiftId(v === "none" ? "" : v)}
+              onValueChange={(value) => setShiftId(value === "none" ? "" : value)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={SELECT_CLASS}>
                 <SelectValue placeholder="Sem turno" />
               </SelectTrigger>
+
               <SelectContent>
                 {ofereceSemTurno ? <SelectItem value="none">Sem turno definido</SelectItem> : null}
-                {operationShifts.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name} ({s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)})
+
+                {operationShifts.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name} ({item.start_time.slice(0, 5)}–{item.end_time.slice(0, 5)})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+
+          <div className="space-y-2">
             <Label>Data</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+
+            <Input
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              className={INPUT_CLASS}
+            />
           </div>
-          <div className="space-y-1.5">
+
+          <div className="space-y-2">
             <Label>Regra aplicada</Label>
-            <p className="pt-2 text-sm text-muted-foreground">
-              {clientName} · diária {brl(rules.daily_rate)} · jornada{" "}
-              {minutesToLabel(plannedMinutes || rules.shift_hours * 60)} · HE{" "}
-              {brl((rules.daily_rate / (rules.shift_hours || 8)) * rules.ot_factor)}/h
-            </p>
+
+            <div className="flex min-h-10 items-center rounded-xl border border-border bg-secondary/35 px-3">
+              <p className="text-xs leading-5 text-muted-foreground">
+                <span className="font-medium text-foreground">{clientName}</span> · diária{" "}
+                {brl(rules.daily_rate)} · jornada{" "}
+                {minutesToLabel(plannedMinutes || rules.shift_hours * 60)} · HE{" "}
+                {brl((rules.daily_rate / (rules.shift_hours || 8)) * rules.ot_factor)}
+                /h
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {conflitos.length ? (
-        <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {mensagemDeDiariaDuplicada()}{" "}
-          {conflitos
-            .map(({ row }) => {
-              const nome = employeeMap.get(row.employeeId)?.name ?? "colaborador";
-              return `${nome} (turno ${diariaEmOutraFolha.get(row.employeeId)})`;
-            })
-            .join(", ")}
+        <div className="mb-5 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-sm leading-6 text-destructive">
+          <p className="font-medium">Conflito de diária identificado</p>
+
+          <p className="mt-1 text-xs">
+            {mensagemDeDiariaDuplicada()}{" "}
+            {conflitos
+              .map(({ row }) => {
+                const nome = employeeMap.get(row.employeeId)?.name ?? "colaborador";
+
+                return `${nome} (turno ${diariaEmOutraFolha.get(row.employeeId)})`;
+              })
+              .join(", ")}
+          </p>
         </div>
       ) : null}
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="text-base">
-            Equipe do dia {isClosed ? <Badge className="ml-2">Fechado</Badge> : null}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {totals.dailies} diárias · {minutesToLabel(totals.overtime)} extras ·{" "}
-            {brl(totals.billed)} a faturar · custo {brl(totals.cost)}
-          </p>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Colaborador</TableHead>
-                <TableHead>Presença</TableHead>
-                <TableHead>Entrada</TableHead>
-                <TableHead>Saída</TableHead>
-                <TableHead>Intervalo</TableHead>
-                <TableHead>Trabalhado</TableHead>
-                <TableHead>Hora extra</TableHead>
-                <TableHead className="text-right">A faturar</TableHead>
-                <TableHead className="text-right">Custo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {carregando ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-muted-foreground">
-                    Carregando equipe e apontamentos…
-                  </TableCell>
-                </TableRow>
-              ) : computed.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-muted-foreground">
-                    Nenhum colaborador alocado neste turno. Configure a equipe em Operações.
-                  </TableCell>
-                </TableRow>
+      <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+        <CardHeader className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-sm font-semibold tracking-tight">Equipe do dia</CardTitle>
+
+              {isClosed ? (
+                <Badge
+                  variant="secondary"
+                  className="border border-border bg-secondary font-medium text-muted-foreground shadow-none"
+                >
+                  <Lock className="mr-1 h-3 w-3" />
+                  Fechado
+                </Badge>
               ) : (
-                computed.map(({ row, employee, calc }) => (
-                  <TableRow key={row.employeeId}>
-                    <TableCell className="font-medium">{employee?.name ?? "—"}</TableCell>
-                    <TableCell>
-                      <Select
-                        value={row.status}
-                        onValueChange={(v) =>
-                          update(row.employeeId, { status: v as AttendanceStatus })
-                        }
-                        disabled={isClosed}
-                      >
-                        <SelectTrigger className="w-36">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(["present", "absent", "replacement"] as AttendanceStatus[]).map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {attendanceLabel[s]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        className="w-28"
-                        value={row.checkIn}
-                        disabled={isClosed || row.status === "absent"}
-                        onChange={(e) => update(row.employeeId, { checkIn: e.target.value })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        className="w-28"
-                        value={row.checkOut}
-                        disabled={isClosed || row.status === "absent"}
-                        onChange={(e) => update(row.employeeId, { checkOut: e.target.value })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={row.breakMinutes}
-                        disabled={isClosed || row.status === "absent"}
-                        onChange={(e) =>
-                          update(row.employeeId, { breakMinutes: Number(e.target.value) })
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>{minutesToLabel(calc.workedMinutes)}</TableCell>
-                    <TableCell>
-                      {calc.overtimeMinutes > 0 ? (
-                        <Badge variant="secondary">{minutesToLabel(calc.overtimeMinutes)}</Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">{brl(calc.billedAmount)}</TableCell>
-                    <TableCell className="text-right">{brl(calc.costAmount)}</TableCell>
-                  </TableRow>
-                ))
+                <Badge
+                  variant="secondary"
+                  className="border border-emerald-500/15 bg-emerald-500/10 font-medium text-emerald-600 shadow-none dark:text-emerald-400"
+                >
+                  <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Aberto
+                </Badge>
               )}
-            </TableBody>
-          </Table>
+            </div>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              Presença e horários da equipe alocada no turno selecionado.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CalendarCheck className="h-4 w-4 text-primary" />
+            {date}
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                  <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
+                    Colaborador
+                  </TableHead>
+
+                  <TableHead className="min-w-40 text-xs font-semibold text-muted-foreground">
+                    Presença
+                  </TableHead>
+
+                  <TableHead className="text-xs font-semibold text-muted-foreground">
+                    Entrada
+                  </TableHead>
+
+                  <TableHead className="text-xs font-semibold text-muted-foreground">
+                    Saída
+                  </TableHead>
+
+                  <TableHead className="text-xs font-semibold text-muted-foreground">
+                    Intervalo
+                  </TableHead>
+
+                  <TableHead className="text-xs font-semibold text-muted-foreground">
+                    Trabalhado
+                  </TableHead>
+
+                  <TableHead className="text-xs font-semibold text-muted-foreground">
+                    Hora extra
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    A faturar
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Custo
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {carregando ? (
+                  <TableRow>
+                    <TableCell colSpan={9}>
+                      <div className="flex min-h-44 items-center justify-center">
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+                          Carregando equipe e apontamentos...
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : computed.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9}>
+                      <div className="flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-secondary/50">
+                          <Users className="h-5 w-5 text-muted-foreground" />
+                        </div>
+
+                        <p className="mt-4 text-sm font-medium text-foreground">
+                          Nenhum colaborador neste turno
+                        </p>
+
+                        <p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">
+                          Configure a equipe desta operação antes de realizar o apontamento.
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  computed.map(({ row, employee, calc }) => (
+                    <TableRow
+                      key={row.employeeId}
+                      className="border-border transition-colors hover:bg-secondary/20"
+                    >
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-3">
+                          <AvatarNome nome={employee?.name ?? ""} />
+
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {employee?.name ?? "—"}
+                            </p>
+
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {employee?.role ?? "Colaborador"}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <Select
+                          value={row.status}
+                          onValueChange={(value) =>
+                            update(row.employeeId, {
+                              status: value as AttendanceStatus,
+                            })
+                          }
+                          disabled={isClosed}
+                        >
+                          <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
+                            <SelectValue />
+                          </SelectTrigger>
+
+                          <SelectContent>
+                            {(["present", "absent", "replacement"] as AttendanceStatus[]).map(
+                              (status) => (
+                                <SelectItem key={status} value={status}>
+                                  {attendanceLabel[status]}
+                                </SelectItem>
+                              ),
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+
+                      <TableCell>
+                        <Input
+                          type="time"
+                          className="h-9 w-28 rounded-xl border-input bg-secondary/40"
+                          value={row.checkIn}
+                          disabled={isClosed || row.status === "absent"}
+                          onChange={(event) =>
+                            update(row.employeeId, {
+                              checkIn: event.target.value,
+                            })
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Input
+                          type="time"
+                          className="h-9 w-28 rounded-xl border-input bg-secondary/40"
+                          value={row.checkOut}
+                          disabled={isClosed || row.status === "absent"}
+                          onChange={(event) =>
+                            update(row.employeeId, {
+                              checkOut: event.target.value,
+                            })
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="h-9 w-20 rounded-xl border-input bg-secondary/40"
+                          value={row.breakMinutes}
+                          disabled={isClosed || row.status === "absent"}
+                          onChange={(event) =>
+                            update(row.employeeId, {
+                              breakMinutes: Number(event.target.value),
+                            })
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {minutesToLabel(calc.workedMinutes)}
+                      </TableCell>
+
+                      <TableCell>
+                        {calc.overtimeMinutes > 0 ? (
+                          <Badge
+                            variant="secondary"
+                            className="border border-primary/15 bg-primary/10 font-medium text-primary shadow-none"
+                          >
+                            {minutesToLabel(calc.overtimeMinutes)}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="whitespace-nowrap text-right text-sm font-medium text-foreground">
+                        {brl(calc.billedAmount)}
+                      </TableCell>
+
+                      <TableCell className="whitespace-nowrap text-right text-sm text-muted-foreground">
+                        {brl(calc.costAmount)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function Resumo({
+  label,
+  value,
+  description,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  description: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <Card className="border-border bg-card text-card-foreground shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+
+            <p className="mt-2 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground">
+              {value}
+            </p>
+
+            <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
+          </div>
+
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AvatarNome({ nome }: { nome: string }) {
+  const iniciais = nome
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("");
+
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-xs font-semibold text-primary">
+      {iniciais || "—"}
     </div>
   );
 }

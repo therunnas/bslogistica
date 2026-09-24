@@ -2,15 +2,24 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { toast } from "@/lib/notificacoes";
-import { Download, FileText } from "lucide-react";
+import {
+  CalendarDays,
+  Clock3,
+  Download,
+  FileText,
+  ReceiptText,
+  TrendingUp,
+  WalletCards,
+  type LucideIcon,
+} from "lucide-react";
+
 import { PageHeader } from "../_components/app-shell";
-import { criarClienteNavegador } from "@/integrations/supabase/browser";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -26,15 +35,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useClients, useInvoices } from "@/lib/queries";
-import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
-import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
+
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { marginPct, round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
+import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
+import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
+import { toast } from "@/lib/notificacoes";
+import { useClients, useInvoices } from "@/lib/queries";
+
+const INPUT_CLASS =
+  "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
+
+const SELECT_CLASS =
+  "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus:ring-primary/20";
 
 export function PainelFaturamento() {
   const initial = monthRange();
   const queryClient = useQueryClient();
+
   const clients = useClients();
   const invoices = useInvoices();
   const { rows } = useLedger();
@@ -56,11 +75,11 @@ export function PainelFaturamento() {
   const period = useMemo(
     () =>
       rows.filter(
-        (r) =>
-          r.clientId === selectedClient &&
-          inPeriod(r.date, start, end) &&
-          r.status !== "absent" &&
-          r.invoiceId === null,
+        (row) =>
+          row.clientId === selectedClient &&
+          inPeriod(row.date, start, end) &&
+          row.status !== "absent" &&
+          row.invoiceId === null,
       ),
     [rows, selectedClient, start, end],
   );
@@ -77,81 +96,97 @@ export function PainelFaturamento() {
         cost: number;
       }
     >();
-    period.forEach((r) => {
-      const item = map.get(r.operationId) ?? {
-        name: r.operationName,
+
+    period.forEach((row) => {
+      const item = map.get(row.operationId) ?? {
+        name: row.operationName,
         dailies: 0,
         otMinutes: 0,
         billed: 0,
         otValue: 0,
         cost: 0,
       };
-      item.dailies += r.dailies;
-      item.otMinutes += r.overtimeMinutes;
-      item.billed += r.billed;
-      item.otValue += r.otValue;
-      item.cost += r.cost;
-      map.set(r.operationId, item);
+
+      item.dailies += row.dailies;
+      item.otMinutes += row.overtimeMinutes;
+      item.billed += row.billed;
+      item.otValue += row.otValue;
+      item.cost += row.cost;
+
+      map.set(row.operationId, item);
     });
-    return [...map.entries()].map(([id, value]) => ({ id, ...value }));
+
+    return [...map.entries()].map(([id, value]) => ({
+      id,
+      ...value,
+    }));
   }, [period]);
 
   const totals = useMemo(() => {
-    const billed = sumBy(period, (r) => r.billed);
+    const billed = sumBy(period, (row) => row.billed);
+
     return {
       billed,
-      cost: sumBy(period, (r) => r.cost),
-      otMinutes: sumBy(period, (r) => r.overtimeMinutes),
-      dailies: sumBy(period, (r) => r.dailies),
-      otValue: round2(sumBy(period, (r) => r.otValue)),
+      cost: sumBy(period, (row) => row.cost),
+      otMinutes: sumBy(period, (row) => row.overtimeMinutes),
+      dailies: sumBy(period, (row) => row.dailies),
+      otValue: round2(sumBy(period, (row) => row.otValue)),
     };
   }, [period]);
 
   const dailiesValue = round2(totals.billed - totals.otValue);
+
   const overtimeValue = totals.otValue;
 
   /**
-   * Uma única chamada transacional. Antes eram três escritas independentes a
-   * partir do navegador — insert da fatura, insert dos itens e update do
-   * vínculo — sem transação e sem filtrar lançamento já faturado, o que deixava
-   * fatura órfã e permitia cobrar o mesmo trabalho de novo.
-   *
-   * Os totais não são mais enviados daqui: a função os soma no servidor, a
-   * partir dos snapshots gravados no apontamento.
+   * Uma única chamada transacional. Os totais não são enviados pelo browser:
+   * a função soma no servidor os snapshots gravados no apontamento.
    */
   const generate = useMutation({
     mutationFn: async () => {
-      if (!selectedClient) throw new Error("Selecione um cliente.");
+      if (!selectedClient) {
+        throw new Error("Selecione um cliente.");
+      }
 
       const { data, error } = await criarClienteNavegador().rpc("gerar_fatura", {
         _client_id: selectedClient,
         _period_start: start,
         _period_end: end,
       });
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
+
       return data;
     },
+
     onSuccess: async (invoice) => {
-      // O vínculo muda `timesheet_entries.invoice_id`, que alimenta o ledger —
-      // e o ledger alimenta Dashboard, Relatórios e a prévia desta tela.
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["invoices"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["timesheet_entries"],
+        }),
       ]);
+
       toast.success(
         invoice
-          ? `Fatura gerada: ${brl(invoice.total_amount)} em ${num(invoice.total_dailies, 0)} diárias.`
+          ? `Fatura gerada: ${brl(invoice.total_amount)} em ${num(
+              invoice.total_dailies,
+              0,
+            )} diárias.`
           : "Fatura gerada.",
       );
     },
-    // A mensagem do Postgres é escrita em pt-BR pela própria função
-    // ("Nenhum lançamento faturável…", "Apenas administradores…", "Período
-    // inválido…"), então vale mais que qualquer texto genérico daqui.
+
     onError: (error: unknown) => {
       const mensagem =
         typeof error === "object" && error !== null && "message" in error
           ? String((error as { message: unknown }).message)
           : "Não foi possível gerar a fatura.";
+
       toast.error(mensagem);
     },
   });
@@ -168,56 +203,80 @@ export function PainelFaturamento() {
       "Valor faturado",
       "Custo",
     ];
-    const lines = period.map((r) => [
-      r.date,
-      r.operationName,
-      r.shiftName,
-      r.employeeName,
-      r.status,
-      r.workedMinutes,
-      r.overtimeMinutes,
-      r.billed.toFixed(2),
-      r.cost.toFixed(2),
+
+    const lines = period.map((row) => [
+      row.date,
+      row.operationName,
+      row.shiftName,
+      row.employeeName,
+      row.status,
+      row.workedMinutes,
+      row.overtimeMinutes,
+      row.billed.toFixed(2),
+      row.cost.toFixed(2),
     ]);
+
     const csv = montarCsv(header, lines);
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], {
+        type: "text/csv;charset=utf-8",
+      }),
+    );
+
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `faturamento-${start}-${end}.csv`;
     link.click();
+
     URL.revokeObjectURL(url);
   }
 
-  const clientName = (id: string) => clients.data?.find((c) => c.id === id)?.name ?? "—";
+  const clientName = (id: string) => clients.data?.find((client) => client.id === id)?.name ?? "—";
 
   return (
     <div>
       <PageHeader
         title="Faturamento"
-        description="Fechamento por cliente e período com diárias e horas extras separadas."
+        description="Revise lançamentos faturáveis, valores consolidados e faturas geradas por cliente e período."
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={exportCsv} disabled={!period.length}>
-              <Download className="size-4" /> Exportar CSV
-            </Button>
+          <div className="flex flex-wrap gap-2">
             <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={exportCsv}
+              disabled={!period.length}
+            >
+              <Download className="h-4 w-4" />
+              Exportar CSV
+            </Button>
+
+            <Button
+              type="button"
+              className="h-10 rounded-xl"
               onClick={() => generate.mutate()}
               disabled={!period.length || generate.isPending}
             >
-              <FileText className="size-4" /> Gerar fatura
+              <FileText className="h-4 w-4" />
+
+              {generate.isPending ? "Gerando..." : "Gerar fatura"}
             </Button>
           </div>
         }
       />
 
-      <Card className="mb-4">
-        <CardContent className="grid gap-3 p-5 md:grid-cols-3">
-          <div className="space-y-1.5">
+      <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+        <CardContent className="grid gap-4 p-5 md:grid-cols-3">
+          <div className="space-y-2">
             <Label>Cliente</Label>
+
             <Select value={selectedClient} onValueChange={setClientId}>
-              <SelectTrigger>
+              <SelectTrigger className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
+
               <SelectContent>
                 {(clients.data ?? []).map((client) => (
                   <SelectItem key={client.id} value={client.id}>
@@ -227,135 +286,365 @@ export function PainelFaturamento() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+
+          <div className="space-y-2">
             <Label>De</Label>
-            <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+
+            <Input
+              type="date"
+              value={start}
+              onChange={(event) => setStart(event.target.value)}
+              className={INPUT_CLASS}
+            />
           </div>
-          <div className="space-y-1.5">
+
+          <div className="space-y-2">
             <Label>Até</Label>
-            <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+
+            <Input
+              type="date"
+              value={end}
+              onChange={(event) => setEnd(event.target.value)}
+              className={INPUT_CLASS}
+            />
           </div>
         </CardContent>
       </Card>
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Summary label="Diárias" value={num(totals.dailies, 0)} hint={brl(dailiesValue)} />
-        <Summary
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Resumo
+          label="Diárias"
+          value={num(totals.dailies, 0)}
+          description={brl(dailiesValue)}
+          icon={CalendarDays}
+        />
+
+        <Resumo
           label="Horas extras"
           value={minutesToLabel(totals.otMinutes)}
-          hint={brl(overtimeValue)}
+          description={brl(overtimeValue)}
+          icon={Clock3}
         />
-        <Summary label="Total a faturar" value={brl(totals.billed)} />
-        <Summary
+
+        <Resumo
+          label="Total a faturar"
+          value={brl(totals.billed)}
+          description="Lançamentos elegíveis"
+          icon={ReceiptText}
+        />
+
+        <Resumo
           label="Margem"
           value={brl(totals.billed - totals.cost)}
-          hint={`${num(marginPct(totals.billed, totals.cost), 1)}% · custo ${brl(totals.cost)}`}
+          description={`${num(
+            marginPct(totals.billed, totals.cost),
+            1,
+          )}% · custo ${brl(totals.cost)}`}
+          icon={TrendingUp}
         />
       </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-base">Prévia por operação</CardTitle>
+      <Card className="mb-6 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+        <CardHeader className="border-b border-border px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+              <WalletCards className="h-4 w-4" />
+            </div>
+
+            <div>
+              <CardTitle className="text-sm font-semibold tracking-tight">
+                Prévia por operação
+              </CardTitle>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Valores ainda disponíveis para faturamento no período selecionado.
+              </p>
+            </div>
+          </div>
         </CardHeader>
+
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Operação</TableHead>
-                <TableHead className="text-right">Diárias</TableHead>
-                <TableHead className="text-right">Horas extras</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Custo</TableHead>
-                <TableHead className="text-right">Margem</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {byOperation.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
-                    Nenhum lançamento faturável no período.
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                  <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
+                    Operação
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Diárias
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Horas extras
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Total
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Custo
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Margem
+                  </TableHead>
                 </TableRow>
-              ) : (
-                byOperation.map((op) => (
-                  <TableRow key={op.id}>
-                    <TableCell className="font-medium">{op.name}</TableCell>
-                    <TableCell className="text-right">{num(op.dailies, 0)}</TableCell>
-                    <TableCell className="text-right">{minutesToLabel(op.otMinutes)}</TableCell>
-                    <TableCell className="text-right">{brl(op.billed)}</TableCell>
-                    <TableCell className="text-right">{brl(op.cost)}</TableCell>
-                    <TableCell className="text-right">{brl(op.billed - op.cost)}</TableCell>
+              </TableHeader>
+
+              <TableBody>
+                {byOperation.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6}>
+                      <EstadoVazio
+                        title="Nenhum lançamento faturável"
+                        description="Não existem apontamentos elegíveis para faturamento neste cliente e período."
+                      />
+                    </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  byOperation.map((operation) => {
+                    const margem = operation.billed - operation.cost;
+
+                    return (
+                      <TableRow
+                        key={operation.id}
+                        className="border-border transition-colors hover:bg-secondary/20"
+                      >
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                              <ReceiptText className="h-4 w-4" />
+                            </div>
+
+                            <p className="text-sm font-medium text-foreground">{operation.name}</p>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {num(operation.dailies, 0)}
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {minutesToLabel(operation.otMinutes)}
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm font-semibold text-foreground">
+                          {brl(operation.billed)}
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {brl(operation.cost)}
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm font-medium text-foreground">
+                          {brl(margem)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Faturas geradas</CardTitle>
+      <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+        <CardHeader className="border-b border-border px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+              <FileText className="h-4 w-4" />
+            </div>
+
+            <div>
+              <CardTitle className="text-sm font-semibold tracking-tight">
+                Faturas geradas
+              </CardTitle>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Histórico das faturas criadas pelo sistema.
+              </p>
+            </div>
+          </div>
         </CardHeader>
+
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Período</TableHead>
-                <TableHead className="text-right">Diárias</TableHead>
-                <TableHead className="text-right">Horas extras</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Custo</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(invoices.data ?? []).length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
-                    Nenhuma fatura gerada.
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                  <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
+                    Cliente
+                  </TableHead>
+
+                  <TableHead className="text-xs font-semibold text-muted-foreground">
+                    Período
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Diárias
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Horas extras
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Total
+                  </TableHead>
+
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                    Custo
+                  </TableHead>
+
+                  <TableHead className="text-xs font-semibold text-muted-foreground">
+                    Status
+                  </TableHead>
                 </TableRow>
-              ) : (
-                (invoices.data ?? []).map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{clientName(invoice.client_id)}</TableCell>
-                    <TableCell>
-                      {dateBR(invoice.period_start)} – {dateBR(invoice.period_end)}
-                    </TableCell>
-                    <TableCell className="text-right">{num(invoice.total_dailies, 0)}</TableCell>
-                    <TableCell className="text-right">{num(invoice.total_overtime, 1)} h</TableCell>
-                    <TableCell className="text-right">{brl(invoice.total_amount)}</TableCell>
-                    <TableCell className="text-right">{brl(invoice.total_cost)}</TableCell>
-                    <TableCell>
-                      <Badge variant={invoice.status === "issued" ? "default" : "secondary"}>
-                        {invoice.status === "draft"
-                          ? "Rascunho"
-                          : invoice.status === "closed"
-                            ? "Fechada"
-                            : "Emitida"}
-                      </Badge>
+              </TableHeader>
+
+              <TableBody>
+                {(invoices.data ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>
+                      <EstadoVazio
+                        title="Nenhuma fatura gerada"
+                        description="As faturas criadas pelo fechamento financeiro aparecerão aqui."
+                      />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  (invoices.data ?? []).map((invoice) => (
+                    <TableRow
+                      key={invoice.id}
+                      className="border-border transition-colors hover:bg-secondary/20"
+                    >
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/40">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                          </div>
+
+                          <span className="text-sm font-medium text-foreground">
+                            {clientName(invoice.client_id)}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {dateBR(invoice.period_start)} – {dateBR(invoice.period_end)}
+                      </TableCell>
+
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {num(invoice.total_dailies, 0)}
+                      </TableCell>
+
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {num(invoice.total_overtime, 1)} h
+                      </TableCell>
+
+                      <TableCell className="text-right text-sm font-semibold text-foreground">
+                        {brl(invoice.total_amount)}
+                      </TableCell>
+
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {brl(invoice.total_cost)}
+                      </TableCell>
+
+                      <TableCell>
+                        <StatusFatura status={invoice.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function Summary({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Resumo({
+  label,
+  value,
+  description,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  description: string;
+  icon: LucideIcon;
+}) {
   return (
-    <Card>
-      <CardContent className="p-5">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-2 font-display text-2xl font-semibold">{value}</p>
-        {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+    <Card className="border-border bg-card text-card-foreground shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+
+            <p className="mt-2 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground">
+              {value}
+            </p>
+
+            <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
+          </div>
+
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function StatusFatura({ status }: { status: string }) {
+  const label = status === "draft" ? "Rascunho" : status === "closed" ? "Fechada" : "Emitida";
+
+  const emitida = status === "issued";
+  const fechada = status === "closed";
+
+  return (
+    <Badge
+      variant="secondary"
+      className={
+        emitida
+          ? "border border-primary/15 bg-primary/10 font-medium text-primary shadow-none"
+          : fechada
+            ? "border border-emerald-500/15 bg-emerald-500/10 font-medium text-emerald-600 shadow-none dark:text-emerald-400"
+            : "border border-border bg-secondary font-medium text-muted-foreground shadow-none"
+      }
+    >
+      <span
+        className={
+          emitida
+            ? "mr-1.5 h-1.5 w-1.5 rounded-full bg-primary"
+            : fechada
+              ? "mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500"
+              : "mr-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground"
+        }
+      />
+
+      {label}
+    </Badge>
+  );
+}
+
+function EstadoVazio({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-secondary/50">
+        <ReceiptText className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-foreground">{title}</p>
+
+      <p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">{description}</p>
+    </div>
   );
 }

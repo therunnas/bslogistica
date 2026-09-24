@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, type FormEvent } from "react";
+import { ArrowLeft, Mail, Send } from "lucide-react";
 
-import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { MolduraAuth } from "@/components/moldura-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MolduraAuth } from "@/components/moldura-auth";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import {
   MENSAGEM_FALHA_GENERICA,
   MENSAGEM_LINK_INVALIDO,
@@ -17,54 +18,42 @@ import {
   decidirRespostaDaSolicitacao,
 } from "@/lib/recuperacao-senha";
 
-/**
- * Aviso de link inválido, vindo de /auth/confirm.
- *
- * Em componente próprio porque `useSearchParams` obriga um limite de Suspense
- * — sem ele o build falha ao pré-renderizar esta rota estática.
- */
 function AvisoLinkInvalido() {
   const parametros = useSearchParams();
-  if (parametros.get("status") !== "link-invalido") return null;
+
+  if (parametros.get("status") !== "link-invalido") {
+    return null;
+  }
 
   return (
-    <p
+    <div
       role="status"
-      className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-foreground"
+      className="rounded-xl border border-destructive/20 bg-destructive/[0.07] px-4 py-3"
     >
-      {MENSAGEM_LINK_INVALIDO}
-    </p>
+      <p className="text-sm font-medium text-destructive">Link de recuperação inválido</p>
+
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{MENSAGEM_LINK_INVALIDO}</p>
+    </div>
   );
 }
 
-/**
- * Solicitação do link de recuperação de senha.
- *
- * Rota pública: quem esqueceu a senha, por definição, não tem sessão. Não cria
- * conta e não faz signUp — o sistema não tem cadastro público, e este fluxo
- * serve só a quem o administrador já cadastrou.
- *
- * A tela nunca revela se o e-mail digitado tem conta. Sucesso, endereço
- * desconhecido e e-mail malformado terminam na mesma frase; só
- * indisponibilidade real muda o texto. Ver `decidirRespostaDaSolicitacao`.
- */
 export default function EsqueciSenha() {
   const [email, setEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  async function solicitar(evento: React.FormEvent) {
+  async function solicitar(evento: FormEvent) {
     evento.preventDefault();
-    if (enviando) return;
+
+    if (enviando) {
+      return;
+    }
 
     setEnviando(true);
     setAviso(null);
 
     const supabase = criarClienteNavegador();
 
-    // Sem `redirectTo`: o destino sai do Site URL configurado no Supabase, que
-    // já aponta para a produção. Passar um daqui exigiria mexer em
-    // additional_redirect_urls e abriria uma superfície que não precisa existir.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
 
     setAviso(
@@ -72,49 +61,61 @@ export default function EsqueciSenha() {
         ? MENSAGEM_FALHA_GENERICA
         : MENSAGEM_SOLICITACAO_ENVIADA,
     );
+
     setEnviando(false);
   }
 
   return (
     <MolduraAuth
       titulo="Recuperar senha"
-      descricao="Informe o e-mail da sua conta e enviaremos um link para definir uma nova senha."
+      descricao="Informe o e-mail da sua conta para receber as instruções de recuperação."
     >
       <Suspense fallback={null}>
         <AvisoLinkInvalido />
       </Suspense>
 
-      <form onSubmit={solicitar} className="space-y-3">
-        <div className="space-y-1.5">
+      <form onSubmit={solicitar} className="space-y-5">
+        <div className="space-y-2">
           <Label htmlFor="email">E-mail</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+
+          <div className="relative">
+            <Mail className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              className="h-11 rounded-xl border-input bg-secondary/50 pl-10 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20"
+            />
+          </div>
         </div>
-        <Button type="submit" className="w-full" disabled={enviando}>
+
+        <Button type="submit" className="h-11 w-full rounded-xl" disabled={enviando}>
+          <Send className="h-4 w-4" />
+
           {enviando ? "Enviando..." : "Enviar link de recuperação"}
         </Button>
       </form>
 
       {aviso ? (
-        <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          {aviso}
-        </p>
+        <div role="status" className="rounded-xl border border-border bg-secondary/40 px-4 py-3">
+          <p className="text-xs leading-5 text-muted-foreground">{aviso}</p>
+        </div>
       ) : null}
 
-      <p className="text-center text-sm">
+      <div className="border-t border-border pt-5">
         <Link
           href={ROTA_LOGIN}
-          className="text-muted-foreground underline-offset-4 hover:underline"
+          className="flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
+          <ArrowLeft className="h-4 w-4" />
           Voltar para entrar
         </Link>
-      </p>
+      </div>
     </MolduraAuth>
   );
 }

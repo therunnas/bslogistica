@@ -1,15 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  Building2,
+  CalendarRange,
+  FileText,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
 import { PageHeader } from "../_components/app-shell";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -33,9 +42,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useClients, useContracts } from "@/lib/queries";
-import { useDeleteRow, useSaveRow } from "@/lib/mutations";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+
 import { brl, dateBR, num, todayISO } from "@/lib/format";
+import { useDeleteRow, useSaveRow } from "@/lib/mutations";
+import { useClients, useContracts } from "@/lib/queries";
 import type { Client, Contract } from "@/lib/types";
 
 const emptyClient = {
@@ -62,20 +74,41 @@ const emptyContract = {
   status: "active",
 };
 
+const INPUT_CLASS =
+  "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
+
+const SELECT_CLASS =
+  "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus:ring-primary/20";
+
+const CARD_CLASS =
+  "overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]";
+
 export function PainelClientes() {
   const clients = useClients();
   const contracts = useContracts();
+
   const saveClient = useSaveRow("clients");
   const removeClient = useDeleteRow("clients");
+
   const saveContract = useSaveRow("contracts");
   const removeContract = useDeleteRow("contracts");
 
   const [clientOpen, setClientOpen] = useState(false);
   const [contractOpen, setContractOpen] = useState(false);
+
   const [clientForm, setClientForm] = useState(emptyClient);
   const [contractForm, setContractForm] = useState(emptyContract);
 
-  const clientName = (id: string) => clients.data?.find((c) => c.id === id)?.name ?? "—";
+  const clientName = (id: string) => clients.data?.find((client) => client.id === id)?.name ?? "—";
+
+  const totalClientes = clients.data?.length ?? 0;
+
+  const clientesAtivos = clients.data?.filter((client) => client.status === "active").length ?? 0;
+
+  const totalContratos = contracts.data?.length ?? 0;
+
+  const contratosAtivos =
+    contracts.data?.filter((contract) => contract.status === "active").length ?? 0;
 
   function editClient(client: Client) {
     setClientForm({
@@ -88,6 +121,7 @@ export function PainelClientes() {
       status: client.status,
       notes: client.notes ?? "",
     });
+
     setClientOpen(true);
   }
 
@@ -101,8 +135,14 @@ export function PainelClientes() {
       status: clientForm.status,
       notes: clientForm.notes || null,
     };
-    if (clientForm.id) payload["id"] = clientForm.id;
-    saveClient.mutate(payload, { onSuccess: () => setClientOpen(false) });
+
+    if (clientForm.id) {
+      payload["id"] = clientForm.id;
+    }
+
+    saveClient.mutate(payload, {
+      onSuccess: () => setClientOpen(false),
+    });
   }
 
   function editContract(contract: Contract) {
@@ -118,6 +158,7 @@ export function PainelClientes() {
       valid_to: contract.valid_to ?? "",
       status: contract.status,
     });
+
     setContractOpen(true);
   }
 
@@ -133,250 +174,549 @@ export function PainelClientes() {
       valid_to: contractForm.valid_to || null,
       status: contractForm.status,
     };
-    if (contractForm.id) payload["id"] = contractForm.id;
-    saveContract.mutate(payload, { onSuccess: () => setContractOpen(false) });
+
+    if (contractForm.id) {
+      payload["id"] = contractForm.id;
+    }
+
+    saveContract.mutate(payload, {
+      onSuccess: () => setContractOpen(false),
+    });
   }
 
   return (
     <div>
       <PageHeader
         title="Clientes e contratos"
-        description="Cada contrato define o valor da diária, a jornada e as regras de hora extra usadas no cálculo."
+        description="Gerencie clientes, contratos comerciais e as regras utilizadas nos cálculos operacionais."
       />
 
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Resumo
+          label="Clientes"
+          value={totalClientes}
+          description="Total cadastrado"
+          icon={Building2}
+        />
+
+        <Resumo
+          label="Clientes ativos"
+          value={clientesAtivos}
+          description="Disponíveis para operação"
+          icon={Users}
+        />
+
+        <Resumo
+          label="Contratos"
+          value={totalContratos}
+          description="Regras cadastradas"
+          icon={FileText}
+        />
+
+        <Resumo
+          label="Contratos ativos"
+          value={contratosAtivos}
+          description="Regras em utilização"
+          icon={CalendarRange}
+        />
+      </div>
+
       <Tabs defaultValue="clients">
-        <TabsList>
-          <TabsTrigger value="clients">Clientes</TabsTrigger>
-          <TabsTrigger value="contracts">Contratos e regras</TabsTrigger>
+        <TabsList className="mb-5 h-auto rounded-xl border border-border bg-secondary/50 p-1">
+          <TabsTrigger
+            value="clients"
+            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Clientes
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="contracts"
+            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Contratos e regras
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="clients" className="mt-4">
-          <div className="mb-3 flex justify-end">
+        <TabsContent value="clients" className="mt-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Cadastro de clientes</p>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Empresas atendidas pela operação da BS.
+              </p>
+            </div>
+
             <Button
+              className="h-10 rounded-xl"
               onClick={() => {
                 setClientForm(emptyClient);
                 setClientOpen(true);
               }}
             >
-              <Plus className="size-4" /> Novo cliente
+              <Plus className="h-4 w-4" />
+              Novo cliente
             </Button>
           </div>
-          <Card>
+
+          <Card className={CARD_CLASS}>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead>Contato</TableHead>
-                    <TableHead>E-mail</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(clients.data ?? []).map((client) => (
-                    <TableRow key={client.id}>
-                      <TableCell className="font-medium">{client.name}</TableCell>
-                      <TableCell>{client.doc ?? "—"}</TableCell>
-                      <TableCell>{client.contact_name ?? "—"}</TableCell>
-                      <TableCell>{client.email ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={client.status === "active" ? "default" : "secondary"}>
-                          {client.status === "active" ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => editClient(client)}>
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeClient.mutate(client.id)}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border bg-secondary/35 hover:bg-secondary/35">
+                      <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
+                        Cliente
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        CNPJ
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Contato
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        E-mail
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Status
+                      </TableHead>
+
+                      <TableHead className="w-24" />
                     </TableRow>
-                  ))}
-                  {clients.data?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-muted-foreground">
-                        Nenhum cliente cadastrado.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+
+                  <TableBody>
+                    {(clients.data ?? []).map((client) => (
+                      <TableRow
+                        key={client.id}
+                        className="border-border transition-colors hover:bg-secondary/30"
+                      >
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06]">
+                              <Building2 className="h-4 w-4 text-primary" />
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-foreground">
+                                {client.name}
+                              </p>
+
+                              <p className="mt-0.5 text-xs text-muted-foreground">Cliente</p>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-sm text-muted-foreground">
+                          {client.doc ?? "—"}
+                        </TableCell>
+
+                        <TableCell className="text-sm text-muted-foreground">
+                          {client.contact_name ?? "—"}
+                        </TableCell>
+
+                        <TableCell className="text-sm text-muted-foreground">
+                          {client.email ?? "—"}
+                        </TableCell>
+
+                        <TableCell>
+                          <StatusBadge status={client.status} />
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground"
+                              onClick={() => editClient(client)}
+                              aria-label={`Editar ${client.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => removeClient.mutate(client.id)}
+                              aria-label={`Excluir ${client.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {clients.data?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6}>
+                          <EstadoVazio
+                            icon={Building2}
+                            title="Nenhum cliente cadastrado"
+                            description="Cadastre o primeiro cliente para começar a estruturar contratos e operações."
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="contracts" className="mt-4">
-          <div className="mb-3 flex justify-end">
+        <TabsContent value="contracts" className="mt-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Contratos e regras</p>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Valores de diária, jornada e parâmetros de hora extra.
+              </p>
+            </div>
+
             <Button
+              className="h-10 rounded-xl"
               onClick={() => {
                 setContractForm({
                   ...emptyContract,
                   client_id: clients.data?.[0]?.id ?? "",
                 });
+
                 setContractOpen(true);
               }}
               disabled={!clients.data?.length}
             >
-              <Plus className="size-4" /> Novo contrato
+              <Plus className="h-4 w-4" />
+              Novo contrato
             </Button>
           </div>
-          <Card>
+
+          <Card className={CARD_CLASS}>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Contrato</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead className="text-right">Diária</TableHead>
-                    <TableHead className="text-right">Jornada (h)</TableHead>
-                    <TableHead className="text-right">Fator HE</TableHead>
-                    <TableHead className="text-right">Tolerância</TableHead>
-                    <TableHead>Vigência</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(contracts.data ?? []).map((contract) => (
-                    <TableRow key={contract.id}>
-                      <TableCell className="font-medium">{contract.name}</TableCell>
-                      <TableCell>{clientName(contract.client_id)}</TableCell>
-                      <TableCell className="text-right">{brl(contract.daily_rate)}</TableCell>
-                      <TableCell className="text-right">{num(contract.shift_hours, 1)}</TableCell>
-                      <TableCell className="text-right">{num(contract.ot_factor, 2)}x</TableCell>
-                      <TableCell className="text-right">{contract.ot_tolerance_min} min</TableCell>
-                      <TableCell>
-                        {dateBR(contract.valid_from)}
-                        {contract.valid_to ? ` até ${dateBR(contract.valid_to)}` : ""}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => editContract(contract)}>
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeContract.mutate(contract.id)}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border bg-secondary/35 hover:bg-secondary/35">
+                      <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
+                        Contrato
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Cliente
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Diária
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Jornada
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Fator HE
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Tolerância
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Vigência
+                      </TableHead>
+
+                      <TableHead className="w-24" />
                     </TableRow>
-                  ))}
-                  {contracts.data?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-muted-foreground">
-                        Nenhum contrato cadastrado.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+
+                  <TableBody>
+                    {(contracts.data ?? []).map((contract) => (
+                      <TableRow
+                        key={contract.id}
+                        className="border-border transition-colors hover:bg-secondary/30"
+                      >
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06]">
+                              <FileText className="h-4 w-4 text-primary" />
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-foreground">
+                                {contract.name}
+                              </p>
+
+                              <div className="mt-1">
+                                <StatusBadge status={contract.status} />
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-sm text-muted-foreground">
+                          {clientName(contract.client_id)}
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm font-medium text-foreground">
+                          {brl(contract.daily_rate)}
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {num(contract.shift_hours, 1)} h
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {num(contract.ot_factor, 2)}x
+                        </TableCell>
+
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {contract.ot_tolerance_min} min
+                        </TableCell>
+
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {dateBR(contract.valid_from)}
+                          {contract.valid_to ? ` até ${dateBR(contract.valid_to)}` : ""}
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground"
+                              onClick={() => editContract(contract)}
+                              aria-label={`Editar ${contract.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => removeContract.mutate(contract.id)}
+                              aria-label={`Excluir ${contract.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {contracts.data?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8}>
+                          <EstadoVazio
+                            icon={FileText}
+                            title="Nenhum contrato cadastrado"
+                            description="Crie uma regra comercial para definir diária, jornada e hora extra."
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       <Dialog open={clientOpen} onOpenChange={setClientOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-border bg-card text-card-foreground sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>{clientForm.id ? "Editar cliente" : "Novo cliente"}</DialogTitle>
+            <DialogTitle className="text-xl tracking-[-0.025em]">
+              {clientForm.id ? "Editar cliente" : "Novo cliente"}
+            </DialogTitle>
+
+            <DialogDescription>
+              {clientForm.id
+                ? "Atualize as informações cadastrais do cliente."
+                : "Cadastre os dados principais da empresa atendida."}
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
+
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
               <Label>Nome</Label>
+
               <Input
                 value={clientForm.name}
-                onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
+                onChange={(event) =>
+                  setClientForm({
+                    ...clientForm,
+                    name: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>CNPJ</Label>
+
               <Input
                 value={clientForm.doc}
-                onChange={(e) => setClientForm({ ...clientForm, doc: e.target.value })}
+                onChange={(event) =>
+                  setClientForm({
+                    ...clientForm,
+                    doc: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Contato</Label>
+
               <Input
                 value={clientForm.contact_name}
-                onChange={(e) => setClientForm({ ...clientForm, contact_name: e.target.value })}
+                onChange={(event) =>
+                  setClientForm({
+                    ...clientForm,
+                    contact_name: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>E-mail</Label>
+
               <Input
+                type="email"
                 value={clientForm.email}
-                onChange={(e) => setClientForm({ ...clientForm, email: e.target.value })}
+                onChange={(event) =>
+                  setClientForm({
+                    ...clientForm,
+                    email: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Telefone</Label>
+
               <Input
                 value={clientForm.phone}
-                onChange={(e) => setClientForm({ ...clientForm, phone: e.target.value })}
+                onChange={(event) =>
+                  setClientForm({
+                    ...clientForm,
+                    phone: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
+
+            <div className="space-y-2 sm:col-span-2">
               <Label>Observações</Label>
+
               <Textarea
                 value={clientForm.notes}
-                onChange={(e) => setClientForm({ ...clientForm, notes: e.target.value })}
+                onChange={(event) =>
+                  setClientForm({
+                    ...clientForm,
+                    notes: event.target.value,
+                  })
+                }
+                className="min-h-24 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20"
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Status</Label>
+
               <Select
                 value={clientForm.status}
-                onValueChange={(v) => setClientForm({ ...clientForm, status: v })}
+                onValueChange={(value) =>
+                  setClientForm({
+                    ...clientForm,
+                    status: value,
+                  })
+                }
               >
-                <SelectTrigger>
+                <SelectTrigger className={SELECT_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
+
                 <SelectContent>
                   <SelectItem value="active">Ativo</SelectItem>
+
                   <SelectItem value="inactive">Inativo</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setClientOpen(false)}>
+
+          <DialogFooter className="mt-2 border-t border-border pt-5">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setClientOpen(false)}
+            >
               Cancelar
             </Button>
-            <Button onClick={submitClient} disabled={!clientForm.name}>
-              Salvar
+
+            <Button
+              type="button"
+              className="rounded-xl"
+              onClick={submitClient}
+              disabled={!clientForm.name}
+            >
+              Salvar cliente
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={contractOpen} onOpenChange={setContractOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-border bg-card text-card-foreground sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{contractForm.id ? "Editar contrato" : "Novo contrato"}</DialogTitle>
+            <DialogTitle className="text-xl tracking-[-0.025em]">
+              {contractForm.id ? "Editar contrato" : "Novo contrato"}
+            </DialogTitle>
+
             <DialogDescription>
               A hora extra é calculada como (diária ÷ jornada) × fator, após a tolerância.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <div className="space-y-2">
               <Label>Cliente</Label>
+
               <Select
                 value={contractForm.client_id}
-                onValueChange={(v) => setContractForm({ ...contractForm, client_id: v })}
+                onValueChange={(value) =>
+                  setContractForm({
+                    ...contractForm,
+                    client_id: value,
+                  })
+                }
               >
-                <SelectTrigger>
+                <SelectTrigger className={SELECT_CLASS}>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
+
                 <SelectContent>
                   {(clients.data ?? []).map((client) => (
                     <SelectItem key={client.id} value={client.id}>
@@ -386,86 +726,224 @@ export function PainelClientes() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Nome do contrato</Label>
+
               <Input
                 value={contractForm.name}
-                onChange={(e) => setContractForm({ ...contractForm, name: e.target.value })}
+                onChange={(event) =>
+                  setContractForm({
+                    ...contractForm,
+                    name: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Valor da diária (R$)</Label>
+
               <Input
                 type="number"
                 step="0.01"
                 value={contractForm.daily_rate}
-                onChange={(e) =>
-                  setContractForm({ ...contractForm, daily_rate: Number(e.target.value) })
+                onChange={(event) =>
+                  setContractForm({
+                    ...contractForm,
+                    daily_rate: Number(event.target.value),
+                  })
                 }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Jornada da diária (horas)</Label>
+
               <Input
                 type="number"
                 step="0.5"
                 value={contractForm.shift_hours}
-                onChange={(e) =>
-                  setContractForm({ ...contractForm, shift_hours: Number(e.target.value) })
+                onChange={(event) =>
+                  setContractForm({
+                    ...contractForm,
+                    shift_hours: Number(event.target.value),
+                  })
                 }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Fator hora extra</Label>
+
               <Input
                 type="number"
                 step="0.05"
                 value={contractForm.ot_factor}
-                onChange={(e) =>
-                  setContractForm({ ...contractForm, ot_factor: Number(e.target.value) })
+                onChange={(event) =>
+                  setContractForm({
+                    ...contractForm,
+                    ot_factor: Number(event.target.value),
+                  })
                 }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Tolerância (min)</Label>
+
               <Input
                 type="number"
                 value={contractForm.ot_tolerance_min}
-                onChange={(e) =>
-                  setContractForm({ ...contractForm, ot_tolerance_min: Number(e.target.value) })
+                onChange={(event) =>
+                  setContractForm({
+                    ...contractForm,
+                    ot_tolerance_min: Number(event.target.value),
+                  })
                 }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Vigente de</Label>
+
               <Input
                 type="date"
                 value={contractForm.valid_from}
-                onChange={(e) => setContractForm({ ...contractForm, valid_from: e.target.value })}
+                onChange={(event) =>
+                  setContractForm({
+                    ...contractForm,
+                    valid_from: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
-            <div className="space-y-1.5">
+
+            <div className="space-y-2">
               <Label>Vigente até (opcional)</Label>
+
               <Input
                 type="date"
                 value={contractForm.valid_to}
-                onChange={(e) => setContractForm({ ...contractForm, valid_to: e.target.value })}
+                onChange={(event) =>
+                  setContractForm({
+                    ...contractForm,
+                    valid_to: event.target.value,
+                  })
+                }
+                className={INPUT_CLASS}
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setContractOpen(false)}>
+
+          <DialogFooter className="mt-2 border-t border-border pt-5">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setContractOpen(false)}
+            >
               Cancelar
             </Button>
+
             <Button
+              type="button"
+              className="rounded-xl"
               onClick={submitContract}
               disabled={!contractForm.name || !contractForm.client_id}
             >
-              Salvar
+              Salvar contrato
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const ativo = status === "active";
+
+  return (
+    <Badge
+      variant="secondary"
+      className={
+        ativo
+          ? "border border-emerald-500/15 bg-emerald-500/10 font-medium text-emerald-600 shadow-none dark:text-emerald-400"
+          : "border border-border bg-secondary font-medium text-muted-foreground shadow-none"
+      }
+    >
+      <span
+        className={
+          ativo
+            ? "mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500"
+            : "mr-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground"
+        }
+      />
+
+      {ativo ? "Ativo" : "Inativo"}
+    </Badge>
+  );
+}
+
+function Resumo({
+  label,
+  value,
+  description,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  description: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <Card className="border-border bg-card text-card-foreground shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+
+            <p className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-foreground">
+              {value}
+            </p>
+
+            <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
+          </div>
+
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EstadoVazio({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-secondary/50">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-foreground">{title}</p>
+
+      <p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">{description}</p>
     </div>
   );
 }
