@@ -24,9 +24,9 @@ tem relação com o TanStack Router.
 - **A chave `service_role` nunca vai para o cliente.** Nenhuma variável
   `NEXT_PUBLIC_*` pode conter segredo — o prefixo embute o valor no bundle.
 - **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`. As 21 migrations do repositório estão
-  aplicadas em Production — a `014` e a `015` inclusive —, e **nenhuma
-  migration aplicada se edita**, nem para corrigir.
+  `supabase migration new <nome>`. O repositório tem 22 migrations: 21 estão
+  aplicadas em Production — a `014` e a `015` inclusive — e a `016` está em PR.
+  **Nenhuma migration aplicada se edita**, nem para corrigir.
 - **Não alterar regras financeiras** — cálculo de diária, hora extra, custo ou
   faturamento — fora de tarefa com esse escopo explícito.
 - **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
@@ -120,14 +120,15 @@ tem relação com o TanStack Router.
   `operador_elegivel_operacional()` — `aal1` sem MFA bloqueando **ou** `aal2` —
   e reapontou os helpers centrais para ela, **sem** ampliar dado, coluna ou
   grant. As 11 policies `*_exige_aal2` **não** foram afrouxadas por nenhuma das
-  duas, e **em AAL1** `operacional` lê zero linha de tabela de negócio pelo
-  PostgREST — ali a RPC é a única porta. **Em AAL2 não é assim:** as policies
-  permissivas originais liberam por `public.is_staff()`, que é verdadeiro para
-  qualquer papel, então o operador em AAL2 alcança essas tabelas direto — e
-  escreve naquelas cuja policy é `FOR ALL`. Isso é anterior à `013` e à `015`, e
-  não se conserta no guard; separar `is_staff()` por papel é tarefa própria, com
-  migration e teste. A interface **consome** as RPCs desde o B2.1
-  (`src/lib/operacional/`) e o B2.3 (tela `/operacional`), e só elas. Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
+  duas. A `016` fecha o acesso direto: uma RESTRICTIVE `*_exige_admin` por
+  tabela faz o acesso direto de `authenticated` exigir **`aal2` E `admin`**, e
+  com isso o `operacional` lê zero linha de tabela de negócio pelo PostgREST
+  **nos dois níveis** — a RPC passa a ser a única porta dele. Antes dela, o
+  operador em AAL2 alcançava as dez tabelas pela permissiva por
+  `public.is_staff()`, que é verdadeira para qualquer papel. `profiles`,
+  `user_roles` e `user_operation_access` ficam de fora, de propósito. A
+  interface **consome** as RPCs desde o B2.1 (`src/lib/operacional/`) e o B2.3
+  (tela `/operacional`), e só elas. **A `016` ainda não está em Production.** Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
   `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
   por linha e recusa a chamada inteira diante de chave inesperada, não existe
   DELETE, e toda função `SECURITY DEFINER` revalida papel + AAL + MFA +

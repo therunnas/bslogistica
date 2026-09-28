@@ -48,6 +48,15 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Cenário. Mesmos UUIDs de admin e operacional do 005, para leitura cruzada.
+--
+-- O ATOR DOS BLOCOS É O ADMIN, e desde a migration 016 isso deixou de ser
+-- detalhe: acesso direto às tabelas de negócio passou a exigir `aal2` E
+-- `admin`, então o operador não escreve mais apontamento por fora — o caminho
+-- dele é a superfície de RPC da `013`/`015`. Esta suíte nunca foi sobre quem
+-- escreve: ela mede a DERIVAÇÃO FINANCEIRA, que é do trigger e independe do
+-- papel de quem disparou o comando. Os valores esperados não mudaram uma
+-- casa decimal; o que mudou foi o `sub` dos claims, de `8888…` para `1111…`.
+-- Quem prova a recusa do operador é `002`, `005` e `012`.
 -- ---------------------------------------------------------------------------
 
 insert into public.profiles (id, full_name, email) values
@@ -137,7 +146,7 @@ declare
   _worked integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- B1/B2. INSERT mandando valores inventados nas duas colunas.
@@ -170,7 +179,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -217,7 +226,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- Nasce sem hora extra: 06:00–15:00 -> billed 200.00.
@@ -301,7 +310,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   insert into public.timesheet_entries
@@ -361,7 +370,7 @@ declare
   _n bigint;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   insert into public.operation_team (operation_id, employee_id)
@@ -387,7 +396,7 @@ declare
   _b numeric; _c numeric; _w integer; _o integer; _r numeric; _h numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- A. jornada exata -> billed 200.00 / cost 120.00
@@ -487,7 +496,7 @@ declare
   _rate   numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- G1. Folha da operação COM CONTRATO (diária 200), payload apontando para a

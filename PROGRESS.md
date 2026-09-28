@@ -10,7 +10,7 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | Último marco       | **PR #28** — checkpoint documental do B1                            |
 | Merge do marco     | `a4b8ed73867b1d0c7492bc1a418b633f80ef05d6` — merge commit do PR #28 |
 | B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
-| Migrations         | **21 locais = 21 em Production**, zero pendentes                    |
+| Migrations         | **22 locais**, 21 em Production; a **`016` em PR**, não aplicada    |
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
@@ -18,7 +18,8 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
 | `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS               |
 | PR C               | **CONCLUÍDO** — PR #37, mergeado. Ver 7.6                           |
-| Etapa atual        | **PR D** — backend administrativo de usuários, não iniciado         |
+| `016`              | **EM PR** — fecha o acesso direto do operacional em AAL2. Ver 7.7   |
+| Etapa atual        | **`016`** — correção de segurança pré-D; depois dela, o **PR D**    |
 
 O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
 atual da `main`", e não deve ser lido como tal.
@@ -263,7 +264,7 @@ O que **ficou provado** no diagnóstico, e vale guardar:
 reproduzido. Só investigar se voltar a acontecer — e, se voltar, o caminho é
 reinstrumentar como no PR #19, não adivinhar.
 
-## 6. Nova política de autorização — APROVADA, NÃO IMPLEMENTADA
+## 6. Nova política de autorização — IMPLEMENTADA (guard no PR C, banco na `016`)
 
 > **Leia esta seção inteira antes de tocar em guard, policy, RLS ou usuário.**
 
@@ -304,6 +305,10 @@ um TOTP no recovery e nenhum admin operando em AAL1.
   interface** (B2.1, seção 7.3, e a tela do B2.3);
 - a **migration `015`** (seção 7.5) estendeu essa mesma superfície estreita ao
   operador em **AAL2**, sem ampliar dado nenhum;
+- a **migration `016`** (seção 7.7) fecha o acesso **direto** em AAL2, que a
+  permissiva por `is_staff()` deixava aberto para qualquer papel: acesso direto
+  de `authenticated` passa a exigir **`aal2` E `admin`**. Está no repositório e
+  **ainda não em Production**;
 - o que **falta** é a tela **Configurações → Segurança** (**PR F**), por onde o
   `operacional` ativaria MFA por vontade própria, e a matriz E2E do **PR G**.
 
@@ -336,7 +341,8 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **CONCLUÍDO** — PR #33     |
 | **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **EM PRODUCTION** — PR #34 |
 | **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **CONCLUÍDO** — PR #37     |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | **PRÓXIMA ETAPA**          |
+| **016**   | **acesso direto às tabelas passa a exigir AAL2 E admin** — fecha o operador em AAL2 pelo PostgREST. Ver 7.7                           | **EM PR**                  |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | próxima, depois da `016`   |
 | **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
 | **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
 | **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado     |
@@ -1111,6 +1117,82 @@ porta segue sendo a RPC, e quem a governa é o banco.
    `liberado` para o painel. Ou seja: **ainda não existe caminho para ele
    ativar MFA por vontade própria** — isso é o **PR F** (Configurações →
    Segurança), como já estava previsto.
+
+### 7.7 Migration `016` — o acesso direto passa a exigir AAL2 **e** admin
+
+**Achado na revisão do Codex no PR #39, e reproduzido no harness antes de
+corrigir.** As policies permissivas originais liberam as tabelas de negócio para
+`authenticated` por `public.is_staff()`, que é
+
+```sql
+SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid())
+```
+
+isto é, **qualquer papel atribuído** — não "é admin". Enquanto o único papel
+real era `admin`, as duas coisas coincidiam. Deixaram de coincidir quando a
+`013` criou a superfície operacional e a `015` passou a aceitar o operador em
+`aal2`: uma conta `operacional` que conclui o TOTP chega em `aal2`, a
+RESTRICTIVE `*_exige_aal2` passa, a permissiva passa, e ela alcança as dez
+tabelas **direto pelo PostgREST** — contornando a superfície estreita inteira.
+
+**O que foi medido antes da correção**, com uma conta só de papel `operacional`:
+
+| Medida                  | `operacional` aal1 | `operacional` aal2                                                                       | `admin` aal2 |
+| ----------------------- | ------------------ | ---------------------------------------------------------------------------------------- | ------------ |
+| SELECT nas 10 tabelas   | 0 linha            | **1 linha em cada**                                                                      | 1 linha      |
+| PII de cliente e pessoa | —                  | **atravessa**                                                                            | atravessa    |
+| coluna financeira       | —                  | **atravessa**                                                                            | atravessa    |
+| UPDATE direto           | —                  | **passa** em `operations`, `shifts`, `timesheets`, `timesheet_entries`, `operation_team` | passa        |
+| DELETE `operation_team` | —                  | **passa**                                                                                | passa        |
+
+Atravessavam `clients.doc`, `contact_name`, `email`, `phone`; `daily_rate`,
+`shift_hours`, `ot_factor` e `ot_tolerance_min` do contrato; `employees.doc`,
+`phone` e `daily_cost`; `operations.agreed_amount`, `contract_id` e `client_id`;
+`billed_amount`, `cost_amount`, `worked_minutes`, `overtime_minutes`, os
+snapshots e `invoice_id`; e os totais de `invoices` e `invoice_items`.
+
+**A correção.** Uma policy RESTRICTIVE nova por tabela — `<tabela>_exige_admin`
+— exigindo `public.has_role(auth.uid(), 'admin')`. RESTRICTIVE entra em `AND`
+com o que já existe, então o resultado é
+
+> acesso direto de `authenticated` = **AAL2 E admin**
+
+sem tocar em permissiva, grant, trigger, RPC ou `is_staff()`. É aditivo: nada
+existente muda de significado.
+
+**Por que não redefinir `is_staff()`:** seria mais curto e muito pior. A função
+é chamada por policies de várias migrations aplicadas; mudar o significado dela
+por baixo alteraria o comportamento de tudo o que a chama, de uma vez, sem que
+nenhuma dessas policies dissesse o que passou a valer.
+
+**Ficam de fora, de propósito:** `profiles` (cada conta lê e edita a própria
+linha, inclusive a operacional), `user_roles` (lida em AAL1, antes do MFA — o
+deadlock já registrado) e `user_operation_access` (já é admin + AAL2 desde a
+`013`).
+
+**As cinco RPCs não são afetadas.** Elas pertencem a `bslog_rpc_operacional`,
+que tem `BYPASSRLS`: policy nenhuma as alcança. O operador continua apontando em
+`aal1` e em `aal2` pela mesma superfície estreita — que passa a ser, de fato, a
+**única** porta dele.
+
+**Teste `supabase/tests/012_restringir_postgrest_operacional.sql`, 95 casos.**
+Contra o schema sem a `016` ele dá **45 FAIL**, exatamente nos blocos que medem
+o operador em AAL2. Ele prova, no mesmo arquivo: zero leitura direta em aal1 e
+aal2, zero PII, zero coluna financeira, zero escrita, as cinco RPCs ainda
+funcionando nos dois níveis, o admin com o acesso administrativo intacto, o
+admin em AAL1 ainda barrado, `admin`+`operacional` tratado como admin e não
+elegível às RPCs, conta sem papel sem nada, `user_operation_access` ainda
+admin-only, e que nenhum grant da superfície foi ampliado.
+
+**Quatro suítes antigas medem o contrato que a `016` revoga** — decisão
+pendente, registrada na seção 11 das proibições e no PR:
+`002_autorizacao` (bloco OPERACIONAL), `005_enforcement_aal2` (caso D),
+`006_valores_financeiros` (a fixture escreve como `operacional`) e
+`007_fontes_financeiras` (bloco J, 43 casos). Elas não foram alteradas neste PR:
+inverter asserção de suíte financeira é decisão de quem aprova, não efeito
+colateral de uma correção de RLS.
+
+**Ainda NÃO aplicada em Production.**
 
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
