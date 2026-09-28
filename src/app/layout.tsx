@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 
 import "@/styles.css";
 import { Providers } from "./providers";
@@ -25,8 +26,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap"
         />
       </head>
+
       <body>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
