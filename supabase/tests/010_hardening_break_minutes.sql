@@ -388,7 +388,12 @@ begin
       where schemaname = 'public' and policyname like '%_exige_aal2'
         and permissive = 'RESTRICTIVE'));
 
-  perform pg_temp.registrar('F3. as 13 tabelas de public seguem com RLS ativa', '13',
+  -- Eram 13 até a migration 017 (PR D): as 12 de sempre mais
+  -- `user_operation_access`, da 013. A 017 acrescenta `admin_audit_log`, com
+  -- RLS ativa desde a criação — passa a 14. Constante atualizada de propósito,
+  -- não relaxada: continua contando TODAS as tabelas com RLS ativa, e uma
+  -- tabela nova sem RLS faria este caso FALHAR do mesmo jeito que antes.
+  perform pg_temp.registrar('F3. as 14 tabelas de public seguem com RLS ativa', '14',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
