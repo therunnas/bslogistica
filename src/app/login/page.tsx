@@ -59,9 +59,7 @@ export default function Login() {
     const supabase = criarClienteNavegador();
 
     void supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        router.replace("/dashboard");
-      }
+      if (data.user) router.replace("/dashboard");
     });
   }, [router]);
 
@@ -132,7 +130,7 @@ export default function Login() {
           <section className="hidden max-w-2xl lg:block">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 text-xs font-medium text-primary">
               <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_10px_rgba(225,29,46,0.6)]" />
-              Ambiente operacional
+              Ambiente de operações
             </div>
 
             <h1 className="max-w-[11ch] text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-foreground xl:text-7xl">
@@ -140,7 +138,7 @@ export default function Login() {
             </h1>
 
             <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground xl:text-lg">
-              Gestão operacional, colaboradores, escalas, apontamentos e faturamento em um único
+              Gestão de operações, colaboradores, escalas, apontamentos e faturamento em um único
               ambiente interno.
             </p>
 

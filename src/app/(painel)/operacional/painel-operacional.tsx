@@ -209,18 +209,9 @@ export function PainelOperacional() {
   );
 
   useEffect(() => {
-    if (!pronto) {
-      return;
-    }
+    if (!pronto) return;
 
-    setRascunho((atual) =>
-      atual?.escopo === escopo
-        ? atual
-        : {
-            escopo,
-            linhas: base,
-          },
-    );
+    setRascunho((atual) => (atual?.escopo === escopo ? atual : { escopo, linhas: base }));
   }, [pronto, escopo, base]);
 
   const linhas = rascunho?.escopo === escopo ? rascunho.linhas : base;
@@ -258,9 +249,7 @@ export function PainelOperacional() {
   const pendentes = pronto ? linhasAlteradas(linhas, apontamentos.data) : [];
 
   function enviar() {
-    if (!operationId || !shiftId || !pronto) {
-      return;
-    }
+    if (!operationId || !shiftId || !pronto) return;
 
     if (pendentes.length === 0) {
       toast.info("Nenhuma alteração para salvar.");
@@ -292,13 +281,7 @@ export function PainelOperacional() {
   }
 
   if (operacoes.data.length === 0) {
-    return (
-      <Aviso>
-        <p className="font-medium text-foreground">Nenhuma operação atribuída</p>
-
-        <p className="mt-1">Procure o administrador para verificar sua alocação.</p>
-      </Aviso>
-    );
+    return <Aviso>Nenhuma operação atribuída a você. Procure o administrador.</Aviso>;
   }
 
   const operacaoSelecionada =
@@ -452,23 +435,9 @@ export function PainelOperacional() {
 
       {fase === "carregando" ? <Aviso tipo="carregando">Carregando apontamento...</Aviso> : null}
 
-      {fase === "sem-turno" ? (
-        <Aviso>
-          <p className="font-medium text-foreground">Nenhum turno configurado</p>
+      {fase === "sem-turno" ? <Aviso>Nenhum turno configurado para esta operação.</Aviso> : null}
 
-          <p className="mt-1">
-            Esta operação ainda não possui um turno disponível para apontamento.
-          </p>
-        </Aviso>
-      ) : null}
-
-      {fase === "sem-equipe" ? (
-        <Aviso>
-          <p className="font-medium text-foreground">Nenhum colaborador alocado</p>
-
-          <p className="mt-1">Ainda não existe equipe vinculada a este turno.</p>
-        </Aviso>
-      ) : null}
+      {fase === "sem-equipe" ? <Aviso>Nenhum colaborador alocado neste turno.</Aviso> : null}
 
       {pronto ? (
         <div className="space-y-4">
@@ -477,11 +446,10 @@ export function PainelOperacional() {
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
 
               <div>
-                <p className="font-medium text-foreground">Folha fechada</p>
+                <p className="font-medium text-foreground">Folha fechada pelo administrador.</p>
 
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Este apontamento foi fechado pelo administrador e está disponível apenas para
-                  consulta.
+                  Disponível apenas para consulta.
                 </p>
               </div>
             </div>

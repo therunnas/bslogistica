@@ -19,9 +19,7 @@ export function FormularioNovaSenha() {
   async function redefinir(evento: FormEvent) {
     evento.preventDefault();
 
-    if (enviando) {
-      return;
-    }
+    if (enviando) return;
 
     const validacao = validarNovaSenha(senha, confirmacao);
 

@@ -30,51 +30,15 @@ import type { PapelEfetivo } from "../_papel";
 
 const NAVEGACAO = {
   admin: [
-    {
-      href: "/dashboard",
-      label: "Dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      href: "/apontamentos",
-      label: "Apontamentos",
-      icon: CalendarCheck,
-    },
-    {
-      href: "/operacoes",
-      label: "Operações",
-      icon: Wrench,
-    },
-    {
-      href: "/clientes",
-      label: "Clientes e contratos",
-      icon: Building2,
-    },
-    {
-      href: "/colaboradores",
-      label: "Colaboradores",
-      icon: Users,
-    },
-    {
-      href: "/faturamento",
-      label: "Faturamento",
-      icon: FileText,
-    },
-    {
-      href: "/relatorios",
-      label: "Relatórios",
-      icon: BarChart3,
-    },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/apontamentos", label: "Apontamentos", icon: CalendarCheck },
+    { href: "/operacoes", label: "Operações", icon: Wrench },
+    { href: "/clientes", label: "Clientes e contratos", icon: Building2 },
+    { href: "/colaboradores", label: "Colaboradores", icon: Users },
+    { href: "/faturamento", label: "Faturamento", icon: FileText },
+    { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
   ],
-
-  operacional: [
-    {
-      href: "/operacional",
-      label: "Apontamentos",
-      icon: CalendarCheck,
-    },
-  ],
-
+  operacional: [{ href: "/operacional", label: "Apontamentos", icon: CalendarCheck }],
   "sem-papel": [],
 } as const;
 
