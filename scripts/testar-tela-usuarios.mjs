@@ -464,6 +464,24 @@ verificar(
   /if \(feedback\.tipo === "sucesso"\)[\s\S]{0,80}setConvidarAberto\(false\)/.test(fontes.painel),
   true,
 );
+// Achado real de revisão (chatgpt-codex-connector, PR #47): um convite pode
+// criar a conta e falhar só depois, ao conceder o papel — devolvendo "erro"
+// mesmo com uma linha persistente e nova em auth.users. Sem invalidar a
+// lista nesse caso, a conta fica escondida e o reenvio esbarra num e-mail já
+// cadastrado. A invalidação precisa ser incondicional, não presa a
+// `situacao === "convidado"`.
+verificar(
+  "H7. useConvidarUsuario invalida a lista de usuários em QUALQUER resultado, não só em 'convidado'",
+  /onSuccess: \(\) => \{\s*void queryClient\.invalidateQueries\(\{ queryKey: CHAVES\.usuarios\(\) \}\);\s*\},/.test(
+    fontes.hooks,
+  ),
+  true,
+);
+verificar(
+  "H8. e não existe mais a condição que escondia a conta parcialmente criada",
+  /if \(resultado\.situacao === "convidado"\)/.test(fontes.hooks),
+  false,
+);
 
 console.log("\nI. Nada de MFA, sessão ou login foi tocado por este PR\n");
 

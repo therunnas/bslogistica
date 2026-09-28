@@ -66,10 +66,15 @@ export function useConvidarUsuario() {
   return useMutation({
     mutationFn: (entrada: { email: unknown; papel: unknown; nomeCompleto?: unknown }) =>
       convidarUsuarioAction(entrada),
-    onSuccess: (resultado) => {
-      if (resultado.situacao === "convidado") {
-        void queryClient.invalidateQueries({ queryKey: CHAVES.usuarios() });
-      }
+    // Invalida sempre, mesmo quando `resultado.situacao` é "erro": como o
+    // próprio `servico.convidarUsuario` documenta, um convite pode criar a
+    // conta e falhar só depois, ao conceder o papel — aí a conta fica
+    // "sem-papel", persistente, e só some da lista se ninguém recarregar.
+    // Invalidar incondicionalmente é o que garante que essa conta apareça
+    // (o admin resolve o papel dali, em vez de tentar convidar de novo e
+    // esbarrar num e-mail já cadastrado).
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CHAVES.usuarios() });
     },
   });
 }
