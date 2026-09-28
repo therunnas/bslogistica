@@ -60,6 +60,7 @@ const TELAS = [
   ["colaboradores", "PainelColaboradores"],
   ["faturamento", "PainelFaturamento"],
   ["relatorios", "PainelRelatorios"],
+  ["usuarios", "PainelUsuarios"],
 ];
 
 const fontes = {
@@ -111,7 +112,7 @@ verificar("A11. ehAdmin concorda com admin", ehAdmin(["admin", "operacional"]), 
 verificar("A12. ehAdmin recusa operacional", ehAdmin(["operacional"]), false);
 verificar("A13. ehAdmin recusa sem papel", ehAdmin([]), false);
 
-console.log("\nB. As sete telas bloqueiam no servidor, antes de renderizar\n");
+console.log("\nB. As oito telas bloqueiam no servidor, antes de renderizar\n");
 
 for (const [rota, componente] of TELAS) {
   const fonte = paginas[rota];
@@ -233,14 +234,26 @@ verificar(
   true,
 );
 // Conta dentro do bloco do admin, e não no arquivo todo: desde o B2.3 há
-// também a entrada do operacional, e somar as duas mediria outra coisa.
+// também a entrada do operacional, e desde o Checkout #16.1 há também a
+// entrada de conta (`ITEM_USUARIOS`), fora de `NAVEGACAO` de propósito.
+// Somar qualquer uma das duas mediria outra coisa.
+const TELAS_NAV = TELAS.filter(([rota]) => rota !== "usuarios");
 {
   const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";
-  verificar("E5. admin mantém os sete links", (bloco.match(/\{ href: "\//g) ?? []).length, 7);
-}
-for (const [rota] of TELAS) {
   verificar(
-    `E6.${rota} — continua na navegação do admin`,
+    "E5. admin mantém os sete links da navegação principal",
+    (bloco.match(/\{ href: "\//g) ?? []).length,
+    7,
+  );
+  verificar(
+    "E5b. usuários NÃO é um item da navegação principal",
+    /href: "\/usuarios"/.test(bloco),
+    false,
+  );
+}
+for (const [rota] of TELAS_NAV) {
+  verificar(
+    `E6.${rota} — continua na navegação principal do admin`,
     fontes.shell.includes(`href: "/${rota}"`),
     true,
   );
@@ -262,14 +275,56 @@ verificar(
   false,
 );
 
+console.log("\nE'. Usuários mora na área de conta do admin, não na navegação principal\n");
+
+verificar(
+  "E9. o item de usuários existe fora do mapa NAVEGACAO",
+  /const ITEM_USUARIOS = \{ href: "\/usuarios", label: "Usuários", icon: UserCog \} as const;/.test(
+    fontes.shell,
+  ),
+  true,
+);
+verificar(
+  "E10. o rodapé abre um menu de conta só para o admin",
+  /\{papel === "admin" \? \(\s*<DropdownMenu>/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E11. o menu de conta oferece o link de usuários",
+  /<DropdownMenuItem asChild>\s*<Link href=\{ITEM_USUARIOS\.href\}/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E12. e continua oferecendo Sair, no mesmo menu",
+  /<DropdownMenuItem onClick=\{encerrarSessao\} disabled=\{saindo\}>/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E13. o operacional não recebe o menu de conta (ramo administrativo não se aplica a ele)",
+  /\) : \(\s*<>\s*<p className="truncate px-3 pb-2/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E14. mas continua com Sair disponível fora do menu de conta",
+  /<Button\s+variant="ghost"\s+className="w-full justify-start gap-3"\s+onClick=\{encerrarSessao\}\s+disabled=\{saindo\}\s*>/.test(
+    fontes.shell,
+  ),
+  true,
+);
+verificar(
+  "E15. nenhum window.confirm nem lógica de papel nova nesta troca de UI",
+  /window\.confirm|papeis\.includes|user_roles/.test(semComentarios(fontes.shell)),
+  false,
+);
+
 console.log("\nF. Esconder o link não é a proteção\n");
 
 // Se o AppShell fosse a única barreira, nenhuma página chamaria o guard. A
 // contagem existe para que remover a chamada de uma tela apareça aqui.
 verificar(
-  "F1. as sete telas chamam o guard, não seis",
+  "F1. as oito telas chamam o guard, não sete",
   Object.values(paginas).filter((f) => f.includes("await exigirAdmin()")).length,
-  7,
+  8,
 );
 verificar(
   "F2. o guard bloqueia por papel, não por caminho na URL",
