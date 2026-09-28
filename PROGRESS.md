@@ -6,11 +6,11 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 | Item               | Valor                                                               |
 | ------------------ | ------------------------------------------------------------------- |
-| Data do checkpoint | 2026-09-19                                                          |
-| Último marco       | **PR #28** — checkpoint documental do B1                            |
-| Merge do marco     | `a4b8ed73867b1d0c7492bc1a418b633f80ef05d6` — merge commit do PR #28 |
+| Data do checkpoint | 2026-09-28                                                          |
+| Último marco       | **PR #40** — migration `016` mergeada e aplicada em Production      |
+| Merge do marco     | `4ffa59184b399e0b3f86d435eb3f43a8a971079a` — merge commit do PR #40 |
 | B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
-| Migrations         | **22 locais**, 21 em Production; a **`016` em PR**, não aplicada    |
+| Migrations         | **22 locais = 22 em Production**, zero pendentes                    |
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
@@ -18,11 +18,14 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
 | `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS               |
 | PR C               | **CONCLUÍDO** — PR #37, mergeado. Ver 7.6                           |
-| `016`              | **EM PR** — fecha o acesso direto do operacional em AAL2. Ver 7.7   |
-| Etapa atual        | **`016`** — correção de segurança pré-D; depois dela, o **PR D**    |
+| `016`              | **EM PRODUCTION** — PR #40, auditoria pós-deploy PASS. Ver 7.7      |
+| Suítes SQL         | **12/12 PASS, 0 FAIL** (`001`–`012`)                                |
+| Testes Node        | **796/796 PASS** (7 suítes)                                         |
+| Etapa atual        | **PR D** — backend administrativo de usuários, server-side          |
 
-O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
-atual da `main`", e não deve ser lido como tal.
+O SHA acima é o **merge commit do PR #40**, o marco documental mais recente —
+não é necessariamente "o SHA atual da `main`" no momento em que este arquivo for
+lido, e não deve ser tratado como tal sem conferir.
 
 > **Branch e HEAD atuais são estado do Git** e devem ser consultados com
 > `git status` e `git rev-parse`; não são persistidos neste checkpoint para
@@ -49,7 +52,7 @@ em 18/09/2026 com **12/12 checks pós-deploy PASS**. Ele também **não libera A
 em tabela nenhuma** — entrega uma superfície de RPC estreita, hoje **consumida
 pela interface** (B2.1 e B2.3).
 
-**As migrations aplicadas são imutáveis — a `013` inclusive.** Qualquer mudança
+**As migrations aplicadas são imutáveis — a `016` inclusive.** Qualquer mudança
 de banco daqui para frente exige migration nova.
 
 O **B2.1** — a camada de dados operacional — está **concluído**, pelo PR #30. A
@@ -57,17 +60,19 @@ O **B2.1** — a camada de dados operacional — está **concluído**, pelo PR #
 7.4), está **CONCLUÍDA EM PRODUCTION** pelo PR #31, com auditoria pós-deploy
 PASS. O **B2.2** (PR #32), o **B2.3** (PR #33), a **migration `015`** (PR #34,
 em Production) e o **PR C** — o guard role-aware (PR #37, seção 7.6) — também
-estão **concluídos**.
+estão **concluídos**. A **migration `016`** — que fecha o acesso direto do
+operador em AAL2 pelo PostgREST (seção 7.7) — foi mergeada e aplicada em
+Production pelo **PR #40** em 28/09/2026, com auditoria pós-deploy PASS.
 
 **A etapa atual é o PR D** — backend administrativo de usuários, exclusivamente
-server-side. Seguem **aprovados e não iniciados**: **PR D**, **PR E**, **PR F** e
+server-side. Seguem **aprovados e não iniciados**: **PR E**, **PR F** e
 **PR G**. Leia a seção 6 antes de tocar em guard, policy ou usuário.
 
 ## 2. Ambiente
 
 |                 |                                                       |
 | --------------- | ----------------------------------------------------- |
-| Projeto local   | `C:\Users\VINICIUS\Documents\BS Logistics`            |
+| Projeto local   | `C:\Users\VINICIUS\Documents\GitHub\BS Logistics Novo` |
 | GitHub          | `therunnas/bslogistica`                               |
 | Produção        | `https://admin.bslogisticas.com.br`                   |
 | Supabase atual  | `ehkduqokntemtmqzdrbd`                                |
@@ -264,7 +269,7 @@ O que **ficou provado** no diagnóstico, e vale guardar:
 reproduzido. Só investigar se voltar a acontecer — e, se voltar, o caminho é
 reinstrumentar como no PR #19, não adivinhar.
 
-## 6. Nova política de autorização — IMPLEMENTADA (guard no PR C, banco na `016`)
+## 6. Nova política de autorização — IMPLEMENTADA (guard no PR C, banco na `016`, em Production)
 
 > **Leia esta seção inteira antes de tocar em guard, policy, RLS ou usuário.**
 
@@ -289,7 +294,7 @@ reinstrumentar como no PR #19, não adivinhar.
 
 **A divisão por papel descrita na seção 6.1 está implementada no guard e na
 superfície de RPC — e NÃO por afrouxamento de policy.** O que segue é o que vale
-hoje, depois do B2.1, do B2.2, do B2.3, da `015` e do **PR C**.
+hoje, depois do B2.1, do B2.2, do B2.3, da `015`, do **PR C** e da `016`.
 
 As proteções do admin **permanecem intactas** — MFA obrigatório, AAL2 no painel,
 um TOTP no recovery e nenhum admin operando em AAL1.
@@ -307,8 +312,9 @@ um TOTP no recovery e nenhum admin operando em AAL1.
   operador em **AAL2**, sem ampliar dado nenhum;
 - a **migration `016`** (seção 7.7) fecha o acesso **direto** em AAL2, que a
   permissiva por `is_staff()` deixava aberto para qualquer papel: acesso direto
-  de `authenticated` passa a exigir **`aal2` E `admin`**. Está no repositório e
-  **ainda não em Production**;
+  de `authenticated` passa a exigir **`aal2` E `admin`**. **Aplicada em
+  Production pelo PR #40 em 28/09/2026**, com auditoria pós-deploy PASS (seção
+  7.7);
 - o que **falta** é a tela **Configurações → Segurança** (**PR F**), por onde o
   `operacional` ativaria MFA por vontade própria, e a matriz E2E do **PR G**.
 
@@ -341,8 +347,8 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **CONCLUÍDO** — PR #33     |
 | **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **EM PRODUCTION** — PR #34 |
 | **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **CONCLUÍDO** — PR #37     |
-| **016**   | **acesso direto às tabelas passa a exigir AAL2 E admin** — fecha o operador em AAL2 pelo PostgREST. Ver 7.7                           | **EM PR**                  |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | próxima, depois da `016`   |
+| **016**   | **acesso direto às tabelas passa a exigir AAL2 E admin** — fecha o operador em AAL2 pelo PostgREST. Ver 7.7                           | **EM PRODUCTION** — PR #40 |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | **ETAPA ATUAL**            |
 | **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
 | **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
 | **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado     |
@@ -1184,15 +1190,33 @@ admin em AAL1 ainda barrado, `admin`+`operacional` tratado como admin e não
 elegível às RPCs, conta sem papel sem nada, `user_operation_access` ainda
 admin-only, e que nenhum grant da superfície foi ampliado.
 
-**Quatro suítes antigas medem o contrato que a `016` revoga** — decisão
-pendente, registrada na seção 11 das proibições e no PR:
+**Quatro suítes antigas mediam o contrato que a `016` revoga** —
 `002_autorizacao` (bloco OPERACIONAL), `005_enforcement_aal2` (caso D),
-`006_valores_financeiros` (a fixture escreve como `operacional`) e
-`007_fontes_financeiras` (bloco J, 43 casos). Elas não foram alteradas neste PR:
-inverter asserção de suíte financeira é decisão de quem aprova, não efeito
-colateral de uma correção de RLS.
+`006_valores_financeiros` (a fixture escrevia os apontamentos como
+`operacional`) e `007_fontes_financeiras` (bloco J, 43 casos). A decisão de
+como reescrevê-las foi tomada e aplicada no commit `8d1b8c1`, dentro do próprio
+PR #40, preservando a intenção original de cada caso: onde a suíte media "o
+trigger recusa o operador", passou a medir (i) que a RLS já o impede de
+alcançar a linha e (ii) que a mesma edição, tentada por um **admin**, continua
+recusada com `42501` pelo trigger financeiro. Nenhuma asserção foi invertida
+sem essa reformulação — a garantia financeira original continua medida, e a
+garantia nova entra ao lado dela. Com a reescrita: `002` PASS, `005` PASS,
+`006` = 33/33, `007` = 150/150.
 
-**Ainda NÃO aplicada em Production.**
+**As doze suítes SQL (`001`–`012`) somam 12/12 PASS, 0 FAIL** contra o schema
+com a `016` aplicada — validado num harness local (stack Supabase completo via
+Docker, `supabase db reset` até a `016`) antes do merge, e reconferido por
+leitura direta em Production depois do deploy.
+
+**Aplicada em Production em 28/09/2026 — PR #40**, merge commit
+`4ffa59184b399e0b3f86d435eb3f43a8a971079a`. Auditoria pós-deploy, por leitura
+direta do catálogo em Production: 22 migrations locais = 22 remotas, a `016`
+como a mais recente; as 10 policies `<tabela>_exige_admin` existindo, todas
+`RESTRICTIVE`/`ALL`, uma por tabela (`clients`, `contracts`, `employees`,
+`invoice_items`, `invoices`, `operation_team`, `operations`, `shifts`,
+`timesheet_entries`, `timesheets`); as 11 `*_exige_aal2` intactas; `profiles`,
+`user_roles` e `user_operation_access` sem nenhuma policy nova; e as cinco RPCs
+operacionais presentes em `public`.
 
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
@@ -1665,10 +1689,11 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 ## 11. Não fazer
 
 - Não reconstruir o Supabase de novo.
-- Não reaplicar migrations já aplicadas — Production tem as **19**, a `013`
+- Não reaplicar migrations já aplicadas — Production tem as **22**, a `016`
   inclusive.
-- **Não editar migration aplicada, em nenhuma hipótese.** `010`, `011`, `012` e
-  `013` são **imutáveis**; mudança de banco exige migration nova.
+- **Não editar migration aplicada, em nenhuma hipótese.** `010`, `011`, `012`,
+  `013`, `014`, `015` e `016` são **imutáveis**; mudança de banco exige
+  migration nova.
 - **Não afrouxar as proteções de `010`/`011`** (seção 9): não devolver
   autoridade de cálculo ao payload, não reabrir `UPDATE`/`DELETE` de linha
   faturada, não devolver `TRUNCATE` a `anon`, `authenticated` ou `service_role`.
@@ -1712,7 +1737,7 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
 5. continue da seção **7 — Próximas etapas oficiais**: **PR A**, **PR B1**,
-   **B2.1**, **`014`**, **B2.2**, **B2.3** e a **`015`** estão fechados e em
-   Production, e o **PR C** — guard role-aware, seção 7.6 — está mergeado; o
-   próximo passo é o **PR D**, seguido de **PR E → PR F → PR G**;
+   **B2.1**, **`014`**, **B2.2**, **B2.3**, a **`015`**, o **PR C** — guard
+   role-aware, seção 7.6 — e a **`016`** — seção 7.7 — estão fechados e em
+   Production; o próximo passo é o **PR D**, seguido de **PR E → PR F → PR G**;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.
