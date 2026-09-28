@@ -13,12 +13,21 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Settings,
   UserCog,
   Users,
   Wrench,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { sair } from "../_acoes";
 import type { PapelEfetivo } from "../_papel";
@@ -26,18 +35,20 @@ import type { PapelEfetivo } from "../_papel";
 /**
  * A navegação de cada papel.
  *
- * As oito telas administrativas são administrativas de fato, não por rótulo:
+ * As sete telas administrativas são administrativas de fato, não por rótulo:
  * dashboard, relatórios e faturamento mostram receita, custo e margem; clientes
  * traz as regras de cobrança; colaboradores, o custo por diária; operações
- * administra a estrutura; apontamentos é a tela administrativa, com o
- * financeiro junto; e usuários é o backend do PR D exposto na interface —
- * convite, papel, acesso e atribuição de operação, nada disso é dado que o
- * operacional deveria ver sobre si mesmo ou sobre outra conta. Por isso a
- * lista inteira troca por papel, em vez de ser filtrada item a item — nenhuma
- * delas serve ao operacional.
+ * administra a estrutura; e apontamentos é a tela administrativa, com o
+ * financeiro junto. Por isso a lista inteira troca por papel, em vez de ser
+ * filtrada item a item — nenhuma delas serve ao operacional.
  *
  * O operacional tem uma tela, e é a dele: `/operacional`, separada da
  * administrativa e alimentada só pelas RPCs da migration 013.
+ *
+ * `/usuarios` (PR E) NÃO está nesta lista, de propósito: gerenciar contas não
+ * é uma tarefa do dia a dia como as sete acima — é administração da própria
+ * área administrativa, e por isso mora no menu de conta, no rodapé, junto do
+ * "Sair". Ver `ITEM_USUARIOS` e o rodapé de `AppShell`.
  */
 const NAVEGACAO = {
   admin: [
@@ -48,11 +59,18 @@ const NAVEGACAO = {
     { href: "/colaboradores", label: "Colaboradores", icon: Users },
     { href: "/faturamento", label: "Faturamento", icon: FileText },
     { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
-    { href: "/usuarios", label: "Usuários", icon: UserCog },
   ],
   operacional: [{ href: "/operacional", label: "Apontamentos", icon: CalendarCheck }],
   "sem-papel": [],
 } as const;
+
+/**
+ * A entrada de administração de contas — só no menu de conta do admin, nunca
+ * na navegação principal nem para o operacional. Fica fora de `NAVEGACAO`
+ * para que a contagem de links da navegação principal (usada em
+ * `scripts/testar-papel.mjs`) não precise saber da existência desta tela.
+ */
+const ITEM_USUARIOS = { href: "/usuarios", label: "Usuários", icon: UserCog } as const;
 
 export function AppShell({
   children,
@@ -130,18 +148,52 @@ export function AppShell({
           <div className="flex-1" />
         )}
         <div className="border-t border-border p-3">
-          <p className="truncate px-3 pb-2 text-xs text-muted-foreground" title={email}>
-            {email}
-          </p>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3"
-            onClick={encerrarSessao}
-            disabled={saindo}
-          >
-            <LogOut className="size-4" />
-            {saindo ? "Saindo..." : "Sair"}
-          </Button>
+          {papel === "admin" ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="w-full justify-start gap-3 px-3">
+                  <Settings className="size-4 shrink-0" />
+                  <span className="truncate text-left" title={email}>
+                    {email}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <p className="truncate text-sm font-medium" title={email}>
+                    {email}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Administrador</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={ITEM_USUARIOS.href} onClick={() => setAberto(false)}>
+                    <ITEM_USUARIOS.icon className="size-4" />
+                    {ITEM_USUARIOS.label}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={encerrarSessao} disabled={saindo}>
+                  <LogOut className="size-4" />
+                  {saindo ? "Saindo..." : "Sair"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <p className="truncate px-3 pb-2 text-xs text-muted-foreground" title={email}>
+                {email}
+              </p>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3"
+                onClick={encerrarSessao}
+                disabled={saindo}
+              >
+                <LogOut className="size-4" />
+                {saindo ? "Saindo..." : "Sair"}
+              </Button>
+            </>
+          )}
         </div>
       </aside>
 

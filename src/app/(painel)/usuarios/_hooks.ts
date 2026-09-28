@@ -17,6 +17,7 @@ import {
   atribuirOperacaoAction,
   convidarUsuarioAction,
   listarOperacoesAtribuidasAction,
+  listarOperacoesDisponiveisAction,
   listarUsuariosAction,
   reativarUsuarioAction,
   removerOperacaoAction,
@@ -26,6 +27,7 @@ import {
 const CHAVES = {
   usuarios: () => ["usuarios-admin"] as const,
   operacoes: (userId: string | null) => ["usuarios-admin", "operacoes", userId] as const,
+  operacoesDisponiveis: () => ["usuarios-admin", "operacoes-disponiveis"] as const,
 };
 
 export function useUsuarios() {
@@ -40,6 +42,22 @@ export function useOperacoesDoUsuario(userId: string | null) {
     queryKey: CHAVES.operacoes(userId),
     queryFn: () => listarOperacoesAtribuidasAction({ userId }),
     enabled: userId !== null,
+  });
+}
+
+/**
+ * Todas as operações existentes, para o picker de atribuição.
+ *
+ * Via Server Action (`listarOperacoesDisponiveisAction`), NÃO pelo
+ * `useOperations()` de `@/lib/queries` — aquele hook lê `operations` direto do
+ * navegador com `criarClienteNavegador()`, e o contrato desta tela é consumir
+ * só a camada administrativa do PR D/PR E, nunca uma tabela de negócio pelo
+ * cliente.
+ */
+export function useOperacoesDisponiveis() {
+  return useQuery({
+    queryKey: CHAVES.operacoesDisponiveis(),
+    queryFn: () => listarOperacoesDisponiveisAction(),
   });
 }
 

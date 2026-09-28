@@ -234,14 +234,26 @@ verificar(
   true,
 );
 // Conta dentro do bloco do admin, e não no arquivo todo: desde o B2.3 há
-// também a entrada do operacional, e somar as duas mediria outra coisa.
+// também a entrada do operacional, e desde o Checkout #16.1 há também a
+// entrada de conta (`ITEM_USUARIOS`), fora de `NAVEGACAO` de propósito.
+// Somar qualquer uma das duas mediria outra coisa.
+const TELAS_NAV = TELAS.filter(([rota]) => rota !== "usuarios");
 {
   const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";
-  verificar("E5. admin mantém os oito links", (bloco.match(/\{ href: "\//g) ?? []).length, 8);
-}
-for (const [rota] of TELAS) {
   verificar(
-    `E6.${rota} — continua na navegação do admin`,
+    "E5. admin mantém os sete links da navegação principal",
+    (bloco.match(/\{ href: "\//g) ?? []).length,
+    7,
+  );
+  verificar(
+    "E5b. usuários NÃO é um item da navegação principal",
+    /href: "\/usuarios"/.test(bloco),
+    false,
+  );
+}
+for (const [rota] of TELAS_NAV) {
+  verificar(
+    `E6.${rota} — continua na navegação principal do admin`,
     fontes.shell.includes(`href: "/${rota}"`),
     true,
   );
@@ -260,6 +272,48 @@ for (const [rota] of TELAS) {
 verificar(
   "E8. nenhum link desabilitado como placeholder",
   /disabled.*href|href.*disabled/.test(fontes.shell),
+  false,
+);
+
+console.log("\nE'. Usuários mora na área de conta do admin, não na navegação principal\n");
+
+verificar(
+  "E9. o item de usuários existe fora do mapa NAVEGACAO",
+  /const ITEM_USUARIOS = \{ href: "\/usuarios", label: "Usuários", icon: UserCog \} as const;/.test(
+    fontes.shell,
+  ),
+  true,
+);
+verificar(
+  "E10. o rodapé abre um menu de conta só para o admin",
+  /\{papel === "admin" \? \(\s*<DropdownMenu>/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E11. o menu de conta oferece o link de usuários",
+  /<DropdownMenuItem asChild>\s*<Link href=\{ITEM_USUARIOS\.href\}/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E12. e continua oferecendo Sair, no mesmo menu",
+  /<DropdownMenuItem onClick=\{encerrarSessao\} disabled=\{saindo\}>/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E13. o operacional não recebe o menu de conta (ramo administrativo não se aplica a ele)",
+  /\) : \(\s*<>\s*<p className="truncate px-3 pb-2/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E14. mas continua com Sair disponível fora do menu de conta",
+  /<Button\s+variant="ghost"\s+className="w-full justify-start gap-3"\s+onClick=\{encerrarSessao\}\s+disabled=\{saindo\}\s*>/.test(
+    fontes.shell,
+  ),
+  true,
+);
+verificar(
+  "E15. nenhum window.confirm nem lógica de papel nova nesta troca de UI",
+  /window\.confirm|papeis\.includes|user_roles/.test(semComentarios(fontes.shell)),
   false,
 );
 

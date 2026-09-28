@@ -31,7 +31,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useOperations } from "@/lib/queries";
 import { toast } from "@/lib/notificacoes";
 import type { Papel, UsuarioAdministrativo } from "@/lib/admin-usuarios/tipos";
 
@@ -48,6 +47,7 @@ import {
 import {
   useAlterarPapel,
   useAtribuirOperacao,
+  useOperacoesDisponiveis,
   useOperacoesDoUsuario,
   useReativarUsuario,
   useRemoverOperacao,
@@ -97,7 +97,7 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
   const revogarAcesso = useRevogarAcesso();
   const reativar = useReativarUsuario();
   const operacoesDoUsuario = useOperacoesDoUsuario(atual.id);
-  const todasOperacoes = useOperations();
+  const todasOperacoes = useOperacoesDisponiveis();
   const atribuir = useAtribuirOperacao();
   const remover = useRemoverOperacao();
 

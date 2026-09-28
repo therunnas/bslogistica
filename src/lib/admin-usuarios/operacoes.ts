@@ -229,3 +229,40 @@ export async function removerTodasAsAtribuicoes(
 ): Promise<number> {
   return cliente.removerTodas(userId);
 }
+
+/** O suficiente para a tela de usuários oferecer uma operação na lista. */
+export interface OperacaoResumo {
+  id: string;
+  name: string;
+}
+
+/**
+ * Lista as operações que existem, para o picker de atribuição da tela de
+ * usuários — NUNCA para o operador ver: quem chama isto já passou por
+ * `exigirAdminAal2()`.
+ *
+ * Ao contrário de `user_operation_access`, `operations` está no `Database`
+ * gerado, então esta função usa o cliente de sessão (RLS) tipado direto, sem
+ * a forma própria que `ClienteDeOperacoes` precisa para a tabela sem tipos.
+ * Mesma razão de não usar `service_role` aqui: a policy de admin+AAL2 já
+ * libera a leitura pela sessão real, e usar `service_role` só ampliaria
+ * superfície sem necessidade — como o comentário do topo deste arquivo já
+ * registra para `user_operation_access`.
+ *
+ * Projeta só `id, name`: a tela de usuários não é a tela de operações, e não
+ * precisa de `client_id`, valores acordados nem qualquer outro campo — a
+ * mesma disciplina de "só o necessário" que rege a superfície operacional da
+ * migration 013.
+ */
+export async function listarOperacoesDisponiveis(
+  supabase: SupabaseClient<Database>,
+): Promise<OperacaoResumo[]> {
+  const resposta = await supabase
+    .from("operations")
+    .select("id, name")
+    .order("created_at", { ascending: false });
+  if (resposta.error) {
+    throw new ErroAdministrativo(resposta.error, "listar operações");
+  }
+  return resposta.data ?? [];
+}

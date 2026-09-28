@@ -67,6 +67,7 @@ const fontes = {
   painel: ler("src/app/(painel)/usuarios/painel-usuarios.tsx"),
   gerenciar: ler("src/app/(painel)/usuarios/gerenciar-usuario.tsx"),
   acoes: ler("src/app/(painel)/usuarios/_acoes.ts"),
+  operacoesLib: ler("src/lib/admin-usuarios/operacoes.ts"),
   shell: ler("src/app/(painel)/_components/app-shell.tsx"),
   guard: ler("src/app/(painel)/_exigir-admin.tsx"),
 };
@@ -272,9 +273,17 @@ verificar(
   false,
 );
 verificar(
-  "E5. a navegação inclui a tela nova",
+  "E5. a tela existe como entrada da área de conta do admin (não da navegação principal)",
   /href: "\/usuarios", label: "Usuários"/.test(fontes.shell),
   true,
+);
+// A contagem completa de links da navegação principal e do menu de conta é
+// asseverada em scripts/testar-papel.mjs (blocos E e E'); aqui só confere que
+// esta tela não duplicou a decisão de onde ela mora.
+verificar(
+  "E5b. usuários não está dentro do mapa NAVEGACAO (é ITEM_USUARIOS, à parte)",
+  /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1]?.includes("/usuarios") ?? false,
+  false,
 );
 
 console.log("\nF. Nenhuma lógica de segurança nova no lado do cliente\n");
@@ -304,11 +313,11 @@ for (const arquivo of ["hooks", "painel", "gerenciar"]) {
 }
 verificar(
   "F6. os hooks só chamam as Server Actions de _acoes, não criam cliente",
-  /criarClienteNavegador|createClient|createBrowserClient/.test(fontes.hooks),
+  /criarClienteNavegador|createClient|createBrowserClient/.test(semComentarios(fontes.hooks)),
   false,
 );
 verificar(
-  "F7. a tela consome exclusivamente as oito ações do backend do PR D",
+  "F7. a tela consome exclusivamente as nove ações do backend do PR D/PR E",
   [
     "listarUsuariosAction",
     "convidarUsuarioAction",
@@ -318,6 +327,7 @@ verificar(
     "atribuirOperacaoAction",
     "removerOperacaoAction",
     "listarOperacoesAtribuidasAction",
+    "listarOperacoesDisponiveisAction",
   ].every((acao) => fontes.hooks.includes(acao)),
   true,
 );
@@ -330,8 +340,62 @@ verificar(
 );
 verificar(
   "F9. _acoes.ts não foi alterado para pular a autorização (chama exigirAdminAal2 em toda ação)",
-  (fontes.acoes.match(/await exigirAdminAal2\(\)/g) ?? []).length >= 7,
+  (fontes.acoes.match(/await exigirAdminAal2\(\)/g) ?? []).length,
+  9,
+);
+
+console.log(
+  "\nF'. A lista de operações do picker vem de uma Server Action, não de useOperations\n",
+);
+
+verificar(
+  "F10. gerenciar-usuario.tsx NÃO importa useOperations de @/lib/queries",
+  /from "@\/lib\/queries"/.test(fontes.gerenciar),
+  false,
+);
+verificar(
+  "F11. nenhum arquivo da tela usa o hook genérico useOperations",
+  /\buseOperations\(/.test(fontes.painel + fontes.gerenciar),
+  false,
+);
+verificar(
+  "F12. o picker de operações consome o hook próprio da tela",
+  /\buseOperacoesDisponiveis\(/.test(fontes.gerenciar),
   true,
+);
+verificar(
+  "F13. o hook próprio chama a Server Action, não cria cliente de navegador",
+  /useOperacoesDisponiveis[\s\S]{0,120}listarOperacoesDisponiveisAction\(\)/.test(fontes.hooks),
+  true,
+);
+verificar(
+  "F14. a Server Action de operações disponíveis exige admin em AAL2",
+  /export async function listarOperacoesDisponiveisAction\(\)[\s\S]{0,120}await exigirAdminAal2\(\)/.test(
+    fontes.acoes,
+  ),
+  true,
+);
+verificar(
+  "F15. e não usa service_role para isso (sessão RLS do admin)",
+  /listarOperacoesDisponiveisAction[\s\S]{0,200}criarClienteAdmin/.test(fontes.acoes),
+  false,
+);
+verificar(
+  "F16. nenhuma leitura de 'operations' pelo navegador na superfície /usuarios",
+  /criarClienteNavegador\([^)]*\)[\s\S]{0,80}\.from\("operations"\)/.test(telaInteira),
+  false,
+);
+verificar(
+  "F17. listarOperacoesDisponiveis projeta só id e name, nada financeiro",
+  /\.from\("operations"\)\s*\.select\("id, name"\)/.test(fontes.operacoesLib),
+  true,
+);
+verificar(
+  "F18. e não usa service_role — sessão de admin já basta (RLS)",
+  /export async function listarOperacoesDisponiveis[\s\S]{0,400}\}/
+    .exec(fontes.operacoesLib)?.[0]
+    ?.includes("service_role") ?? false,
+  false,
 );
 
 console.log("\nG. Confirmações destrutivas usam AlertDialog, não window.confirm\n");

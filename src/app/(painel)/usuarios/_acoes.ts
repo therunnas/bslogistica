@@ -19,6 +19,7 @@ import { exigirAdminAal2 } from "@/lib/admin-usuarios/autorizacao";
 import { criarClienteAdministrativo } from "@/lib/admin-usuarios/cliente";
 import { criarClienteDeOperacoes } from "@/lib/admin-usuarios/operacoes";
 import * as operacoes from "@/lib/admin-usuarios/operacoes";
+import type { OperacaoResumo } from "@/lib/admin-usuarios/operacoes";
 import * as servico from "@/lib/admin-usuarios/servico";
 import type {
   AtribuicaoDeOperacao,
@@ -104,4 +105,17 @@ export async function listarOperacoesAtribuidasAction(entrada: {
   await exigirAdminAal2();
   const supabase = await criarClienteServidor();
   return operacoes.listarOperacoesAtribuidas(criarClienteDeOperacoes(supabase), entrada);
+}
+
+/**
+ * Todas as operações existentes, para o picker de atribuição da tela.
+ *
+ * Sessão real do admin (RLS), não `service_role` — a leitura de `operations`
+ * já é liberada por policy para admin em AAL2, e não há motivo para esta tela
+ * ampliar superfície com o cliente privilegiado só para ler duas colunas.
+ */
+export async function listarOperacoesDisponiveisAction(): Promise<OperacaoResumo[]> {
+  await exigirAdminAal2();
+  const supabase = await criarClienteServidor();
+  return operacoes.listarOperacoesDisponiveis(supabase);
 }
