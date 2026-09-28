@@ -384,6 +384,9 @@ const DEPENDENTES = [
   "src/app/(painel)/_exigir-admin.tsx",
   "src/app/(painel)/_exigir-operacional.tsx",
   "src/app/mfa/page.tsx",
+  // PR F: /configuracoes lê lerAcesso() como qualquer outra rota — não ganha
+  // exceção nem consulta o nível de garantia por conta própria.
+  "src/app/(painel)/configuracoes/page.tsx",
 ];
 
 for (const caminho of DEPENDENTES) {
