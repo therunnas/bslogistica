@@ -53,7 +53,7 @@ export async function convidarUsuarioAction(entrada: {
 export async function alterarPapelAction(entrada: {
   userId: unknown;
   papel: unknown;
-  acao: "conceder" | "revogar";
+  acao: unknown;
 }): Promise<ResultadoAlteracaoDePapel> {
   const ator = await exigirAdminAal2();
   const cliente = criarClienteAdministrativo(criarClienteAdmin());
@@ -64,8 +64,9 @@ export async function revogarAcessoAction(entrada: {
   userId: unknown;
 }): Promise<ResultadoRevogacaoDeAcesso> {
   const ator = await exigirAdminAal2();
+  const supabase = await criarClienteServidor();
   const cliente = criarClienteAdministrativo(criarClienteAdmin());
-  return servico.revogarAcesso(cliente, entrada, ator);
+  return servico.revogarAcesso(cliente, criarClienteDeOperacoes(supabase), entrada, ator);
 }
 
 export async function reativarUsuarioAction(entrada: {

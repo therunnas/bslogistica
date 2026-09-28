@@ -36,6 +36,7 @@ import {
   DURACAO_BANIMENTO_INDEFINIDO,
   DURACAO_SEM_BANIMENTO,
   estaBanido,
+  exigirAcaoDePapel,
   exigirEmailValido,
   exigirPapelValido,
   exigirUuid,
@@ -52,6 +53,7 @@ import {
   atribuirOperacao,
   listarOperacoesAtribuidas,
   removerOperacao,
+  removerTodasAsAtribuicoes,
 } from "../src/lib/admin-usuarios/operacoes.ts";
 
 let passou = 0;
@@ -217,7 +219,13 @@ verificar(
 // Cliente administrativo falso — em memória, sem rede.
 // ---------------------------------------------------------------------------
 
-function criarClienteFalso({ ultimoAdminId = null } = {}) {
+/**
+ * `falharEm` simula uma etapa específica de um fluxo multi-passo quebrando —
+ * não o passo que o trigger recusaria (isso é `ultimoAdminId`), mas um passo
+ * POSTERIOR, para provar que `servico.ts` reporta "parcial", nunca "erro",
+ * quando algo persistente já mudou antes da falha.
+ */
+function criarClienteFalso({ ultimoAdminId = null, falharEm = null } = {}) {
   const usuarios = new Map();
   const papeis = []; // { user_id, role }
   const banidos = new Set();
@@ -228,6 +236,12 @@ function criarClienteFalso({ ultimoAdminId = null } = {}) {
     if (papel !== "admin" || userId !== ultimoAdminId) return;
     const erro = new Error("Não é possível remover ou rebaixar o único administrador restante.");
     throw new ErroAdministrativo({ message: erro.message, code: "42501" }, "revogar papel");
+  }
+
+  function falharSeForAVez(etapa) {
+    if (falharEm === etapa) {
+      throw new Error(`Falha simulada em: ${etapa}`);
+    }
   }
 
   return {
@@ -251,12 +265,14 @@ function criarClienteFalso({ ultimoAdminId = null } = {}) {
     },
 
     async banirUsuario(userId) {
+      falharSeForAVez("banir");
       banidos.add(userId);
       const usuario = usuarios.get(userId);
       if (usuario) usuario.banned_until = "2999-01-01T00:00:00Z";
     },
 
     async desbanirUsuario(userId) {
+      falharSeForAVez("desbanir");
       banidos.delete(userId);
       const usuario = usuarios.get(userId);
       if (usuario) usuario.banned_until = null;
@@ -286,12 +302,13 @@ function criarClienteFalso({ ultimoAdminId = null } = {}) {
     },
 
     async registrarAuditoria(entrada) {
+      falharSeForAVez("registrarAuditoria");
       auditoria.push(entrada);
     },
   };
 }
 
-function criarClienteDeOperacoesFalso() {
+function criarClienteDeOperacoesFalso({ falharEmRemoverTodas = false } = {}) {
   const atribuicoes = [];
   return {
     _estado: atribuicoes,
@@ -309,6 +326,19 @@ function criarClienteDeOperacoesFalso() {
         (a) => a.userId === userId && a.operationId === operationId,
       );
       if (indice !== -1) atribuicoes.splice(indice, 1);
+    },
+    async removerTodas(userId) {
+      if (falharEmRemoverTodas) {
+        throw new Error("Falha simulada em: removerTodas");
+      }
+      let removidas = 0;
+      for (let i = atribuicoes.length - 1; i >= 0; i--) {
+        if (atribuicoes[i].userId === userId) {
+          atribuicoes.splice(i, 1);
+          removidas++;
+        }
+      }
+      return removidas;
     },
   };
 }
@@ -433,39 +463,86 @@ const U1 = "11111111-1111-4111-8111-111111111111";
   verificar("E7. userId inválido é rejeitado antes de tocar o cliente", resultado.situacao, "erro");
 }
 
-console.log("\nF. revogarAcesso e reativarUsuario\n");
+console.log("\nF. revogarAcesso — papel, TODAS as operações, e ban\n");
+
+const OP1 = "22222222-2222-4222-8222-222222222222";
+const OP2 = "33333333-3333-4333-8333-333333333333";
+const OP3 = "44444444-4444-4444-8444-444444444444";
 
 {
   const cliente = criarClienteFalso();
+  const operacoesCliente = criarClienteDeOperacoesFalso();
   await cliente.concederPapel(U1, "operacional");
-  const resultado = await revogarAcesso(cliente, { userId: U1 }, ATOR);
+  await operacoesCliente.atribuir(U1, OP1, ATOR.id);
+  await operacoesCliente.atribuir(U1, OP2, ATOR.id);
+  await operacoesCliente.atribuir(U1, OP3, ATOR.id);
+
+  const resultado = await revogarAcesso(cliente, operacoesCliente, { userId: U1 }, ATOR);
   verificar("F1. revogar acesso remove o papel", resultado.situacao, "revogado");
   verificar("F2. e bane a conta", cliente._estado.banidos.has(U1), true);
   verificar("F3. nenhum papel sobra", cliente._estado.papeis.length, 0);
+  verificar(
+    "F3b. usuário com VÁRIAS operações fica com ZERO após revogação",
+    (await listarOperacoesAtribuidas(operacoesCliente, { userId: U1 })).length,
+    0,
+  );
+  verificar(
+    "F3c. a auditoria registra quantas operações saíram",
+    cliente._estado.auditoria.at(-1)?.details?.operacoesRemovidas,
+    3,
+  );
 }
 
 {
   const cliente = criarClienteFalso({ ultimoAdminId: U1 });
+  const operacoesCliente = criarClienteDeOperacoesFalso();
   await cliente.concederPapel(U1, "admin");
-  const resultado = await revogarAcesso(cliente, { userId: U1 }, ATOR);
+  await operacoesCliente.atribuir(U1, OP1, ATOR.id);
+
+  const resultado = await revogarAcesso(cliente, operacoesCliente, { userId: U1 }, ATOR);
   verificar("F4. revogar acesso do último admin é recusado", resultado.situacao, "ultimo-admin");
   verificar(
     "F5. e a conta NÃO fica banida — revogação não é parcial",
     cliente._estado.banidos.has(U1),
     false,
   );
+  verificar(
+    "F5b. e as operações do último admin recusado NÃO são tocadas",
+    (await listarOperacoesAtribuidas(operacoesCliente, { userId: U1 })).length,
+    1,
+  );
+  verificar("F5c. papel do último admin continua intacto", cliente._estado.papeis, [
+    { user_id: U1, role: "admin" },
+  ]);
 }
+
+console.log("\nG-bis. reativarUsuario — papel antes de desbanir, sem restaurar operações\n");
 
 {
   const cliente = criarClienteFalso();
+  const operacoesCliente = criarClienteDeOperacoesFalso();
   const { userId } = await cliente.convidarPorEmail("u1@x.com", null);
-  await cliente.banirUsuario(userId);
+  await cliente.concederPapel(userId, "operacional");
+  await operacoesCliente.atribuir(userId, OP1, ATOR.id);
+  await operacoesCliente.atribuir(userId, OP2, ATOR.id);
+
+  await revogarAcesso(cliente, operacoesCliente, { userId }, ATOR);
   const resultado = await reativarUsuario(cliente, { userId, papel: "operacional" }, ATOR);
-  verificar("F6. reativar desbane a conta", resultado.situacao, "reativado");
-  verificar("F7. e a conta não aparece mais banida", cliente._estado.banidos.has(userId), false);
-  verificar("F8. e recebe o papel informado", cliente._estado.papeis, [
+
+  verificar("G-bis.1. reativar desbane a conta", resultado.situacao, "reativado");
+  verificar(
+    "G-bis.2. e a conta não aparece mais banida",
+    cliente._estado.banidos.has(userId),
+    false,
+  );
+  verificar("G-bis.3. e recebe o papel informado", cliente._estado.papeis, [
     { user_id: userId, role: "operacional" },
   ]);
+  verificar(
+    "G-bis.4. NENHUMA operação antiga reaparece — reativação não é 'desfazer'",
+    (await listarOperacoesAtribuidas(operacoesCliente, { userId })).length,
+    0,
+  );
 }
 
 console.log("\nG. Atribuição de operações — cliente separado, RLS, não service_role\n");
@@ -530,6 +607,127 @@ console.log("\nG. Atribuição de operações — cliente separado, RLS, não se
   );
   verificar("G6. uuid inválido não atribui nada", resultado.situacao, "erro");
   verificar("G7. e não grava auditoria", registrador._estado.auditoria.length, 0);
+}
+
+console.log('\nH. Validação de "acao" em runtime — não é só o tipo do TypeScript\n');
+
+verificar("H1. exigirAcaoDePapel aceita conceder", exigirAcaoDePapel("conceder"), "conceder");
+verificar("H2. exigirAcaoDePapel aceita revogar", exigirAcaoDePapel("revogar"), "revogar");
+verificar(
+  "H3. qualquer outro valor é rejeitado",
+  (await erroDe(() => exigirAcaoDePapel("apagar"))) !== null,
+  true,
+);
+verificar(
+  "H4. undefined é rejeitado",
+  (await erroDe(() => exigirAcaoDePapel(undefined))) !== null,
+  true,
+);
+verificar("H5. null é rejeitado", (await erroDe(() => exigirAcaoDePapel(null))) !== null, true);
+verificar(
+  "H6. um objeto (payload malicioso simulando string) é rejeitado",
+  (await erroDe(() => exigirAcaoDePapel({ toString: () => "conceder" }))) !== null,
+  true,
+);
+
+{
+  // O caso que motivou a correção: antes de exigirAcaoDePapel, qualquer valor
+  // DIFERENTE de "conceder" caía implicitamente no branch de revogação — um
+  // payload runtime com acao: "apagar-tudo" revogaria o papel do usuário.
+  const cliente = criarClienteFalso();
+  await cliente.concederPapel(U1, "admin");
+  await cliente.concederPapel(U1, "operacional"); // acumulador, não é o único admin
+  const resultado = await alterarPapel(
+    cliente,
+    { userId: U1, papel: "admin", acao: "apagar-tudo" },
+    ATOR,
+  );
+  verificar("H7. acao runtime inválida não concede nem revoga nada", resultado.situacao, "erro");
+  verificar(
+    "H8. e o papel admin continua exatamente como estava",
+    cliente._estado.papeis.some((p) => p.user_id === U1 && p.role === "admin"),
+    true,
+  );
+  verificar("H9. nenhuma auditoria é gravada", cliente._estado.auditoria.length, 0);
+}
+
+console.log('\nI. Estados "parcial" — nunca dizer "erro" quando algo já mudou\n');
+
+{
+  // revogarTodosOsPapeis funciona, mas o banimento falha depois: o papel já
+  // saiu de verdade, e reportar "erro" faria o admin tentar de novo achando
+  // que nada aconteceu.
+  const cliente = criarClienteFalso({ falharEm: "banir" });
+  const operacoesCliente = criarClienteDeOperacoesFalso();
+  await cliente.concederPapel(U1, "operacional");
+  const resultado = await revogarAcesso(cliente, operacoesCliente, { userId: U1 }, ATOR);
+  verificar(
+    "I1. falha no banimento após revogar papel volta como 'parcial'",
+    resultado.situacao,
+    "parcial",
+  );
+  verificar(
+    "I2. e o papel FOI removido de verdade — não é um 'erro' comum",
+    cliente._estado.papeis.length,
+    0,
+  );
+}
+
+{
+  // O mesmo, mas a falha é ao limpar as operações — papel já saiu.
+  const cliente = criarClienteFalso();
+  const operacoesCliente = criarClienteDeOperacoesFalso({ falharEmRemoverTodas: true });
+  await cliente.concederPapel(U1, "operacional");
+  const resultado = await revogarAcesso(cliente, operacoesCliente, { userId: U1 }, ATOR);
+  verificar(
+    "I3. falha ao limpar operações também volta como 'parcial'",
+    resultado.situacao,
+    "parcial",
+  );
+  verificar("I4. o papel continua removido", cliente._estado.papeis.length, 0);
+  verificar("I5. e a conta não chegou a ser banida", cliente._estado.banidos.has(U1), false);
+}
+
+{
+  // reativarUsuario: concede o papel, mas desbanir falha depois.
+  const cliente = criarClienteFalso({ falharEm: "desbanir" });
+  await cliente.banirUsuario(U1);
+  const resultado = await reativarUsuario(cliente, { userId: U1, papel: "operacional" }, ATOR);
+  verificar(
+    "I6. desbanir falhando após conceder papel volta como 'parcial'",
+    resultado.situacao,
+    "parcial",
+  );
+  verificar(
+    "I7. o papel FOI concedido de verdade, mesmo com o resultado 'parcial'",
+    cliente._estado.papeis,
+    [{ user_id: U1, role: "operacional" }],
+  );
+  verificar(
+    "I8. a conta continua banida (estado seguro, não o contrário)",
+    cliente._estado.banidos.has(U1),
+    true,
+  );
+}
+
+{
+  // Auditoria falhando NUNCA pode transformar sucesso real em "erro".
+  const cliente = criarClienteFalso({ falharEm: "registrarAuditoria" });
+  const resultado = await alterarPapel(
+    cliente,
+    { userId: U1, papel: "operacional", acao: "conceder" },
+    ATOR,
+  );
+  verificar(
+    "I9. auditoria falhando não esconde um sucesso real de alterarPapel",
+    resultado.situacao,
+    "concedido",
+  );
+  verificar(
+    "I10. e o papel foi mesmo concedido",
+    cliente._estado.papeis.some((p) => p.user_id === U1 && p.role === "operacional"),
+    true,
+  );
 }
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);

@@ -83,6 +83,24 @@ export function exigirPapelValido(valor: unknown): Papel {
   return valor as Papel;
 }
 
+export type AcaoDePapel = "conceder" | "revogar";
+
+const ACOES_DE_PAPEL_VALIDAS: readonly AcaoDePapel[] = ["conceder", "revogar"];
+
+/**
+ * `AlterarPapelEntrada.acao` chegava tipada como `"conceder" | "revogar"` no
+ * TypeScript, mas isso não é validação de runtime — uma Server Action é um
+ * endpoint POST como outro qualquer, e nada impede um corpo malformado
+ * chegando como `unknown` de verdade. Sem esta checagem, qualquer valor
+ * diferente de `"conceder"` caía implicitamente no `else` de revogação.
+ */
+export function exigirAcaoDePapel(valor: unknown): AcaoDePapel {
+  if (typeof valor !== "string" || !(ACOES_DE_PAPEL_VALIDAS as readonly string[]).includes(valor)) {
+    throw new Error(`Ação inválida: ${String(valor)}. Use "conceder" ou "revogar".`);
+  }
+  return valor as AcaoDePapel;
+}
+
 export function exigirUuid(valor: unknown, nome: string): string {
   const formato = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (typeof valor !== "string" || !formato.test(valor)) {

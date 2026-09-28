@@ -41,10 +41,21 @@ export type ResultadoAlteracaoDePapel =
 export type ResultadoRevogacaoDeAcesso =
   | { situacao: "revogado" }
   | { situacao: "ultimo-admin"; mensagem: string }
+  /**
+   * O papel já foi removido (passo que o trigger poderia ter recusado, e não
+   * recusou) mas um passo POSTERIOR falhou — limpar operações ou banir. Nunca
+   * confundir com "erro": algo persistente já mudou, e dizer "erro" faria o
+   * admin acreditar que pode tentar de novo do zero quando na verdade o
+   * usuário já ficou sem papel.
+   */
+  | { situacao: "parcial"; mensagem: string }
   | { situacao: "erro"; mensagem: string };
 
 export type ResultadoReativacao =
-  { situacao: "reativado" } | { situacao: "erro"; mensagem: string };
+  | { situacao: "reativado" }
+  /** O papel foi concedido, mas desbanir falhou depois — ver `servico.ts`. */
+  | { situacao: "parcial"; mensagem: string }
+  | { situacao: "erro"; mensagem: string };
 
 export type ResultadoAtribuicaoDeOperacao =
   { situacao: "atribuida" } | { situacao: "erro"; mensagem: string };

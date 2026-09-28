@@ -287,6 +287,50 @@ insert into public.user_roles (user_id, role) values
 
 
 -- ---------------------------------------------------------------------------
+-- B9-lock. Serialização do último admin — forma literal
+--
+-- O QUE ESTE BLOCO NÃO PROVA
+--
+-- Uma transação só, como esta suíte inteira, não reproduz duas transações
+-- concorrentes — não existe "segunda sessão" dentro de uma `DO` block. A
+-- prova de que a corrida está fechada de verdade foi feita à parte, com duas
+-- sessões `psql` reais contra este mesmo harness, timing medido por
+-- `clock_timestamp()`:
+--
+--   S1 (t=0.000s)  BEGIN; DELETE admin A; segura a transação aberta 4s.
+--   S2 (t=1.000s)  BEGIN; DELETE admin B — BLOQUEIA na trava.
+--   S1 (t=4.000s)  COMMIT (libera a trava; A já não é admin).
+--   S2 (t≈4.000s)  desbloqueia, reconta, vê zero admins restantes,
+--                  recusa com 42501 — 3006ms de espera medidos no próprio
+--                  `\timing` do psql, não estimados.
+--
+-- Estado final medido: só B continua admin. CONTROLE NEGATIVO, no mesmo
+-- harness: a mesma sequência contra uma cópia da função SEM
+-- `pg_advisory_xact_lock` faz o DELETE de S2 retornar em 2.4ms (sem
+-- bloquear) e COMMITar — estado final medido: ZERO admins. É a corrida
+-- descrita no checkout #13.1, reproduzida antes de fechá-la.
+-- ---------------------------------------------------------------------------
+
+do $bloco_lock$
+begin
+  perform pg_temp.registrar(
+    'B9-lock. proteger_ultimo_admin serializa com pg_advisory_xact_lock',
+    'true',
+    (select (prosrc like '%pg_advisory_xact_lock%')::text
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'proteger_ultimo_admin'));
+
+  perform pg_temp.registrar(
+    'B9-lock2. a chave do lock e especifica deste projeto (bslog/ultimo-admin)',
+    'true',
+    (select (prosrc like '%bslog/ultimo-admin%')::text
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'proteger_ultimo_admin'));
+end;
+$bloco_lock$;
+
+
+-- ---------------------------------------------------------------------------
 -- C. Nada que já existia mudou de forma
 -- ---------------------------------------------------------------------------
 

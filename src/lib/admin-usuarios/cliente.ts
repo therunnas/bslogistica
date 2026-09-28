@@ -74,6 +74,29 @@ export interface EntradaDeAuditoria {
   details?: Record<string, unknown> | undefined;
 }
 
+/**
+ * A auditoria nunca pode transformar um sucesso real em "erro" reportado. Se
+ * `registrarAuditoria` falhar DEPOIS que o estado já mudou de verdade — papel
+ * concedido, operação atribuída, acesso revogado —, a falha vai para o
+ * console e é engolida: o resultado que volta para o admin continua
+ * refletindo o que aconteceu de fato no banco, não o que aconteceu na trilha
+ * de auditoria. Usada por `servico.ts` e `operacoes.ts`.
+ */
+export async function auditarSemFalhar(
+  cliente: { registrarAuditoria(entrada: EntradaDeAuditoria): Promise<void> },
+  entrada: EntradaDeAuditoria,
+): Promise<void> {
+  try {
+    await cliente.registrarAuditoria(entrada);
+  } catch (erro) {
+    console.error(
+      "Falha ao registrar auditoria administrativa (ação já aplicada):",
+      entrada.action,
+      erro,
+    );
+  }
+}
+
 export interface ClienteAdministrativo {
   listarUsuarios(): Promise<UsuarioBruto[]>;
   convidarPorEmail(email: string, nomeCompleto: string | null): Promise<{ userId: string }>;

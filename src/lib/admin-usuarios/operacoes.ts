@@ -23,7 +23,12 @@ import type {
   ResultadoAtribuicaoDeOperacao,
   ResultadoRemocaoDeOperacao,
 } from "./tipos";
-import { type ClienteAdministrativo, ErroAdministrativo, type ErroDaResposta } from "./cliente";
+import {
+  auditarSemFalhar,
+  type ClienteAdministrativo,
+  ErroAdministrativo,
+  type ErroDaResposta,
+} from "./cliente";
 
 interface LinhaBruta {
   operation_id: string;
@@ -34,6 +39,8 @@ export interface ClienteDeOperacoes {
   listarAtribuidas(userId: string): Promise<AtribuicaoDeOperacao[]>;
   atribuir(userId: string, operationId: string, criadoPor: string): Promise<void>;
   remover(userId: string, operationId: string): Promise<void>;
+  /** Remove TODAS as atribuições do usuário. Devolve quantas linhas saíram. */
+  removerTodas(userId: string): Promise<number>;
 }
 
 interface TabelaUserOperationAccess {
@@ -52,7 +59,17 @@ interface TabelaUserOperationAccess {
     eq(
       coluna: "user_id",
       valor: string,
-    ): { eq(coluna: "operation_id", valor: string): PromiseLike<{ error: ErroDaResposta | null }> };
+    ): {
+      eq(coluna: "operation_id", valor: string): PromiseLike<{ error: ErroDaResposta | null }>;
+      /**
+       * Sem o segundo `.eq`: apaga TODAS as linhas daquele usuário.
+       * `.select()` pede `Prefer: return=representation` — é o que permite
+       * saber QUANTAS linhas saíram, para a auditoria de `revogarAcesso`.
+       */
+      select(
+        colunas: "operation_id",
+      ): PromiseLike<{ data: { operation_id: string }[] | null; error: ErroDaResposta | null }>;
+    };
   };
 }
 
@@ -98,6 +115,18 @@ export function criarClienteDeOperacoes(supabase: SupabaseClient<Database>): Cli
         throw new ErroAdministrativo(resposta.error, "remover operação");
       }
     },
+
+    async removerTodas(userId) {
+      const resposta = await bruto
+        .from("user_operation_access")
+        .delete()
+        .eq("user_id", userId)
+        .select("operation_id");
+      if (resposta.error) {
+        throw new ErroAdministrativo(resposta.error, "remover todas as operações");
+      }
+      return (resposta.data ?? []).length;
+    },
   };
 }
 
@@ -128,7 +157,7 @@ export async function atribuirOperacao(
 
   try {
     await cliente.atribuir(userId, operationId, ator.id);
-    await registrador.registrarAuditoria({
+    await auditarSemFalhar(registrador, {
       actorId: ator.id,
       action: ACAO_AUDITORIA.operacaoAtribuida,
       targetUserId: userId,
@@ -163,7 +192,7 @@ export async function removerOperacao(
 
   try {
     await cliente.remover(userId, operationId);
-    await registrador.registrarAuditoria({
+    await auditarSemFalhar(registrador, {
       actorId: ator.id,
       action: ACAO_AUDITORIA.operacaoRemovida,
       targetUserId: userId,
@@ -184,4 +213,19 @@ export async function listarOperacoesAtribuidas(
 ): Promise<AtribuicaoDeOperacao[]> {
   const userId = exigirUuid(entrada.userId, "userId");
   return cliente.listarAtribuidas(userId);
+}
+
+/**
+ * Limpa TODAS as atribuições do usuário — parte do contrato de
+ * `revogarAcesso` (`servico.ts`): acesso revogado não deixa a conta com
+ * operações que ela não pode mais alcançar de outro jeito nenhum. `userId`
+ * chega já validado por quem chama (`servico.revogarAcesso` já exigiu UUID
+ * antes de começar a sequência), por isso não é `unknown` aqui — ao contrário
+ * de `atribuirOperacao`/`removerOperacao`, que são a própria borda de entrada.
+ */
+export async function removerTodasAsAtribuicoes(
+  cliente: ClienteDeOperacoes,
+  userId: string,
+): Promise<number> {
+  return cliente.removerTodas(userId);
 }

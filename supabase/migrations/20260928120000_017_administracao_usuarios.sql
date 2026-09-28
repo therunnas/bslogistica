@@ -122,6 +122,29 @@ GRANT ALL ON public.admin_audit_log TO service_role;
 -- exclui exatamente a linha sendo alterada/removida e nenhuma outra — inclusive
 -- quando o próprio usuário também tem uma linha 'operacional' à parte, que não
 -- é admin e não deveria contar OU descontar aqui.
+--
+-- A CORRIDA, E POR QUE `COUNT` SOZINHO NÃO BASTA
+--
+-- Sem serialização, duas transações concorrentes que removem admins
+-- DIFERENTES passam as duas: T1 remove A vendo B ainda lá; T2 remove B vendo A
+-- ainda lá — sob READ COMMITTED, cada uma lê o snapshot de ANTES do commit da
+-- outra. As duas COMMITam, e o resultado é zero admins, exatamente o que esta
+-- proteção existe para impedir. Não é hipotético: é a definição de corrida
+-- entre duas transações que leem antes de a outra escrever.
+--
+-- `pg_advisory_xact_lock` serializa a DECISÃO, não a escrita da tabela: a
+-- primeira transação a chegar aqui pega a trava, decide (vendo o estado real),
+-- e libera automaticamente no COMMIT/ROLLBACK. A segunda BLOQUEIA até a
+-- primeira terminar, e só então conta — a essa altura, se a primeira já
+-- removeu um admin, a contagem reflete isso de verdade. Mesmo mecanismo, e
+-- mesmo estilo de chave, do lock de bootstrap-admin em
+-- `provision_bslog_user` (migration `004`): `hashtextextended('chave', 0)`
+-- como argumento único de `pg_advisory_xact_lock`, para não colidir com
+-- nenhum outro lock nomeado do projeto.
+--
+-- SEM EXCEÇÃO DE PAPEL — nem para isso. `pg_advisory_xact_lock` serializa
+-- qualquer sessão que o chame, `postgres` e `service_role` inclusive: não há
+-- "modo direto" que pule a fila.
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.proteger_ultimo_admin()
@@ -140,6 +163,13 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Serializa a decisão entre transações concorrentes. Liberado sozinho no
+  -- COMMIT ou ROLLBACK desta transação — nunca precisa (nem pode) ser
+  -- liberado manualmente aqui dentro.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('bslog/ultimo-admin', 0)
+  );
+
   SELECT count(*) INTO restantes
   FROM public.user_roles
   WHERE role = 'admin'::public.app_role
@@ -155,7 +185,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.proteger_ultimo_admin() IS
-  'Recusa DELETE/UPDATE em user_roles que removeria a ultima linha role=admin. Sem excecao de papel — nao ha caminho legitimo para essa operacao, ao contrario das guardas financeiras da 010/011.';
+  'Recusa DELETE/UPDATE em user_roles que removeria a ultima linha role=admin. Serializado por pg_advisory_xact_lock contra corrida entre transacoes concorrentes. Sem excecao de papel — nao ha caminho legitimo para essa operacao, ao contrario das guardas financeiras da 010/011.';
 
 DROP TRIGGER IF EXISTS trg_proteger_ultimo_admin ON public.user_roles;
 CREATE TRIGGER trg_proteger_ultimo_admin
@@ -188,6 +218,14 @@ BEGIN
    WHERE tgname = 'trg_proteger_ultimo_admin' AND NOT tgisinternal;
   IF _n <> 1 THEN
     RAISE EXCEPTION '017: trigger trg_proteger_ultimo_admin deveria existir, encontrei %', _n;
+  END IF;
+
+  SELECT count(*) INTO _n FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'proteger_ultimo_admin'
+     AND p.prosrc LIKE '%pg_advisory_xact_lock%';
+  IF _n <> 1 THEN
+    RAISE EXCEPTION '017: proteger_ultimo_admin deveria serializar com pg_advisory_xact_lock, encontrei %', _n;
   END IF;
 
   -- As 11 *_exige_aal2 e as 10 *_exige_admin não podem ter mudado de
