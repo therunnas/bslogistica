@@ -60,6 +60,7 @@ const TELAS = [
   ["colaboradores", "PainelColaboradores"],
   ["faturamento", "PainelFaturamento"],
   ["relatorios", "PainelRelatorios"],
+  ["usuarios", "PainelUsuarios"],
 ];
 
 const fontes = {
@@ -111,7 +112,7 @@ verificar("A11. ehAdmin concorda com admin", ehAdmin(["admin", "operacional"]), 
 verificar("A12. ehAdmin recusa operacional", ehAdmin(["operacional"]), false);
 verificar("A13. ehAdmin recusa sem papel", ehAdmin([]), false);
 
-console.log("\nB. As sete telas bloqueiam no servidor, antes de renderizar\n");
+console.log("\nB. As oito telas bloqueiam no servidor, antes de renderizar\n");
 
 for (const [rota, componente] of TELAS) {
   const fonte = paginas[rota];
@@ -236,7 +237,7 @@ verificar(
 // também a entrada do operacional, e somar as duas mediria outra coisa.
 {
   const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";
-  verificar("E5. admin mantém os sete links", (bloco.match(/\{ href: "\//g) ?? []).length, 7);
+  verificar("E5. admin mantém os oito links", (bloco.match(/\{ href: "\//g) ?? []).length, 8);
 }
 for (const [rota] of TELAS) {
   verificar(
@@ -267,9 +268,9 @@ console.log("\nF. Esconder o link não é a proteção\n");
 // Se o AppShell fosse a única barreira, nenhuma página chamaria o guard. A
 // contagem existe para que remover a chamada de uma tela apareça aqui.
 verificar(
-  "F1. as sete telas chamam o guard, não seis",
+  "F1. as oito telas chamam o guard, não sete",
   Object.values(paginas).filter((f) => f.includes("await exigirAdmin()")).length,
-  7,
+  8,
 );
 verificar(
   "F2. o guard bloqueia por papel, não por caminho na URL",

@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  UserCog,
   Users,
   Wrench,
 } from "lucide-react";
@@ -25,12 +26,15 @@ import type { PapelEfetivo } from "../_papel";
 /**
  * A navegação de cada papel.
  *
- * As sete telas administrativas são administrativas de fato, não por rótulo:
+ * As oito telas administrativas são administrativas de fato, não por rótulo:
  * dashboard, relatórios e faturamento mostram receita, custo e margem; clientes
  * traz as regras de cobrança; colaboradores, o custo por diária; operações
- * administra a estrutura; e apontamentos é a tela administrativa, com o
- * financeiro junto. Por isso a lista inteira troca por papel, em vez de ser
- * filtrada item a item — nenhuma delas serve ao operacional.
+ * administra a estrutura; apontamentos é a tela administrativa, com o
+ * financeiro junto; e usuários é o backend do PR D exposto na interface —
+ * convite, papel, acesso e atribuição de operação, nada disso é dado que o
+ * operacional deveria ver sobre si mesmo ou sobre outra conta. Por isso a
+ * lista inteira troca por papel, em vez de ser filtrada item a item — nenhuma
+ * delas serve ao operacional.
  *
  * O operacional tem uma tela, e é a dele: `/operacional`, separada da
  * administrativa e alimentada só pelas RPCs da migration 013.
@@ -44,6 +48,7 @@ const NAVEGACAO = {
     { href: "/colaboradores", label: "Colaboradores", icon: Users },
     { href: "/faturamento", label: "Faturamento", icon: FileText },
     { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+    { href: "/usuarios", label: "Usuários", icon: UserCog },
   ],
   operacional: [{ href: "/operacional", label: "Apontamentos", icon: CalendarCheck }],
   "sem-papel": [],
