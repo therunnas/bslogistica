@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
+
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { BSBrand } from "@/components/branding/bs-brand";
 import { criarClienteServidor } from "@/integrations/supabase/server";
-import { MolduraAuth } from "@/components/moldura-auth";
 import { decidirMfaNaRecuperacao, decidirSituacaoMfa } from "@/lib/mfa";
 import { NOME_DO_COOKIE_DE_PROVA, validarProvaDeRecuperacao } from "@/lib/prova-recuperacao";
 import {
@@ -14,43 +16,66 @@ import {
 
 import { FormularioNovaSenha } from "./formulario-nova-senha";
 
+type MolduraRedefinicaoProps = {
+  titulo: string;
+  descricao: string;
+  children: ReactNode;
+};
+
+function MolduraRedefinicao({ titulo, descricao, children }: MolduraRedefinicaoProps) {
+  return (
+    <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
+      {/* Marca */}
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand variant="light" size="sm" align="start" priority />
+      </div>
+
+      {/* Conteúdo */}
+      <div className="flex flex-1 items-center justify-center py-10">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+            <div className="mb-7">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Segurança da conta
+              </p>
+
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                {titulo}
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">{descricao}</p>
+            </div>
+
+            {children}
+          </div>
+        </div>
+      </div>
+
+      {/* Rodapé */}
+      <p className="text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} BS Soluções Logística
+      </p>
+    </main>
+  );
+}
+
 /**
  * Definição da nova senha.
  *
- * Fica FORA de (painel) de propósito. O layout do painel exige papel e AAL2, e
- * quem chega aqui tem apenas a sessão de recuperação criada em /auth/confirm —
- * seria barrado antes de conseguir trocar a senha.
+ * Fica FORA de (painel) de propósito. O layout do painel exige papel e AAL2,
+ * e quem chega aqui tem apenas a sessão de recuperação criada em
+ * /auth/confirmar-recuperacao.
  *
- * Isso não afrouxa o painel. Esta rota não renderiza dado de negócio, não
- * consulta tabela nenhuma e não dá acesso a nada além do próprio
- * `auth.updateUser`. O painel continua atrás do guard completo, e a RLS segue
- * valendo para tudo que for dado.
+ * Esta rota não renderiza dados de negócio e não afrouxa as proteções do painel.
  *
- * O PORTEIRO
+ * O acesso à redefinição exige simultaneamente:
  *
- * "Existe usuário autenticado" não basta: uma sessão comum de
- * `signInWithPassword`, mesmo em aal1, também é autenticada, e o
- * `updateUser({ password })` aceitaria a troca. Por isso são três exigências
- * simultâneas, todas no servidor:
+ * 1. getUser() — valida o usuário no Supabase;
+ * 2. getClaims() — obtém o session_id verificado;
+ * 3. prova assinada de recuperação — vinculada ao usuário e à sessão.
  *
- * 1. `getUser()` — valida o token contra o Supabase, não confia no cookie;
- * 2. `getClaims()` — claims verificados do JWT, de onde sai o `session_id`;
- * 3. a prova assinada em `bs_recovery_proof` — íntegra, no prazo, com
- *    `purpose` correto e amarrada a este `sub` e a este `session_id`.
- *
- * A origem da sessão NÃO é mais deduzida do AMR. O `verifyOtp({ type:
- * "recovery" })` cria a sessão como `models.OTP`, então `recovery` nunca
- * aparece ali; quem prova a origem é a assinatura emitida em /auth/confirm.
- *
- * Sem o segredo do servidor ninguém fabrica a prova mandando um Cookie.
- *
- * ALCANCE DESTE GUARD — limite conhecido e aceito
- *
- * Ele protege o fluxo da aplicação, não a API do Supabase. O Supabase Auth
- * permite `updateUser` para qualquer usuário autenticado, então este guard não
- * impede que alguém com sessão válida chame a API diretamente. A barreira
- * principal contra acesso ao painel continua sendo o guard de papel e AAL2, e a
- * proteção dos dados continua sendo a RLS. Nada disso é escopo desta etapa.
+ * Quando existe MFA verificado na conta, o usuário também é encaminhado para
+ * o desafio de segundo fator antes da alteração da senha.
  */
 export default async function RedefinirSenha() {
   const supabase = await criarClienteServidor();
@@ -60,16 +85,19 @@ export default async function RedefinirSenha() {
   } = await supabase.auth.getUser();
 
   const { data: claims } = await supabase.auth.getClaims();
+
   const sessionId = claims?.claims?.session_id;
 
   const armazemDeCookies = await cookies();
+
   const provaBruta = armazemDeCookies.get(NOME_DO_COOKIE_DE_PROVA)?.value;
 
-  // A validação recebe o que o servidor confirmou, não o que o cookie afirma:
-  // a prova só vale se apontar para ESTE usuário e ESTA sessão.
   const resultadoDaProva =
     user && typeof sessionId === "string"
-      ? await validarProvaDeRecuperacao(provaBruta, { sub: user.id, sessionId })
+      ? await validarProvaDeRecuperacao(provaBruta, {
+          sub: user.id,
+          sessionId,
+        })
       : "ausente";
 
   const acesso = decidirAcessoRedefinicao({
@@ -78,41 +106,50 @@ export default async function RedefinirSenha() {
     resultadoDaProva,
   });
 
-  if (acesso === "negar") redirect(ROTA_ESQUECI_SENHA);
+  if (acesso === "negar") {
+    redirect(ROTA_ESQUECI_SENHA);
+  }
 
   /**
-   * Segundo fator, quando a conta tem um.
+   * MFA condicional.
    *
-   * A exigência é CONDICIONAL. O `verifyOtp` cria a sessão em aal1, e o
-   * Supabase recusa a troca de senha nela **apenas** se a conta tiver MFA
-   * verificado — `PUT /user` devolve 401 "AAL2 session is required…". Exigir
-   * aal2 de todo mundo travaria a recuperação de quem nunca cadastrou fator.
+   * Contas que possuem fator MFA verificado precisam concluir AAL2 antes
+   * da alteração da senha. Contas sem fator podem continuar normalmente.
    */
   const { data: nivel, error: erroNivel } =
     await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
   const decisao = decidirMfaNaRecuperacao(decidirSituacaoMfa(nivel ?? null, Boolean(erroNivel)));
 
-  if (decisao === "desafiar-mfa") redirect(ROTA_REDEFINIR_SENHA_MFA);
+  if (decisao === "desafiar-mfa") {
+    redirect(ROTA_REDEFINIR_SENHA_MFA);
+  }
 
-  // Falha fechada: sem saber se há fator, trocar a senha esbarraria no 401.
+  /**
+   * Falha fechada.
+   *
+   * Se não for possível determinar corretamente a situação do MFA,
+   * nenhuma alteração de senha é permitida.
+   */
   if (decisao === "falhar") {
     return (
-      <MolduraAuth titulo="Definir nova senha" descricao={MENSAGEM_MFA_INDISPONIVEL}>
-        <p className="text-sm text-muted-foreground">
-          Recarregue a página em instantes. Se o problema continuar, solicite um novo link de
-          recuperação.
-        </p>
-      </MolduraAuth>
+      <MolduraRedefinicao titulo="Definir nova senha" descricao={MENSAGEM_MFA_INDISPONIVEL}>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-sm leading-6 text-slate-600">
+            Recarregue a página em instantes. Se o problema continuar, solicite um novo link de
+            recuperação.
+          </p>
+        </div>
+      </MolduraRedefinicao>
     );
   }
 
   return (
-    <MolduraAuth
+    <MolduraRedefinicao
       titulo="Definir nova senha"
       descricao="Escolha uma nova senha para a sua conta. Depois disso você entrará novamente."
     >
       <FormularioNovaSenha />
-    </MolduraAuth>
+    </MolduraRedefinicao>
   );
 }
