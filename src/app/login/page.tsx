@@ -90,7 +90,7 @@ export default function Login() {
         <div className="mb-12 lg:hidden">
           <Image
             src="/branding/bs-logo-oficial.png"
-            alt="BS Soluções Logísticas"
+            alt="BS Soluções Logística"
             width={1000}
             height={625}
             priority
@@ -165,7 +165,7 @@ export default function Login() {
               <Button
                 type="submit"
                 disabled={enviando}
-                className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823b43]"
+                className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823b43] hover:text-white"
               >
                 {enviando ? "Aguarde..." : "Entrar"}
               </Button>
@@ -179,16 +179,13 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="mt-8 text-center text-xs text-slate-500 lg:text-left">
+        <p className="mt-1 text-center text-xs text-slate-500 lg:text-left">
           © {new Date().getFullYear()} BS Soluções Logística
         </p>
       </section>
 
       {/* ÁREA INSTITUCIONAL */}
       <section className="relative hidden min-h-screen overflow-hidden bg-[#0d0d0d] lg:flex lg:flex-col">
-        {/* Divisória vermelha */}
-        <div className="absolute inset-y-0 left-0 w-[2px] bg-[#e30613]" />
-
         {/* Elementos gráficos discretos */}
         <div className="pointer-events-none absolute -right-36 -top-36 h-[430px] w-[430px] rounded-full border border-white/[0.04]" />
         <div className="pointer-events-none absolute -right-14 -top-14 h-[300px] w-[300px] rounded-full border border-white/[0.04]" />
@@ -196,38 +193,40 @@ export default function Login() {
         {/* Brilho vermelho discreto */}
         <div className="pointer-events-none absolute bottom-24 left-20 h-40 w-40 rounded-full bg-red-700/[0.06] blur-3xl" />
 
-        <div className="relative z-10 flex min-h-screen flex-col px-16 py-14 xl:px-20 xl:py-16">
-          {/* Logo */}
-          <div className="w-fit rounded-xl bg-white px-4 py-3 shadow-lg shadow-black/20">
+        <div className="relative z-10 flex min-h-screen flex-col px-16 pb-8 pt-14 xl:px-20 xl:pb-8 xl:pt-16">
+          {/* Marca */}
+          <div className="mx-auto flex flex-col items-center">
             <Image
-              src="/branding/bs-logo-oficial.png"
+              src="/branding/bs-simbolo-retangular.png"
               alt="BS Soluções Logística"
-              width={1000}
-              height={625}
+              width={1774}
+              height={887}
               priority
-              className="h-auto w-28 object-contain xl:w-32"
+              className="h-auto w-64 object-contain xl:w-90"
             />
+
+            <p className="mt-3 text-center text-xs font-semibold tracking-[0.22em] text-white/90 xl:text-lg">
+              BS SOLUÇÕES LOGÍSTICA
+            </p>
           </div>
 
           {/* Conteúdo principal */}
-          <div className="flex flex-1 items-center">
-            <div className="-mt-8 max-w-xl">
-              <div className="mb-9 h-[3px] w-16 rounded-full bg-[#e30613]" />
-
-              <h2 className="font-display text-[44px] font-semibold leading-[1.1] tracking-[-0.025em] text-white xl:text-[52px]">
+          <div className="flex flex-1 items-start pt-14 xl:pt-13">
+            <div className="max-w-xl">
+              <h2 className="font-display text-[35px] font-semibold leading-[1.1] tracking-[-0.025em] text-white xl:text-[34px]">
                 Gestão operacional
                 <br />
                 em um só lugar.
               </h2>
 
-              <p className="mt-7 max-w-md text-[16px] leading-7 text-white/60">
+              <p className="mt-9 max-w-md text-[15px] leading-7 text-white/60">
                 Pessoas, operações e resultados conectados em uma plataforma centralizada.
               </p>
             </div>
           </div>
 
           {/* Rodapé */}
-          <div className="flex items-center justify-between border-t border-white/10 pt-6">
+          <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-6">
             <p className="text-xs text-white/40">Sistema interno de gestão</p>
 
             <p className="text-xs text-white/35">BS Soluções Logística</p>
