@@ -19,7 +19,8 @@
     "test:papel": "node --experimental-strip-types scripts/testar-papel.mjs",
     "test:tela-operacional": "node --experimental-strip-types scripts/testar-tela-operacional.mjs",
     "test:admin-usuarios": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-admin-usuarios.mjs",
-    "test:tela-usuarios": "node --experimental-strip-types scripts/testar-tela-usuarios.mjs"
+    "test:tela-usuarios": "node --experimental-strip-types scripts/testar-tela-usuarios.mjs",
+    "test:configuracoes": "node --experimental-strip-types scripts/testar-configuracoes.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

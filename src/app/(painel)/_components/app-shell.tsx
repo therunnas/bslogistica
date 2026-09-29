@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  ShieldCheck,
   UserCog,
   Users,
   Wrench,
@@ -65,12 +66,25 @@ const NAVEGACAO = {
 } as const;
 
 /**
- * A entrada de administração de contas — só no menu de conta do admin, nunca
- * na navegação principal nem para o operacional. Fica fora de `NAVEGACAO`
- * para que a contagem de links da navegação principal (usada em
- * `scripts/testar-papel.mjs`) não precise saber da existência desta tela.
+ * Os itens do menu de conta, por papel — no rodapé da sidebar, ao lado de
+ * "Sair". Ficam fora de `NAVEGACAO` de propósito: não são tarefa do dia a
+ * dia, são administração da própria conta, e a contagem de links da
+ * navegação principal (`scripts/testar-papel.mjs`) não deve depender deles.
+ *
+ * `/usuarios` (PR E) é só do admin — gerenciar outras contas é privilégio
+ * administrativo. `/configuracoes` (PR F, "Segurança") é dos dois papéis: é
+ * onde o operacional ativa o segundo fator por vontade própria, e onde o
+ * admin vê o próprio estado — sempre "ativo", porque ele não chega a
+ * `liberado` sem ter passado por AAL2, e portanto sem fator verificado.
  */
 const ITEM_USUARIOS = { href: "/usuarios", label: "Usuários", icon: UserCog } as const;
+const ITEM_SEGURANCA = { href: "/configuracoes", label: "Segurança", icon: ShieldCheck } as const;
+
+const MENU_DE_CONTA = {
+  admin: [ITEM_USUARIOS, ITEM_SEGURANCA],
+  operacional: [ITEM_SEGURANCA],
+  "sem-papel": [],
+} as const;
 
 export function AppShell({
   children,
@@ -82,6 +96,7 @@ export function AppShell({
   papel: PapelEfetivo;
 }) {
   const navegacao = NAVEGACAO[papel];
+  const itensDeConta = MENU_DE_CONTA[papel];
 
   const caminho = usePathname();
   const queryClient = useQueryClient();
@@ -148,7 +163,7 @@ export function AppShell({
           <div className="flex-1" />
         )}
         <div className="border-t border-border p-3">
-          {papel === "admin" ? (
+          {itensDeConta.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-start gap-3 px-3">
@@ -163,15 +178,19 @@ export function AppShell({
                   <p className="truncate text-sm font-medium" title={email}>
                     {email}
                   </p>
-                  <p className="text-xs text-muted-foreground">Administrador</p>
+                  <p className="text-xs text-muted-foreground">
+                    {papel === "admin" ? "Administrador" : "Operacional"}
+                  </p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href={ITEM_USUARIOS.href} onClick={() => setAberto(false)}>
-                    <ITEM_USUARIOS.icon className="size-4" />
-                    {ITEM_USUARIOS.label}
-                  </Link>
-                </DropdownMenuItem>
+                {itensDeConta.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href} onClick={() => setAberto(false)}>
+                      <item.icon className="size-4" />
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuItem onClick={encerrarSessao} disabled={saindo}>
                   <LogOut className="size-4" />
                   {saindo ? "Saindo..." : "Sair"}

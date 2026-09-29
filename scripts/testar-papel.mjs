@@ -275,7 +275,7 @@ verificar(
   false,
 );
 
-console.log("\nE'. Usuários mora na área de conta do admin, não na navegação principal\n");
+console.log("\nE'. Usuários e Segurança moram na área de conta, não na navegação principal\n");
 
 verificar(
   "E9. o item de usuários existe fora do mapa NAVEGACAO",
@@ -284,14 +284,32 @@ verificar(
   ),
   true,
 );
+// PR F: Segurança (Configurações) é o segundo item de conta, também fora de
+// NAVEGACAO — mesma razão do ITEM_USUARIOS, e dos dois papéis desta vez.
 verificar(
-  "E10. o rodapé abre um menu de conta só para o admin",
-  /\{papel === "admin" \? \(\s*<DropdownMenu>/.test(fontes.shell),
+  "E9b. o item de segurança também existe fora do mapa NAVEGACAO",
+  /const ITEM_SEGURANCA = \{ href: "\/configuracoes", label: "Segurança", icon: ShieldCheck \} as const;/.test(
+    fontes.shell,
+  ),
   true,
 );
 verificar(
-  "E11. o menu de conta oferece o link de usuários",
-  /<DropdownMenuItem asChild>\s*<Link href=\{ITEM_USUARIOS\.href\}/.test(fontes.shell),
+  "E9c. os dois vivem num mapa de conta por papel, não numa condição solta",
+  /const MENU_DE_CONTA = \{\s*admin: \[ITEM_USUARIOS, ITEM_SEGURANCA\],\s*operacional: \[ITEM_SEGURANCA\],\s*"sem-papel": \[\],\s*\} as const;/.test(
+    fontes.shell,
+  ),
+  true,
+);
+verificar(
+  "E10. o rodapé abre o menu de conta quando o papel tem algum item",
+  /\{itensDeConta\.length > 0 \? \(\s*<DropdownMenu>/.test(fontes.shell),
+  true,
+);
+verificar(
+  "E11. o menu de conta é montado a partir de itensDeConta, não de um link fixo",
+  /\{itensDeConta\.map\(\(item\) => \(\s*<DropdownMenuItem key=\{item\.href\} asChild>\s*<Link href=\{item\.href\}/.test(
+    fontes.shell,
+  ),
   true,
 );
 verificar(
@@ -299,16 +317,19 @@ verificar(
   /<DropdownMenuItem onClick=\{encerrarSessao\} disabled=\{saindo\}>/.test(fontes.shell),
   true,
 );
+// Checkout #17 muda exatamente isto: o operacional passa a ter menu de
+// conta também (só sem "Usuários") — o teste antigo afirmava o oposto de
+// propósito e precisou mudar com a política, não para mascarar regressão.
 verificar(
-  "E13. o operacional não recebe o menu de conta (ramo administrativo não se aplica a ele)",
-  /\) : \(\s*<>\s*<p className="truncate px-3 pb-2/.test(fontes.shell),
+  "E13. o operacional TAMBÉM recebe o menu de conta agora (só sem Usuários)",
+  /operacional: \[ITEM_SEGURANCA\]/.test(fontes.shell) &&
+    !/operacional: \[ITEM_USUARIOS/.test(fontes.shell),
   true,
 );
 verificar(
-  "E14. mas continua com Sair disponível fora do menu de conta",
-  /<Button\s+variant="ghost"\s+className="w-full justify-start gap-3"\s+onClick=\{encerrarSessao\}\s+disabled=\{saindo\}\s*>/.test(
-    fontes.shell,
-  ),
+  "E14. sem papel continua sem menu de conta (fallback só e-mail + Sair)",
+  /"sem-papel": \[\]/.test(fontes.shell) &&
+    /\) : \(\s*<>\s*<p className="truncate px-3 pb-2/.test(fontes.shell),
   true,
 );
 verificar(

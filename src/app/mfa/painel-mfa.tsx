@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, ShieldCheck } from "lucide-react";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
-import { decidirFluxoMfa } from "@/lib/mfa";
+import { decidirFluxoMfa, fonteDoQrTotp } from "@/lib/mfa";
 import { toast } from "@/lib/notificacoes";
 import { sair } from "@/app/(painel)/_acoes";
 import { Button } from "@/components/ui/button";
@@ -14,25 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const NOME_DO_FATOR = "BS Logística";
-
-/**
- * Fonte do <img> do QR.
- *
- * O campo `totp.qr_code` do Supabase já vem como data URL completo — a
- * referência oficial usa `src={data.totp.qr_code}` direto, sem montar nada.
- * O comentário do tipo em @supabase/auth-js diz o contrário, que é preciso
- * prefixar `data:image/svg+xml;utf-8,`; seguir esse comentário foi o que
- * quebrou o QR na primeira tentativa, porque o prefixo entrava duas vezes e o
- * conteúdo virava texto em vez de SVG.
- *
- * Como as duas fontes se contradizem, aqui a decisão é pelo valor recebido:
- * se já é data URL, usa como está; se for SVG cru, aí sim monta o data URL.
- * Funciona nos dois formatos e não depende de qual está certo hoje.
- */
-function fonteDoQr(valor: string): string {
-  if (valor.startsWith("data:")) return valor;
-  return `data:image/svg+xml;utf-8,${encodeURIComponent(valor)}`;
-}
 
 /**
  * Segundo fator por TOTP, usando exclusivamente o MFA oficial do Supabase.
@@ -213,7 +194,7 @@ export function PainelMfa({
                         sugere usar totp.uri ali, mas essa URI carrega o segredo
                         TOTP, que passaria a ficar legível no DOM. */}
                     <img
-                      src={fonteDoQr(qr)}
+                      src={fonteDoQrTotp(qr)}
                       alt="QR code para cadastrar o segundo fator"
                       className="size-44"
                     />
