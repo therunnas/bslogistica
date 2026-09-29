@@ -125,7 +125,7 @@ export function AppShell({
               no texto ao lado, e repeti-lo faria o leitor de tela anunciar a
               marca duas vezes. */}
           <Image
-            src="/branding/bs-logo-temp.png"
+            src="/branding/bs-logo-oficial.png"
             alt=""
             width={1000}
             height={625}
@@ -222,7 +222,7 @@ export function AppShell({
             <Menu className="size-4" />
           </Button>
           <Image
-            src="/branding/bs-logo-temp.png"
+            src="/branding/bs-logo-oficial.png"
             alt=""
             width={1000}
             height={625}
