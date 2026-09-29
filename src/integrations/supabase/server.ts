@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
+import { obterOpcoesCookieSupabase } from "./cookie-options";
 import { lerAmbienteSupabase } from "./env";
 import type { Database } from "./types";
 
@@ -16,6 +17,7 @@ export async function criarClienteServidor() {
   const armazemDeCookies = await cookies();
 
   return createServerClient<Database>(url, chave, {
+    cookieOptions: obterOpcoesCookieSupabase(),
     cookies: {
       getAll() {
         return armazemDeCookies.getAll();
