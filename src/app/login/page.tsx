@@ -93,16 +93,12 @@ export default function Login() {
 
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-[448px]">
-            <div className="mb-10">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <div className="mb-8">
+              <h1 className="font-display text-[27px] font-semibold tracking-tight text-slate-950">
                 Acesso ao sistema
-              </p>
-
-              <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-950 sm:text-[38px]">
-                Acesse sua conta
               </h1>
 
-              <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-[15px]">
+              <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-[15px]">
                 Entre com suas credenciais para continuar.
               </p>
             </div>
@@ -201,7 +197,7 @@ export default function Login() {
                 em um só lugar.
               </h2>
 
-              <p className="mt-9 max-w-md text-[16px] leading-7 text-white/60">
+              <p className="mt-9 max-w-md text-[15px] leading-7 text-white/60">
                 Pessoas, operações e resultados conectados em uma plataforma centralizada.
               </p>
             </div>
