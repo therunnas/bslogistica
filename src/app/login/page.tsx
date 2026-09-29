@@ -111,7 +111,7 @@ export default function Login() {
           `self-start` alinha a marca pela borda esquerda do card no empilhado,
           já que o container centraliza os filhos. */}
       <Image
-        src="/branding/bs-logo-temp.png"
+        src="/branding/bs-logo-oficial.png"
         alt="BS Soluções Logísticas"
         width={1000}
         height={625}

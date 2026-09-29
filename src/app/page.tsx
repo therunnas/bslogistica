@@ -48,7 +48,7 @@ export default function Landing() {
         {/* Logo provisória do MVP. A própria arte já traz "BS" e
             "SOLUÇÕES LOGÍSTICAS", então não há texto ao lado. */}
         <Image
-          src="/branding/bs-logo-temp.png"
+          src="/branding/bs-logo-oficial.png"
           alt="BS Soluções Logísticas"
           width={1000}
           height={625}
