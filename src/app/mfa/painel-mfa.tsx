@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, ShieldCheck } from "lucide-react";
 
 import { sair } from "@/app/(painel)/_acoes";
+import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -180,15 +180,8 @@ export function PainelMfa({
   return (
     <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
       {/* Marca */}
-      <div className="mx-auto flex w-full max-w-6xl">
-        <Image
-          src="/branding/bs-logo-oficial.png"
-          alt="BS Soluções Logística"
-          width={1000}
-          height={625}
-          priority
-          className="h-auto w-28 object-contain sm:w-32"
-        />
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand variant="light" size="sm" align="start" priority />
       </div>
 
       {/* Conteúdo */}
@@ -235,10 +228,6 @@ export function PainelMfa({
                     <div className="space-y-5">
                       {/* QR */}
                       <div className="grid place-items-center rounded-xl border border-slate-200 bg-white p-5">
-                        {/*
-                         * O QR fica em <img>, não inline no HTML.
-                         * A URI TOTP não é colocada no alt nem exposta como texto.
-                         */}
                         <img
                           src={fonteDoQrTotp(qr)}
                           alt="QR code para cadastrar o segundo fator"

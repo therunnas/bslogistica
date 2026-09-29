@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,14 +65,12 @@ export default function EsqueciSenha() {
   return (
     <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
       {/* Marca */}
-      <div className="mx-auto flex w-full max-w-6xl">
-        <Image
-          src="/branding/bs-logo-oficial.png"
-          alt="BS Soluções Logísticas"
-          width={1000}
-          height={625}
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand
+          variant="light"
+          size="sm"
+          align="start"
           priority
-          className="h-auto w-28 object-contain sm:w-32"
         />
       </div>
 
@@ -90,7 +88,8 @@ export default function EsqueciSenha() {
               </h1>
 
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                Informe o e-mail da sua conta e enviaremos um link para definir uma nova senha.
+                Informe o e-mail da sua conta e enviaremos um link para definir
+                uma nova senha.
               </p>
             </div>
 
@@ -101,7 +100,10 @@ export default function EsqueciSenha() {
 
               <form onSubmit={solicitar} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-900">
+                  <Label
+                    htmlFor="email"
+                    className="text-sm font-medium text-slate-900"
+                  >
                     E-mail
                   </Label>
 
@@ -120,7 +122,7 @@ export default function EsqueciSenha() {
                 <Button
                   type="submit"
                   disabled={enviando}
-                  className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823b43]"
+                  className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823b43] hover:text-white"
                 >
                   {enviando ? "Enviando..." : "Enviar link de recuperação"}
                 </Button>
@@ -152,7 +154,7 @@ export default function EsqueciSenha() {
 
       {/* Rodapé */}
       <p className="text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} BS Soluções Logísticas
+        © {new Date().getFullYear()} BS Soluções Logística
       </p>
     </main>
   );

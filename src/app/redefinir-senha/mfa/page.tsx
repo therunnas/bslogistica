@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import Image from "next/image";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { BSBrand } from "@/components/branding/bs-brand";
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import { decidirMfaNaRecuperacao, decidirSituacaoMfa } from "@/lib/mfa";
 import { NOME_DO_COOKIE_DE_PROVA, validarProvaDeRecuperacao } from "@/lib/prova-recuperacao";
@@ -37,15 +37,8 @@ function MolduraMfa({ titulo, descricao, children }: MolduraMfaProps) {
   return (
     <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
       {/* Marca */}
-      <div className="mx-auto flex w-full max-w-6xl">
-        <Image
-          src="/branding/bs-logo-oficial.png"
-          alt="BS Soluções Logística"
-          width={1000}
-          height={625}
-          priority
-          className="h-auto w-28 object-contain sm:w-32"
-        />
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand variant="light" size="sm" align="start" priority />
       </div>
 
       {/* Conteúdo */}

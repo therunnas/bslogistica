@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
+import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,16 +86,9 @@ export default function Login() {
     <main className="min-h-screen bg-background lg:grid lg:grid-cols-2">
       {/* ÁREA DE LOGIN */}
       <section className="relative z-10 flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
-        {/* Logo somente em telas menores */}
+        {/* Marca somente em telas menores */}
         <div className="mb-12 lg:hidden">
-          <Image
-            src="/branding/bs-logo-oficial.png"
-            alt="BS Soluções Logística"
-            width={1000}
-            height={625}
-            priority
-            className="h-auto w-32 object-contain"
-          />
+          <BSBrand variant="light" size="sm" align="start" priority />
         </div>
 
         <div className="flex flex-1 items-center justify-center">
@@ -195,31 +188,20 @@ export default function Login() {
 
         <div className="relative z-10 flex min-h-screen flex-col px-16 pb-8 pt-14 xl:px-20 xl:pb-8 xl:pt-16">
           {/* Marca */}
-          <div className="mx-auto flex flex-col items-center">
-            <Image
-              src="/branding/bs-simbolo-retangular.png"
-              alt="BS Soluções Logística"
-              width={1774}
-              height={887}
-              priority
-              className="h-auto w-64 object-contain xl:w-90"
-            />
-
-            <p className="mt-3 text-center text-xs font-semibold tracking-[0.22em] text-white/90 xl:text-lg">
-              BS SOLUÇÕES LOGÍSTICA
-            </p>
+          <div className="mx-auto">
+            <BSBrand variant="dark" size="lg" align="center" priority />
           </div>
 
           {/* Conteúdo principal */}
-          <div className="flex flex-1 items-start pt-14 xl:pt-13">
+          <div className="flex flex-1 items-start pt-14 xl:pt-16">
             <div className="max-w-xl">
-              <h2 className="font-display text-[35px] font-semibold leading-[1.1] tracking-[-0.025em] text-white xl:text-[34px]">
+              <h2 className="font-display text-[40px] font-semibold leading-[1.1] tracking-[-0.025em] text-white xl:text-[36px]">
                 Gestão operacional
                 <br />
                 em um só lugar.
               </h2>
 
-              <p className="mt-9 max-w-md text-[15px] leading-7 text-white/60">
+              <p className="mt-9 max-w-md text-[16px] leading-7 text-white/60">
                 Pessoas, operações e resultados conectados em uma plataforma centralizada.
               </p>
             </div>

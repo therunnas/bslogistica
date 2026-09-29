@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
-import Image from "next/image";
 import { cookies } from "next/headers";
 
+import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import {
   MENSAGEM_CONFIRMAR_RECUPERACAO,
@@ -51,15 +51,8 @@ export default async function ConfirmarRecuperacaoPage() {
   return (
     <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
       {/* Marca */}
-      <div className="mx-auto flex w-full max-w-6xl">
-        <Image
-          src="/branding/bs-logo-oficial.png"
-          alt="BS Soluções Logística"
-          width={1000}
-          height={625}
-          priority
-          className="h-auto w-28 object-contain sm:w-32"
-        />
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand variant="light" size="sm" align="start" priority />
       </div>
 
       {/* Conteúdo */}
