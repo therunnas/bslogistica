@@ -2,6 +2,7 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
+import { obterOpcoesCookieSupabase } from "./cookie-options";
 import { lerAmbienteSupabase } from "./env";
 import type { Database } from "./types";
 
@@ -20,7 +21,9 @@ let cliente: ReturnType<typeof createBrowserClient<Database>> | undefined;
 export function criarClienteNavegador() {
   if (!cliente) {
     const { url, chave } = lerAmbienteSupabase();
-    cliente = createBrowserClient<Database>(url, chave);
+    cliente = createBrowserClient<Database>(url, chave, {
+      cookieOptions: obterOpcoesCookieSupabase(),
+    });
   }
   return cliente;
 }

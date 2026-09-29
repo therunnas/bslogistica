@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:cookies-supabase": "node --experimental-strip-types scripts/testar-cookies-supabase.mjs",
     "test:mfa": "node --experimental-strip-types scripts/testar-mfa.mjs",
     "format": "prettier --write .",
     "test:recuperacao": "node --experimental-strip-types scripts/testar-recuperacao-senha.mjs",

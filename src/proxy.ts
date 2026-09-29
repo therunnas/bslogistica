@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { obterOpcoesCookieSupabase } from "@/integrations/supabase/cookie-options";
 import { lerAmbienteSupabase } from "@/integrations/supabase/env";
 
 /**
@@ -25,6 +26,7 @@ export async function proxy(request: NextRequest) {
   let resposta = NextResponse.next({ request });
 
   const supabase = createServerClient(url, chave, {
+    cookieOptions: obterOpcoesCookieSupabase(),
     cookies: {
       getAll() {
         return request.cookies.getAll();
