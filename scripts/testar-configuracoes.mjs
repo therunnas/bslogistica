@@ -292,22 +292,88 @@ verificar(
   1,
 );
 
-console.log("\nF. Remoção/desativação: registrada como pendência, não inventada\n");
+console.log("\nF. Desativação de MFA — autosserviço do operacional, achado P1 do Codex\n");
 
 verificar(
-  "F1. nenhuma chamada a unenroll sobre um fator JÁ verificado (só sobre pendentes de enroll)",
+  "F1. nenhuma chamada a unenroll sobre um fator ainda 'unverified' durante a ativação usa o fator já verificado (continua só limpando pendentes)",
   /fatores\.totp\[0\][\s\S]{0,300}unenroll/.test(fontes.painel),
   false,
 );
 verificar(
-  "F2. a tela com fator ativo não oferece botão de remover/desativar",
-  /fase === "com-fator"[\s\S]{0,400}(Remover|Desativar|Desligar)/i.test(fontes.painel),
+  "F2. o operacional COM fator vê a ação de desativação",
+  /papel === "operacional" \? \([\s\S]{0,400}Desativar autenticação em duas etapas/.test(
+    fontes.painel,
+  ),
+  true,
+);
+verificar(
+  "F3. o admin COM fator NÃO vê a ação de desativação (ramo dele não tem botão)",
+  /\) : \(\s*<p className="text-sm text-muted-foreground">\s*A verificação em duas etapas é obrigatória para administradores e não pode ser desativada/.test(
+    fontes.painel,
+  ) && !/administradores e não pode ser desativada[\s\S]{0,200}Button/.test(fontes.painel),
+  true,
+);
+verificar(
+  "F4. a desativação exige confirmação por AlertDialog, não window.confirm",
+  /<AlertDialog open=\{confirmando\}/.test(fontes.painel) &&
+    /<AlertDialogAction onClick=\{\(\) => void desativar\(\)\}>Desativar<\/AlertDialogAction>/.test(
+      fontes.painel,
+    ),
+  true,
+);
+verificar(
+  "F4b. nenhum window.confirm em lugar nenhum da tela",
+  /window\.confirm/.test(fontes.painel),
   false,
 );
 verificar(
-  "F3. o texto da tela é explícito: remoção não está disponível aqui",
-  /remoção do segundo fator não\s*\n?\s*está disponível nesta tela/i.test(fontes.painel),
+  "F5. a desativação usa supabase.auth.mfa.unenroll, a API oficial",
+  /async function desativar\(\)[\s\S]{0,300}supabase\.auth\.mfa\.unenroll\(\{ factorId: fator\.id \}\)/.test(
+    fontes.painel,
+  ),
   true,
+);
+verificar(
+  "F6. usa o factorId do fator ATUAL (prop), não um id arbitrário ou de outro fator",
+  /unenroll\(\{ factorId: fator\.id \}\)/.test(fontes.painel),
+  true,
+);
+verificar(
+  "F7. sucesso relê os fatores do servidor via aoRemover (carregarFatores), não seta 'sem-fator' na mão",
+  /aoRemover\(\);\s*setRemovendo\(false\);/.test(fontes.painel) &&
+    /aoRemover=\{\(\) => void carregarFatores\(\)\}/.test(fontes.painel),
+  true,
+);
+verificar(
+  "F8. refreshSession() roda depois do unenroll, antes de reler os fatores",
+  /const \{ error: erroUnenroll \} = await supabase\.auth\.mfa\.unenroll\(\{ factorId: fator\.id \}\);[\s\S]{0,900}const \{ error: erroRefresh \} = await supabase\.auth\.refreshSession\(\);[\s\S]{0,150}aoRemover\(\);/.test(
+    fontes.painel,
+  ),
+  true,
+);
+verificar(
+  "F9. falha do unenroll NÃO mostra sucesso nem relê fatores — sai antes de aoRemover()",
+  /if \(erroUnenroll\) \{\s*toast\.error\(erroUnenroll\.message\);\s*setRemovendo\(false\);\s*return;\s*\}/.test(
+    fontes.painel,
+  ),
+  true,
+);
+verificar(
+  "F10. falha do refreshSession DEPOIS do unenroll não mascara a remoção já persistida — ainda relê fatores e avisa, não trata como erro",
+  /if \(erroRefresh\) \{\s*toast\.warning\(/.test(fontes.painel),
+  true,
+);
+verificar(
+  "F10b. o aviso de falha de refresh não usa toast.error (a remoção não falhou)",
+  /if \(erroRefresh\) \{\s*toast\.error\(/.test(fontes.painel),
+  false,
+);
+verificar(
+  "F11. nenhum service_role/Admin API na desativação",
+  /async function desativar\(\)[\s\S]{0,600}\n  \}/
+    .exec(fontes.painel)?.[0]
+    ?.match(/service_role|auth\.admin\./i) ?? null,
+  null,
 );
 
 console.log("\nG. Segurança: nada proibido entrou por este PR\n");
