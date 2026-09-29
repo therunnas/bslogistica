@@ -1,16 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { toast } from "@/lib/notificacoes";
 
-import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { toast } from "@/lib/notificacoes";
+
 import {
   MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS,
   MENSAGEM_SENHA_REDEFINIDA,
@@ -18,76 +17,60 @@ import {
   ROTA_ESQUECI_SENHA,
 } from "@/lib/recuperacao-senha";
 
-/**
- * Confirmação de senha redefinida, vinda de /redefinir-senha.
- *
- * Em componente próprio porque `useSearchParams` obriga um limite de Suspense
- * — sem ele o build falha ao pré-renderizar esta rota estática.
- */
 function AvisoSenhaRedefinida() {
   const parametros = useSearchParams();
-  if (parametros.get("senha-redefinida") !== "1") return null;
 
-  // Desfecho parcial: a senha mudou, mas o `signOut` global não respondeu e
-  // podem ter sobrado sessões abertas. Mensagem própria — a de sucesso normal
-  // omitiria justamente o que o usuário precisa saber.
+  if (parametros.get("senha-redefinida") !== "1") {
+    return null;
+  }
+
   const sessoesAtivas = parametros.get(PARAM_SESSOES_ATIVAS) === "1";
 
   return (
     <p
       role="status"
-      className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground"
+      className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground"
     >
       {sessoesAtivas ? MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS : MENSAGEM_SENHA_REDEFINIDA}
     </p>
   );
 }
 
-/**
- * Tela de entrada do painel.
- *
- * Sistema interno: não há criação de conta por aqui. Os acessos são criados
- * pelo administrador no Supabase, e o papel em user_roles é o que libera os
- * dados — quem entra sem papel não enxerga nada, por causa da RLS.
- */
 export default function Login() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  /**
-   * Quem já tem sessão não precisa ver esta tela — com uma exceção.
-   *
-   * No desfecho parcial da redefinição (`sessoes-ativas=1`) a sessão que
-   * sobreviveu ao `signOut` é exatamente o problema, não um atalho: mandar esse
-   * usuário ao painel o faria pular o aviso e seguir com a sessão antiga, sem
-   * nunca usar a senha nova. Nesse estado ele fica aqui e entra de novo.
-   *
-   * O parâmetro é lido de `window.location` em vez de `useSearchParams` porque
-   * este efeito já só roda no cliente. Trazer o hook para cá obrigaria a
-   * envolver o componente inteiro em Suspense — sem isso o build falha ao
-   * pré-renderizar esta rota estática, que é o motivo de `AvisoSenhaRedefinida`
-   * existir separado.
-   */
   useEffect(() => {
     const sessoesAtivas =
       new URLSearchParams(window.location.search).get(PARAM_SESSOES_ATIVAS) === "1";
 
-    if (sessoesAtivas) return;
+    if (sessoesAtivas) {
+      return;
+    }
 
     const supabase = criarClienteNavegador();
+
     void supabase.auth.getUser().then(({ data }) => {
-      if (data.user) router.replace("/dashboard");
+      if (data.user) {
+        router.replace("/dashboard");
+      }
     });
   }, [router]);
 
   async function entrar(evento: React.FormEvent) {
     evento.preventDefault();
+
     setEnviando(true);
 
     const supabase = criarClienteNavegador();
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: senha,
+    });
 
     if (error) {
       toast.error(error.message);
@@ -95,80 +78,162 @@ export default function Login() {
       return;
     }
 
-    // refresh faz o servidor reavaliar a sessão recém-criada antes de navegar,
-    // para o layout protegido já enxergar o usuário autenticado.
     router.refresh();
     router.replace("/dashboard");
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/40 px-4 py-12">
-      {/* Marca fora do card, com espaço próprio.
-          Em telas largas ela sai do fluxo e ancora no canto superior esquerdo
-          da página; o card continua centralizado como sempre esteve.
-          Abaixo de lg volta ao fluxo, empilhada acima do card — absoluta em
-          tela estreita ela passaria por cima dele.
-          `self-start` alinha a marca pela borda esquerda do card no empilhado,
-          já que o container centraliza os filhos. */}
-      <Image
-        src="/branding/bs-logo-oficial.png"
-        alt="BS Soluções Logísticas"
-        width={1000}
-        height={625}
-        priority
-        className="h-auto w-36 self-start object-contain lg:absolute lg:top-8 lg:left-10 lg:w-40"
-      />
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="font-display text-xl">Entrar</CardTitle>
-          <CardDescription>
-            Painel interno de gestão de diárias, horas extras e faturamento.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Suspense fallback={null}>
-            <AvisoSenhaRedefinida />
-          </Suspense>
-          <form onSubmit={entrar} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+    <main className="min-h-screen bg-background lg:grid lg:grid-cols-2">
+      {/* ÁREA DE LOGIN */}
+      <section className="relative z-10 flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
+        {/* Logo somente em telas menores */}
+        <div className="mb-12 lg:hidden">
+          <Image
+            src="/branding/bs-logo-oficial.png"
+            alt="BS Soluções Logísticas"
+            width={1000}
+            height={625}
+            priority
+            className="h-auto w-32 object-contain"
+          />
+        </div>
+
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-[448px]">
+            <div className="mb-10">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                Acesso ao sistema
+              </p>
+
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-950 sm:text-[38px]">
+                Acesse sua conta
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-[15px]">
+                Entre com suas credenciais para continuar.
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="senha">Senha</Label>
-              <Input
-                id="senha"
-                type="password"
-                autoComplete="current-password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-              />
+
+            <Suspense fallback={null}>
+              <AvisoSenhaRedefinida />
+            </Suspense>
+
+            <form onSubmit={entrar} className="mt-7 space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-slate-900">
+                  E-mail
+                </Label>
+
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(evento) => setEmail(evento.target.value)}
+                  required
+                  placeholder="seuemail@empresa.com.br"
+                  className="h-12 rounded-lg border-slate-300 bg-white px-4 shadow-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="senha" className="text-sm font-medium text-slate-900">
+                    Senha
+                  </Label>
+
+                  <a
+                    href={ROTA_ESQUECI_SENHA}
+                    className="relative z-20 inline-flex cursor-pointer items-center py-1 text-sm text-slate-500 transition-colors hover:text-slate-950 hover:underline"
+                  >
+                    Esqueci minha senha
+                  </a>
+                </div>
+
+                <Input
+                  id="senha"
+                  type="password"
+                  autoComplete="current-password"
+                  value={senha}
+                  onChange={(evento) => setSenha(evento.target.value)}
+                  required
+                  placeholder="Digite sua senha"
+                  className="h-12 rounded-lg border-slate-300 bg-white px-4 shadow-sm"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={enviando}
+                className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823b43]"
+              >
+                {enviando ? "Aguarde..." : "Entrar"}
+              </Button>
+            </form>
+
+            <div className="mt-8 border-t border-slate-200 pt-6">
+              <p className="text-center text-xs text-slate-500">
+                Acesso exclusivo a usuários autorizados.
+              </p>
             </div>
-            <Button type="submit" className="w-full" disabled={enviando}>
-              {enviando ? "Aguarde..." : "Entrar"}
-            </Button>
-          </form>
-          <p className="text-center text-sm">
-            <Link
-              href={ROTA_ESQUECI_SENHA}
-              className="text-muted-foreground underline-offset-4 hover:underline"
-            >
-              Esqueci minha senha
-            </Link>
-          </p>
-          <p className="text-center text-sm text-muted-foreground">
-            Precisa de acesso? Fale com o administrador do sistema.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+        </div>
+
+        <p className="mt-8 text-center text-xs text-slate-500 lg:text-left">
+          © {new Date().getFullYear()} BS Soluções Logística
+        </p>
+      </section>
+
+      {/* ÁREA INSTITUCIONAL */}
+      <section className="relative hidden min-h-screen overflow-hidden bg-[#0d0d0d] lg:flex lg:flex-col">
+        {/* Divisória vermelha */}
+        <div className="absolute inset-y-0 left-0 w-[2px] bg-[#e30613]" />
+
+        {/* Elementos gráficos discretos */}
+        <div className="pointer-events-none absolute -right-36 -top-36 h-[430px] w-[430px] rounded-full border border-white/[0.04]" />
+        <div className="pointer-events-none absolute -right-14 -top-14 h-[300px] w-[300px] rounded-full border border-white/[0.04]" />
+
+        {/* Brilho vermelho discreto */}
+        <div className="pointer-events-none absolute bottom-24 left-20 h-40 w-40 rounded-full bg-red-700/[0.06] blur-3xl" />
+
+        <div className="relative z-10 flex min-h-screen flex-col px-16 py-14 xl:px-20 xl:py-16">
+          {/* Logo */}
+          <div className="w-fit rounded-xl bg-white px-4 py-3 shadow-lg shadow-black/20">
+            <Image
+              src="/branding/bs-logo-oficial.png"
+              alt="BS Soluções Logística"
+              width={1000}
+              height={625}
+              priority
+              className="h-auto w-28 object-contain xl:w-32"
+            />
+          </div>
+
+          {/* Conteúdo principal */}
+          <div className="flex flex-1 items-center">
+            <div className="-mt-8 max-w-xl">
+              <div className="mb-9 h-[3px] w-16 rounded-full bg-[#e30613]" />
+
+              <h2 className="font-display text-[44px] font-semibold leading-[1.1] tracking-[-0.025em] text-white xl:text-[52px]">
+                Gestão operacional
+                <br />
+                em um só lugar.
+              </h2>
+
+              <p className="mt-7 max-w-md text-[16px] leading-7 text-white/60">
+                Pessoas, operações e resultados conectados em uma plataforma centralizada.
+              </p>
+            </div>
+          </div>
+
+          {/* Rodapé */}
+          <div className="flex items-center justify-between border-t border-white/10 pt-6">
+            <p className="text-xs text-white/40">Sistema interno de gestão</p>
+
+            <p className="text-xs text-white/35">BS Soluções Logística</p>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

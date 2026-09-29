@@ -12,13 +12,14 @@ import { confirmarSegundoFator } from "./actions";
 /**
  * Campo do código TOTP.
  *
- * O componente não fala com o Supabase: ele só coleta o código e chama a Server
- * Action. `challengeAndVerify`, a leitura dos fatores e a reemissão da prova
- * acontecem no servidor — aqui não existe cliente do Supabase, nem id de fator,
- * nem prova, nem token.
+ * O componente não fala diretamente com o Supabase.
+ * Ele apenas coleta o código e chama a Server Action.
  *
- * O código não vai para log, URL nem armazenamento local: vive no estado do
- * componente e some quando a tela sai.
+ * challengeAndVerify, leitura dos fatores e reemissão da prova
+ * continuam acontecendo exclusivamente no servidor.
+ *
+ * O código permanece apenas no estado do componente e não é
+ * enviado para logs, URL ou armazenamento local.
  */
 export function FormularioMfaRecuperacao() {
   const [codigo, setCodigo] = useState("");
@@ -26,13 +27,16 @@ export function FormularioMfaRecuperacao() {
 
   async function confirmar(evento: React.FormEvent) {
     evento.preventDefault();
-    if (enviando) return;
+
+    if (enviando) {
+      return;
+    }
 
     setEnviando(true);
 
-    // No sucesso a action redireciona para /redefinir-senha e esta promessa não
-    // devolve estado — só o caminho de erro chega de volta aqui.
-    const estado = await confirmarSegundoFator({ codigo });
+    const estado = await confirmarSegundoFator({
+      codigo,
+    });
 
     if (estado?.situacao === "erro") {
       toast.error(estado.mensagem);
@@ -42,9 +46,12 @@ export function FormularioMfaRecuperacao() {
   }
 
   return (
-    <form onSubmit={confirmar} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label htmlFor="codigo">Código do aplicativo</Label>
+    <form onSubmit={confirmar} className="space-y-5">
+      <div className="space-y-2">
+        <Label htmlFor="codigo" className="text-sm font-medium text-slate-900">
+          Código do aplicativo
+        </Label>
+
         <Input
           id="codigo"
           name="codigo"
@@ -52,11 +59,18 @@ export function FormularioMfaRecuperacao() {
           autoComplete="one-time-code"
           placeholder="000000"
           value={codigo}
-          onChange={(e) => setCodigo(e.target.value)}
+          onChange={(evento) => setCodigo(evento.target.value)}
           required
+          maxLength={6}
+          className="h-12 rounded-lg border-slate-300 bg-white px-4 text-center text-lg tracking-[0.35em] shadow-sm"
         />
       </div>
-      <Button type="submit" className="w-full" disabled={enviando}>
+
+      <Button
+        type="submit"
+        disabled={enviando}
+        className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823B43] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
         {enviando ? "Confirmando..." : "Confirmar"}
       </Button>
     </form>

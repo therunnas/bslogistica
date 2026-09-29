@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
-import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MolduraAuth } from "@/components/moldura-auth";
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
+
 import {
   MENSAGEM_FALHA_GENERICA,
   MENSAGEM_LINK_INVALIDO,
@@ -17,37 +17,23 @@ import {
   decidirRespostaDaSolicitacao,
 } from "@/lib/recuperacao-senha";
 
-/**
- * Aviso de link inválido, vindo de /auth/confirm.
- *
- * Em componente próprio porque `useSearchParams` obriga um limite de Suspense
- * — sem ele o build falha ao pré-renderizar esta rota estática.
- */
 function AvisoLinkInvalido() {
   const parametros = useSearchParams();
-  if (parametros.get("status") !== "link-invalido") return null;
+
+  if (parametros.get("status") !== "link-invalido") {
+    return null;
+  }
 
   return (
     <p
       role="status"
-      className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-foreground"
+      className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
     >
       {MENSAGEM_LINK_INVALIDO}
     </p>
   );
 }
 
-/**
- * Solicitação do link de recuperação de senha.
- *
- * Rota pública: quem esqueceu a senha, por definição, não tem sessão. Não cria
- * conta e não faz signUp — o sistema não tem cadastro público, e este fluxo
- * serve só a quem o administrador já cadastrou.
- *
- * A tela nunca revela se o e-mail digitado tem conta. Sucesso, endereço
- * desconhecido e e-mail malformado terminam na mesma frase; só
- * indisponibilidade real muda o texto. Ver `decidirRespostaDaSolicitacao`.
- */
 export default function EsqueciSenha() {
   const [email, setEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -55,16 +41,16 @@ export default function EsqueciSenha() {
 
   async function solicitar(evento: React.FormEvent) {
     evento.preventDefault();
-    if (enviando) return;
+
+    if (enviando) {
+      return;
+    }
 
     setEnviando(true);
     setAviso(null);
 
     const supabase = criarClienteNavegador();
 
-    // Sem `redirectTo`: o destino sai do Site URL configurado no Supabase, que
-    // já aponta para a produção. Passar um daqui exigiria mexer em
-    // additional_redirect_urls e abriria uma superfície que não precisa existir.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
 
     setAviso(
@@ -72,49 +58,102 @@ export default function EsqueciSenha() {
         ? MENSAGEM_FALHA_GENERICA
         : MENSAGEM_SOLICITACAO_ENVIADA,
     );
+
     setEnviando(false);
   }
 
   return (
-    <MolduraAuth
-      titulo="Recuperar senha"
-      descricao="Informe o e-mail da sua conta e enviaremos um link para definir uma nova senha."
-    >
-      <Suspense fallback={null}>
-        <AvisoLinkInvalido />
-      </Suspense>
+    <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
+      {/* Marca */}
+      <div className="mx-auto flex w-full max-w-6xl">
+        <Image
+          src="/branding/bs-logo-oficial.png"
+          alt="BS Soluções Logísticas"
+          width={1000}
+          height={625}
+          priority
+          className="h-auto w-28 object-contain sm:w-32"
+        />
+      </div>
 
-      <form onSubmit={solicitar} className="space-y-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">E-mail</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+      {/* Conteúdo */}
+      <div className="flex flex-1 items-center justify-center py-10">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+            <div className="mb-7">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Recuperação de acesso
+              </p>
+
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                Recuperar senha
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Informe o e-mail da sua conta e enviaremos um link para definir uma nova senha.
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              <Suspense fallback={null}>
+                <AvisoLinkInvalido />
+              </Suspense>
+
+              <form onSubmit={solicitar} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-900">
+                    E-mail
+                  </Label>
+
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(evento) => setEmail(evento.target.value)}
+                    required
+                    placeholder="seuemail@empresa.com.br"
+                    className="h-12 rounded-lg border-slate-300 bg-white px-4 shadow-sm"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={enviando}
+                  className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823b43]"
+                >
+                  {enviando ? "Enviando..." : "Enviar link de recuperação"}
+                </Button>
+              </form>
+
+              {aviso ? (
+                <p
+                  role="status"
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600"
+                >
+                  {aviso}
+                </p>
+              ) : null}
+
+              <div className="border-t border-slate-200 pt-5">
+                <p className="text-center text-sm">
+                  <a
+                    href={ROTA_LOGIN}
+                    className="cursor-pointer text-slate-500 transition-colors hover:text-slate-950 hover:underline"
+                  >
+                    Voltar para entrar
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-        <Button type="submit" className="w-full" disabled={enviando}>
-          {enviando ? "Enviando..." : "Enviar link de recuperação"}
-        </Button>
-      </form>
+      </div>
 
-      {aviso ? (
-        <p role="status" className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          {aviso}
-        </p>
-      ) : null}
-
-      <p className="text-center text-sm">
-        <Link
-          href={ROTA_LOGIN}
-          className="text-muted-foreground underline-offset-4 hover:underline"
-        >
-          Voltar para entrar
-        </Link>
+      {/* Rodapé */}
+      <p className="text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} BS Soluções Logísticas
       </p>
-    </MolduraAuth>
+    </main>
   );
 }
