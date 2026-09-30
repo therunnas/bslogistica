@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState, type FormEvent } from "react";
-import { ArrowLeft, Mail, Send } from "lucide-react";
+import { Suspense, useState } from "react";
 
-import { MolduraAuth } from "@/components/moldura-auth";
+import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
+
 import {
   MENSAGEM_FALHA_GENERICA,
   MENSAGEM_LINK_INVALIDO,
@@ -26,14 +25,12 @@ function AvisoLinkInvalido() {
   }
 
   return (
-    <div
+    <p
       role="status"
-      className="rounded-xl border border-destructive/20 bg-destructive/[0.07] px-4 py-3"
+      className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
     >
-      <p className="text-sm font-medium text-destructive">Link de recuperação inválido</p>
-
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">{MENSAGEM_LINK_INVALIDO}</p>
-    </div>
+      {MENSAGEM_LINK_INVALIDO}
+    </p>
   );
 }
 
@@ -42,7 +39,7 @@ export default function EsqueciSenha() {
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  async function solicitar(evento: FormEvent) {
+  async function solicitar(evento: React.FormEvent) {
     evento.preventDefault();
 
     if (enviando) {
@@ -66,56 +63,90 @@ export default function EsqueciSenha() {
   }
 
   return (
-    <MolduraAuth
-      titulo="Recuperar senha"
-      descricao="Informe o e-mail da sua conta para receber as instruções de recuperação."
-    >
-      <Suspense fallback={null}>
-        <AvisoLinkInvalido />
-      </Suspense>
+    <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
+      {/* Marca */}
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand variant="light" size="sm" align="start" priority />
+      </div>
 
-      <form onSubmit={solicitar} className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="email">E-mail</Label>
+      {/* Conteúdo */}
+      <div className="flex flex-1 items-center justify-center py-10">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+            <div className="mb-7">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Recuperação de acesso
+              </p>
 
-          <div className="relative">
-            <Mail className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                Recuperar senha
+              </h1>
 
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              className="h-11 rounded-xl border-input bg-secondary/50 pl-10 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20"
-            />
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Informe o e-mail da sua conta e enviaremos um link para definir uma nova senha.
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              <Suspense fallback={null}>
+                <AvisoLinkInvalido />
+              </Suspense>
+
+              <form onSubmit={solicitar} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-900">
+                    E-mail
+                  </Label>
+
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(evento) => setEmail(evento.target.value)}
+                    required
+                    placeholder="seuemail@empresa.com.br"
+                    className="h-12 rounded-lg border-slate-300 bg-white px-4 shadow-sm"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={enviando}
+                  className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823b43] hover:text-white"
+                >
+                  {enviando ? "Enviando..." : "Enviar link de recuperação"}
+                </Button>
+              </form>
+
+              {aviso ? (
+                <p
+                  role="status"
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600"
+                >
+                  {aviso}
+                </p>
+              ) : null}
+
+              <div className="border-t border-slate-200 pt-5">
+                <p className="text-center text-sm">
+                  <a
+                    href={ROTA_LOGIN}
+                    className="cursor-pointer text-slate-500 transition-colors hover:text-slate-950 hover:underline"
+                  >
+                    Voltar para entrar
+                  </a>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-
-        <Button type="submit" className="h-11 w-full rounded-xl" disabled={enviando}>
-          <Send className="h-4 w-4" />
-
-          {enviando ? "Enviando..." : "Enviar link de recuperação"}
-        </Button>
-      </form>
-
-      {aviso ? (
-        <div role="status" className="rounded-xl border border-border bg-secondary/40 px-4 py-3">
-          <p className="text-xs leading-5 text-muted-foreground">{aviso}</p>
-        </div>
-      ) : null}
-
-      <div className="border-t border-border pt-5">
-        <Link
-          href={ROTA_LOGIN}
-          className="flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar para entrar
-        </Link>
       </div>
-    </MolduraAuth>
+
+      {/* Rodapé */}
+      <p className="text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} BS Soluções Logística
+      </p>
+    </main>
   );
 }

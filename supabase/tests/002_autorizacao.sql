@@ -207,7 +207,27 @@ $sempapel$;
 
 
 -- ---------------------------------------------------------------------------
--- 3. OPERACIONAL — opera apontamentos sem administrar cadastros ou financeiro.
+-- 3. OPERACIONAL — nenhum acesso direto às tabelas de negócio.
+--
+-- ESTE BLOCO MUDOU DE CONTRATO NA MIGRATION 016, e a mudança é deliberada.
+--
+-- Antes dela, este bloco media o oposto: que o `operacional` em aal2 enxergava
+-- clientes, operações e apontamentos e podia editar apontamento direto. Aquilo
+-- não vinha do papel — vinha de `public.is_staff()`, que é `EXISTS` de linha em
+-- `user_roles` e por isso é verdadeiro para **qualquer** papel atribuído.
+-- Enquanto só existia `admin`, "é staff" e "é admin" coincidiam. Deixaram de
+-- coincidir quando a `013` criou a superfície operacional e a `015` passou a
+-- aceitar o operador em `aal2`.
+--
+-- A `016` fecha isso: acesso direto de `authenticated` passa a exigir `aal2` E
+-- `admin`. O caminho do operador é a superfície estreita de RPC — medida em
+-- `009`, `011` e `012` —, e não a tabela.
+--
+-- As asserções de NÃO-PODER deste bloco não mudaram: ele continua sem
+-- administrar cadastro, sem conceder grant, sem se autoelevar, sem tocar
+-- `invoice_id` e sem gerar fatura. O que mudou são as de PODER, que a `016`
+-- revogou. A 012 mede a superfície inteira; aqui fica o que esta suíte sempre
+-- fez — papel a papel, no contexto geral de autorização.
 -- ---------------------------------------------------------------------------
 
 do $operacional$
@@ -221,30 +241,40 @@ begin
     json_build_object('sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
+  -- `is_staff()` continua verdadeiro para ele, e é justamente por isso que a
+  -- `016` precisou existir: ela não redefiniu a função, acrescentou a exigência
+  -- de papel onde faltava.
   if not public.is_staff() then raise exception 'OPERACIONAL: is_staff devolveu falso'; end if;
   if public.has_role(auth.uid(), 'admin'::public.app_role) then
     raise exception 'OPERACIONAL: has_role devolveu admin';
   end if;
 
   select count(*) into _n from public.clients;
-  if _n = 0 then raise exception 'OPERACIONAL SELECT: não enxerga clientes'; end if;
+  if _n <> 0 then raise exception 'OPERACIONAL SELECT: enxergou % cliente(s) direto', _n; end if;
   select count(*) into _n from public.operations;
-  if _n = 0 then raise exception 'OPERACIONAL SELECT: não enxerga operações'; end if;
+  if _n <> 0 then raise exception 'OPERACIONAL SELECT: enxergou % operação(ões) direto', _n; end if;
   select count(*) into _n from public.timesheet_entries;
-  if _n = 0 then raise exception 'OPERACIONAL SELECT: não enxerga apontamentos'; end if;
+  if _n <> 0 then raise exception 'OPERACIONAL SELECT: enxergou % apontamento(s) direto', _n; end if;
+  select count(*) into _n from public.contracts;
+  if _n <> 0 then raise exception 'OPERACIONAL SELECT: enxergou % contrato(s) direto', _n; end if;
+  select count(*) into _n from public.invoices;
+  if _n <> 0 then raise exception 'OPERACIONAL SELECT: enxergou % fatura(s) direto', _n; end if;
 
   update public.operations
      set notes = 'editado pelo operacional'
    where id = '44444444-4444-4444-8444-444444444444';
   get diagnostics _afetadas = row_count;
-  if _afetadas <> 1 then raise exception 'OPERACIONAL UPDATE operação: afetou % linhas', _afetadas; end if;
+  if _afetadas <> 0 then raise exception 'OPERACIONAL UPDATE operação: afetou % linhas', _afetadas; end if;
 
   update public.timesheet_entries
      set notes = 'apontamento operacional'
    where id = '77777777-7777-4777-8777-777777777777';
   get diagnostics _afetadas = row_count;
-  if _afetadas <> 1 then raise exception 'OPERACIONAL UPDATE apontamento: afetou % linhas', _afetadas; end if;
+  if _afetadas <> 0 then raise exception 'OPERACIONAL UPDATE apontamento: afetou % linhas', _afetadas; end if;
 
+  -- INSERT é recusado por privilégio, e não por linha: a WITH CHECK da
+  -- RESTRICTIVE nova sobe como 42501, do mesmo jeito que já subia para o
+  -- apontamento nascido com vínculo de fatura.
   _bloqueou := false;
   begin
     insert into public.timesheet_entries (
@@ -256,21 +286,27 @@ begin
       '99999999-9999-4999-8999-999999999991',
       'vínculo injetado'
     );
-  exception when insufficient_privilege then _bloqueou := true;
+  exception when others then _bloqueou := true;
   end;
   if not _bloqueou then raise exception 'OPERACIONAL INSERT: criou apontamento já faturado'; end if;
 
-  insert into public.timesheet_entries (id, timesheet_id, employee_id, notes)
-  values (
-    '77777777-7777-4777-8777-777777777778',
-    '66666666-6666-4666-8666-666666666666',
-    '55555555-5555-4555-8555-555555555556',
-    'criado pelo operacional'
-  );
+  _bloqueou := false;
+  begin
+    insert into public.timesheet_entries (id, timesheet_id, employee_id, notes)
+    values (
+      '77777777-7777-4777-8777-777777777778',
+      '66666666-6666-4666-8666-666666666666',
+      '55555555-5555-4555-8555-555555555556',
+      'criado pelo operacional'
+    );
+  exception when others then _bloqueou := true;
+  end;
+  if not _bloqueou then raise exception 'OPERACIONAL INSERT: criou apontamento direto'; end if;
+
   delete from public.timesheet_entries
-   where id = '77777777-7777-4777-8777-777777777778';
+   where id = '77777777-7777-4777-8777-777777777777';
   get diagnostics _afetadas = row_count;
-  if _afetadas <> 1 then raise exception 'OPERACIONAL CRUD: não criou/removeu apontamento permitido'; end if;
+  if _afetadas <> 0 then raise exception 'OPERACIONAL DELETE: apagou % apontamento(s)', _afetadas; end if;
 
   update public.clients
      set name = 'cliente sequestrado'
@@ -306,19 +342,21 @@ begin
   end;
   if not _bloqueou then raise exception 'OPERACIONAL AUTOELEVAÇÃO: concedeu admin a si'; end if;
 
-  _bloqueou := false;
-  begin
-    update public.timesheet_entries
-       set invoice_id = '99999999-9999-4999-8999-999999999991'
-     where id = '77777777-7777-4777-8777-777777777777';
-  exception when insufficient_privilege then _bloqueou := true;
-  end;
-  if not _bloqueou then raise exception 'OPERACIONAL FINANCEIRO: alterou invoice_id'; end if;
+  -- O vínculo de fatura continua fora do alcance dele. Antes a recusa vinha do
+  -- guard da 011; agora a linha nem é alcançada — e o efeito medido é o mesmo:
+  -- nenhuma alteração, e o vínculo segue nulo.
+  update public.timesheet_entries
+     set invoice_id = '99999999-9999-4999-8999-999999999991'
+   where id = '77777777-7777-4777-8777-777777777777';
+  get diagnostics _afetadas = row_count;
+  if _afetadas <> 0 then raise exception 'OPERACIONAL FINANCEIRO: alterou invoice_id'; end if;
 
+  execute 'set local role postgres';
   select invoice_id into _invoice
     from public.timesheet_entries
    where id = '77777777-7777-4777-8777-777777777777';
   if _invoice is not null then raise exception 'OPERACIONAL FINANCEIRO: vínculo persistiu como %', _invoice; end if;
+  execute 'set local role authenticated';
 
   _bloqueou := false;
   begin
@@ -331,7 +369,13 @@ begin
   end;
   if not _bloqueou then raise exception 'OPERACIONAL FINANCEIRO: conseguiu gerar fatura'; end if;
 
-  raise notice 'OPERACIONAL: PASS (opera dados, sem admin, elevação ou vínculo financeiro)';
+  -- E em aal1 nada muda: lá quem barra é a `*_exige_aal2`, desde a 009.
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+  select count(*) into _n from public.operations;
+  if _n <> 0 then raise exception 'OPERACIONAL aal1 SELECT: enxergou % operação(ões)', _n; end if;
+
+  raise notice 'OPERACIONAL: PASS (sem acesso direto, sem admin, sem elevação, sem financeiro)';
 end
 $operacional$;
 

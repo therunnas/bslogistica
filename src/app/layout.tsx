@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/next";
 
 import "@/styles.css";
 
@@ -7,12 +8,10 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: {
-    default: "BS Soluções Logísticas",
-    template: "%s | BS Soluções Logísticas",
+    default: "BS Soluções Logística",
+    template: "%s | BS Soluções Logística",
   },
-
   description: "Painel interno de gestão operacional e financeira de mão de obra terceirizada.",
-
   robots: {
     index: false,
     follow: false,
@@ -23,14 +22,38 @@ const scriptDoTema = `
 (() => {
   try {
     const chave = "bs-theme";
-    const salvo = localStorage.getItem(chave);
 
-    const tema =
-      salvo === "light" || salvo === "dark"
-        ? salvo
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+    const rotasComTema = [
+      "/dashboard",
+      "/apontamentos",
+      "/operacoes",
+      "/clientes",
+      "/colaboradores",
+      "/faturamento",
+      "/relatorios",
+      "/operacional",
+      "/usuarios",
+      "/configuracoes"
+    ];
+
+    const caminho = window.location.pathname;
+
+    const usaTemaDoPainel = rotasComTema.some(
+      (rota) => caminho === rota || caminho.startsWith(rota + "/")
+    );
+
+    let tema = "light";
+
+    if (usaTemaDoPainel) {
+      const salvo = localStorage.getItem(chave);
+
+      tema =
+        salvo === "light" || salvo === "dark"
+          ? salvo
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+    }
 
     const raiz = document.documentElement;
 
@@ -63,6 +86,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
       <body>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );

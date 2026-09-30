@@ -1,30 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
 import { useRouter } from "next/navigation";
-
-import { ArrowRight, Check, Copy, KeyRound, LogOut, ShieldCheck, Smartphone } from "lucide-react";
+import { Check, Copy, ShieldCheck } from "lucide-react";
 
 import { sair } from "@/app/(painel)/_acoes";
+import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
-import { decidirFluxoMfa } from "@/lib/mfa";
+import { decidirFluxoMfa, fonteDoQrTotp } from "@/lib/mfa";
 import { toast } from "@/lib/notificacoes";
 
-const NOME_DO_FATOR = "BS Logística";
+const NOME_DO_FATOR = "BS Soluções Logística";
 
-function fonteDoQr(valor: string): string {
-  if (valor.startsWith("data:")) {
-    return valor;
-  }
-
-  return `data:image/svg+xml;utf-8,${encodeURIComponent(valor)}`;
-}
-
+/**
+ * Segundo fator por TOTP usando exclusivamente o MFA oficial do Supabase.
+ *
+ * Existem dois fluxos:
+ *
+ * - mfa-ausente: cadastra o segundo fator e confirma;
+ * - mfa-pendente: solicita apenas o código do fator já existente.
+ *
+ * QR, segredo e código permanecem somente no estado do componente.
+ */
 export function PainelMfa({
   email,
   etapa,
@@ -45,6 +45,10 @@ export function PainelMfa({
 
   const [modo, setModo] = useState<"mfa-ausente" | "mfa-pendente">(etapa);
 
+  /**
+   * enroll cria um fator novo a cada chamada.
+   * A trava evita duplicação durante renders extras em desenvolvimento.
+   */
   const jaPreparou = useRef(false);
 
   const preparar = useCallback(async () => {
@@ -59,6 +63,9 @@ export function PainelMfa({
       return;
     }
 
+    /**
+     * listFactors devolve em totp somente fatores já verificados.
+     */
     const verificado = fatores.totp[0];
 
     const fluxo = decidirFluxoMfa(Boolean(verificado), etapa);
@@ -77,6 +84,15 @@ export function PainelMfa({
       return;
     }
 
+    /**
+     * Cadastro.
+     *
+     * Tentativas anteriores que não chegaram a ser confirmadas ficam
+     * como fatores não verificados. Eles são removidos antes da criação
+     * do novo fator.
+     *
+     * Fatores já verificados nunca são removidos neste fluxo.
+     */
     const pendentes = fatores.all.filter(
       (fator) => fator.factor_type === "totp" && fator.status === "unverified",
     );
@@ -106,7 +122,9 @@ export function PainelMfa({
   }, [etapa]);
 
   useEffect(() => {
-    if (jaPreparou.current) return;
+    if (jaPreparou.current) {
+      return;
+    }
 
     jaPreparou.current = true;
 
@@ -141,15 +159,18 @@ export function PainelMfa({
 
     if (error) {
       toast.error(error.message);
-
       setCodigo("");
       setEnviando(false);
-
       return;
     }
 
     toast.success(modo === "mfa-ausente" ? "Segundo fator ativado." : "Acesso confirmado.");
 
+    /**
+     * A sessão agora está em AAL2.
+     *
+     * O servidor precisa reavaliar a sessão antes de navegar para o painel.
+     */
     router.refresh();
     router.replace("/dashboard");
   }
@@ -157,213 +178,154 @@ export function PainelMfa({
   const cadastrando = modo === "mfa-ausente";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-40 right-[-10rem] h-[34rem] w-[34rem] rounded-full bg-primary/[0.08] blur-[120px]"
-      />
+    <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
+      {/* Marca */}
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand variant="light" size="sm" align="start" priority />
+      </div>
 
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-40 left-[-12rem] h-[30rem] w-[30rem] rounded-full bg-primary/[0.05] blur-[120px]"
-      />
-
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1440px] flex-col px-5 py-5 sm:px-8 lg:px-12">
-        <header className="flex min-h-16 items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-tight text-foreground">
-              BS Soluções Logísticas
-            </p>
-
-            <p className="text-xs text-muted-foreground">Sistema interno</p>
-          </div>
-
-          <div className="hidden items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-2 text-xs text-muted-foreground backdrop-blur-xl sm:flex">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            Verificação protegida
-          </div>
-        </header>
-
-        <div className="grid flex-1 items-center gap-16 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:py-8">
-          <section className="hidden max-w-2xl lg:block">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 text-xs font-medium text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              Segurança da conta
-            </div>
-
-            <h1 className="max-w-[11ch] text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-foreground xl:text-7xl">
-              Mais uma camada de proteção.
-            </h1>
-
-            <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground xl:text-lg">
-              A verificação em duas etapas protege o acesso ao ambiente administrativo mesmo que uma
-              senha seja comprometida.
-            </p>
-
-            <div className="mt-10 grid max-w-lg gap-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card/60">
-                  <Smartphone className="h-4 w-4 text-primary" />
-                </div>
-                Código temporário gerado pelo seu autenticador
+      {/* Conteúdo */}
+      <div className="flex flex-1 items-center justify-center py-10">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+            {/* Cabeçalho */}
+            <div className="mb-7">
+              <div className="mb-5 grid size-11 place-items-center rounded-xl bg-[#722F37]/10 text-[#722F37]">
+                <ShieldCheck className="size-5" />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card/60">
-                  <KeyRound className="h-4 w-4 text-primary" />
-                </div>
-                Acesso confirmado antes de abrir o painel
-              </div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Verificação de segurança
+              </p>
+
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                {cadastrando ? "Ativar verificação em duas etapas" : "Verificação em duas etapas"}
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                {cadastrando
+                  ? "Escaneie o código com seu aplicativo autenticador e confirme usando os seis dígitos."
+                  : "Digite os seis dígitos do seu aplicativo autenticador para concluir a entrada."}
+              </p>
             </div>
-          </section>
 
-          <section className="mx-auto w-full max-w-[460px]">
-            <div className="relative overflow-hidden rounded-[22px] border border-border bg-card/95 shadow-[0_32px_100px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
-
-              <div className="p-6 sm:p-8 lg:p-9">
-                <div className="mb-8">
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-secondary/70">
-                    <ShieldCheck className="h-5 w-5 text-primary" />
-                  </div>
-
-                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
-                    {cadastrando
-                      ? "Ativar verificação em duas etapas"
-                      : "Verificação em duas etapas"}
-                  </h2>
-
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {cadastrando
-                      ? "Escaneie o QR Code no seu aplicativo autenticador e confirme o cadastro com os seis dígitos."
-                      : "Digite os seis dígitos do seu aplicativo autenticador para concluir a entrada."}
-                  </p>
+            <div className="space-y-6">
+              {preparando ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-sm text-slate-600">Preparando verificação...</p>
                 </div>
+              ) : null}
 
-                {preparando && (
-                  <div className="rounded-xl border border-border bg-secondary/60 px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+              {falha ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm leading-6 text-red-800">{falha}</p>
+                </div>
+              ) : null}
 
-                      <p className="text-sm text-muted-foreground">Preparando verificação...</p>
-                    </div>
-                  </div>
-                )}
-
-                {falha && (
-                  <div
-                    role="alert"
-                    className="rounded-xl border border-destructive/25 bg-destructive/[0.07] px-4 py-3 text-sm leading-6 text-destructive"
-                  >
-                    {falha}
-                  </div>
-                )}
-
-                {!preparando && !falha && (
-                  <>
-                    {cadastrando && qr && (
-                      <div className="mb-6 space-y-5">
-                        <div className="rounded-2xl border border-border bg-secondary/50 p-4">
-                          <div className="grid place-items-center rounded-xl bg-white p-5">
-                            <img
-                              src={fonteDoQr(qr)}
-                              alt="QR code para cadastrar o segundo fator"
-                              className="size-44"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="segredo" className="text-sm font-medium text-foreground">
-                            Não consegue escanear?
-                          </Label>
-
-                          <p className="text-xs leading-5 text-muted-foreground">
-                            Use a chave abaixo diretamente no seu aplicativo autenticador.
-                          </p>
-
-                          <p
-                            id="segredo"
-                            className="rounded-xl border border-border bg-secondary/60 p-3 font-mono text-sm break-all text-foreground select-all"
-                          >
-                            {segredo}
-                          </p>
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 w-full rounded-xl"
-                            onClick={copiarChave}
-                          >
-                            {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-
-                            {copiado ? "Chave copiada" : "Copiar chave"}
-                          </Button>
-                        </div>
+              {!preparando && !falha ? (
+                <>
+                  {cadastrando && qr ? (
+                    <div className="space-y-5">
+                      {/* QR */}
+                      <div className="grid place-items-center rounded-xl border border-slate-200 bg-white p-5">
+                        <img
+                          src={fonteDoQrTotp(qr)}
+                          alt="QR code para cadastrar o segundo fator"
+                          className="size-44"
+                        />
                       </div>
-                    )}
 
-                    <form onSubmit={confirmar} className="space-y-5">
+                      {/* Chave manual */}
                       <div className="space-y-2">
-                        <Label htmlFor="codigo" className="text-sm font-medium text-foreground">
-                          Código de seis dígitos
+                        <Label htmlFor="segredo" className="text-sm font-medium text-slate-900">
+                          Não consegue escanear? Use esta chave
                         </Label>
 
-                        <div className="relative">
-                          <KeyRound className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <p
+                          id="segredo"
+                          className="select-all break-all rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-sm text-slate-700"
+                        >
+                          {segredo}
+                        </p>
 
-                          <Input
-                            id="codigo"
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            pattern="[0-9]{6}"
-                            maxLength={6}
-                            placeholder="000000"
-                            value={codigo}
-                            onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
-                            required
-                            autoFocus
-                            className="h-12 rounded-xl border-input bg-secondary/70 pl-10 tracking-[0.3em] text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20"
-                          />
-                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+                          onClick={copiarChave}
+                        >
+                          {copiado ? <Check className="size-4" /> : <Copy className="size-4" />}
+
+                          {copiado ? "Chave copiada" : "Copiar chave"}
+                        </Button>
                       </div>
 
-                      <Button
-                        type="submit"
-                        disabled={enviando || codigo.length !== 6 || !idDoFator}
-                        className="group h-12 w-full rounded-xl bg-primary font-semibold text-primary-foreground"
-                      >
-                        {enviando ? (
-                          "Verificando..."
-                        ) : (
-                          <>
-                            {cadastrando ? "Ativar e entrar" : "Confirmar"}
+                      <p className="text-xs leading-5 text-slate-500">
+                        Conclua o cadastro nesta mesma tela. Recarregar a página gera uma nova chave
+                        e invalida a anterior.
+                      </p>
+                    </div>
+                  ) : null}
 
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                          </>
-                        )}
-                      </Button>
-                    </form>
-                  </>
-                )}
+                  {/* Código */}
+                  <form onSubmit={confirmar} className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="codigo" className="text-sm font-medium text-slate-900">
+                        Código de seis dígitos
+                      </Label>
 
-                <div className="mt-7 border-t border-border pt-6">
-                  <p className="text-center text-xs leading-5 text-muted-foreground">
-                    Conectado como <span className="font-medium text-foreground">{email}</span>
-                  </p>
+                      <Input
+                        id="codigo"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        placeholder="000000"
+                        value={codigo}
+                        onChange={(evento) => setCodigo(evento.target.value.replace(/\D/g, ""))}
+                        required
+                        autoFocus
+                        className="h-12 rounded-lg border-slate-300 bg-white px-4 text-center text-lg tracking-[0.35em] shadow-sm"
+                      />
+                    </div>
 
-                  <form action={sair} className="mt-4">
-                    <Button type="submit" variant="outline" className="h-11 w-full rounded-xl">
-                      <LogOut className="h-4 w-4" />
-                      Sair
+                    <Button
+                      type="submit"
+                      disabled={enviando || codigo.length !== 6 || !idDoFator}
+                      className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823B43] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {enviando ? "Verificando..." : cadastrando ? "Ativar e entrar" : "Confirmar"}
                     </Button>
                   </form>
-                </div>
+                </>
+              ) : null}
+
+              {/* Conta */}
+              <div className="border-t border-slate-200 pt-5">
+                <p className="text-center text-xs text-slate-500">
+                  Conectado como <span className="font-medium text-slate-700">{email}</span>
+                </p>
               </div>
+
+              {/* Sair */}
+              <form action={sair}>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="h-11 w-full rounded-lg border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+                >
+                  Sair
+                </Button>
+              </form>
             </div>
-          </section>
+          </div>
         </div>
       </div>
+
+      {/* Rodapé */}
+      <p className="text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} BS Soluções Logística
+      </p>
     </main>
   );
 }

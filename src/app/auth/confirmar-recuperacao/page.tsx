@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+
 import { cookies } from "next/headers";
 
-import { MolduraAuth } from "@/components/moldura-auth";
+import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import {
   MENSAGEM_CONFIRMAR_RECUPERACAO,
@@ -16,52 +17,87 @@ import { confirmarRecuperacao } from "./actions";
 
 export const metadata: Metadata = {
   title: TITULO_CONFIRMAR_RECUPERACAO,
-  // O layout raiz já declara noindex para todo o app; repetido aqui porque
-  // esta tela nasce de um link enviado por e-mail e não pode acabar indexada
-  // por um caminho que ninguém previu.
-  robots: { index: false, follow: false },
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 /**
  * Confirmação deliberada antes de consumir o token de recuperação.
  *
- * Esta tela existe para que exista um POST. O token de uso único era gasto no
- * GET do link, e scanners de gateway de e-mail — que visitam cada URL da
- * mensagem automaticamente — queimavam a recuperação antes do usuário clicar.
- * Um clique aqui é o que separa a varredura automática da intenção real.
+ * Esta tela existe para que o consumo do token aconteça por POST.
  *
- * Server Component puro, sem `"use client"`: o `<form action={...}>` do Next
- * posta direto para a Server Action e funciona sem JavaScript no navegador.
- * Isso importa além da robustez — é o que mantém o token fora do bundle.
+ * Scanners de gateway de e-mail podem visitar automaticamente URLs
+ * presentes nas mensagens. Se o token fosse consumido diretamente no GET,
+ * ele poderia ser invalidado antes mesmo de o usuário clicar no link.
  *
- * A página NÃO recebe nem exibe o `token_hash`. Ele fica no cookie `httpOnly`
- * gravado pelo GET e só é lido no servidor, dentro da action. Aqui apenas se
- * verifica que o cookie existe, para não oferecer um botão que falharia.
+ * O clique em "Continuar" representa a intenção real do usuário.
+ *
+ * Server Component puro, sem "use client":
+ * o form envia diretamente para a Server Action.
+ *
+ * O token_hash nunca é enviado ao navegador nem exibido nesta página.
+ * Ele permanece no cookie httpOnly criado anteriormente e é lido apenas
+ * no servidor durante a confirmação.
  */
 export default async function ConfirmarRecuperacaoPage() {
   const armazemDeCookies = await cookies();
+
   const pendente = armazemDeCookies.get(NOME_DO_COOKIE_PENDENTE)?.value;
 
-  // Sem cookie: link aberto direto, cookie expirado (5 min) ou descartado pelo
-  // navegador. Mensagem única, igual à de token inválido — esta tela não conta
-  // qual dos casos aconteceu.
-  if (typeof pendente !== "string" || pendente.trim() === "") {
-    return (
-      <MolduraAuth titulo={TITULO_CONFIRMAR_RECUPERACAO} descricao={MENSAGEM_LINK_INVALIDO}>
-        <Button asChild className="w-full">
-          <a href={ROTA_ESQUECI_SENHA}>Solicitar novo link</a>
-        </Button>
-      </MolduraAuth>
-    );
-  }
+  const temRecuperacaoPendente = typeof pendente === "string" && pendente.trim() !== "";
 
   return (
-    <MolduraAuth titulo={TITULO_CONFIRMAR_RECUPERACAO} descricao={MENSAGEM_CONFIRMAR_RECUPERACAO}>
-      <form action={confirmarRecuperacao}>
-        <Button type="submit" className="w-full">
-          {ROTULO_CONFIRMAR_RECUPERACAO}
-        </Button>
-      </form>
-    </MolduraAuth>
+    <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
+      {/* Marca */}
+      <div className="mx-auto w-full max-w-6xl">
+        <BSBrand variant="light" size="sm" align="start" priority />
+      </div>
+
+      {/* Conteúdo */}
+      <div className="flex flex-1 items-center justify-center py-10">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+            <div className="mb-7">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Recuperação de acesso
+              </p>
+
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                {TITULO_CONFIRMAR_RECUPERACAO}
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                {temRecuperacaoPendente ? MENSAGEM_CONFIRMAR_RECUPERACAO : MENSAGEM_LINK_INVALIDO}
+              </p>
+            </div>
+
+            {temRecuperacaoPendente ? (
+              <form action={confirmarRecuperacao}>
+                <Button
+                  type="submit"
+                  className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823B43] hover:text-white"
+                >
+                  {ROTULO_CONFIRMAR_RECUPERACAO}
+                </Button>
+              </form>
+            ) : (
+              <Button
+                asChild
+                className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823B43] hover:text-white"
+              >
+                <a href={ROTA_ESQUECI_SENHA}>Solicitar novo link</a>
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Rodapé */}
+      <p className="text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} BS Soluções Logística
+      </p>
+    </main>
   );
 }

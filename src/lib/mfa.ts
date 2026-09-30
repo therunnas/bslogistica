@@ -206,3 +206,26 @@ export function decidirFluxoMfa(
   if (etapa === "mfa-pendente") return "sem-fator-esperado";
   return "cadastro";
 }
+
+/**
+ * Fonte de um `<img>` para o QR do cadastro de TOTP.
+ *
+ * O campo `totp.qr_code` do Supabase já vem como data URL completo — a
+ * referência oficial usa `src={data.totp.qr_code}` direto, sem montar nada.
+ * O comentário do tipo em `@supabase/auth-js` diz o contrário, que é preciso
+ * prefixar `data:image/svg+xml;utf-8,`; seguir esse comentário foi o que
+ * quebrou o QR na primeira tentativa (`/mfa`), porque o prefixo entrava duas
+ * vezes e o conteúdo virava texto em vez de SVG.
+ *
+ * Como as duas fontes se contradizem, a decisão aqui é pelo valor recebido:
+ * se já é data URL, usa como está; se for SVG cru, monta o data URL. Funciona
+ * nos dois formatos e não depende de qual está certo hoje.
+ *
+ * Extraída para cá (PR F) porque `/mfa` (cadastro/desafio obrigatório) e
+ * `/configuracoes` (ativação opcional do operacional) precisam do mesmo QR, e
+ * duas cópias da mesma decisão divergiriam no dia em que uma delas mudasse.
+ */
+export function fonteDoQrTotp(valor: string): string {
+  if (valor.startsWith("data:")) return valor;
+  return `data:image/svg+xml;utf-8,${encodeURIComponent(valor)}`;
+}

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { ShieldCheck, Smartphone } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +9,23 @@ import { toast } from "@/lib/notificacoes";
 
 import { confirmarSegundoFator } from "./actions";
 
+/**
+ * Campo do código TOTP.
+ *
+ * O componente não fala diretamente com o Supabase.
+ * Ele apenas coleta o código e chama a Server Action.
+ *
+ * challengeAndVerify, leitura dos fatores e reemissão da prova
+ * continuam acontecendo exclusivamente no servidor.
+ *
+ * O código permanece apenas no estado do componente e não é
+ * enviado para logs, URL ou armazenamento local.
+ */
 export function FormularioMfaRecuperacao() {
   const [codigo, setCodigo] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  async function confirmar(evento: FormEvent) {
+  async function confirmar(evento: React.FormEvent) {
     evento.preventDefault();
 
     if (enviando) {
@@ -36,24 +47,10 @@ export function FormularioMfaRecuperacao() {
 
   return (
     <form onSubmit={confirmar} className="space-y-5">
-      <div className="rounded-xl border border-border bg-secondary/35 px-4 py-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-            <Smartphone className="h-4 w-4" />
-          </div>
-
-          <div>
-            <p className="text-sm font-medium text-foreground">Verificação em duas etapas</p>
-
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Informe o código exibido no aplicativo autenticador vinculado à sua conta.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="space-y-2">
-        <Label htmlFor="codigo">Código do aplicativo</Label>
+        <Label htmlFor="codigo" className="text-sm font-medium text-slate-900">
+          Código do aplicativo
+        </Label>
 
         <Input
           id="codigo"
@@ -62,17 +59,19 @@ export function FormularioMfaRecuperacao() {
           autoComplete="one-time-code"
           placeholder="000000"
           value={codigo}
-          onChange={(event) => setCodigo(event.target.value)}
+          onChange={(evento) => setCodigo(evento.target.value)}
           required
-          autoFocus
-          className="h-12 rounded-xl border-input bg-secondary/50 text-center font-mono text-lg tracking-[0.3em] text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20"
+          maxLength={6}
+          className="h-12 rounded-lg border-slate-300 bg-white px-4 text-center text-lg tracking-[0.35em] shadow-sm"
         />
       </div>
 
-      <Button type="submit" className="h-11 w-full rounded-xl" disabled={enviando}>
-        <ShieldCheck className="h-4 w-4" />
-
-        {enviando ? "Confirmando..." : "Confirmar código"}
+      <Button
+        type="submit"
+        disabled={enviando}
+        className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823B43] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {enviando ? "Confirmando..." : "Confirmar"}
       </Button>
     </form>
   );

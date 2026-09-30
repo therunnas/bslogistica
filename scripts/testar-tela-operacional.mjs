@@ -214,9 +214,9 @@ verificar(
   2,
 );
 verificar(
-  "B15. o admin mantém os sete links",
+  "B15. o admin mantém os oito links",
   (fontes.shell.match(/\{ href: "\/[a-z]+", label/g) ?? []).length,
-  8,
+  10,
 );
 verificar(
   "B16. e o operacional tem exatamente um",

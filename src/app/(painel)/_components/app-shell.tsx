@@ -14,8 +14,10 @@ import {
   LogOut,
   Menu,
   Moon,
+  Settings,
   ShieldCheck,
   Sun,
+  UserCog,
   Users,
   Wrench,
   X,
@@ -23,6 +25,14 @@ import {
 
 import { useTema } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 import { sair } from "../_acoes";
@@ -38,7 +48,31 @@ const NAVEGACAO = {
     { href: "/faturamento", label: "Faturamento", icon: FileText },
     { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
   ],
-  operacional: [{ href: "/operacional", label: "Apontamentos", icon: CalendarCheck }],
+  operacional: [
+    {
+      href: "/operacional",
+      label: "Apontamentos",
+      icon: CalendarCheck,
+    },
+  ],
+  "sem-papel": [],
+} as const;
+
+const ITEM_USUARIOS = {
+  href: "/usuarios",
+  label: "Usuários",
+  icon: UserCog,
+} as const;
+
+const ITEM_SEGURANCA = {
+  href: "/configuracoes",
+  label: "Segurança",
+  icon: ShieldCheck,
+} as const;
+
+const MENU_DE_CONTA = {
+  admin: [ITEM_USUARIOS, ITEM_SEGURANCA],
+  operacional: [ITEM_SEGURANCA],
   "sem-papel": [],
 } as const;
 
@@ -52,6 +86,7 @@ export function AppShell({
   papel: PapelEfetivo;
 }) {
   const navegacao = NAVEGACAO[papel];
+  const itensDeConta = MENU_DE_CONTA[papel];
 
   const caminho = usePathname();
   const queryClient = useQueryClient();
@@ -62,7 +97,7 @@ export function AppShell({
   const [saindo, iniciarSaida] = useTransition();
 
   const paginaAtual =
-    [...navegacao].find(({ href }) => href === caminho)?.label ?? "Painel interno";
+    [...navegacao, ...itensDeConta].find(({ href }) => href === caminho)?.label ?? "Painel interno";
 
   const papelVisivel =
     papel === "admin" ? "Administrador" : papel === "operacional" ? "Operacional" : "Sem perfil";
@@ -132,25 +167,23 @@ export function AppShell({
   function SidebarContent({ mobile = false }: { mobile?: boolean }) {
     return (
       <>
-        <div className="flex h-20 shrink-0 items-center border-b border-sidebar-border px-5">
+        <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded-xl border border-border bg-white px-2 shadow-sm">
-              <Image
-                src="/branding/bs-logo-temp.png"
-                alt=""
-                width={1000}
-                height={625}
-                priority
-                className="h-auto w-full object-contain"
-              />
-            </div>
+            <Image
+              src="/branding/bs-simbolo-retangular.png"
+              alt="BS Soluções Logística"
+              width={1774}
+              height={887}
+              priority
+              className="h-auto w-16 shrink-0 object-contain"
+            />
 
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
-                BS Soluções Logísticas
+                BS Soluções Logística
               </p>
 
-              <p className="mt-0.5 text-[11px] text-muted-foreground">Sistema interno</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Sistema interno</p>
             </div>
           </div>
 
@@ -159,7 +192,7 @@ export function AppShell({
               type="button"
               variant="ghost"
               size="icon"
-              className="relative z-20 ml-auto shrink-0 rounded-xl"
+              className="ml-auto shrink-0 rounded-lg"
               onClick={fecharMenuMobile}
               aria-label="Fechar menu"
             >
@@ -169,8 +202,8 @@ export function AppShell({
         </div>
 
         {navegacao.length > 0 ? (
-          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
-            <p className="mb-3 px-3 text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Navegação
             </p>
 
@@ -182,22 +215,19 @@ export function AppShell({
                   <Link
                     key={href}
                     href={href}
+                    aria-current={ativo ? "page" : undefined}
                     onClick={() => {
                       if (mobile) {
                         fecharMenuMobile();
                       }
                     }}
                     className={cn(
-                      "group relative flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm font-medium transition-all duration-150",
+                      "group flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
                       ativo
-                        ? "border-primary/20 bg-primary/[0.08] text-sidebar-foreground"
-                        : "border-transparent text-muted-foreground hover:border-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        ? "bg-primary/[0.10] text-sidebar-foreground"
+                        : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     )}
                   >
-                    {ativo ? (
-                      <span className="absolute top-1/2 left-0 h-5 w-[2px] -translate-y-1/2 rounded-full bg-primary" />
-                    ) : null}
-
                     <Icon
                       className={cn(
                         "h-4 w-4 shrink-0",
@@ -217,11 +247,11 @@ export function AppShell({
 
         <div className="shrink-0 border-t border-sidebar-border p-3">
           <div className="mb-3">
-            <p className="mb-2 px-1 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Aparência
             </p>
 
-            <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-secondary/50 p-1">
+            <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-secondary/40 p-1">
               <button
                 type="button"
                 disabled={!pronto}
@@ -254,36 +284,68 @@ export function AppShell({
             </div>
           </div>
 
-          <div className="mb-2 rounded-xl border border-border bg-secondary/40 p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11 w-full justify-start gap-3 rounded-lg px-3 text-muted-foreground hover:text-foreground"
+              >
+                <Settings className="h-4 w-4 shrink-0" />
 
-              <span className="text-[11px] font-medium text-muted-foreground">{papelVisivel}</span>
-            </div>
+                <span className="min-w-0 flex-1 truncate text-left text-xs" title={email}>
+                  {email}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
 
-            <p className="truncate text-xs text-muted-foreground" title={email}>
-              {email}
-            </p>
-          </div>
+            <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <p className="truncate text-sm font-medium text-foreground" title={email}>
+                  {email}
+                </p>
 
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-11 w-full justify-start gap-3 rounded-xl text-muted-foreground"
-            onClick={encerrarSessao}
-            disabled={saindo}
-          >
-            <LogOut className="h-4 w-4" />
+                <p className="mt-0.5 text-xs text-muted-foreground">{papelVisivel}</p>
+              </DropdownMenuLabel>
 
-            {saindo ? "Saindo..." : "Sair"}
-          </Button>
+              <DropdownMenuSeparator />
+
+              {itensDeConta.map(({ href, label, icon: Icon }) => (
+                <DropdownMenuItem key={href} asChild>
+                  <Link
+                    href={href}
+                    onClick={() => {
+                      if (mobile) {
+                        fecharMenuMobile();
+                      }
+                    }}
+                    className="flex cursor-pointer items-center gap-2"
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+
+              {itensDeConta.length > 0 ? <DropdownMenuSeparator /> : null}
+
+              <DropdownMenuItem
+                onClick={encerrarSessao}
+                disabled={saindo}
+                className="cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+                {saindo ? "Saindo..." : "Sair"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)]">
+    <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
       {menuMobileAberto ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
@@ -297,7 +359,7 @@ export function AppShell({
             role="dialog"
             aria-modal="true"
             aria-label="Menu de navegação"
-            className="absolute inset-y-0 left-0 z-10 flex w-[min(88vw,20rem)] flex-col border-r border-sidebar-border bg-sidebar shadow-[24px_0_80px_rgba(0,0,0,0.28)]"
+            className="absolute inset-y-0 left-0 z-10 flex w-[min(88vw,16rem)] flex-col border-r border-sidebar-border bg-sidebar shadow-[24px_0_80px_rgba(0,0,0,0.28)]"
             onClick={(evento) => evento.stopPropagation()}
           >
             <SidebarContent mobile />
@@ -305,7 +367,7 @@ export function AppShell({
         </div>
       ) : null}
 
-      <aside className="sticky top-0 hidden h-screen min-h-0 w-[17.5rem] flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+      <aside className="sticky top-0 hidden h-screen min-h-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <SidebarContent />
       </aside>
 
@@ -315,7 +377,7 @@ export function AppShell({
             type="button"
             variant="outline"
             size="icon"
-            className="mr-3 shrink-0 rounded-xl lg:hidden"
+            className="mr-3 shrink-0 rounded-lg lg:hidden"
             onClick={abrirMenuMobile}
             aria-label="Abrir menu"
             aria-expanded={menuMobileAberto}
@@ -329,7 +391,7 @@ export function AppShell({
             </p>
 
             <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">
-              BS Soluções Logísticas
+              BS Soluções Logística
             </p>
           </div>
         </header>

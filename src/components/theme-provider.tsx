@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -14,6 +15,19 @@ export type Tema = "light" | "dark";
 
 const CHAVE_TEMA = "bs-theme";
 
+const ROTAS_COM_TEMA = [
+  "/dashboard",
+  "/apontamentos",
+  "/operacoes",
+  "/clientes",
+  "/colaboradores",
+  "/faturamento",
+  "/relatorios",
+  "/operacional",
+  "/usuarios",
+  "/configuracoes",
+] as const;
+
 type ContextoTema = {
   tema: Tema;
   pronto: boolean;
@@ -23,6 +37,10 @@ type ContextoTema = {
 
 const TemaContext = createContext<ContextoTema | null>(null);
 
+function rotaUsaTemaDoPainel(caminho: string) {
+  return ROTAS_COM_TEMA.some((rota) => caminho === rota || caminho.startsWith(`${rota}/`));
+}
+
 function aplicarTema(tema: Tema) {
   const raiz = document.documentElement;
 
@@ -31,18 +49,43 @@ function aplicarTema(tema: Tema) {
   raiz.style.colorScheme = tema;
 }
 
+function lerTemaPreferido(): Tema {
+  const salvo = localStorage.getItem(CHAVE_TEMA);
+
+  if (salvo === "light" || salvo === "dark") {
+    return salvo;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [tema, setTema] = useState<Tema>("dark");
+  const caminho = usePathname();
+  const usaTemaDoPainel = rotaUsaTemaDoPainel(caminho);
+
+  const [tema, setTema] = useState<Tema>("light");
   const [pronto, setPronto] = useState(false);
 
   useEffect(() => {
-    const temaAtual: Tema = document.documentElement.classList.contains("dark") ? "dark" : "light";
+    if (!usaTemaDoPainel) {
+      aplicarTema("light");
+      setTema("light");
+      setPronto(true);
+      return;
+    }
 
-    setTema(temaAtual);
+    const temaPreferido = lerTemaPreferido();
+
+    aplicarTema(temaPreferido);
+    setTema(temaPreferido);
     setPronto(true);
+  }, [usaTemaDoPainel]);
 
+  useEffect(() => {
     function sincronizarEntreAbas(evento: StorageEvent) {
-      if (evento.key !== CHAVE_TEMA) return;
+      if (!usaTemaDoPainel || evento.key !== CHAVE_TEMA) {
+        return;
+      }
 
       if (evento.newValue !== "light" && evento.newValue !== "dark") {
         return;
@@ -57,13 +100,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener("storage", sincronizarEntreAbas);
     };
-  }, []);
+  }, [usaTemaDoPainel]);
 
-  const definirTema = useCallback((novoTema: Tema) => {
-    aplicarTema(novoTema);
-    localStorage.setItem(CHAVE_TEMA, novoTema);
-    setTema(novoTema);
-  }, []);
+  const definirTema = useCallback(
+    (novoTema: Tema) => {
+      localStorage.setItem(CHAVE_TEMA, novoTema);
+      setTema(novoTema);
+
+      if (usaTemaDoPainel) {
+        aplicarTema(novoTema);
+      }
+    },
+    [usaTemaDoPainel],
+  );
 
   const alternarTema = useCallback(() => {
     definirTema(tema === "dark" ? "light" : "dark");

@@ -6,11 +6,11 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 | Item               | Valor                                                               |
 | ------------------ | ------------------------------------------------------------------- |
-| Data do checkpoint | 2026-09-19                                                          |
-| Último marco       | **PR #28** — checkpoint documental do B1                            |
-| Merge do marco     | `a4b8ed73867b1d0c7492bc1a418b633f80ef05d6` — merge commit do PR #28 |
+| Data do checkpoint | 2026-09-28                                                          |
+| Último marco       | **PR #44** — PR D concluído, migration `017` aplicada em Production |
+| Merge do marco     | `481cf22e50ff21b07bf47ccf1324b7e997cc20c5` — merge commit do PR #44 |
 | B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
-| Migrations         | **21 locais = 21 em Production**, zero pendentes                    |
+| Migrations         | **23 locais = 23 em Production**, zero pendentes                    |
 | Usuários reais     | **um**: o administrador, com TOTP verificado                        |
 | B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
 | `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
@@ -18,10 +18,16 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
 | `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS               |
 | PR C               | **CONCLUÍDO** — PR #37, mergeado. Ver 7.6                           |
-| Etapa atual        | **PR D** — backend administrativo de usuários, não iniciado         |
+| `016`              | **EM PRODUCTION** — PR #40, auditoria pós-deploy PASS. Ver 7.7      |
+| PR D               | **CONCLUÍDO** — PR #44, mergeado. Ver 7.8                           |
+| `017`              | **EM PRODUCTION** — PR #44, auditoria pós-deploy PASS. Ver 7.8      |
+| Suítes SQL         | **13/13 PASS, 0 FAIL** (`001`–`013`)                                |
+| Testes Node        | **874/874 PASS** (8 suítes)                                         |
+| Etapa atual        | **PR E** — tela `/usuarios`, consumindo o backend do PR D           |
 
-O SHA acima é o **merge commit do PR #28**, o marco documental — não é "o SHA
-atual da `main`", e não deve ser lido como tal.
+O SHA acima é o **merge commit do PR #44**, o marco documental mais recente —
+não é necessariamente "o SHA atual da `main`" no momento em que este arquivo for
+lido, e não deve ser tratado como tal sem conferir.
 
 > **Branch e HEAD atuais são estado do Git** e devem ser consultados com
 > `git status` e `git rev-parse`; não são persistidos neste checkpoint para
@@ -48,7 +54,7 @@ em 18/09/2026 com **12/12 checks pós-deploy PASS**. Ele também **não libera A
 em tabela nenhuma** — entrega uma superfície de RPC estreita, hoje **consumida
 pela interface** (B2.1 e B2.3).
 
-**As migrations aplicadas são imutáveis — a `013` inclusive.** Qualquer mudança
+**As migrations aplicadas são imutáveis — a `017` inclusive.** Qualquer mudança
 de banco daqui para frente exige migration nova.
 
 O **B2.1** — a camada de dados operacional — está **concluído**, pelo PR #30. A
@@ -56,17 +62,23 @@ O **B2.1** — a camada de dados operacional — está **concluído**, pelo PR #
 7.4), está **CONCLUÍDA EM PRODUCTION** pelo PR #31, com auditoria pós-deploy
 PASS. O **B2.2** (PR #32), o **B2.3** (PR #33), a **migration `015`** (PR #34,
 em Production) e o **PR C** — o guard role-aware (PR #37, seção 7.6) — também
-estão **concluídos**.
+estão **concluídos**. A **migration `016`** — que fecha o acesso direto do
+operador em AAL2 pelo PostgREST (seção 7.7) — foi mergeada e aplicada em
+Production pelo **PR #40** em 28/09/2026, com auditoria pós-deploy PASS. O
+**PR D** — backend administrativo de usuários (seção 7.8) — foi mergeado pelo
+**PR #44**, e a **migration `017`** (`admin_audit_log` e a proteção do último
+admin serializada por `pg_advisory_xact_lock`) está **aplicada em Production**,
+com auditoria pós-deploy PASS.
 
-**A etapa atual é o PR D** — backend administrativo de usuários, exclusivamente
-server-side. Seguem **aprovados e não iniciados**: **PR D**, **PR E**, **PR F** e
-**PR G**. Leia a seção 6 antes de tocar em guard, policy ou usuário.
+**A etapa atual é o PR E** — tela `/usuarios`, consumindo o backend do PR D.
+Seguem **aprovados e não iniciados**: **PR F** e **PR G**. Leia a seção 6 antes
+de tocar em guard, policy ou usuário.
 
 ## 2. Ambiente
 
 |                 |                                                       |
 | --------------- | ----------------------------------------------------- |
-| Projeto local   | `C:\Users\VINICIUS\Documents\BS Logistics`            |
+| Projeto local   | `C:\Users\VINICIUS\Documents\GitHub\BS Logistics Novo` |
 | GitHub          | `therunnas/bslogistica`                               |
 | Produção        | `https://admin.bslogisticas.com.br`                   |
 | Supabase atual  | `ehkduqokntemtmqzdrbd`                                |
@@ -263,7 +275,7 @@ O que **ficou provado** no diagnóstico, e vale guardar:
 reproduzido. Só investigar se voltar a acontecer — e, se voltar, o caminho é
 reinstrumentar como no PR #19, não adivinhar.
 
-## 6. Nova política de autorização — APROVADA, NÃO IMPLEMENTADA
+## 6. Nova política de autorização — IMPLEMENTADA (guard no PR C, banco na `016`, em Production)
 
 > **Leia esta seção inteira antes de tocar em guard, policy, RLS ou usuário.**
 
@@ -288,7 +300,7 @@ reinstrumentar como no PR #19, não adivinhar.
 
 **A divisão por papel descrita na seção 6.1 está implementada no guard e na
 superfície de RPC — e NÃO por afrouxamento de policy.** O que segue é o que vale
-hoje, depois do B2.1, do B2.2, do B2.3, da `015` e do **PR C**.
+hoje, depois do B2.1, do B2.2, do B2.3, da `015`, do **PR C** e da `016`.
 
 As proteções do admin **permanecem intactas** — MFA obrigatório, AAL2 no painel,
 um TOTP no recovery e nenhum admin operando em AAL1.
@@ -304,8 +316,19 @@ um TOTP no recovery e nenhum admin operando em AAL1.
   interface** (B2.1, seção 7.3, e a tela do B2.3);
 - a **migration `015`** (seção 7.5) estendeu essa mesma superfície estreita ao
   operador em **AAL2**, sem ampliar dado nenhum;
-- o que **falta** é a tela **Configurações → Segurança** (**PR F**), por onde o
-  `operacional` ativaria MFA por vontade própria, e a matriz E2E do **PR G**.
+- a **migration `016`** (seção 7.7) fecha o acesso **direto** em AAL2, que a
+  permissiva por `is_staff()` deixava aberto para qualquer papel: acesso direto
+  de `authenticated` passa a exigir **`aal2` E `admin`**. **Aplicada em
+  Production pelo PR #40 em 28/09/2026**, com auditoria pós-deploy PASS (seção
+  7.7);
+- o **PR D** (seção 7.8) entrega o backend administrativo — convite, papel,
+  revogação/reativação, atribuição de operações e auditoria — e a **migration
+  `017`** acrescenta `admin_audit_log` e serializa a proteção do último admin
+  com `pg_advisory_xact_lock`. **Mergeado pelo PR #44 e aplicado em
+  Production**, com auditoria pós-deploy PASS;
+- o que **falta** é a tela **`/usuarios`** (**PR E**, etapa atual), a tela
+  **Configurações → Segurança** (**PR F**), por onde o `operacional` ativaria
+  MFA por vontade própria, e a matriz E2E do **PR G**.
 
 ### 6.3 Proibições enquanto a refatoração não acontecer
 
@@ -336,8 +359,10 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **B2.3**  | tela operacional de apontamentos, sem nada financeiro. Ver 7.3                                                                        | **CONCLUÍDO** — PR #33     |
 | **015**   | **operador em AAL2 na superfície operacional** — a 013 só aceitava aal1. Ver 7.5                                                      | **EM PRODUCTION** — PR #34 |
 | **PR C**  | **guard role-aware**: admin sempre AAL2, `operacional` com fator verificado barrado em AAL1, `admin`+`operacional` tratado como admin | **CONCLUÍDO** — PR #37     |
-| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | **PRÓXIMA ETAPA**          |
-| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | aprovado, não iniciado     |
+| **016**   | **acesso direto às tabelas passa a exigir AAL2 E admin** — fecha o operador em AAL2 pelo PostgREST. Ver 7.7                           | **EM PRODUCTION** — PR #40 |
+| **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | **CONCLUÍDO** — PR #44     |
+| **017**   | **`admin_audit_log`** e proteção do último admin serializada por `pg_advisory_xact_lock`. Ver 7.8                                     | **EM PRODUCTION** — PR #44 |
+| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | **ETAPA ATUAL**            |
 | **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
 | **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado     |
 
@@ -1112,6 +1137,205 @@ porta segue sendo a RPC, e quem a governa é o banco.
    ativar MFA por vontade própria** — isso é o **PR F** (Configurações →
    Segurança), como já estava previsto.
 
+### 7.7 Migration `016` — o acesso direto passa a exigir AAL2 **e** admin
+
+**Achado na revisão do Codex no PR #39, e reproduzido no harness antes de
+corrigir.** As policies permissivas originais liberam as tabelas de negócio para
+`authenticated` por `public.is_staff()`, que é
+
+```sql
+SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid())
+```
+
+isto é, **qualquer papel atribuído** — não "é admin". Enquanto o único papel
+real era `admin`, as duas coisas coincidiam. Deixaram de coincidir quando a
+`013` criou a superfície operacional e a `015` passou a aceitar o operador em
+`aal2`: uma conta `operacional` que conclui o TOTP chega em `aal2`, a
+RESTRICTIVE `*_exige_aal2` passa, a permissiva passa, e ela alcança as dez
+tabelas **direto pelo PostgREST** — contornando a superfície estreita inteira.
+
+**O que foi medido antes da correção**, com uma conta só de papel `operacional`:
+
+| Medida                  | `operacional` aal1 | `operacional` aal2                                                                       | `admin` aal2 |
+| ----------------------- | ------------------ | ---------------------------------------------------------------------------------------- | ------------ |
+| SELECT nas 10 tabelas   | 0 linha            | **1 linha em cada**                                                                      | 1 linha      |
+| PII de cliente e pessoa | —                  | **atravessa**                                                                            | atravessa    |
+| coluna financeira       | —                  | **atravessa**                                                                            | atravessa    |
+| UPDATE direto           | —                  | **passa** em `operations`, `shifts`, `timesheets`, `timesheet_entries`, `operation_team` | passa        |
+| DELETE `operation_team` | —                  | **passa**                                                                                | passa        |
+
+Atravessavam `clients.doc`, `contact_name`, `email`, `phone`; `daily_rate`,
+`shift_hours`, `ot_factor` e `ot_tolerance_min` do contrato; `employees.doc`,
+`phone` e `daily_cost`; `operations.agreed_amount`, `contract_id` e `client_id`;
+`billed_amount`, `cost_amount`, `worked_minutes`, `overtime_minutes`, os
+snapshots e `invoice_id`; e os totais de `invoices` e `invoice_items`.
+
+**A correção.** Uma policy RESTRICTIVE nova por tabela — `<tabela>_exige_admin`
+— exigindo `public.has_role(auth.uid(), 'admin')`. RESTRICTIVE entra em `AND`
+com o que já existe, então o resultado é
+
+> acesso direto de `authenticated` = **AAL2 E admin**
+
+sem tocar em permissiva, grant, trigger, RPC ou `is_staff()`. É aditivo: nada
+existente muda de significado.
+
+**Por que não redefinir `is_staff()`:** seria mais curto e muito pior. A função
+é chamada por policies de várias migrations aplicadas; mudar o significado dela
+por baixo alteraria o comportamento de tudo o que a chama, de uma vez, sem que
+nenhuma dessas policies dissesse o que passou a valer.
+
+**Ficam de fora, de propósito:** `profiles` (cada conta lê e edita a própria
+linha, inclusive a operacional), `user_roles` (lida em AAL1, antes do MFA — o
+deadlock já registrado) e `user_operation_access` (já é admin + AAL2 desde a
+`013`).
+
+**As cinco RPCs não são afetadas.** Elas pertencem a `bslog_rpc_operacional`,
+que tem `BYPASSRLS`: policy nenhuma as alcança. O operador continua apontando em
+`aal1` e em `aal2` pela mesma superfície estreita — que passa a ser, de fato, a
+**única** porta dele.
+
+**Teste `supabase/tests/012_restringir_postgrest_operacional.sql`, 95 casos.**
+Contra o schema sem a `016` ele dá **45 FAIL**, exatamente nos blocos que medem
+o operador em AAL2. Ele prova, no mesmo arquivo: zero leitura direta em aal1 e
+aal2, zero PII, zero coluna financeira, zero escrita, as cinco RPCs ainda
+funcionando nos dois níveis, o admin com o acesso administrativo intacto, o
+admin em AAL1 ainda barrado, `admin`+`operacional` tratado como admin e não
+elegível às RPCs, conta sem papel sem nada, `user_operation_access` ainda
+admin-only, e que nenhum grant da superfície foi ampliado.
+
+**Quatro suítes antigas mediam o contrato que a `016` revoga** —
+`002_autorizacao` (bloco OPERACIONAL), `005_enforcement_aal2` (caso D),
+`006_valores_financeiros` (a fixture escrevia os apontamentos como
+`operacional`) e `007_fontes_financeiras` (bloco J, 43 casos). A decisão de
+como reescrevê-las foi tomada e aplicada no commit `8d1b8c1`, dentro do próprio
+PR #40, preservando a intenção original de cada caso: onde a suíte media "o
+trigger recusa o operador", passou a medir (i) que a RLS já o impede de
+alcançar a linha e (ii) que a mesma edição, tentada por um **admin**, continua
+recusada com `42501` pelo trigger financeiro. Nenhuma asserção foi invertida
+sem essa reformulação — a garantia financeira original continua medida, e a
+garantia nova entra ao lado dela. Com a reescrita: `002` PASS, `005` PASS,
+`006` = 33/33, `007` = 150/150.
+
+**As doze suítes SQL (`001`–`012`) somam 12/12 PASS, 0 FAIL** contra o schema
+com a `016` aplicada — validado num harness local (stack Supabase completo via
+Docker, `supabase db reset` até a `016`) antes do merge, e reconferido por
+leitura direta em Production depois do deploy.
+
+**Aplicada em Production em 28/09/2026 — PR #40**, merge commit
+`4ffa59184b399e0b3f86d435eb3f43a8a971079a`. Auditoria pós-deploy, por leitura
+direta do catálogo em Production: 22 migrations locais = 22 remotas, a `016`
+como a mais recente; as 10 policies `<tabela>_exige_admin` existindo, todas
+`RESTRICTIVE`/`ALL`, uma por tabela (`clients`, `contracts`, `employees`,
+`invoice_items`, `invoices`, `operation_team`, `operations`, `shifts`,
+`timesheet_entries`, `timesheets`); as 11 `*_exige_aal2` intactas; `profiles`,
+`user_roles` e `user_operation_access` sem nenhuma policy nova; e as cinco RPCs
+operacionais presentes em `public`.
+
+### 7.8 PR D — backend administrativo de usuários e a migration `017`
+
+**Estado: CONCLUÍDO E EM PRODUCTION** (PR #44, merge
+`481cf22e50ff21b07bf47ccf1324b7e997cc20c5`). Migration
+`20260928120000_017_administracao_usuarios.sql` e teste
+`supabase/tests/013_administracao_usuarios.sql` (28 casos).
+
+**O que o PR D entrega**, em `src/lib/admin-usuarios/` (mais
+`src/integrations/supabase/admin.ts` e `src/app/(painel)/usuarios/_acoes.ts`),
+exclusivamente server-side:
+
+- listar usuários — identidade da Admin API (`auth.admin.listUsers`) combinada
+  com papéis de `user_roles`;
+- convidar por e-mail (`auth.admin.inviteUserByEmail`) seguido de atribuição
+  **explícita** do papel — o convite em si só cria conta e `profiles`, via
+  `provision_bslog_user`, que desde `remove_automatic_admin_bootstrap` nunca
+  atribui papel sozinha;
+- conceder/revogar **um** papel, com a ação (`"conceder"`/`"revogar"`)
+  **validada em runtime** (`exigirAcaoDePapel`, em `dominio.ts`) — o tipo
+  TypeScript nunca foi validação de fronteira real;
+- **revogar acesso por completo**: remove todos os papéis, remove **todas** as
+  atribuições em `user_operation_access` e bane a conta pela Admin API, nessa
+  ordem — só o primeiro passo pode ser recusado pelo trigger do último admin, e
+  se for recusado nada mais é tentado;
+- **reativar**: concede o papel **antes** de desbanir — banido-mas-com-papel é
+  o estado seguro, o inverso não é. Reativação **não** restaura as operações
+  removidas na revogação;
+- atribuir/remover/consultar operações em `user_operation_access` — pela
+  **sessão RLS real do admin**, não por `service_role`: a tabela já concede
+  `FOR ALL` a admin+AAL2 desde a `013`, então usar `service_role` ali ampliaria
+  superfície privilegiada sem necessidade.
+
+**Toda ação passa por `exigirAdminAal2()` antes de tocar qualquer tabela** —
+reusa `lerAcesso()`, que já implica AAL2 para o papel `admin`; não recalcula a
+decisão. `service_role` só é instanciado depois dessa checagem, só em
+`admin.ts`, nunca em código client.
+
+**Resultados `"parcial"`, e por que existem.** `revogarAcesso` e
+`reativarUsuario` encadeiam mais de uma escrita real (não é uma transação só —
+são chamadas separadas ao PostgREST e à Admin API). Se o passo que o trigger
+pode recusar já teve sucesso e um passo **posterior** falhar por outro motivo,
+o resultado é `"parcial"`, nunca `"erro"`: o estado já mudou de verdade, e
+dizer "erro" faria o admin repetir a ação achando que nada aconteceu.
+
+**Auditoria é best-effort, não garantia transacional.** Toda alteração tenta
+registrar um evento em `admin_audit_log`; se a gravação falhar depois que o
+estado já mudou, a alteração **não é revertida** — a falha só é registrada no
+servidor (`auditarSemFalhar()`, em `cliente.ts`). Não afirmar cobertura
+absoluta de auditoria.
+
+**A migration `017` entrega duas coisas no banco:**
+
+1. **`public.admin_audit_log`** — leitura só admin+AAL2 (mesmo padrão de
+   `user_operation_access`, fora da família `*_exige_aal2`/`*_exige_admin` de
+   propósito, para não mudar as contagens que `008`/`009`/`012` já asseveram
+   como regressão). **Sem GRANT de INSERT/UPDATE/DELETE para `authenticated`**
+   — só `service_role` grava, então nem um admin em AAL2 consegue adulterar a
+   própria trilha.
+2. **`trg_proteger_ultimo_admin`** em `user_roles` — recusa com `42501`
+   qualquer `DELETE`/`UPDATE` que deixaria zero linhas `role = 'admin'`. **Não
+   isenta `postgres` nem `service_role`**, ao contrário das guardas financeiras
+   da `010`/`011`: aqui não existe caminho legítimo para a operação.
+
+**A decisão do último admin é serializada por `pg_advisory_xact_lock`**, dentro
+do próprio trigger, antes do `COUNT` — mesmo estilo do lock de bootstrap-admin
+já existente em `provision_bslog_user` (migration `004`). Sem isso, duas
+transações concorrentes removendo admins **diferentes** cada uma veria "ainda
+sobra um" antes de a outra commitar, e as duas passariam — zero admins ao
+final. **Provado nos dois sentidos**, com duas sessões `psql` reais contra um
+harness local (`\timing on` + `clock_timestamp()`), antes do merge:
+
+- **sem o lock** (controle negativo): a segunda transação concorrente **não
+  bloqueia** (retorna em 2,4ms) e commita — estado final medido: **zero
+  admins**, a corrida reproduzida de propósito antes de fechá-la;
+- **com o lock**: a segunda transação **bloqueia ~3006ms** (medido pelo
+  próprio `\timing`, não estimado) até a primeira commitar, e ao desbloquear
+  reconta e recusa com `42501` — estado final medido: só um admin restante.
+
+Nenhuma das 11 policies `*_exige_aal2` nem das 10 `*_exige_admin` (016) foi
+tocada. As 5 RPCs operacionais não foram tocadas. `user_operation_access`
+continua com a mesma estrutura que a `013` deixou.
+
+**Testes:** `013` cobre **28 casos** — RLS e grants de `admin_audit_log`
+(leitura admin+AAL2, ausência de grant de escrita para `authenticated`,
+`service_role` conseguindo gravar por bypassar RLS), o trigger do último admin
+(concede/revoga com folga, recusa no último, `postgres` e `service_role`
+também recusados, UPDATE que mantém `admin` não é bloqueio, INSERT nunca
+aciona o trigger) e a forma literal do `pg_advisory_xact_lock` na função. Node:
+`scripts/testar-admin-usuarios.mjs`, **78 asserções** — forma literal, domínio
+puro, e orquestração de `servico.ts`/`operacoes.ts` com cliente injetado em
+memória, incluindo revogação com múltiplas operações atribuídas, reativação
+não restaurando operações antigas, validação runtime de `acao` com payload
+malicioso, e os quatro cenários de `"parcial"`.
+
+**Auditoria pós-deploy em Production** (leitura direta do catálogo, depois do
+`db push`): 23 migrations locais = 23 remotas, a `017` como a mais recente;
+`admin_audit_log` existente com RLS habilitada e as duas policies esperadas;
+`proteger_ultimo_admin()` e `trg_proteger_ultimo_admin` existentes; a função
+contendo `pg_advisory_xact_lock`; as 11 `*_exige_aal2` e as 10 `*_exige_admin`
+intactas; as cinco RPCs operacionais presentes.
+
+**O que o PR D NÃO faz:** não cria interface — a tela `/usuarios` é o **PR E**;
+não mexe em MFA opcional do operacional — isso é o **PR F**; não cria o
+primeiro usuário `operacional` real — isso só depois do **PR G**.
+
 ### ETAPA 1 — histórico: entregue pelos PRs A e B1
 
 **Auditoria e desenho da autorização** por **papel + AAL + RLS + guards**.
@@ -1200,19 +1424,20 @@ MFA para quem optou por ele fica só no guard. No banco, essa linha já está
 coberta: `operador_elegivel_aal1()` exige `mfa_bloqueia_excecao_aal1() = false`,
 e o caso correspondente do teste `009` a exercita.
 
-### ETAPA 3 → **PR D**
+### ETAPA 3 → **PR D** — CONCLUÍDA
 
 **Backend administrativo de usuários:** listar · convidar por e-mail · atribuir
 papel · alterar papel · remover acesso · **impedir remoção ou rebaixamento do
-último admin** · auditoria.
+último admin** · auditoria. **Entregue e em Production** — detalhe completo na
+seção 7.8.
 
 Mais **atribuir e remover operações do `operacional`** e **consultar as
-atribuições** — é a escrita em `user_operation_access`, que hoje só existe por
-SQL. Operações privilegiadas **exclusivamente server-side**; nunca expor
-`service_role` no navegador; nunca autorizar por parâmetro vindo do browser;
-convite por e-mail, sem self-signup. **Isto faz parte do MVP** (seção 7.0).
+atribuições** — a escrita em `user_operation_access`, pela sessão RLS do admin.
+Operações privilegiadas **exclusivamente server-side**; `service_role` nunca no
+navegador; nenhuma autorização por parâmetro vindo do browser; convite por
+e-mail, sem self-signup. **Isto fazia parte do MVP** (seção 7.0) — cumprido.
 
-### ETAPA 4 → **PR E**
+### ETAPA 4 → **PR E** — ETAPA ATUAL
 
 Tela **`/usuarios`**, somente para admin: visualizar, convidar, definir
 admin/operacional, alterar papel, remover acesso e atribuir operações ao
@@ -1583,10 +1808,11 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 ## 11. Não fazer
 
 - Não reconstruir o Supabase de novo.
-- Não reaplicar migrations já aplicadas — Production tem as **19**, a `013`
+- Não reaplicar migrations já aplicadas — Production tem as **23**, a `017`
   inclusive.
-- **Não editar migration aplicada, em nenhuma hipótese.** `010`, `011`, `012` e
-  `013` são **imutáveis**; mudança de banco exige migration nova.
+- **Não editar migration aplicada, em nenhuma hipótese.** `010`, `011`, `012`,
+  `013`, `014`, `015`, `016` e `017` são **imutáveis**; mudança de banco exige
+  migration nova.
 - **Não afrouxar as proteções de `010`/`011`** (seção 9): não devolver
   autoridade de cálculo ao payload, não reabrir `UPDATE`/`DELETE` de linha
   faturada, não devolver `TRUNCATE` a `anon`, `authenticated` ou `service_role`.
@@ -1597,9 +1823,9 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 - Não modificar DNS sem confirmação.
 - Não adicionar enforcement AAL2 em `user_roles`.
 - **Não remover a policy AAL2 global sem substituição segura** (seção 6.3).
-- **Não criar usuário `operacional` real** antes do **PR D**, do **PR E**, do
-  **PR F** e da matriz E2E do **PR G** (seções 6.3, 7 e 7.3). B2.1, B2.2, B2.3 e
-  PR C já estão fechados; a proibição continua valendo pelos que faltam.
+- **Não criar usuário `operacional` real** antes do **PR E**, do **PR F** e da
+  matriz E2E do **PR G** (seções 6.3, 7 e 7.3). B2.1, B2.2, B2.3, PR C e PR D já
+  estão fechados; a proibição continua valendo pelos que faltam.
 - **Não afrouxar a superfície do PR B1** (seção 7.2): não acrescentar coluna
   financeira, `client_id`, documento ou telefone ao retorno das RPCs; não
   aceitar campo novo no JSON da escrita sem decisão de produto; não criar RPC de
@@ -1630,7 +1856,8 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
 3. confira `git status` e HEAD;
 4. não reaudite todo o projeto sem necessidade;
 5. continue da seção **7 — Próximas etapas oficiais**: **PR A**, **PR B1**,
-   **B2.1**, **`014`**, **B2.2**, **B2.3** e a **`015`** estão fechados e em
-   Production, e o **PR C** — guard role-aware, seção 7.6 — está mergeado; o
-   próximo passo é o **PR D**, seguido de **PR E → PR F → PR G**;
+   **B2.1**, **`014`**, **B2.2**, **B2.3**, a **`015`**, o **PR C** — guard
+   role-aware, seção 7.6 —, a **`016`** — seção 7.7 — e o **PR D**/`017` —
+   backend administrativo, seção 7.8 — estão fechados e em Production; o
+   próximo passo é o **PR E**, seguido de **PR F → PR G**;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.

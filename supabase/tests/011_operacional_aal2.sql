@@ -586,12 +586,21 @@ $bloco_i$;
 
 
 -- ---------------------------------------------------------------------------
--- J. AAL1 e AAL2 continuam sem alcançar tabela direto
+-- J. AAL1 continua sem alcançar tabela direto
 --
 -- O nível maior não abriu porta nova: o operador em aal2 é `authenticated` como
--- qualquer outro, e as policies RESTRICTIVE seguem valendo. A diferença é que
--- em aal2 ele passa a ver as tabelas que o PAPEL dele sempre permitiu — o que
--- já era verdade antes da 015 e não é o que a superfície entrega.
+-- qualquer outro, e as policies RESTRICTIVE seguem valendo.
+--
+-- ATUALIZADO PELA MIGRATION 016. Quando este bloco foi escrito, o comentário
+-- registrava aqui que em aal2 o operador passava a ver as tabelas que o PAPEL
+-- dele sempre permitiu — pela permissiva por `public.is_staff()`, que é
+-- verdadeira para qualquer papel atribuído. Aquilo era verdade, era anterior à
+-- 013 e à 015, e **deixou de ser**: a `016` acrescentou uma RESTRICTIVE por
+-- tabela exigindo `admin`, então acesso direto passou a ser `aal2` E `admin`.
+--
+-- Os casos deste bloco medem o aal1 e seguem valendo palavra por palavra — eles
+-- nunca dependeram daquele comportamento. Quem mede o contrato novo, nos dois
+-- níveis e com PII e dinheiro, é `012_restringir_postgrest_operacional.sql`.
 -- ---------------------------------------------------------------------------
 
 do $bloco_j$
