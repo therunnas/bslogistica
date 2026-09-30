@@ -100,8 +100,14 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-background lg:grid lg:grid-cols-2">
       <section className="relative z-10 flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
-        <div className="mb-12 lg:hidden">
-          <LogoLogin mobile />
+        <div className="mb-8 lg:hidden">
+          <div className="inline-flex flex-col items-start">
+            <LogoLogin mobile />
+
+            <p className="mt-2 text-sm font-medium tracking-[0.04em] text-slate-600">
+              Soluções Logística
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-1 items-center justify-center">
