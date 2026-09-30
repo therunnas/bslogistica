@@ -1,9 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,21 @@ function AvisoSenhaRedefinida() {
     >
       {sessoesAtivas ? MENSAGEM_SENHA_ALTERADA_SESSOES_ATIVAS : MENSAGEM_SENHA_REDEFINIDA}
     </p>
+  );
+}
+
+function LogoLogin({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <Image
+      src="/branding/bs-simbolo-retangular.png"
+      alt="BS Soluções Logística"
+      width={1774}
+      height={887}
+      priority
+      className={
+        mobile ? "h-auto w-40 object-contain" : "h-auto w-[320px] object-contain xl:w-[380px]"
+      }
+    />
   );
 }
 
@@ -84,11 +99,9 @@ export default function Login() {
 
   return (
     <main className="min-h-screen bg-background lg:grid lg:grid-cols-2">
-      {/* ÁREA DE LOGIN */}
       <section className="relative z-10 flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
-        {/* Marca somente em telas menores */}
         <div className="mb-12 lg:hidden">
-          <BSBrand variant="light" size="sm" align="start" priority />
+          <LogoLogin mobile />
         </div>
 
         <div className="flex flex-1 items-center justify-center">
@@ -121,7 +134,7 @@ export default function Login() {
                   onChange={(evento) => setEmail(evento.target.value)}
                   required
                   placeholder="seuemail@empresa.com.br"
-                  className="h-12 rounded-lg border-slate-300 bg-white px-4 shadow-sm"
+                  className="h-12 rounded-lg border-slate-300 bg-white px-4 text-slate-950 shadow-sm placeholder:text-slate-400"
                 />
               </div>
 
@@ -147,7 +160,7 @@ export default function Login() {
                   onChange={(evento) => setSenha(evento.target.value)}
                   required
                   placeholder="Digite sua senha"
-                  className="h-12 rounded-lg border-slate-300 bg-white px-4 shadow-sm"
+                  className="h-12 rounded-lg border-slate-300 bg-white px-4 text-slate-950 shadow-sm placeholder:text-slate-400"
                 />
               </div>
 
@@ -173,22 +186,18 @@ export default function Login() {
         </p>
       </section>
 
-      {/* ÁREA INSTITUCIONAL */}
       <section className="relative hidden min-h-screen overflow-hidden bg-[#0d0d0d] lg:flex lg:flex-col">
-        {/* Elementos gráficos discretos */}
         <div className="pointer-events-none absolute -right-36 -top-36 h-[430px] w-[430px] rounded-full border border-white/[0.04]" />
+
         <div className="pointer-events-none absolute -right-14 -top-14 h-[300px] w-[300px] rounded-full border border-white/[0.04]" />
 
-        {/* Brilho vermelho discreto */}
         <div className="pointer-events-none absolute bottom-24 left-20 h-40 w-40 rounded-full bg-red-700/[0.06] blur-3xl" />
 
         <div className="relative z-10 flex min-h-screen flex-col px-16 pb-8 pt-14 xl:px-20 xl:pb-8 xl:pt-16">
-          {/* Marca */}
           <div className="mx-auto">
-            <BSBrand variant="dark" size="lg" align="center" priority />
+            <LogoLogin />
           </div>
 
-          {/* Conteúdo principal */}
           <div className="flex flex-1 items-start pt-14 xl:pt-16">
             <div className="max-w-xl">
               <h2 className="font-display text-[40px] font-semibold leading-[1.1] tracking-[-0.025em] text-white xl:text-[36px]">
@@ -203,7 +212,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Rodapé */}
           <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-6">
             <p className="text-xs text-white/40">Sistema interno de gestão</p>
 

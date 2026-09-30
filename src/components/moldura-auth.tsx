@@ -25,8 +25,8 @@ export function MolduraAuth({
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/40 px-4 py-12">
       <Image
-        src="/branding/bs-logo-oficial.png"
-        alt="BS Soluções Logísticas"
+        src="/branding/bs-simbolo-retangular.png"
+        alt="BS Soluções Logística"
         width={1000}
         height={625}
         priority

@@ -1,32 +1,23 @@
 import { Lock } from "lucide-react";
 
-/**
- * Tela de quem está autenticado e autorizado no sistema, mas não na ÁREA
- * ADMINISTRATIVA.
- *
- * Não confundir com `AcessoNaoLiberado`, que é para conta sem papel nenhum e
- * diz que o acesso ainda não foi liberado. Aqui a conta tem papel e tem uso
- * legítimo do sistema — só não este. Reaproveitar aquela mensagem diria ao
- * operacional que ele não tem acesso a nada, o que é falso.
- *
- * Renderiza dentro do `AppShell`, e não em tela cheia como as outras duas: a
- * sessão continua válida, a marca e o botão Sair seguem onde estavam, e quem
- * chegou aqui só errou de endereço.
- *
- * A mensagem não cita tabela, papel do banco, RLS nem qualquer detalhe de
- * implementação. Quem lê isto quer saber que não é aqui, não como o sistema
- * decidiu.
- */
 export function AcessoAdministrativoRestrito() {
   return (
-    <div className="mx-auto max-w-md rounded-lg border border-border bg-card p-8 text-center">
-      <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted">
-        <Lock className="size-6 text-muted-foreground" />
+    <section className="mx-auto mt-16 w-full max-w-md">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-8 text-center text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.08)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/[0.07]">
+          <Lock className="h-5 w-5 text-primary" />
+        </div>
+
+        <h1 className="mt-6 text-xl font-semibold tracking-[-0.025em] text-foreground">
+          Área administrativa restrita
+        </h1>
+
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Seu perfil não possui permissão para acessar esta área.
+        </p>
       </div>
-      <h1 className="mt-5 font-display text-xl font-semibold">Área administrativa restrita</h1>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Seu perfil não possui permissão para acessar esta área.
-      </p>
-    </div>
+    </section>
   );
 }

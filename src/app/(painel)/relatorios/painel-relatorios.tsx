@@ -1,14 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download } from "lucide-react";
+import {
+  BadgeDollarSign,
+  CalendarDays,
+  Clock3,
+  Download,
+  FileSpreadsheet,
+  ReceiptText,
+  TrendingUp,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
 import { PageHeader } from "../_components/app-shell";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -17,19 +28,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
-import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { attendanceLabel, marginPct } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
+import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format";
+import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
+
+const INPUT_CLASS =
+  "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
 
 export function PainelRelatorios() {
   const initial = monthRange();
+
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
+
   const { rows } = useLedger();
 
   const period = useMemo(
-    () => rows.filter((r) => inPeriod(r.date, start, end)),
+    () => rows.filter((row) => inPeriod(row.date, start, end)),
     [rows, start, end],
   );
 
@@ -45,22 +63,30 @@ export function PainelRelatorios() {
         billed: number;
       }
     >();
-    period.forEach((r) => {
-      const item = map.get(r.employeeId) ?? {
-        name: r.employeeName,
+
+    period.forEach((row) => {
+      const item = map.get(row.employeeId) ?? {
+        name: row.employeeName,
         dailies: 0,
         absences: 0,
         otMinutes: 0,
         cost: 0,
         billed: 0,
       };
-      item.dailies += r.dailies;
-      if (r.status === "absent") item.absences += 1;
-      item.otMinutes += r.overtimeMinutes;
-      item.cost += r.cost;
-      item.billed += r.billed;
-      map.set(r.employeeId, item);
+
+      item.dailies += row.dailies;
+
+      if (row.status === "absent") {
+        item.absences += 1;
+      }
+
+      item.otMinutes += row.overtimeMinutes;
+      item.cost += row.cost;
+      item.billed += row.billed;
+
+      map.set(row.employeeId, item);
     });
+
     return [...map.values()].sort((a, b) => b.dailies - a.dailies);
   }, [period]);
 
@@ -76,22 +102,41 @@ export function PainelRelatorios() {
         cost: number;
       }
     >();
-    period.forEach((r) => {
-      const item = map.get(r.operationId) ?? {
-        name: r.operationName,
-        client: r.clientName,
+
+    period.forEach((row) => {
+      const item = map.get(row.operationId) ?? {
+        name: row.operationName,
+        client: row.clientName,
         dailies: 0,
         otMinutes: 0,
         billed: 0,
         cost: 0,
       };
-      item.dailies += r.dailies;
-      item.otMinutes += r.overtimeMinutes;
-      item.billed += r.billed;
-      item.cost += r.cost;
-      map.set(r.operationId, item);
+
+      item.dailies += row.dailies;
+      item.otMinutes += row.overtimeMinutes;
+      item.billed += row.billed;
+      item.cost += row.cost;
+
+      map.set(row.operationId, item);
     });
+
     return [...map.values()].sort((a, b) => b.billed - a.billed);
+  }, [period]);
+
+  const totals = useMemo(() => {
+    const billed = sumBy(period, (row) => row.billed);
+
+    const cost = sumBy(period, (row) => row.cost);
+
+    return {
+      dailies: sumBy(period, (row) => row.dailies),
+      absences: period.filter((row) => row.status === "absent").length,
+      overtime: sumBy(period, (row) => row.overtimeMinutes),
+      billed,
+      cost,
+      margin: billed - cost,
+    };
   }, [period]);
 
   function exportCsv() {
@@ -107,24 +152,34 @@ export function PainelRelatorios() {
       "Receita",
       "Custo",
     ];
-    const lines = period.map((r) => [
-      r.date,
-      r.clientName,
-      r.operationName,
-      r.shiftName,
-      r.employeeName,
-      attendanceLabel[r.status],
-      r.workedMinutes,
-      r.overtimeMinutes,
-      r.billed.toFixed(2),
-      r.cost.toFixed(2),
+
+    const lines = period.map((row) => [
+      row.date,
+      row.clientName,
+      row.operationName,
+      row.shiftName,
+      row.employeeName,
+      attendanceLabel[row.status],
+      row.workedMinutes,
+      row.overtimeMinutes,
+      row.billed.toFixed(2),
+      row.cost.toFixed(2),
     ]);
+
     const csv = montarCsv(header, lines);
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], {
+        type: "text/csv;charset=utf-8",
+      }),
+    );
+
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `relatorio-${start}-${end}.csv`;
     link.click();
+
     URL.revokeObjectURL(url);
   }
 
@@ -132,172 +187,561 @@ export function PainelRelatorios() {
     <div>
       <PageHeader
         title="Relatórios"
-        description="Consolidação de diárias, faltas, horas extras, receita, custo e margem do período."
+        description="Analise diárias, faltas, horas extras, receita, custo e margem do período selecionado."
         action={
-          <div className="flex items-end gap-2">
-            <div className="space-y-1">
-              <Label className="text-xs">De</Label>
-              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Até</Label>
-              <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
-            </div>
-            <Button variant="outline" onClick={exportCsv} disabled={!period.length}>
-              <Download className="size-4" /> CSV
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-xl"
+            onClick={exportCsv}
+            disabled={!period.length}
+          >
+            <Download className="h-4 w-4" />
+            Exportar CSV
+          </Button>
         }
       />
 
+      <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+        <CardContent className="grid gap-4 p-5 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>De</Label>
+
+            <Input
+              type="date"
+              value={start}
+              onChange={(event) => setStart(event.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Até</Label>
+
+            <Input
+              type="date"
+              value={end}
+              onChange={(event) => setEnd(event.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Resumo
+          label="Diárias"
+          value={num(totals.dailies, 0)}
+          description={`${totals.absences} falta${totals.absences === 1 ? "" : "s"}`}
+          icon={CalendarDays}
+        />
+
+        <Resumo
+          label="Horas extras"
+          value={minutesToLabel(totals.overtime)}
+          description="Excedente acumulado"
+          icon={Clock3}
+        />
+
+        <Resumo
+          label="Receita"
+          value={brl(totals.billed)}
+          description="Receita gerada"
+          icon={BadgeDollarSign}
+        />
+
+        <Resumo
+          label="Margem"
+          value={brl(totals.margin)}
+          description={`${pct(marginPct(totals.billed, totals.cost))} · custo ${brl(totals.cost)}`}
+          icon={TrendingUp}
+        />
+      </div>
+
       <Tabs defaultValue="employees">
-        <TabsList>
-          <TabsTrigger value="employees">Por colaborador</TabsTrigger>
-          <TabsTrigger value="operations">Por operação</TabsTrigger>
-          <TabsTrigger value="entries">Lançamentos</TabsTrigger>
+        <TabsList className="mb-5 h-auto flex-wrap rounded-xl border border-border bg-secondary/50 p-1">
+          <TabsTrigger
+            value="employees"
+            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Por colaborador
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="operations"
+            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Por operação
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="entries"
+            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Lançamentos
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="employees" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Diárias e custo por colaborador — total {brl(sumBy(byEmployee, (e) => e.cost))}
-              </CardTitle>
+        <TabsContent value="employees" className="mt-0">
+          <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+            <CardHeader className="border-b border-border px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                  <Users className="h-4 w-4" />
+                </div>
+
+                <div>
+                  <CardTitle className="text-sm font-semibold tracking-tight">
+                    Desempenho por colaborador
+                  </CardTitle>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Diárias, faltas, horas extras e custo individual.
+                  </p>
+                </div>
+              </div>
             </CardHeader>
+
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead className="text-right">Diárias</TableHead>
-                    <TableHead className="text-right">Faltas</TableHead>
-                    <TableHead className="text-right">Horas extras</TableHead>
-                    <TableHead className="text-right">Receita gerada</TableHead>
-                    <TableHead className="text-right">Custo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {byEmployee.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-muted-foreground">
-                        Sem lançamentos no período.
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                      <TableHead className="h-12 min-w-52 text-xs font-semibold text-muted-foreground">
+                        Colaborador
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Diárias
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Faltas
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Horas extras
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Receita gerada
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Custo
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    byEmployee.map((e) => (
-                      <TableRow key={e.name}>
-                        <TableCell className="font-medium">{e.name}</TableCell>
-                        <TableCell className="text-right">{num(e.dailies, 0)}</TableCell>
-                        <TableCell className="text-right">{num(e.absences, 0)}</TableCell>
-                        <TableCell className="text-right">{minutesToLabel(e.otMinutes)}</TableCell>
-                        <TableCell className="text-right">{brl(e.billed)}</TableCell>
-                        <TableCell className="text-right">{brl(e.cost)}</TableCell>
+                  </TableHeader>
+
+                  <TableBody>
+                    {byEmployee.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6}>
+                          <EstadoVazio />
+                        </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      byEmployee.map((employee) => (
+                        <TableRow
+                          key={employee.name}
+                          className="border-border transition-colors hover:bg-secondary/20"
+                        >
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-3">
+                              <AvatarNome nome={employee.name} />
+
+                              <span className="text-sm font-medium text-foreground">
+                                {employee.name}
+                              </span>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {num(employee.dailies, 0)}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            {employee.absences > 0 ? (
+                              <Badge
+                                variant="secondary"
+                                className="border border-destructive/15 bg-destructive/10 font-medium text-destructive shadow-none"
+                              >
+                                {num(employee.absences, 0)}
+                              </Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {minutesToLabel(employee.otMinutes)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm font-medium text-foreground">
+                            {brl(employee.billed)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {brl(employee.cost)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="operations" className="mt-4">
-          <Card>
+        <TabsContent value="operations" className="mt-0">
+          <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+            <CardHeader className="border-b border-border px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                  <ReceiptText className="h-4 w-4" />
+                </div>
+
+                <div>
+                  <CardTitle className="text-sm font-semibold tracking-tight">
+                    Resultado por operação
+                  </CardTitle>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Receita, custo e margem de cada operação no período.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Operação</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead className="text-right">Diárias</TableHead>
-                    <TableHead className="text-right">Horas extras</TableHead>
-                    <TableHead className="text-right">Receita</TableHead>
-                    <TableHead className="text-right">Custo</TableHead>
-                    <TableHead className="text-right">Margem</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {byOperation.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-muted-foreground">
-                        Sem lançamentos no período.
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                      <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
+                        Operação
+                      </TableHead>
+
+                      <TableHead className="min-w-40 text-xs font-semibold text-muted-foreground">
+                        Cliente
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Diárias
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Horas extras
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Receita
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Custo
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Margem
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    byOperation.map((o) => (
-                      <TableRow key={o.name}>
-                        <TableCell className="font-medium">{o.name}</TableCell>
-                        <TableCell>{o.client}</TableCell>
-                        <TableCell className="text-right">{num(o.dailies, 0)}</TableCell>
-                        <TableCell className="text-right">{minutesToLabel(o.otMinutes)}</TableCell>
-                        <TableCell className="text-right">{brl(o.billed)}</TableCell>
-                        <TableCell className="text-right">{brl(o.cost)}</TableCell>
-                        <TableCell className="text-right">
-                          {brl(o.billed - o.cost)}{" "}
-                          <span className="text-xs text-muted-foreground">
-                            {pct(marginPct(o.billed, o.cost))}
-                          </span>
+                  </TableHeader>
+
+                  <TableBody>
+                    {byOperation.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7}>
+                          <EstadoVazio />
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      byOperation.map((operation) => (
+                        <TableRow
+                          key={operation.name}
+                          className="border-border transition-colors hover:bg-secondary/20"
+                        >
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                                <ReceiptText className="h-4 w-4" />
+                              </div>
+
+                              <span className="text-sm font-medium text-foreground">
+                                {operation.name}
+                              </span>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-sm text-muted-foreground">
+                            {operation.client}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {num(operation.dailies, 0)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {minutesToLabel(operation.otMinutes)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm font-medium text-foreground">
+                            {brl(operation.billed)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {brl(operation.cost)}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <p className="text-sm font-medium text-foreground">
+                              {brl(operation.billed - operation.cost)}
+                            </p>
+
+                            <p className="mt-0.5 text-[11px] text-primary">
+                              {pct(marginPct(operation.billed, operation.cost))}
+                            </p>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="entries" className="mt-4">
-          <Card>
+        <TabsContent value="entries" className="mt-0">
+          <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+            <CardHeader className="border-b border-border px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </div>
+
+                <div>
+                  <CardTitle className="text-sm font-semibold tracking-tight">
+                    Lançamentos detalhados
+                  </CardTitle>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Histórico individual de apontamentos e faturamento.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Operação</TableHead>
-                    <TableHead>Turno</TableHead>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead>Presença</TableHead>
-                    <TableHead className="text-right">Hora extra</TableHead>
-                    <TableHead className="text-right">Receita</TableHead>
-                    <TableHead>Faturado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {period.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-muted-foreground">
-                        Sem lançamentos no período.
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                      <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
+                        Data
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Cliente
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Operação
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Turno
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Colaborador
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Presença
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Hora extra
+                      </TableHead>
+
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Receita
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Faturado
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    period.map((r) => (
-                      <TableRow key={r.entryId}>
-                        <TableCell>{dateBR(r.date)}</TableCell>
-                        <TableCell>{r.clientName}</TableCell>
-                        <TableCell>{r.operationName}</TableCell>
-                        <TableCell>{r.shiftName}</TableCell>
-                        <TableCell>{r.employeeName}</TableCell>
-                        <TableCell>{attendanceLabel[r.status]}</TableCell>
-                        <TableCell className="text-right">
-                          {minutesToLabel(r.overtimeMinutes)}
-                        </TableCell>
-                        <TableCell className="text-right">{brl(r.billed)}</TableCell>
-                        <TableCell>
-                          <Badge variant={r.invoiceId ? "default" : "secondary"}>
-                            {r.invoiceId ? "Sim" : "Não"}
-                          </Badge>
+                  </TableHeader>
+
+                  <TableBody>
+                    {period.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9}>
+                          <EstadoVazio />
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      period.map((row) => (
+                        <TableRow
+                          key={row.entryId}
+                          className="border-border transition-colors hover:bg-secondary/20"
+                        >
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                            {dateBR(row.date)}
+                          </TableCell>
+
+                          <TableCell className="text-sm text-muted-foreground">
+                            {row.clientName}
+                          </TableCell>
+
+                          <TableCell className="text-sm font-medium text-foreground">
+                            {row.operationName}
+                          </TableCell>
+
+                          <TableCell className="text-sm text-muted-foreground">
+                            {row.shiftName}
+                          </TableCell>
+
+                          <TableCell className="text-sm text-muted-foreground">
+                            {row.employeeName}
+                          </TableCell>
+
+                          <TableCell>
+                            <PresencaBadge status={row.status} />
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {minutesToLabel(row.overtimeMinutes)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm font-medium text-foreground">
+                            {brl(row.billed)}
+                          </TableCell>
+
+                          <TableCell>
+                            <FaturadoBadge faturado={!!row.invoiceId} />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function Resumo({
+  label,
+  value,
+  description,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  description: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <Card className="border-border bg-card text-card-foreground shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+
+            <p className="mt-2 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground">
+              {value}
+            </p>
+
+            <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
+          </div>
+
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AvatarNome({ nome }: { nome: string }) {
+  const iniciais = nome
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("");
+
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-xs font-semibold text-primary">
+      {iniciais || "—"}
+    </div>
+  );
+}
+
+function PresencaBadge({ status }: { status: keyof typeof attendanceLabel }) {
+  const ausente = status === "absent";
+  const substituicao = status === "replacement";
+
+  return (
+    <Badge
+      variant="secondary"
+      className={
+        ausente
+          ? "border border-destructive/15 bg-destructive/10 font-medium text-destructive shadow-none"
+          : substituicao
+            ? "border border-primary/15 bg-primary/10 font-medium text-primary shadow-none"
+            : "border border-emerald-500/15 bg-emerald-500/10 font-medium text-emerald-600 shadow-none dark:text-emerald-400"
+      }
+    >
+      {attendanceLabel[status]}
+    </Badge>
+  );
+}
+
+function FaturadoBadge({ faturado }: { faturado: boolean }) {
+  return (
+    <Badge
+      variant="secondary"
+      className={
+        faturado
+          ? "border border-primary/15 bg-primary/10 font-medium text-primary shadow-none"
+          : "border border-border bg-secondary font-medium text-muted-foreground shadow-none"
+      }
+    >
+      <span
+        className={
+          faturado
+            ? "mr-1.5 h-1.5 w-1.5 rounded-full bg-primary"
+            : "mr-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground"
+        }
+      />
+
+      {faturado ? "Sim" : "Não"}
+    </Badge>
+  );
+}
+
+function EstadoVazio() {
+  return (
+    <div className="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-secondary/50">
+        <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-foreground">Sem lançamentos no período</p>
+
+      <p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">
+        Ajuste o intervalo de datas ou registre novos apontamentos para visualizar os dados.
+      </p>
     </div>
   );
 }

@@ -35,13 +35,9 @@ export function BSBrand({
 }: BSBrandProps) {
   const tamanho = tamanhos[size];
 
-  const alinhamento =
-    align === "center"
-      ? "items-center text-center"
-      : "items-start text-left";
+  const alinhamento = align === "center" ? "items-center text-center" : "items-start text-left";
 
-  const corDoTexto =
-    variant === "dark" ? "text-white/90" : "text-slate-900";
+  const corDoTexto = variant === "dark" ? "text-white/90" : "text-slate-900";
 
   return (
     <div className={`flex flex-col ${alinhamento} ${className}`}>

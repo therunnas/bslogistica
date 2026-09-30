@@ -66,12 +66,7 @@ export default function EsqueciSenha() {
     <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
       {/* Marca */}
       <div className="mx-auto w-full max-w-6xl">
-        <BSBrand
-          variant="light"
-          size="sm"
-          align="start"
-          priority
-        />
+        <BSBrand variant="light" size="sm" align="start" priority />
       </div>
 
       {/* Conteúdo */}
@@ -88,8 +83,7 @@ export default function EsqueciSenha() {
               </h1>
 
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                Informe o e-mail da sua conta e enviaremos um link para definir
-                uma nova senha.
+                Informe o e-mail da sua conta e enviaremos um link para definir uma nova senha.
               </p>
             </div>
 
@@ -100,10 +94,7 @@ export default function EsqueciSenha() {
 
               <form onSubmit={solicitar} className="space-y-5">
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="email"
-                    className="text-sm font-medium text-slate-900"
-                  >
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-900">
                     E-mail
                   </Label>
 

@@ -1,36 +1,63 @@
-import { ShieldAlert } from "lucide-react";
+import { LogOut, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { sair } from "../_acoes";
 
-/**
- * Tela de quem entrou mas ainda não tem papel atribuído.
- *
- * Acontece quando a conta existe no Supabase Auth mas ninguém definiu se ela é
- * admin ou operacional. A RLS já impediria a leitura dos dados; isto apenas
- * explica a situação em vez de mostrar um painel vazio e sem sentido.
- */
 export function AcessoNaoLiberado({ email }: { email: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-12">
-      <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 text-center">
-        <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted">
-          <ShieldAlert className="size-6 text-muted-foreground" />
-        </div>
-        <h1 className="mt-5 font-display text-xl font-semibold">Acesso não liberado</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Sua conta foi criada, mas ainda não tem permissão de uso. Peça ao administrador do sistema
-          para liberar o seu acesso.
-        </p>
-        <p className="mt-4 text-xs text-muted-foreground">
-          Conectado como <span className="font-medium text-foreground">{email}</span>
-        </p>
-        <form action={sair} className="mt-6">
-          <Button type="submit" variant="outline" className="w-full">
-            Sair
-          </Button>
-        </form>
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-40 right-[-10rem] h-[34rem] w-[34rem] rounded-full bg-primary/[0.08] blur-[120px]"
+      />
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 left-[-12rem] h-[30rem] w-[30rem] rounded-full bg-primary/[0.05] blur-[120px]"
+      />
+
+      <div className="relative flex min-h-screen items-center justify-center px-5 py-12">
+        <section className="w-full max-w-[440px]">
+          <div className="relative overflow-hidden rounded-[22px] border border-border bg-card/95 shadow-[0_32px_100px_rgba(0,0,0,0.12)] backdrop-blur-2xl">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
+
+            <div className="p-7 text-center sm:p-9">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/[0.07]">
+                <ShieldAlert className="h-5 w-5 text-primary" />
+              </div>
+
+              <h1 className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-foreground">
+                Acesso não liberado
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                Sua conta existe, mas ainda não possui uma permissão de uso atribuída.
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Solicite ao administrador do sistema a liberação do seu acesso.
+              </p>
+
+              <div className="mt-7 rounded-xl border border-border bg-secondary/50 px-4 py-3">
+                <p className="text-xs text-muted-foreground">Conta conectada</p>
+
+                <p className="mt-1 truncate text-sm font-medium text-foreground">{email}</p>
+              </div>
+
+              <form action={sair} className="mt-6">
+                <Button type="submit" variant="outline" className="h-11 w-full rounded-xl">
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </Button>
+              </form>
+            </div>
+          </div>
+
+          <p className="mt-5 text-center text-[11px] text-muted-foreground">
+            BS Soluções Logística · Ambiente interno
+          </p>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
