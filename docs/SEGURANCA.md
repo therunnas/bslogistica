@@ -134,7 +134,7 @@ até lá a superfície existe sem nenhum consumidor.
 | `.env`                    | fora do Git, ignorado        |
 | `.env.local`              | fora do Git, ignorado        |
 | `.env.example`            | versionado, sem valores      |
-| `service_role`            | **não usada pela aplicação** |
+| `service_role`            | **usada somente server-side** |
 | Chaves reais no histórico | nenhuma                      |
 | Segredos no bundle        | nenhum                       |
 
@@ -143,8 +143,10 @@ O bundle do navegador foi auditado: zero ocorrências de `service_role`,
 servidor.
 
 **Nenhuma variável `NEXT_PUBLIC_*` pode conter segredo** — o prefixo faz o Next
-embutir o valor no JavaScript servido ao navegador. As duas em uso são públicas
-por natureza; quem protege os dados é a RLS.
+embutir o valor no JavaScript servido ao navegador. As duas variáveis
+`NEXT_PUBLIC_*` em uso são públicas por natureza; quem protege os dados é a RLS.
+A `SUPABASE_SERVICE_ROLE_KEY` é segredo, não tem esse prefixo e é lida somente
+pela integração administrativa server-side, depois da autorização do backend.
 
 ## Vercel
 
@@ -356,9 +358,12 @@ shadcn **importado por zero arquivos**: não é alcançável, e o que ele injeta
 são cores de tema escritas no código, nunca dado do banco. O único `src` dinâmico
 é o QR do MFA, entregue como data URI em `<img>` — onde SVG não executa script.
 
-**Segredos** — a única variável lida em `src/` é `NODE_ENV`; as do Supabase
-passam por `lerAmbienteSupabase()` e são as duas públicas. Nenhuma chave não
-pública referenciada no cliente. O único `.env*` versionado é `.env.example`.
+**Segredos** — as duas variáveis públicas do Supabase passam por
+`lerAmbienteSupabase()`. A `SUPABASE_SERVICE_ROLE_KEY` é lida exclusivamente por
+`src/integrations/supabase/admin.ts`, no servidor, para operações administrativas
+autorizadas. `PASSWORD_RECOVERY_PROOF_SECRET` também é server-only. Nenhuma chave
+não pública é referenciada no cliente. O único `.env*` versionado é
+`.env.example`.
 
 **Infra** — zero arquivos `.map` no build do cliente, então nenhum source map é
 servido ao navegador. Sentry com `userInfo: false`, `httpBodies: []`,
@@ -712,8 +717,9 @@ cabeçalho.
 
 **O que atenua, sem zerar:** alcançar esse `TRUNCATE` exige possuir a chave
 `service_role` **e** conexão direta ao Postgres. O PostgREST não expõe
-`TRUNCATE`, e a aplicação não usa essa chave — ela nunca vai para o navegador.
-O privilégio está errado; a via pela API não existe.
+`TRUNCATE`, e a aplicação usa essa chave somente no backend administrativo, sem
+conexão SQL direta — ela nunca vai para o navegador. O privilégio está errado; a
+via pela API não existe.
 
 A segunda é que `REVOKE` sozinho não é o bastante. `TRUNCATE` **não dispara
 trigger de linha e não consulta a RLS**, e alcança por `CASCADE` tabelas que

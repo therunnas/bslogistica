@@ -3,9 +3,9 @@
  *
  * As duas são públicas por natureza: viajam no JavaScript da página. Quem
  * protege os dados é a RLS do banco, não o sigilo delas. A chave secreta
- * (service_role) não é usada por esta aplicação e nunca deve aparecer numa
- * variável NEXT_PUBLIC_ — o prefixo faz o Next embutir o valor no bundle do
- * navegador.
+ * (service_role) é usada exclusivamente no servidor pela integração
+ * administrativa e nunca deve aparecer numa variável NEXT_PUBLIC_ — o prefixo
+ * faz o Next embutir o valor no bundle do navegador.
  */
 export function lerAmbienteSupabase() {
   const url = process.env["NEXT_PUBLIC_SUPABASE_URL"];

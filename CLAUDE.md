@@ -421,7 +421,11 @@ Está registrado assim de propósito; se virar invariante, é tarefa própria.
 
 ## Segredos
 
-- **`service_role` nunca vai para o cliente.** A aplicação não a usa.
+- **`service_role` nunca vai para o cliente.** A aplicação usa a
+  `SUPABASE_SERVICE_ROLE_KEY` exclusivamente no servidor, nas operações
+  administrativas de usuários e somente depois dos controles de autorização do
+  backend. Nunca prefixar com `NEXT_PUBLIC_`, importar em código client ou remover
+  a variável enquanto essa integração existir.
 - **Nenhuma variável `NEXT_PUBLIC_*` pode conter segredo** — o prefixo embute o
   valor no bundle do navegador.
 - Credencial de SMTP e chave de API de e-mail existem **só** no Dashboard do

@@ -32,11 +32,16 @@ Abre em http://localhost:3000.
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY
 ```
 
-As duas são públicas por natureza: viajam no JavaScript da página. Quem protege
-os dados é a RLS do banco. **A chave secreta do Supabase (`service_role`) não é
-usada por esta aplicação e não deve entrar no `.env`.**
+As duas variáveis `NEXT_PUBLIC_*` são públicas por natureza: viajam no JavaScript
+da página. Quem protege os dados é a RLS do banco. A
+`SUPABASE_SERVICE_ROLE_KEY` é segredo e é usada exclusivamente no servidor pelas
+operações administrativas de usuários. Ela nunca pode receber o prefixo
+`NEXT_PUBLIC_` nem ser importada por código client. O cliente privilegiado só é
+instanciado depois dos controles de autorização do backend; a chave não substitui
+esses controles e nunca deve ser versionada.
 
 ## Comandos
 
