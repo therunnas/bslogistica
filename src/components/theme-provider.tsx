@@ -49,14 +49,30 @@ function aplicarTema(tema: Tema) {
   raiz.style.colorScheme = tema;
 }
 
-function lerTemaPreferido(): Tema {
-  const salvo = localStorage.getItem(CHAVE_TEMA);
+function lerTemaDoSistema(): Tema {
+  try {
+    if (typeof window.matchMedia !== "function") {
+      return "light";
+    }
 
-  if (salvo === "light" || salvo === "dark") {
-    return salvo;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+}
+
+function lerTemaPreferido(): Tema {
+  try {
+    const salvo = localStorage.getItem(CHAVE_TEMA);
+
+    if (salvo === "light" || salvo === "dark") {
+      return salvo;
+    }
+  } catch {
+    return lerTemaDoSistema();
   }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return lerTemaDoSistema();
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -104,7 +120,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const definirTema = useCallback(
     (novoTema: Tema) => {
-      localStorage.setItem(CHAVE_TEMA, novoTema);
+      try {
+        localStorage.setItem(CHAVE_TEMA, novoTema);
+      } catch {
+        // Mantém a troca de tema funcional mesmo sem armazenamento persistente.
+      }
+
       setTema(novoTema);
 
       if (usaTemaDoPainel) {

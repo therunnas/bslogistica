@@ -1,10 +1,7 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
 import {
   BarChart3,
   Building2,
@@ -22,6 +19,10 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 
 import { useTema } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
@@ -110,35 +111,9 @@ export function AppShell({
     });
   }
 
-  function abrirMenuMobile() {
-    setMenuMobileAberto(true);
-  }
-
   function fecharMenuMobile() {
     setMenuMobileAberto(false);
   }
-
-  useEffect(() => {
-    if (!menuMobileAberto) {
-      return;
-    }
-
-    function fecharComEscape(evento: KeyboardEvent) {
-      if (evento.key === "Escape") {
-        setMenuMobileAberto(false);
-      }
-    }
-
-    const overflowAnterior = document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", fecharComEscape);
-
-    return () => {
-      document.body.style.overflow = overflowAnterior;
-      window.removeEventListener("keydown", fecharComEscape);
-    };
-  }, [menuMobileAberto]);
 
   useEffect(() => {
     setMenuMobileAberto(false);
@@ -188,16 +163,17 @@ export function AppShell({
           </div>
 
           {mobile ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="ml-auto shrink-0 rounded-lg"
-              onClick={fecharMenuMobile}
-              aria-label="Fechar menu"
-            >
-              <X className="h-5 w-5" />
-            </Button>
+            <DialogPrimitive.Close asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="ml-auto shrink-0 rounded-lg"
+                aria-label="Fechar menu"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </DialogPrimitive.Close>
           ) : null}
         </div>
 
@@ -345,67 +321,61 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
-      {menuMobileAberto ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            type="button"
-            aria-label="Fechar menu"
-            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-            onClick={fecharMenuMobile}
-          />
+    <DialogPrimitive.Root open={menuMobileAberto} onOpenChange={setMenuMobileAberto}>
+      <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px] lg:hidden" />
 
-          <aside
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu de navegação"
-            className="absolute inset-y-0 left-0 z-10 flex w-[min(88vw,16rem)] flex-col border-r border-sidebar-border bg-sidebar shadow-[24px_0_80px_rgba(0,0,0,0.28)]"
-            onClick={(evento) => evento.stopPropagation()}
+          <DialogPrimitive.Content
+            className="fixed inset-y-0 left-0 z-50 flex w-[min(88vw,16rem)] flex-col border-r border-sidebar-border bg-sidebar shadow-[24px_0_80px_rgba(0,0,0,0.28)] outline-none lg:hidden"
+            aria-describedby={undefined}
           >
+            <DialogPrimitive.Title className="sr-only">Menu de navegação</DialogPrimitive.Title>
+
             <SidebarContent mobile />
-          </aside>
-        </div>
-      ) : null}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
 
-      <aside className="sticky top-0 hidden h-screen min-h-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
-        <SidebarContent />
-      </aside>
+        <aside className="sticky top-0 hidden h-screen min-h-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+          <SidebarContent />
+        </aside>
 
-      <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-background/90 px-4 backdrop-blur-xl lg:px-8">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="mr-3 shrink-0 rounded-lg lg:hidden"
-            onClick={abrirMenuMobile}
-            aria-label="Abrir menu"
-            aria-expanded={menuMobileAberto}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+        <div className="min-w-0">
+          <header className="sticky top-0 z-30 flex h-16 items-center border-b border-border bg-background/90 px-4 backdrop-blur-xl lg:px-8">
+            <DialogPrimitive.Trigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="mr-3 shrink-0 rounded-lg lg:hidden"
+                aria-label="Abrir menu"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </DialogPrimitive.Trigger>
 
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-foreground">
-              {paginaAtual}
-            </p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold tracking-tight text-foreground">
+                {paginaAtual}
+              </p>
 
-            <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">
-              BS Soluções Logística
-            </p>
+              <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">
+                BS Soluções Logística
+              </p>
+            </div>
+          </header>
+
+          <div className="relative min-w-0 overflow-hidden">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-64 right-[-14rem] h-[34rem] w-[34rem] rounded-full bg-primary/[0.04] blur-[130px]"
+            />
+
+            <main className="relative min-w-0 overflow-x-hidden p-4 md:p-6 xl:p-8">{children}</main>
           </div>
-        </header>
-
-        <div className="relative min-w-0 overflow-hidden">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-64 right-[-14rem] h-[34rem] w-[34rem] rounded-full bg-primary/[0.04] blur-[130px]"
-          />
-
-          <main className="relative min-w-0 overflow-x-hidden p-4 md:p-6 xl:p-8">{children}</main>
         </div>
       </div>
-    </div>
+    </DialogPrimitive.Root>
   );
 }
 
