@@ -117,7 +117,7 @@ export default function Login() {
                 Acesso ao sistema
               </h1>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-[15px]">
+              <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-[15px]">
                 Entre com suas credenciais para continuar.
               </p>
             </div>
@@ -152,7 +152,7 @@ export default function Login() {
 
                   <a
                     href={ROTA_ESQUECI_SENHA}
-                    className="relative z-20 inline-flex cursor-pointer items-center py-1 text-sm text-slate-500 transition-colors hover:text-slate-950 hover:underline"
+                    className="relative z-20 inline-flex cursor-pointer items-center py-1 text-sm text-slate-600 transition-colors hover:text-slate-950 hover:underline"
                   >
                     Esqueci minha senha
                   </a>
@@ -180,14 +180,14 @@ export default function Login() {
             </form>
 
             <div className="mt-8 border-t border-slate-200 pt-6">
-              <p className="text-center text-xs text-slate-500">
+              <p className="text-center text-xs text-slate-600">
                 Acesso exclusivo a usuários autorizados.
               </p>
             </div>
           </div>
         </div>
 
-        <p className="mt-1 text-center text-xs text-slate-500 lg:text-left">
+        <p className="mt-1 text-center text-xs text-slate-600 lg:text-left">
           © {new Date().getFullYear()} BS Soluções Logística
         </p>
       </section>
