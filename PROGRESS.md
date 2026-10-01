@@ -22,8 +22,11 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 | PR D               | **CONCLUÍDO** — PR #44, mergeado. Ver 7.8                           |
 | `017`              | **EM PRODUCTION** — PR #44, auditoria pós-deploy PASS. Ver 7.8      |
 | Suítes SQL         | **13/13 PASS, 0 FAIL** (`001`–`013`)                                |
-| Testes Node        | **874/874 PASS** (8 suítes)                                         |
-| Etapa atual        | **PR E** — tela `/usuarios`, consumindo o backend do PR D           |
+| Testes Node        | **1.062/1.062 PASS** (11 suítes)                                    |
+| PR E               | **CONCLUÍDO** — PR #47, mergeado: tela `/usuarios`                  |
+| PR F               | **CONCLUÍDO** — PR #48, mergeado: tela `/configuracoes`             |
+| Baseline           | Next 16.3.6; CI em `.github/workflows/ci.yml` (PR de estabilização) |
+| Etapa atual        | **PR G** — matriz E2E; baseline em revisão no PR de estabilização   |
 
 O SHA acima é o **merge commit do PR #44**, o marco documental mais recente —
 não é necessariamente "o SHA atual da `main`" no momento em que este arquivo for
@@ -70,20 +73,22 @@ Production pelo **PR #40** em 28/09/2026, com auditoria pós-deploy PASS. O
 admin serializada por `pg_advisory_xact_lock`) está **aplicada em Production**,
 com auditoria pós-deploy PASS.
 
-**A etapa atual é o PR E** — tela `/usuarios`, consumindo o backend do PR D.
-Seguem **aprovados e não iniciados**: **PR F** e **PR G**. Leia a seção 6 antes
+O **PR E** (tela `/usuarios`, PR #47) e o **PR F** (tela `/configuracoes`,
+PR #48) estão mergeados. **A etapa atual é o PR G**, aprovado e não iniciado,
+precedido pela estabilização do baseline (Next 16.3.6, testes estruturais
+alinhados, CI no GitHub Actions). Leia a seção 6 antes
 de tocar em guard, policy ou usuário.
 
 ## 2. Ambiente
 
-|                 |                                                       |
-| --------------- | ----------------------------------------------------- |
+|                 |                                                        |
+| --------------- | ------------------------------------------------------ |
 | Projeto local   | `C:\Users\VINICIUS\Documents\GitHub\BS Logistics Novo` |
-| GitHub          | `therunnas/bslogistica`                               |
-| Produção        | `https://admin.bslogisticas.com.br`                   |
-| Supabase atual  | `ehkduqokntemtmqzdrbd`                                |
-| Supabase antigo | `qaibhlucbpetxrtswulf` — **apagado**, não existe mais |
-| GoTrue          | `v2.196.0` — lido de `/auth/v1/health` em 12/09/2026  |
+| GitHub          | `therunnas/bslogistica`                                |
+| Produção        | `https://admin.bslogisticas.com.br`                    |
+| Supabase atual  | `ehkduqokntemtmqzdrbd`                                 |
+| Supabase antigo | `qaibhlucbpetxrtswulf` — **apagado**, não existe mais  |
+| GoTrue          | `v2.196.0` — lido de `/auth/v1/health` em 12/09/2026   |
 
 **Site institucional é outro projeto:** `https://bslogisticas.com.br`,
 repositório `therunnas/PROJETO-BS-LOGISTICA`, pasta
@@ -326,9 +331,9 @@ um TOTP no recovery e nenhum admin operando em AAL1.
   `017`** acrescenta `admin_audit_log` e serializa a proteção do último admin
   com `pg_advisory_xact_lock`. **Mergeado pelo PR #44 e aplicado em
   Production**, com auditoria pós-deploy PASS;
-- o que **falta** é a tela **`/usuarios`** (**PR E**, etapa atual), a tela
-  **Configurações → Segurança** (**PR F**), por onde o `operacional` ativaria
-  MFA por vontade própria, e a matriz E2E do **PR G**.
+- as telas **`/usuarios`** (**PR E**, PR #47) e **`/configuracoes`** (**PR F**,
+  PR #48) já existem e estão mergeadas; o que **falta** é a matriz E2E do
+  **PR G**.
 
 ### 6.3 Proibições enquanto a refatoração não acontecer
 
@@ -362,8 +367,8 @@ quebrada em três PRs, **nesta ordem obrigatória**:
 | **016**   | **acesso direto às tabelas passa a exigir AAL2 E admin** — fecha o operador em AAL2 pelo PostgREST. Ver 7.7                           | **EM PRODUCTION** — PR #40 |
 | **PR D**  | **backend administrativo de usuários**, exclusivamente server-side — convite, papel, atribuição de operações, último admin, auditoria | **CONCLUÍDO** — PR #44     |
 | **017**   | **`admin_audit_log`** e proteção do último admin serializada por `pg_advisory_xact_lock`. Ver 7.8                                     | **EM PRODUCTION** — PR #44 |
-| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | **ETAPA ATUAL**            |
-| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | aprovado, não iniciado     |
+| **PR E**  | tela `/usuarios`, só admin, com bloqueio server-side                                                                                  | **CONCLUÍDO** — PR #47     |
+| **PR F**  | Configurações → Segurança: estado de MFA, opção do operacional, desativação protegida no backend                                      | **CONCLUÍDO** — PR #48     |
 | **PR G**  | **matriz E2E completa**, antes do segundo usuário real                                                                                | aprovado, não iniciado     |
 
 Sequência obrigatória: **B2.1 → 014 → B2.2 → B2.3 → 015 → PR C → PR D → PR E →
@@ -1437,18 +1442,18 @@ Operações privilegiadas **exclusivamente server-side**; `service_role` nunca n
 navegador; nenhuma autorização por parâmetro vindo do browser; convite por
 e-mail, sem self-signup. **Isto fazia parte do MVP** (seção 7.0) — cumprido.
 
-### ETAPA 4 → **PR E** — ETAPA ATUAL
+### ETAPA 4 → **PR E** — CONCLUÍDO (PR #47)
 
 Tela **`/usuarios`**, somente para admin: visualizar, convidar, definir
 admin/operacional, alterar papel, remover acesso e atribuir operações ao
 operacional. **Bloqueio server-side obrigatório.**
 
-### ETAPA 5 → **PR F**
+### ETAPA 5 → **PR F** — CONCLUÍDO (PR #48)
 
 **Configurações → Segurança:** estado do MFA · `operacional` pode ativar · admin
 permanece obrigatório · política de desativação protegida **no backend**.
 
-### ETAPA 6 → **PR G**
+### ETAPA 6 → **PR G** — ETAPA ATUAL
 
 **Matriz E2E completa** antes do segundo usuário real — incluindo a variante de
 recovery **sem MFA**, que ainda não foi exercitada (seção 4.3).
@@ -1859,5 +1864,5 @@ intencionalmente bloqueado (`noindex` + `robots`): é painel interno, não mexer
    **B2.1**, **`014`**, **B2.2**, **B2.3**, a **`015`**, o **PR C** — guard
    role-aware, seção 7.6 —, a **`016`** — seção 7.7 — e o **PR D**/`017` —
    backend administrativo, seção 7.8 — estão fechados e em Production; o
-   próximo passo é o **PR E**, seguido de **PR F → PR G**;
+   **PR E** (PR #47) e **PR F** (PR #48) também estão mergeados; o próximo passo é o **PR G**;
 6. se o estado real divergir deste checkpoint, **pare e reporte**.

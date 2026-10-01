@@ -22,7 +22,7 @@ repositório, outro projeto na Vercel, outra pasta. Nunca tocar nele.
 
 Next.js 16 (App Router) · React 19 · TypeScript estrito · Tailwind CSS 4 ·
 shadcn/ui · Supabase (`@supabase/ssr`) · TanStack Query · npm · Vercel.
-Node ≥ 20.9.
+Node ≥ 22.6.
 
 **Não reintroduzir:** TanStack Start, TanStack Router, Vite, Nitro, Vinxi,
 Wrangler, Lovable. Foram removidos de propósito. `@tanstack/react-query`
@@ -31,7 +31,8 @@ Wrangler, Lovable. Foram removidos de propósito. `@tanstack/react-query`
 ## Arquitetura
 
 ```
-src/app/(painel)/            área protegida — 7 telas de admin + /operacional
+src/app/(painel)/            área protegida — telas de admin, /usuarios,
+                             /configuracoes e /operacional
   layout.tsx                 guard de acesso (sessão → papel → MFA)
   _autorizacao.ts            decisão de acesso role-aware, no servidor
   _papel.ts                  papel efetivo: admin + operacional = ADMIN
@@ -53,11 +54,13 @@ src/lib/billing.ts           cálculo de diária, hora extra, custo
 src/lib/ledger.ts            consolidação apontamento → cliente
 src/lib/mfa.ts               decisões de segundo fator e de acesso, puras
 src/lib/operacional/         contratos e hooks das 5 RPCs — sem tabela direta
+src/lib/admin-usuarios/      administração de usuários, server-side
+src/components/branding/     marca da interface
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server), tipos do banco
 src/proxy.ts                 renovação de sessão a cada requisição
-supabase/migrations/         22 arquivos — 21 em Production, a `016` em PR
-supabase/tests/              12 testes SQL de RLS, invariáveis, fontes, MFA e
+supabase/migrations/         23 arquivos, todos em Production
+supabase/tests/              13 testes SQL de RLS, invariáveis, fontes, MFA e
                              superfície operacional
 ```
 
@@ -78,11 +81,18 @@ Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 | `npm run test:prova`       | prova HMAC e saídas pós-`verifyOtp` |
 | `npm run test:troca`       | troca de senha e desfechos do login |
 
-As quatro suítes somam **357 asserções**. Mexer em auth, MFA ou recuperação
-exige rodar todas — várias delas asseveram a **forma literal** do código, não só
-o comportamento.
+Há 11 scripts `test:*` no `package.json` (além dos quatro acima:
+`cookies-supabase`, `operacional`, `papel`, `tela-operacional`,
+`admin-usuarios`, `tela-usuarios`, `configuracoes`), somando **1.062
+asserções**. Mexer em auth, MFA, recuperação ou nas telas exige rodar todas —
+várias delas asseveram a **forma literal** do código, não só o comportamento. Os
+scripts exigem Node ≥ 22.6 (`--experimental-strip-types`).
 
-Antes de entregar: `npm run lint`, `npx tsc --noEmit`, `npm run build`.
+Antes de entregar: `npm run lint`, `npx tsc --noEmit`, as 11 suítes e
+`npm run build`. A CI (`.github/workflows/ci.yml`) roda essa sequência em todo
+PR e em push para `main`, sem secret e sem tocar o Supabase de Production; o
+build recebe valores inertes para as variáveis públicas. Os testes SQL não rodam
+nela.
 
 Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 `--fix` — o formatador reescreve arquivos que não fazem parte da tarefa.
@@ -251,7 +261,7 @@ conta lê a própria linha), `user_roles` (lida em AAL1, antes do MFA) e
 que torna a superfície estreita, agora, a **única** porta do operador.
 Medido em `supabase/tests/012_restringir_postgrest_operacional.sql`.
 
-**A `016` está no repositório e ainda NÃO foi aplicada em Production.**
+**A `016` está aplicada em Production** (auditoria pós-deploy registrada no `PROGRESS.md`).
 
 **Regras permanentes desta superfície:**
 
@@ -377,7 +387,7 @@ Está registrado assim de propósito; se virar invariante, é tarefa própria.
   Há trigger `BEFORE TRUNCATE` sobre `timesheet_entries` e `invoice_items`. Não
   afrouxar nada disso sem tarefa de escopo próprio.
 - **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`. As 21 migrations do repositório estão
+  `supabase migration new <nome>`. As 23 migrations do repositório estão
   aplicadas em Production — a `014` e a `015` inclusive —, e **nenhuma
   migration aplicada se edita**, nem para corrigir.
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse

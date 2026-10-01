@@ -215,7 +215,7 @@ verificar(
 );
 verificar(
   "D4. o rótulo do item é 'Segurança', apontando para /configuracoes",
-  /\{ href: "\/configuracoes", label: "Segurança"/.test(fontes.shell),
+  /\{\s*href: "\/configuracoes",\s*label: "Segurança"/.test(fontes.shell),
   true,
 );
 verificar(

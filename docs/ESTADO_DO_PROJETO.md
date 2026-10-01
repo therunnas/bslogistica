@@ -32,7 +32,7 @@ Nitro e as integrações com o Lovable foram removidos do repositório.
 
 Next.js 16 (App Router) · React 19 · TypeScript estrito · Tailwind CSS 4 ·
 shadcn/ui · Supabase (Postgres, Auth e RLS) · TanStack Query · npm · Vercel.
-Node ≥ 20.9.
+Node ≥ 22.6.
 
 `@tanstack/react-query` permanece: é a camada de dados da aplicação e não tem
 relação com o TanStack Router.

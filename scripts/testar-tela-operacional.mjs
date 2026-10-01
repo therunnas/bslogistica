@@ -205,7 +205,7 @@ verificar(
 );
 verificar(
   "B13. a decisão de papel NÃO foi duplicada no login",
-  /resolverPapelEfetivo|papeis|operacional/.test(fontes.login),
+  /resolverPapelEfetivo|papeis|user_roles|["']operacional["']/.test(fontes.login),
   false,
 );
 verificar(
@@ -214,13 +214,14 @@ verificar(
   2,
 );
 verificar(
-  "B15. o admin mantém os oito links",
-  (fontes.shell.match(/\{ href: "\/[a-z]+", label/g) ?? []).length,
-  10,
+  "B15. o admin mantém os sete links da navegação principal",
+  (/admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1]?.match(/href: "\//g) ?? [])
+    .length,
+  7,
 );
 verificar(
   "B16. e o operacional tem exatamente um",
-  /operacional: \[\{ href: "\/operacional", label: "Apontamentos", icon: CalendarCheck \}\]/.test(
+  /operacional: \[\s*\{\s*href: "\/operacional",\s*label: "Apontamentos",\s*icon: CalendarCheck,?\s*\},?\s*\]/.test(
     fontes.shell,
   ),
   true,

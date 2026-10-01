@@ -6,9 +6,7 @@ e horas extras, faturamento por período e relatórios.
 
 Sistema de uso interno, **publicado** em `admin.bslogisticas.com.br`. Não há
 cadastro público: `disable_signup = true`, e a criação de contas passa
-exclusivamente pelo administrador. Hoje isso acontece no painel do Supabase —
-a administração de usuários dentro do próprio sistema está planejada e ainda
-não existe.
+exclusivamente pelo administrador, pela tela `/usuarios` do próprio painel.
 
 ## Stack
 
@@ -17,7 +15,8 @@ shadcn/ui · Supabase (Postgres, Auth e RLS) · TanStack Query · Vercel.
 
 ## Instalação
 
-Requer Node.js 20.9 ou superior.
+Requer Node.js 22.6 ou superior (as suítes usam `--experimental-strip-types`).
+A CI roda em Node 24.
 
 ```bash
 npm install
@@ -33,6 +32,7 @@ Abre em http://localhost:3000.
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 SUPABASE_SERVICE_ROLE_KEY
+PASSWORD_RECOVERY_PROOF_SECRET
 ```
 
 As duas variáveis `NEXT_PUBLIC_*` são públicas por natureza: viajam no JavaScript
@@ -41,46 +41,71 @@ da página. Quem protege os dados é a RLS do banco. A
 operações administrativas de usuários. Ela nunca pode receber o prefixo
 `NEXT_PUBLIC_` nem ser importada por código client. O cliente privilegiado só é
 instanciado depois dos controles de autorização do backend; a chave não substitui
-esses controles e nunca deve ser versionada.
+esses controles e nunca deve ser versionada. A `PASSWORD_RECOVERY_PROOF_SECRET`
+também é segredo, só do servidor, e assina a prova da recuperação de senha;
+`.env.example` descreve como gerá-la.
 
 ## Comandos
 
-| Comando                    | O que faz                           |
-| -------------------------- | ----------------------------------- |
-| `npm run dev`              | servidor de desenvolvimento         |
-| `npm run build`            | build de produção                   |
-| `npm run start`            | serve o build                       |
-| `npm run lint`             | ESLint com Prettier                 |
-| `npm run format`           | formata o código                    |
-| `npm run test:mfa`         | decisões de segundo fator           |
-| `npm run test:recuperacao` | fluxo de recuperação de senha       |
-| `npm run test:prova`       | prova HMAC e saídas pós-`verifyOtp` |
-| `npm run test:troca`       | troca de senha e desfechos do login |
+| Comando                         | O que faz                              |
+| ------------------------------- | -------------------------------------- |
+| `npm run dev`                   | servidor de desenvolvimento            |
+| `npm run build`                 | build de produção                      |
+| `npm run start`                 | serve o build                          |
+| `npm run lint`                  | ESLint com Prettier                    |
+| `npm run format`                | formata o código                       |
+| `npm run test:mfa`              | decisões de segundo fator              |
+| `npm run test:recuperacao`      | fluxo de recuperação de senha          |
+| `npm run test:prova`            | prova HMAC e saídas pós-`verifyOtp`    |
+| `npm run test:troca`            | troca de senha e desfechos do login    |
+| `npm run test:cookies-supabase` | cookies de sessão do Supabase          |
+| `npm run test:operacional`      | contratos da superfície operacional    |
+| `npm run test:papel`            | papel efetivo e guards                 |
+| `npm run test:tela-operacional` | tela `/operacional`                    |
+| `npm run test:admin-usuarios`   | administração de usuários, no servidor |
+| `npm run test:tela-usuarios`    | tela `/usuarios`                       |
+| `npm run test:configuracoes`    | tela `/configuracoes`                  |
 
-As quatro suítes somam **357 asserções**, e várias asseveram a **forma literal**
-do código de autenticação, não só o comportamento. Mexeu em auth, MFA ou
-recuperação: rode as quatro.
+São **11 suítes Node, com 1.062 asserções** no total. Várias asseveram a **forma
+literal** do código, não só o comportamento — mexeu em auth, MFA, recuperação ou
+nas telas, rode todas.
 
-Os testes de banco ficam em `supabase/tests/` — nove arquivos SQL de RLS,
+Os testes de banco ficam em `supabase/tests/` — 13 arquivos SQL de RLS,
 invariáveis, proteção financeira, estado de MFA e superfície operacional. Cada
-um roda de uma vez e termina em `rollback`.
+um roda de uma vez e termina em `rollback`. Não rodam na CI.
+
+## Validação e CI
+
+Antes de entregar: `npm run lint`, `npx tsc --noEmit`, as 11 suítes e
+`npm run build`. O workflow `.github/workflows/ci.yml` executa essa mesma
+sequência em todo pull request e em todo push para `main`. Ele não usa secret
+algum e não acessa o Supabase de Production: o `build` recebe valores inertes
+para as duas variáveis públicas, só para a pré-renderização passar.
+
+`main` recebe alterações por pull request; o trabalho é feito em branch.
 
 ## Estrutura
 
 ```
 src/
 ├── app/                      rotas (App Router)
-│   ├── page.tsx              landing pública
-│   ├── login/                entrada no painel
-│   └── (painel)/             área protegida — 7 telas
-├── components/ui/            shadcn/ui
+│   ├── page.tsx              redireciona para /login
+│   ├── login/, mfa/          entrada e segundo fator
+│   ├── esqueci-senha/, auth/, redefinir-senha/
+│   │                         recuperação de senha
+│   └── (painel)/             área protegida — 10 rotas: dashboard, clientes,
+│                             colaboradores, operações, apontamentos,
+│                             faturamento, relatórios, usuários, configurações
+│                             e operacional
+├── components/               ui (shadcn/ui), branding
 ├── integrations/supabase/    clientes, tipos do banco
-├── lib/                      regras de cálculo, queries, formatação
+├── lib/                      cálculo, queries, MFA, recuperação de senha,
+│                             admin-usuarios, operacional
 └── proxy.ts                  renovação de sessão
 
 supabase/
-├── migrations/               19 arquivos, todos aplicados em Production
-└── tests/                    9 suítes SQL
+├── migrations/               23 arquivos, todos aplicados em Production
+└── tests/                    13 testes SQL
 ```
 
 Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
