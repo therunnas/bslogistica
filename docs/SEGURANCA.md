@@ -540,19 +540,28 @@ porque entrar na lista dos navegadores é rápido e sair leva meses.
 
 ### SEC-003b — Content-Security-Policy
 
-**Status:** PENDENTE — etapa própria
-**Severidade:** média
-**Motivo:** o Next injeta scripts inline e o Sentry adiciona os seus. Uma CSP mal
-calibrada quebra a aplicação em silêncio, então ela não entra junto com os
-cabeçalhos simples.
-
-**Risco atual:** médio. Sem CSP, um XSS futuro teria alcance máximo. Não há XSS
-conhecido: todo dado do banco é renderizado como texto em JSX, e não existe
-`dangerouslySetInnerHTML` em código alcançável.
-**Mitigação atual:** escaping do React e ausência de HTML dinâmico.
-**Condição para fechamento:** CSP ativa em produção sem regressão, cobrindo
-Next.js, Sentry (incluindo o túnel `/monitoring`), Supabase e scripts inline, com
-`nonce` ou `hash`, validada primeiro em `report-only`.
+**Status:** FECHADO — `Content-Security-Policy` ativa em Production, com
+enforcement (não mais `report-only`).
+**Severidade:** era média; mitigada.
+**Como foi fechada:** nonce por requisição gerado em `src/proxy.ts` (mecanismo
+oficial do Next.js — header na requisição e na resposta; `RootLayout` chama
+`headers()` para forçar renderização dinâmica, necessária para o Next embutir o
+nonce atual em cada resposta). Isso cobre os scripts inline que o próprio Next
+injeta no streaming do RSC (`self.__next_f.push`) sem precisar de
+`unsafe-inline`. O script de tema foi externalizado para
+`public/theme-script.js`, eliminando o único `dangerouslySetInnerHTML`
+alcançável da aplicação. Sentry usa o túnel `/monitoring` (same-origin, não
+precisa de domínio externo em `connect-src`) e reporta violação via
+`report-uri` apontando para o endpoint de segurança do Sentry, derivado do DSN
+já público. `style-src` mantém `'unsafe-inline'` — Radix/shadcn (popover,
+dialog, select) usam estilo inline para posicionamento; apertar isso é etapa
+própria.
+**Validação:** rodou em `report-only` em Production sem nenhuma violação
+legítima — as únicas observadas vieram de `vercel.live`, só em ambiente de
+Preview (não representa o navegador de um usuário real), e não entraram na
+policy.
+**Impacto conhecido:** `/`, `/_not-found`, `/login` e `/esqueci-senha` deixaram
+de ser estáticas e passaram a renderizar por requisição — preço do nonce.
 
 ### SEC-004 — Proteção contra senhas vazadas
 
