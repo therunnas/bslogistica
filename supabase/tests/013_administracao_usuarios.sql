@@ -142,6 +142,23 @@ begin
       $sql$with u as (update public.admin_audit_log set action = 'adulterado' returning 1)
            select count(*)::text from u$sql$));
 
+  -- A7b-A7d — defesa em profundidade da migration 018: sem o GRANT de
+  -- escrita, `anon` recusa com 42501 antes mesmo de a RLS entrar em jogo,
+  -- igual ao que A5-A7 já provam para `authenticated`.
+  perform pg_temp.registrar('A7b. anon nao insere', 'erro 42501',
+    pg_temp.medir_como('anon', null, null,
+      $sql$with i as (insert into public.admin_audit_log (action) values ('forjado') returning 1)
+           select count(*)::text from i$sql$));
+
+  perform pg_temp.registrar('A7c. anon nao apaga', 'erro 42501',
+    pg_temp.medir_como('anon', null, null,
+      'with d as (delete from public.admin_audit_log returning 1) select count(*)::text from d'));
+
+  perform pg_temp.registrar('A7d. anon nao altera', 'erro 42501',
+    pg_temp.medir_como('anon', null, null,
+      $sql$with u as (update public.admin_audit_log set action = 'adulterado' returning 1)
+           select count(*)::text from u$sql$));
+
   -- `select ... from i`, não da tabela: um SELECT direto na tabela dentro do
   -- mesmo comando usa o snapshot de INÍCIO do comando e não enxergaria a linha
   -- que o próprio INSERT acabou de criar.
