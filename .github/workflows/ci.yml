@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node 24 é o runtime LTS usado na Vercel. Os testes rodam com
+      # --experimental-strip-types, que exige Node 22.6 ou superior — o piso de
+      # engines (20.9) não basta para eles.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Teste cookies-supabase
+        run: npm run test:cookies-supabase
+
+      - name: Teste mfa
+        run: npm run test:mfa
+
+      - name: Teste recuperacao
+        run: npm run test:recuperacao
+
+      - name: Teste prova
+        run: npm run test:prova
+
+      - name: Teste troca
+        run: npm run test:troca
+
+      - name: Teste operacional
+        run: npm run test:operacional
+
+      - name: Teste papel
+        run: npm run test:papel
+
+      - name: Teste tela-operacional
+        run: npm run test:tela-operacional
+
+      - name: Teste admin-usuarios
+        run: npm run test:admin-usuarios
+
+      - name: Teste tela-usuarios
+        run: npm run test:tela-usuarios
+
+      - name: Teste configuracoes
+        run: npm run test:configuracoes
+
+      # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
+      # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
+      # .invalid nunca resolve, e nenhum código roda contra um banco no build.
+      # Este job não recebe secret nenhum e não alcança o Supabase de Production.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.invalid
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-not-a-real-key
