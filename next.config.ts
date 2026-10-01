@@ -1,15 +1,37 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+// O projeto só tem um Supabase, e a URL é pública por natureza (viaja no
+// JavaScript da página) — não é segredo, é o mesmo valor de
+// NEXT_PUBLIC_SUPABASE_URL, derivado aqui do project_id de
+// supabase/config.toml para não duplicar o literal.
+const SUPABASE_HOST = "https://ehkduqokntemtmqzdrbd.supabase.co";
+
+// Content-Security-Policy em Report-Only: observa violação sem bloquear
+// nada, primeiro passo antes de aplicar a CSP de verdade. Sem nonce: o único
+// script inline que existia (tema) foi externalizado para
+// public/theme-script.js, então 'self' basta em script-src. style-src
+// precisa de 'unsafe-inline' porque Radix/shadcn (popover, dialog, select)
+// usam estilo inline para posicionamento — apertar isso é etapa própria.
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  `connect-src 'self' ${SUPABASE_HOST}`,
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+  "upgrade-insecure-requests",
+].join("; ");
+
 /**
  * Baseline de cabeçalhos de segurança.
  *
  * Fonte única: ficam aqui, e não em vercel.json nem em public/_headers, para
  * não existir uma segunda definição competindo com esta.
- *
- * Content-Security-Policy fica de fora de propósito — o Next injeta scripts
- * inline e uma CSP mal calibrada quebra a aplicação em silêncio. Ela merece
- * etapa própria, com nonce e teste.
  */
 const cabecalhosDeSeguranca = [
   // Impede o navegador de adivinhar o tipo de um arquivo e executá-lo como
@@ -27,6 +49,10 @@ const cabecalhosDeSeguranca = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
   },
+  // Report-Only: só registra violação (via Reporting API/console), não
+  // bloqueia nada. Promover para Content-Security-Policy é etapa própria,
+  // depois de observar pelo menos um ciclo de deploy sem violação inesperada.
+  { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
 ];
 
 const nextConfig: NextConfig = {

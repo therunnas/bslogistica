@@ -31,52 +31,6 @@ export const metadata: Metadata = {
   },
 };
 
-const scriptDoTema = `
-(() => {
-  try {
-    const chave = "bs-theme";
-
-    const rotasComTema = [
-      "/dashboard",
-      "/apontamentos",
-      "/operacoes",
-      "/clientes",
-      "/colaboradores",
-      "/faturamento",
-      "/relatorios",
-      "/operacional",
-      "/usuarios",
-      "/configuracoes"
-    ];
-
-    const caminho = window.location.pathname;
-
-    const usaTemaDoPainel = rotasComTema.some(
-      (rota) => caminho === rota || caminho.startsWith(rota + "/")
-    );
-
-    let tema = "light";
-
-    if (usaTemaDoPainel) {
-      const salvo = localStorage.getItem(chave);
-
-      tema =
-        salvo === "light" || salvo === "dark"
-          ? salvo
-          : window.matchMedia("(prefers-color-scheme: dark)").matches
-            ? "dark"
-            : "light";
-    }
-
-    const raiz = document.documentElement;
-
-    raiz.classList.toggle("dark", tema === "dark");
-    raiz.dataset.theme = tema;
-    raiz.style.colorScheme = tema;
-  } catch {}
-})();
-`;
-
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
@@ -85,11 +39,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${dmSans.variable} ${spaceGrotesk.variable}`}
     >
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: scriptDoTema,
-          }}
-        />
+        {/* Arquivo estático, não inline: evita dangerouslySetInnerHTML e
+            dispensa nonce/hash na CSP (script-src 'self' já cobre). Roda
+            antes da hidratação, do mesmo jeito que o inline rodava, para
+            não piscar o tema errado. */}
+        <script src="/theme-script.js" />
       </head>
 
       <body>
