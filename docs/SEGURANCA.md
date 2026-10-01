@@ -385,22 +385,24 @@ origem. Hoje só a RLS impede manipulação de papel — e impede: `INSERT` leva
 `REVOKE` seria uma segunda tranca, em defesa em profundidade. Não é urgente
 porque a primeira tranca está provada em execução.
 
-**`admin_audit_log` tinha o mesmo padrão — FECHADO LOCALMENTE, PENDENTE DE
-DEPLOY EM PRODUCTION (migration `018`, PR #55).** A migration existe no
-repositório e foi validada contra um Supabase local descartável, mas **ainda
-não foi aplicada em Production** — até lá, Production continua com o GRANT
-herdado descrito abaixo, protegido só pela RLS (primeira tranca), do mesmo
-jeito que `user_roles` continua hoje. Achado na validação local das 13
-suítes SQL (Postgres 17.6, migrations 001-017 do zero): `anon` e
+**`admin_audit_log` — grant normalizado localmente, PENDENTE DE DEPLOY EM
+PRODUCTION (migration `018`, PR #55).** Achado inicial na validação local
+das 13 suítes SQL (Postgres 17.6, migrations 001-017 do zero): `anon` e
 `authenticated` tinham, na tabela, o GRANT `arwdxtm` (SELECT/INSERT/UPDATE/
-DELETE/REFERENCES/TRIGGER/MAINTAIN) herdado do mesmo `ALTER DEFAULT
-PRIVILEGES` do bootstrap do Supabase — apesar do comentário da `017` afirmar
-que só `service_role` tinha GRANT de escrita. A RLS já bloqueava na prática
-(`UPDATE`/`DELETE` de `authenticated` afetavam zero linhas, medido em
-execução; nenhum dado foi alterado), mas a migration `018` fecha a segunda
-tranca: `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role`
-seguido de `GRANT SELECT TO authenticated` e `GRANT ALL TO service_role` —
-o mesmo padrão que a `013` já usa em `user_operation_access`. Comprovado por
+DELETE/REFERENCES/TRIGGER/MAINTAIN), herdado do default ACL que o Supabase
+CLI **local** configura para tabela nova em `public`. **Checado depois
+direto nos catálogos de Production** (`pg_class.relacl`, `pg_default_acl`):
+Production nunca teve esse GRANT de escrita — o default ACL de lá concede só
+`xtm` (REFERENCES/TRIGGER/MAINTAIN) a `anon`/`authenticated`, superfície não
+usada por nenhuma FK ou trigger do projeto, mas sem INSERT/UPDATE/DELETE. O
+comentário original da `017` ("só `service_role` tem GRANT de escrita")
+estava correto quanto a Production; o problema existiu só no harness local.
+A migration `018` continua valendo como hardening — fecha o `xtm` residual e
+deixa o contrato de privilégio auto-contido na migration, no mesmo padrão
+que a `013` já usa em `user_operation_access` (`REVOKE ALL ... FROM PUBLIC,
+anon, authenticated, service_role` seguido de `GRANT SELECT TO authenticated`
+e `GRANT ALL TO service_role`) — mas não corrige uma falha de dado que
+Production tivesse. Comprovado por
 `supabase/tests/013_administracao_usuarios.sql` (casos A5-A7, A7b-A7d):
 `anon` e `authenticated` recusam INSERT/UPDATE/DELETE com 42501, a leitura de
 admin em AAL2 continua, e `service_role` continua gravando. `scripts/

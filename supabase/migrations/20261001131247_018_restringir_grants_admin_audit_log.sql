@@ -1,48 +1,40 @@
--- Fecha o GRANT herdado em admin_audit_log — achado na validação local das
--- 13 suítes SQL (supabase/tests/013_administracao_usuarios.sql, casos A6/A7).
+-- Normaliza o GRANT de admin_audit_log pelo princípio de menor privilégio —
+-- achado na validação local das 13 suítes SQL
+-- (supabase/tests/013_administracao_usuarios.sql, casos A6/A7).
 --
--- O QUE ESTAVA ERRADO
+-- O QUE FOI MEDIDO, E ONDE
 --
--- O comentário da 017 (linhas 102-104) afirma que `authenticated` não tem
--- GRANT de INSERT/UPDATE/DELETE em admin_audit_log, e que por isso um INSERT
--- recusaria com 42501 antes mesmo de avaliar policy. Isso presume que a
--- tabela nasce sem privilégio para `anon`/`authenticated` — falso: o
--- bootstrap do Supabase mantém, no schema `public`,
---
---   ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO postgres, anon,
---   authenticated, service_role;
---
--- e `admin_audit_log` (criada pela 017, depois da 007) herda isso na hora do
--- CREATE TABLE. A 007 revogou esse default só para TRUNCATE — os demais
--- comandos continuam sendo concedidos a toda tabela nova. Medido em ambiente
--- local (Postgres 17.6, migrations 001-017 aplicadas do zero):
+-- No ambiente LOCAL (Supabase CLI, Postgres 17.6, migrations 001-017
+-- aplicadas do zero), `anon` e `authenticated` tinham INSERT/UPDATE/DELETE
+-- de fato concedidos em admin_audit_log:
 --
 --   \dp public.admin_audit_log
 --   anon=arwdxtm/postgres, authenticated=arwdxtm/postgres
 --
--- (a=INSERT, r=SELECT, w=UPDATE, d=DELETE — TRUNCATE já ausente, por obra da
--- 007). A 013 já conhecia esse problema e por isso revoga explicitamente
--- antes de conceder, em `user_operation_access`; a 017 não repetiu o padrão.
---
--- POR QUE ISSO NÃO É, HOJE, UMA LINHA VAZADA
---
--- A RLS nega por padrão quando não há policy PERMISSIVE aplicável ao
--- comando: admin_audit_log só tem uma PERMISSIVE, `FOR SELECT`. Um INSERT,
--- UPDATE ou DELETE de `authenticated` roda (o GRANT existe) mas não casa
--- nenhuma linha — a suíte local mediu `0`, não erro, e nenhuma linha foi de
--- fato alterada ou apagada. Mesmo padrão que `docs/SEGURANCA.md` já aceita
--- para `anon` em geral e para `authenticated` em `user_roles`: a RLS é a
--- primeira tranca, e está provada em execução.
+-- herdado do default ACL que o CLI local configura para tabela nova em
+-- `public` (a=INSERT, r=SELECT, w=UPDATE, d=DELETE — TRUNCATE já ausente,
+-- por obra da 007). **Checado depois, direto no catálogo de Production**
+-- (pg_class.relacl e pg_default_acl, antes desta migration ser aplicada lá):
+-- o default ACL de Production para tabela nova em `public` é mais estreito —
+-- concede só `xtm` (REFERENCES, TRIGGER, MAINTAIN) a `anon`/`authenticated`,
+-- nunca incluiu INSERT/UPDATE/DELETE. Ou seja: **o GRANT de escrita indevido
+-- existiu no harness local, não em Production** — o comentário original da
+-- 017 (linhas 102-104), que presumia não haver GRANT nenhum além de SELECT,
+-- estava certo quanto a Production e errado só quanto ao harness local. Não
+-- foi possível provar qual script de bootstrap da plataforma hospedada gera
+-- esse default mais estreito; nenhuma migration deste repositório o explica
+-- (a 007 revogou só TRUNCATE do default).
 --
 -- POR QUE FECHAR ASSIM MESMO
 --
--- Essa segunda tranca é defesa em profundidade: se uma policy PERMISSIVE de
--- escrita for adicionada aqui no futuro — por engano, ou para outra
--- finalidade — e satisfizer a RESTRICTIVE `admin_audit_log_exige_admin_aal2`
--- (basta ser admin em AAL2, o que um admin legítimo já é), a trilha de
--- auditoria passaria a ser gravável por quem não é `service_role`. Com o
--- GRANT fechado, essa mesma falha futura continuaria batendo em 42501 antes
--- de a policy entrar em jogo.
+-- O `xtm` residual (REFERENCES/TRIGGER/MAINTAIN) que `anon`/`authenticated`
+-- têm em Production não é usado por nenhuma FK ou trigger do projeto — é
+-- superfície desnecessária, mesma categoria que `docs/SEGURANCA.md` já
+-- documenta para `anon` em geral. Fechar via REVOKE/GRANT explícito, no
+-- mesmo padrão que a 013 já usa em `user_operation_access`, é defesa em
+-- profundidade: deixa o contrato de privilégio auto-contido na migration,
+-- em vez de depender de um default ACL de plataforma que já se mostrou
+-- diferente entre ambientes.
 --
 -- O QUE NÃO MUDA
 --
