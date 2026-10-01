@@ -129,14 +129,14 @@ até lá a superfície existe sem nenhum consumidor.
 
 ## Segredos
 
-| Item                      | Estado                       |
-| ------------------------- | ---------------------------- |
-| `.env`                    | fora do Git, ignorado        |
-| `.env.local`              | fora do Git, ignorado        |
-| `.env.example`            | versionado, sem valores      |
+| Item                      | Estado                        |
+| ------------------------- | ----------------------------- |
+| `.env`                    | fora do Git, ignorado         |
+| `.env.local`              | fora do Git, ignorado         |
+| `.env.example`            | versionado, sem valores       |
 | `service_role`            | **usada somente server-side** |
-| Chaves reais no histórico | nenhuma                      |
-| Segredos no bundle        | nenhum                       |
+| Chaves reais no histórico | nenhuma                       |
+| Segredos no bundle        | nenhum                        |
 
 O bundle do navegador foi auditado: zero ocorrências de `service_role`,
 `sb_secret_` com valor, JWT, ou vazamento de `next/headers` e do cliente de
@@ -384,6 +384,28 @@ origem. Hoje só a RLS impede manipulação de papel — e impede: `INSERT` leva
 42501, `UPDATE` e `DELETE` afetam zero linhas, e ninguém se promove. Um
 `REVOKE` seria uma segunda tranca, em defesa em profundidade. Não é urgente
 porque a primeira tranca está provada em execução.
+
+**`admin_audit_log` tinha o mesmo padrão — FECHADO LOCALMENTE, PENDENTE DE
+DEPLOY EM PRODUCTION (migration `018`, PR #55).** A migration existe no
+repositório e foi validada contra um Supabase local descartável, mas **ainda
+não foi aplicada em Production** — até lá, Production continua com o GRANT
+herdado descrito abaixo, protegido só pela RLS (primeira tranca), do mesmo
+jeito que `user_roles` continua hoje. Achado na validação local das 13
+suítes SQL (Postgres 17.6, migrations 001-017 do zero): `anon` e
+`authenticated` tinham, na tabela, o GRANT `arwdxtm` (SELECT/INSERT/UPDATE/
+DELETE/REFERENCES/TRIGGER/MAINTAIN) herdado do mesmo `ALTER DEFAULT
+PRIVILEGES` do bootstrap do Supabase — apesar do comentário da `017` afirmar
+que só `service_role` tinha GRANT de escrita. A RLS já bloqueava na prática
+(`UPDATE`/`DELETE` de `authenticated` afetavam zero linhas, medido em
+execução; nenhum dado foi alterado), mas a migration `018` fecha a segunda
+tranca: `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role`
+seguido de `GRANT SELECT TO authenticated` e `GRANT ALL TO service_role` —
+o mesmo padrão que a `013` já usa em `user_operation_access`. Comprovado por
+`supabase/tests/013_administracao_usuarios.sql` (casos A5-A7, A7b-A7d):
+`anon` e `authenticated` recusam INSERT/UPDATE/DELETE com 42501, a leitura de
+admin em AAL2 continua, e `service_role` continua gravando. `scripts/
+testar-sql-local.sh` reproduz essa validação num ambiente Supabase local
+descartável — nunca contra Production.
 
 ## Pendências abertas
 

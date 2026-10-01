@@ -104,7 +104,7 @@ src/
 └── proxy.ts                  renovação de sessão
 
 supabase/
-├── migrations/               23 arquivos, todos aplicados em Production
+├── migrations/               24 arquivos, 23 aplicados em Production (1 pendente)
 └── tests/                    13 testes SQL
 ```
 
