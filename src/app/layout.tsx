@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Space_Grotesk } from "next/font/google";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -31,7 +32,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Lê um header de requisição só para forçar renderização dinâmica: é isso
+  // que faz o Next embutir, em cada resposta, o nonce que o proxy.ts gerou
+  // para ESTA requisição nos scripts internos que ele injeta (streaming do
+  // RSC). Página estática não recebe nonce novo a cada request — ficaria
+  // presa ao nonce do build, e a CSP pararia de bater.
+  await headers();
+
   return (
     <html
       lang="pt-BR"
