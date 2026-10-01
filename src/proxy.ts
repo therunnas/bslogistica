@@ -18,7 +18,7 @@ const SUPABASE_HOST = "https://ehkduqokntemtmqzdrbd.supabase.co";
 const SENTRY_CSP_REPORT_URI =
   "https://o4512036932419584.ingest.us.sentry.io/api/4512036953260032/security/?sentry_key=61af9cd029eab6da3f484461be2f9d7d";
 
-function construirCspReportOnly(nonce: string): string {
+function construirCsp(nonce: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
@@ -36,8 +36,8 @@ function construirCspReportOnly(nonce: string): string {
 }
 
 /**
- * Renovação da sessão do Supabase a cada requisição, e CSP em Report-Only
- * com nonce por requisição.
+ * Renovação da sessão do Supabase a cada requisição, e CSP com nonce por
+ * requisição.
  *
  * No Next.js 16 esta convenção se chama proxy.ts — o antigo middleware.ts foi
  * descontinuado e renomeado nesta versão.
@@ -55,19 +55,23 @@ function construirCspReportOnly(nonce: string): string {
  * aplica a policy) quanto no cabeçalho da REQUISIÇÃO que segue para o
  * render (`requestHeaders`). É essa segunda cópia que faz o Next detectar o
  * nonce e aplicá-lo sozinho aos scripts inline que ele mesmo injeta no HTML
- * (o payload de streaming do RSC, `self.__next_f.push`) — sem isso, esses
- * scripts internos violariam a CSP e o sinal do Report-Only ficaria inútil.
- * Continua Report-Only: só observa, não bloqueia nada no navegador ainda.
+ * (o payload de streaming do RSC, `self.__next_f.push`).
+ *
+ * ENFORCEMENT — rodou em Report-Only em Production sem nenhuma violação
+ * legítima (as únicas observadas vieram de `vercel.live`, só em Preview, e
+ * não entram na policy — Preview não representa o navegador de um usuário
+ * real). Promovida para `Content-Security-Policy`: o navegador passa a
+ * bloquear o que a policy não permitir, não só registrar.
  */
 export async function proxy(request: NextRequest) {
   const { url, chave } = lerAmbienteSupabase();
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = construirCspReportOnly(nonce);
+  const csp = construirCsp(nonce);
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("Content-Security-Policy-Report-Only", csp);
+  requestHeaders.set("Content-Security-Policy", csp);
 
   // A resposta é recriada quando há cookie novo, para que os cabeçalhos
   // Set-Cookie acompanhem o que o Supabase acabou de renovar. Os headers da
@@ -98,7 +102,7 @@ export async function proxy(request: NextRequest) {
   // no cookie.
   await supabase.auth.getUser();
 
-  resposta.headers.set("Content-Security-Policy-Report-Only", csp);
+  resposta.headers.set("Content-Security-Policy", csp);
 
   // A resposta precisa ser devolvida como está. Criar outra e esquecer de
   // copiar os cookies faz a sessão se perder de forma difícil de diagnosticar.
