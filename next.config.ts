@@ -7,9 +7,10 @@ import type { NextConfig } from "next";
  * Fonte única: ficam aqui, e não em vercel.json nem em public/_headers, para
  * não existir uma segunda definição competindo com esta.
  *
- * Content-Security-Policy fica de fora de propósito — o Next injeta scripts
- * inline e uma CSP mal calibrada quebra a aplicação em silêncio. Ela merece
- * etapa própria, com nonce e teste.
+ * Content-Security-Policy-Report-Only NÃO está aqui — ela precisa de um nonce
+ * diferente a cada requisição (para os scripts internos que o Next injeta no
+ * streaming do RSC), e esta função roda só no build, não por requisição.
+ * Ela é montada em src/proxy.ts, que roda a cada requisição.
  */
 const cabecalhosDeSeguranca = [
   // Impede o navegador de adivinhar o tipo de um arquivo e executá-lo como
