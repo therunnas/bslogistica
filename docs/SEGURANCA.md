@@ -129,14 +129,14 @@ até lá a superfície existe sem nenhum consumidor.
 
 ## Segredos
 
-| Item                      | Estado                       |
-| ------------------------- | ---------------------------- |
-| `.env`                    | fora do Git, ignorado        |
-| `.env.local`              | fora do Git, ignorado        |
-| `.env.example`            | versionado, sem valores      |
+| Item                      | Estado                        |
+| ------------------------- | ----------------------------- |
+| `.env`                    | fora do Git, ignorado         |
+| `.env.local`              | fora do Git, ignorado         |
+| `.env.example`            | versionado, sem valores       |
 | `service_role`            | **usada somente server-side** |
-| Chaves reais no histórico | nenhuma                      |
-| Segredos no bundle        | nenhum                       |
+| Chaves reais no histórico | nenhuma                       |
+| Segredos no bundle        | nenhum                        |
 
 O bundle do navegador foi auditado: zero ocorrências de `service_role`,
 `sb_secret_` com valor, JWT, ou vazamento de `next/headers` e do cliente de
@@ -385,9 +385,13 @@ origem. Hoje só a RLS impede manipulação de papel — e impede: `INSERT` leva
 `REVOKE` seria uma segunda tranca, em defesa em profundidade. Não é urgente
 porque a primeira tranca está provada em execução.
 
-**`admin_audit_log` tinha o mesmo padrão — FECHADO pela migration `018`.**
-Achado na validação local das 13 suítes SQL contra um ambiente Supabase
-descartável (Postgres 17.6, migrations 001-017 do zero): `anon` e
+**`admin_audit_log` tinha o mesmo padrão — FECHADO LOCALMENTE, PENDENTE DE
+DEPLOY EM PRODUCTION (migration `018`, PR #55).** A migration existe no
+repositório e foi validada contra um Supabase local descartável, mas **ainda
+não foi aplicada em Production** — até lá, Production continua com o GRANT
+herdado descrito abaixo, protegido só pela RLS (primeira tranca), do mesmo
+jeito que `user_roles` continua hoje. Achado na validação local das 13
+suítes SQL (Postgres 17.6, migrations 001-017 do zero): `anon` e
 `authenticated` tinham, na tabela, o GRANT `arwdxtm` (SELECT/INSERT/UPDATE/
 DELETE/REFERENCES/TRIGGER/MAINTAIN) herdado do mesmo `ALTER DEFAULT
 PRIVILEGES` do bootstrap do Supabase — apesar do comentário da `017` afirmar

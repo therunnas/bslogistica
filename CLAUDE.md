@@ -387,9 +387,10 @@ Está registrado assim de propósito; se virar invariante, é tarefa própria.
   Há trigger `BEFORE TRUNCATE` sobre `timesheet_entries` e `invoice_items`. Não
   afrouxar nada disso sem tarefa de escopo próprio.
 - **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`. As 23 migrations do repositório estão
-  aplicadas em Production — a `014` e a `015` inclusive —, e **nenhuma
-  migration aplicada se edita**, nem para corrigir.
+  `supabase migration new <nome>`. O repositório tem 24 migrations; 23 estão
+  aplicadas em Production — a `014` e a `015` inclusive —, e a `018`
+  (hardening de grants de `admin_audit_log`, PR #55) está pendente de deploy.
+  **Nenhuma migration aplicada se edita**, nem para corrigir.
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse
   escopo explícito.
 - **Não alterar regras financeiras** — diária, hora extra, custo, faturamento —

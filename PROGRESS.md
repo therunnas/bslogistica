@@ -4,29 +4,30 @@ Checkpoint dinâmico. Regras permanentes ficam em [CLAUDE.md](CLAUDE.md).
 
 ## 1. Checkpoint
 
-| Item               | Valor                                                               |
-| ------------------ | ------------------------------------------------------------------- |
-| Data do checkpoint | 2026-09-28                                                          |
-| Último marco       | **PR #44** — PR D concluído, migration `017` aplicada em Production |
-| Merge do marco     | `481cf22e50ff21b07bf47ccf1324b7e997cc20c5` — merge commit do PR #44 |
-| B1                 | **CONCLUÍDO EM PRODUCTION**                                         |
-| Migrations         | **23 locais = 23 em Production**, zero pendentes                    |
-| Usuários reais     | **um**: o administrador, com TOTP verificado                        |
-| B2.1               | **CONCLUÍDO** — PR #30, mergeado                                    |
-| `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS     |
-| B2.2               | **CONCLUÍDO** — PR #32, mergeado                                    |
-| B2.3               | **CONCLUÍDO** — PR #33, mergeado                                    |
-| `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS               |
-| PR C               | **CONCLUÍDO** — PR #37, mergeado. Ver 7.6                           |
-| `016`              | **EM PRODUCTION** — PR #40, auditoria pós-deploy PASS. Ver 7.7      |
-| PR D               | **CONCLUÍDO** — PR #44, mergeado. Ver 7.8                           |
-| `017`              | **EM PRODUCTION** — PR #44, auditoria pós-deploy PASS. Ver 7.8      |
-| Suítes SQL         | **13/13 PASS, 0 FAIL** (`001`–`013`)                                |
-| Testes Node        | **1.062/1.062 PASS** (11 suítes)                                    |
-| PR E               | **CONCLUÍDO** — PR #47, mergeado: tela `/usuarios`                  |
-| PR F               | **CONCLUÍDO** — PR #48, mergeado: tela `/configuracoes`             |
-| Baseline           | Next 16.3.6; CI em `.github/workflows/ci.yml` (PR de estabilização) |
-| Etapa atual        | **PR G** — matriz E2E; baseline em revisão no PR de estabilização   |
+| Item               | Valor                                                                            |
+| ------------------ | -------------------------------------------------------------------------------- |
+| Data do checkpoint | 2026-09-28                                                                       |
+| Último marco       | **PR #44** — PR D concluído, migration `017` aplicada em Production              |
+| Merge do marco     | `481cf22e50ff21b07bf47ccf1324b7e997cc20c5` — merge commit do PR #44              |
+| B1                 | **CONCLUÍDO EM PRODUCTION**                                                      |
+| Migrations         | **24 locais, 23 em Production**, `018` pendente de deploy                        |
+| Usuários reais     | **um**: o administrador, com TOTP verificado                                     |
+| B2.1               | **CONCLUÍDO** — PR #30, mergeado                                                 |
+| `014`              | **CONCLUÍDA EM PRODUCTION** — PR #31, auditoria pós-deploy PASS                  |
+| B2.2               | **CONCLUÍDO** — PR #32, mergeado                                                 |
+| B2.3               | **CONCLUÍDO** — PR #33, mergeado                                                 |
+| `015`              | **EM PRODUCTION** — PR #34, auditoria pós-deploy PASS                            |
+| PR C               | **CONCLUÍDO** — PR #37, mergeado. Ver 7.6                                        |
+| `016`              | **EM PRODUCTION** — PR #40, auditoria pós-deploy PASS. Ver 7.7                   |
+| PR D               | **CONCLUÍDO** — PR #44, mergeado. Ver 7.8                                        |
+| `017`              | **EM PRODUCTION** — PR #44, auditoria pós-deploy PASS. Ver 7.8                   |
+| `018`              | **FECHADO LOCALMENTE, PENDENTE DE DEPLOY** — PR #55, grants de `admin_audit_log` |
+| Suítes SQL         | **13/13 PASS, 0 FAIL** (`001`–`013`)                                             |
+| Testes Node        | **1.062/1.062 PASS** (11 suítes)                                                 |
+| PR E               | **CONCLUÍDO** — PR #47, mergeado: tela `/usuarios`                               |
+| PR F               | **CONCLUÍDO** — PR #48, mergeado: tela `/configuracoes`                          |
+| Baseline           | Next 16.3.6; CI em `.github/workflows/ci.yml` (PR de estabilização)              |
+| Etapa atual        | **PR G** — matriz E2E; baseline em revisão no PR de estabilização                |
 
 O SHA acima é o **merge commit do PR #44**, o marco documental mais recente —
 não é necessariamente "o SHA atual da `main`" no momento em que este arquivo for

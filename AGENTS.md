@@ -24,9 +24,10 @@ tem relação com o TanStack Router.
 - **A chave `service_role` nunca vai para o cliente.** Nenhuma variável
   `NEXT_PUBLIC_*` pode conter segredo — o prefixo embute o valor no bundle.
 - **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`. O repositório tem 23 migrations, todas
-  aplicadas em Production — a `014`, a `015` e a `016` inclusive.
-  **Nenhuma migration aplicada se edita**, nem para corrigir.
+  `supabase migration new <nome>`. O repositório tem 24 migrations; 23 estão
+  aplicadas em Production — a `014`, a `015` e a `016` inclusive —, e a `018`
+  está pendente de deploy. **Nenhuma migration aplicada se edita**, nem para
+  corrigir.
 - **Não alterar regras financeiras** — cálculo de diária, hora extra, custo ou
   faturamento — fora de tarefa com esse escopo explícito.
 - **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
