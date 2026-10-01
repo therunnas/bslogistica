@@ -22,7 +22,7 @@ repositório, outro projeto na Vercel, outra pasta. Nunca tocar nele.
 
 Next.js 16 (App Router) · React 19 · TypeScript estrito · Tailwind CSS 4 ·
 shadcn/ui · Supabase (`@supabase/ssr`) · TanStack Query · npm · Vercel.
-Node ≥ 20.9.
+Node ≥ 22.6.
 
 **Não reintroduzir:** TanStack Start, TanStack Router, Vite, Nitro, Vinxi,
 Wrangler, Lovable. Foram removidos de propósito. `@tanstack/react-query`

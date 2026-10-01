@@ -15,8 +15,8 @@ shadcn/ui · Supabase (Postgres, Auth e RLS) · TanStack Query · Vercel.
 
 ## Instalação
 
-A aplicação requer Node.js 20.9 ou superior. As suítes de teste rodam com
-`--experimental-strip-types` e exigem Node.js 22.6 ou superior; a CI usa Node 24.
+Requer Node.js 22.6 ou superior (as suítes usam `--experimental-strip-types`).
+A CI roda em Node 24.
 
 ```bash
 npm install
