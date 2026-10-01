@@ -385,6 +385,24 @@ origem. Hoje só a RLS impede manipulação de papel — e impede: `INSERT` leva
 `REVOKE` seria uma segunda tranca, em defesa em profundidade. Não é urgente
 porque a primeira tranca está provada em execução.
 
+**`admin_audit_log` tinha o mesmo padrão — FECHADO pela migration `018`.**
+Achado na validação local das 13 suítes SQL contra um ambiente Supabase
+descartável (Postgres 17.6, migrations 001-017 do zero): `anon` e
+`authenticated` tinham, na tabela, o GRANT `arwdxtm` (SELECT/INSERT/UPDATE/
+DELETE/REFERENCES/TRIGGER/MAINTAIN) herdado do mesmo `ALTER DEFAULT
+PRIVILEGES` do bootstrap do Supabase — apesar do comentário da `017` afirmar
+que só `service_role` tinha GRANT de escrita. A RLS já bloqueava na prática
+(`UPDATE`/`DELETE` de `authenticated` afetavam zero linhas, medido em
+execução; nenhum dado foi alterado), mas a migration `018` fecha a segunda
+tranca: `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role`
+seguido de `GRANT SELECT TO authenticated` e `GRANT ALL TO service_role` —
+o mesmo padrão que a `013` já usa em `user_operation_access`. Comprovado por
+`supabase/tests/013_administracao_usuarios.sql` (casos A5-A7, A7b-A7d):
+`anon` e `authenticated` recusam INSERT/UPDATE/DELETE com 42501, a leitura de
+admin em AAL2 continua, e `service_role` continua gravando. `scripts/
+testar-sql-local.sh` reproduz essa validação num ambiente Supabase local
+descartável — nunca contra Production.
+
 ## Pendências abertas
 
 Nenhuma bloqueia produção. Todas estão documentadas.
