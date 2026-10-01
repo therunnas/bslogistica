@@ -46,19 +46,19 @@ reais era o mais fácil de percorrer, e foi o que aconteceu de verdade.
 
 ## Estado observado em 06/09/2026
 
-| | |
-| --- | --- |
-| Folhas com `shift_id NULL` | 0 |
-| Vínculos `operation_team` sem turno | 0 |
-| Pares operação+data com folha NULL e folha com turno | nenhum |
-| Colaboradores com duas diárias na mesma operação+data | **1** |
+|                                                       |        |
+| ----------------------------------------------------- | ------ |
+| Folhas com `shift_id NULL`                            | 0      |
+| Vínculos `operation_team` sem turno                   | 0      |
+| Pares operação+data com folha NULL e folha com turno  | nenhum |
+| Colaboradores com duas diárias na mesma operação+data | **1**  |
 
 O caso real veio por dois turnos reais, não por nulo:
 
-| Colaborador | Data | Operação | Turno | Jornada | Faturado |
-| --- | --- | --- | --- | --- | --- |
+| Colaborador         | Data       | Operação       | Turno    | Jornada  | Faturado  |
+| ------------------- | ---------- | -------------- | -------- | -------- | --------- |
 | Gabriel Jesus Rocha | 05/09/2026 | Itajai ludovic | Matutino | 1200 min | R$ 450,00 |
-| Gabriel Jesus Rocha | 05/09/2026 | Itajai ludovic | Noturno | 480 min | R$ 180,00 |
+| Gabriel Jesus Rocha | 05/09/2026 | Itajai ludovic | Noturno  | 480 min  | R$ 180,00 |
 
 Ambos já faturados, na mesma invoice.
 
@@ -113,7 +113,7 @@ mensagem de negócio, em vez de erro técnico.
 
 ## Exceção histórica preservada
 
-O lançamento `a453c848-3478-4388-858a-12546103d10b` — Noturno, 480 min,
+O lançamento histórico — Noturno, 480 min,
 R$ 180,00, já faturado — é anterior à invariável e está **excluído do índice**.
 Nada nele foi alterado: valores, status, `invoice_id` e os itens da fatura
 seguem exatamente como foram cobrados.
@@ -130,7 +130,7 @@ permanente com nome de exceção histórica. Amarrada às quatro colunas, a isen
 vale apenas enquanto a linha continuar sendo exatamente o registro conhecido;
 mudou qualquer parte da chave, ela volta a ser coberta pelo índice.
 
-O par dele, `5ebf2a8b-cf39-4862-869f-030e7f49377d` (Matutino, 1200 min,
+O par dele (Matutino, 1200 min,
 R$ 450,00), permanece **sob** o índice como a diária canônica do dia. O critério
 é objetivo: sob a regra nova, a diária é a da maior jornada e o excedente
 deveria ter sido hora extra — o excedente é o que sai do índice.

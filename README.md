@@ -1,26 +1,43 @@
-# BS Logística — sistema de gestão
+# BS Soluções Logística — sistema de gestão
 
-Painel interno de gestão operacional e financeira de mão de obra terceirizada:
-clientes e contratos, colaboradores, operações e turnos, apontamento de diárias
-e horas extras, faturamento por período e relatórios.
+Painel interno de gestão operacional e financeira de mão de obra terceirizada.
+Uso interno, publicado em `admin.bslogisticas.com.br`; não há cadastro público.
 
-Sistema de uso interno, **publicado** em `admin.bslogisticas.com.br`. Não há
-cadastro público: `disable_signup = true`, e a criação de contas passa
-exclusivamente pelo administrador, pela tela `/usuarios` do próprio painel.
+> O site institucional (`bslogisticas.com.br`) é outro projeto, em outro
+> repositório. Este repositório contém somente o painel.
+
+## Principais funcionalidades
+
+- **Clientes e contratos** — cadastro e regras de cobrança (diária, jornada, hora
+  extra).
+- **Colaboradores, operações e turnos** — equipe alocada por operação e turno.
+- **Apontamento** de presença, horários e intervalo, com cálculo de diária e hora
+  extra.
+- **Faturamento** por cliente e período, e **relatórios** com exportação CSV.
+- **Usuários e papéis** — convite por e-mail, papel `admin` ou `operacional`,
+  atribuição de operações e auditoria das alterações.
+- **Área operacional** — tela separada, sem valores financeiros, para quem
+  registra a presença em campo.
+- **Segurança** — segundo fator (TOTP) obrigatório para o administrador, RLS no
+  banco e valores financeiros calculados no banco.
 
 ## Stack
 
-Next.js 16 com App Router · React 19 · TypeScript estrito · Tailwind CSS 4 ·
+Next.js 16 (App Router) · React 19 · TypeScript estrito · Tailwind CSS 4 ·
 shadcn/ui · Supabase (Postgres, Auth e RLS) · TanStack Query · Vercel.
 
-## Instalação
+## Pré-requisitos
 
-Requer Node.js 22.6 ou superior (as suítes usam `--experimental-strip-types`).
-A CI roda em Node 24.
+- Node.js 22.6 ou superior (as suítes de teste usam `--experimental-strip-types`;
+  a CI roda em Node 24).
+- npm.
+- Um projeto Supabase com as migrations de `supabase/migrations/` aplicadas.
+
+## Início rápido
 
 ```bash
 npm install
-cp .env.example .env
+cp .env.example .env   # preencha as variáveis abaixo
 npm run dev
 ```
 
@@ -28,112 +45,86 @@ Abre em http://localhost:3000.
 
 ## Variáveis de ambiente
 
-```
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-SUPABASE_SERVICE_ROLE_KEY
-PASSWORD_RECOVERY_PROOF_SECRET
-```
+| Variável                               | Onde roda   | Descrição                                           |
+| -------------------------------------- | ----------- | --------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | navegador   | URL do projeto Supabase                             |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | navegador   | chave publicável; quem protege os dados é a RLS     |
+| `SUPABASE_SERVICE_ROLE_KEY`            | só servidor | **segredo**; operações administrativas de usuário   |
+| `PASSWORD_RECOVERY_PROOF_SECRET`       | só servidor | **segredo**; assina a prova da recuperação de senha |
 
-As duas variáveis `NEXT_PUBLIC_*` são públicas por natureza: viajam no JavaScript
-da página. Quem protege os dados é a RLS do banco. A
-`SUPABASE_SERVICE_ROLE_KEY` é segredo e é usada exclusivamente no servidor pelas
-operações administrativas de usuários. Ela nunca pode receber o prefixo
-`NEXT_PUBLIC_` nem ser importada por código client. O cliente privilegiado só é
-instanciado depois dos controles de autorização do backend; a chave não substitui
-esses controles e nunca deve ser versionada. A `PASSWORD_RECOVERY_PROOF_SECRET`
-também é segredo, só do servidor, e assina a prova da recuperação de senha;
-`.env.example` descreve como gerá-la.
+As variáveis marcadas como segredo nunca recebem o prefixo `NEXT_PUBLIC_` e nunca
+são versionadas. O `.env.example` explica cada uma e como gerar o segredo de
+recuperação. Detalhes em [Segurança](docs/SEGURANCA.md).
 
 ## Comandos
 
-| Comando                         | O que faz                              |
-| ------------------------------- | -------------------------------------- |
-| `npm run dev`                   | servidor de desenvolvimento            |
-| `npm run build`                 | build de produção                      |
-| `npm run start`                 | serve o build                          |
-| `npm run lint`                  | ESLint com Prettier                    |
-| `npm run format`                | formata o código                       |
-| `npm run test:mfa`              | decisões de segundo fator              |
-| `npm run test:recuperacao`      | fluxo de recuperação de senha          |
-| `npm run test:prova`            | prova HMAC e saídas pós-`verifyOtp`    |
-| `npm run test:troca`            | troca de senha e desfechos do login    |
-| `npm run test:cookies-supabase` | cookies de sessão do Supabase          |
-| `npm run test:operacional`      | contratos da superfície operacional    |
-| `npm run test:papel`            | papel efetivo e guards                 |
-| `npm run test:tela-operacional` | tela `/operacional`                    |
-| `npm run test:admin-usuarios`   | administração de usuários, no servidor |
-| `npm run test:tela-usuarios`    | tela `/usuarios`                       |
-| `npm run test:configuracoes`    | tela `/configuracoes`                  |
+| Comando               | O que faz                                     |
+| --------------------- | --------------------------------------------- |
+| `npm run dev`         | servidor de desenvolvimento                   |
+| `npm run build`       | build de produção                             |
+| `npm run start`       | serve o build                                 |
+| `npm run lint`        | ESLint com Prettier                           |
+| `npm run format`      | formata o código                              |
+| `npm run test:<nome>` | uma suíte de testes (lista em `package.json`) |
 
-São **11 suítes Node, com 1.062 asserções** no total. Várias asseveram a **forma
-literal** do código, não só o comportamento — mexeu em auth, MFA, recuperação ou
-nas telas, rode todas.
+## Testes e CI
 
-Os testes de banco ficam em `supabase/tests/` — 13 arquivos SQL de RLS,
-invariáveis, proteção financeira, estado de MFA e superfície operacional. Cada
-um roda de uma vez e termina em `rollback`. Não rodam na CI.
+- **Suítes Node** (`npm run test:*`): decisões de MFA, recuperação de senha, papel
+  e guards, telas, administração de usuários e camada operacional. Várias
+  asseveram a **forma literal** do código, não só o comportamento: mexeu em auth,
+  MFA, recuperação ou nas telas, rode todas.
+- **Testes de banco** em `supabase/tests/`: arquivos SQL de RLS, invariantes,
+  proteção financeira e superfície operacional. Cada um termina em `rollback`.
+  Rodam localmente com `scripts/testar-sql-local.sh`, contra um Supabase local
+  descartável, e não na CI.
+- **CI** (`.github/workflows/ci.yml`): em todo pull request e em push para `main`,
+  roda lint, `tsc --noEmit`, as suítes Node e o build. Não usa secret nem acessa
+  o Supabase de Production.
 
-## Validação e CI
-
-Antes de entregar: `npm run lint`, `npx tsc --noEmit`, as 11 suítes e
-`npm run build`. O workflow `.github/workflows/ci.yml` executa essa mesma
-sequência em todo pull request e em todo push para `main`. Ele não usa secret
-algum e não acessa o Supabase de Production: o `build` recebe valores inertes
-para as duas variáveis públicas, só para a pré-renderização passar.
-
-`main` recebe alterações por pull request; o trabalho é feito em branch.
+Antes de entregar: `npm run lint`, `npx tsc --noEmit`, todas as suítes e
+`npm run build`. `main` recebe alterações por pull request.
 
 ## Estrutura
 
 ```
 src/
-├── app/                      rotas (App Router)
-│   ├── page.tsx              redireciona para /login
-│   ├── login/, mfa/          entrada e segundo fator
-│   ├── esqueci-senha/, auth/, redefinir-senha/
-│   │                         recuperação de senha
-│   └── (painel)/             área protegida — 10 rotas: dashboard, clientes,
-│                             colaboradores, operações, apontamentos,
-│                             faturamento, relatórios, usuários, configurações
-│                             e operacional
-├── components/               ui (shadcn/ui), branding
-├── integrations/supabase/    clientes, tipos do banco
-├── lib/                      cálculo, queries, MFA, recuperação de senha,
-│                             admin-usuarios, operacional
-└── proxy.ts                  renovação de sessão
+├── app/                  rotas (App Router): login, MFA, recuperação de senha
+│   └── (painel)/         área protegida: telas administrativas e /operacional
+├── components/           shadcn/ui e marca
+├── integrations/supabase/ clientes (navegador, servidor, admin) e tipos do banco
+├── lib/                  cálculo, consultas, MFA, usuários, camada operacional
+└── proxy.ts              renovação de sessão e política de conteúdo (CSP)
 
 supabase/
-├── migrations/               24 arquivos, 23 aplicados em Production (1 pendente)
-└── tests/                    13 testes SQL
+├── migrations/           esquema, RLS, triggers e RPCs
+└── tests/                testes SQL
 ```
 
-Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+Detalhes em [Arquitetura](docs/ARQUITETURA.md).
+
+## Segurança
+
+Sem cadastro público. Dois papéis (`admin` e `operacional`), MFA obrigatório para
+o administrador, RLS no banco como proteção real dos dados, valores financeiros
+derivados no banco e operações privilegiadas somente no servidor. O modelo
+completo e os riscos residuais estão em [Segurança](docs/SEGURANCA.md).
 
 ## Deploy
 
-Vercel, projeto `bs-logistica-sistema`. O `vercel.json` declara o framework; o
-build usa o script `build`. As duas variáveis precisam existir no ambiente — sem
-elas o build falha na pré-renderização, de propósito, em vez de publicar uma
-aplicação quebrada.
+Vercel, a partir de `main`; o `vercel.json` declara o framework e o build usa o
+script `build`. As variáveis de ambiente precisam existir no ambiente — sem elas o
+build falha na pré-renderização, de propósito, em vez de publicar uma aplicação
+quebrada. O Preview não recebe as variáveis do banco de produção.
 
-O site institucional (`bslogisticas.com.br`) é outro projeto e outro repositório.
-Este painel responde em `admin.bslogisticas.com.br`.
+## Documentação do projeto
 
-## Documentação
+| Documento                                      | Conteúdo                                                 |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| [Arquitetura](docs/ARQUITETURA.md)             | organização do código, fluxo de dados, regras de negócio |
+| [Segurança](docs/SEGURANCA.md)                 | autenticação, MFA, RLS, segredos, riscos residuais       |
+| [Estado do projeto](docs/ESTADO_DO_PROJETO.md) | fotografia atual: Production, testes, módulos            |
+| [Progresso](PROGRESS.md)                       | etapa atual, marcos e próximas etapas                    |
+| [Dívidas técnicas](docs/divida-tecnica/)       | histórico dos defeitos já diagnosticados e resolvidos    |
 
-| Documento                                      | Conteúdo                                                     |
-| ---------------------------------------------- | ------------------------------------------------------------ |
-| [Arquitetura](docs/ARQUITETURA.md)             | organização do código, autenticação, fluxo de dados, módulos |
-| [Segurança](docs/SEGURANCA.md)                 | RLS, papéis, segredos, pendências abertas                    |
-| [Progresso](PROGRESS.md)                       | **estado atual, decisões abertas e próximo passo**           |
-| [Estado do projeto](docs/ESTADO_DO_PROJETO.md) | fotografia do projeto, atualizada a cada marco               |
-| [Dívidas técnicas](docs/divida-tecnica/)       | defeitos conhecidos, com causa e reprodução                  |
-
-**Antes de mexer em apontamentos ou faturamento, leia as dívidas técnicas.** As
-que afetavam valores cobrados já foram fechadas por migration, mas os documentos
-explicam a causa — e o banco, não a interface, é a autoridade sobre qualquer
-valor.
-
-Regras permanentes para quem for editar o projeto estão em
-[CLAUDE.md](CLAUDE.md); `AGENTS.md` repete o subconjunto que agentes precisam.
+Regras permanentes para quem edita o projeto com agentes de código:
+[CLAUDE.md](CLAUDE.md) (Claude Code) e [AGENTS.md](AGENTS.md) (demais agentes).

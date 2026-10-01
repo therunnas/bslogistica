@@ -11,8 +11,9 @@ seções de correção vêm em seguida.
 
 ## Causa técnica
 
-A geração de fatura, em `src/routes/_authenticated/faturamento.tsx`, executa três
-escritas separadas a partir do navegador, sem transação:
+A geração de fatura, na tela de faturamento (à época em
+`src/routes/_authenticated/faturamento.tsx`, caminho do projeto anterior ao Next.js),
+executava três escritas separadas a partir do navegador, sem transação:
 
 ```
 1. INSERT em invoices          -> devolve invoice.id
@@ -33,15 +34,15 @@ vinculado, o mesmo trabalho pode ser cobrado repetidamente.
 
 ## Estado observado
 
-Quatro faturas, todas do cliente **Salmonela**, três delas cobrindo exatamente
+Quatro faturas, todas de um mesmo cliente de teste, três delas cobrindo exatamente
 o mesmo período.
 
-| #   | ID                                     | Período       | Total     | Soma dos itens | Itens | Apontamentos vinculados | Criada   |
-| --- | -------------------------------------- | ------------- | --------- | -------------- | ----- | ----------------------- | -------- |
-| 1   | `d5bb5206-ffb9-477a-af9a-df199760dca7` | 01/09 a 30/09 | R$ 0,00   | R$ 0,00        | 1     | **0 — órfã**            | 12:30:44 |
-| 2   | `7aa38d0f-d765-4fa9-af6c-b3a03f8483da` | 01/09 a 30/09 | R$ 0,00   | R$ 0,00        | 1     | **0 — órfã**            | 12:33:26 |
-| 3   | `4528e427-beae-4dfc-b0c6-90a9630df4c7` | 01/09 a 30/09 | R$ 264,38 | R$ 264,38      | 2     | **0 — órfã**            | 12:37:29 |
-| 4   | `e66e6b17-09e4-46a6-8a89-19707cf82295` | 01/09 a 11/09 | R$ 264,38 | R$ 264,38      | 2     | 1                       | 13:03:53 |
+| #   | Fatura   | Período       | Total     | Soma dos itens | Itens | Apontamentos vinculados | Criada   |
+| --- | -------- | ------------- | --------- | -------------- | ----- | ----------------------- | -------- |
+| 1   | fatura 1 | 01/09 a 30/09 | R$ 0,00   | R$ 0,00        | 1     | **0 — órfã**            | 12:30:44 |
+| 2   | fatura 2 | 01/09 a 30/09 | R$ 0,00   | R$ 0,00        | 1     | **0 — órfã**            | 12:33:26 |
+| 3   | fatura 3 | 01/09 a 30/09 | R$ 264,38 | R$ 264,38      | 2     | **0 — órfã**            | 12:37:29 |
+| 4   | fatura 4 | 01/09 a 11/09 | R$ 264,38 | R$ 264,38      | 2     | 1                       | 13:03:53 |
 
 Todas com situação `closed`.
 
@@ -201,19 +202,19 @@ período. O filtro de elegibilidade já resolve o defeito real.
 
 Todos contra o banco real, com a base em `invoices = 0` e dois apontamentos.
 
-| Teste | Resultado |
-| ----- | --------- |
-| Autorização: usuário sem papel admin | **PASS** — `42501` |
-| Período inválido (`início > fim`) | **PASS** — `22023` |
-| Cliente inexistente | **PASS** — `P0002` |
-| Geração transacional com rollback | **PASS** |
-| `total_amount` = soma de `billed_amount` | **PASS** — 433,13 |
-| `total_cost` = soma de `cost_amount` | **PASS** — 330,94 |
-| `total_amount` = soma de `invoice_items.amount` | **PASS** |
-| `total_dailies` = nº de entries faturados | **PASS** — 2 |
-| Vínculo dos entries | **PASS** — 2 vinculados, nenhum `absent` |
-| Duplicidade: segunda geração no mesmo período | **PASS** — `P0002`, vínculos não movidos |
-| Concorrência real entre duas sessões | **PASS** — sessão 2 bloqueada no advisory lock até o `COMMIT` da sessão 1, depois `P0002`; nunca existiram duas faturas |
+| Teste                                           | Resultado                                                                                                               |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Autorização: usuário sem papel admin            | **PASS** — `42501`                                                                                                      |
+| Período inválido (`início > fim`)               | **PASS** — `22023`                                                                                                      |
+| Cliente inexistente                             | **PASS** — `P0002`                                                                                                      |
+| Geração transacional com rollback               | **PASS**                                                                                                                |
+| `total_amount` = soma de `billed_amount`        | **PASS** — 433,13                                                                                                       |
+| `total_cost` = soma de `cost_amount`            | **PASS** — 330,94                                                                                                       |
+| `total_amount` = soma de `invoice_items.amount` | **PASS**                                                                                                                |
+| `total_dailies` = nº de entries faturados       | **PASS** — 2                                                                                                            |
+| Vínculo dos entries                             | **PASS** — 2 vinculados, nenhum `absent`                                                                                |
+| Duplicidade: segunda geração no mesmo período   | **PASS** — `P0002`, vínculos não movidos                                                                                |
+| Concorrência real entre duas sessões            | **PASS** — sessão 2 bloqueada no advisory lock até o `COMMIT` da sessão 1, depois `P0002`; nunca existiram duas faturas |
 
 A concorrência foi validada com **duas sessões `psql` independentes**. Fica
 registrado o motivo: o SQL Editor do Supabase não é adequado para esse teste —
@@ -229,19 +230,19 @@ apontamentos inalterada.
 
 Executados na aplicação local, contra o banco real.
 
-| Teste                                                                | Resultado |
-| -------------------------------------------------------------------- | --------- |
-| Gerar fatura via `rpc("gerar_fatura")`                               | **PASS** |
-| Fatura com 2,00 diárias · 3,25 h · R$ 433,13 · custo R$ 330,94       | **PASS** |
-| 2 `invoice_items` criados                                            | **PASS** |
-| 2 `timesheet_entries` vinculados                                     | **PASS** |
-| Prévia zerou após o faturamento                                      | **PASS** |
-| Botão de gerar perdeu elegibilidade                                  | **PASS** |
-| F5 preservou a fatura                                                | **PASS** |
-| Dashboard permaneceu coerente                                        | **PASS** |
-| Relatórios por colaborador                                           | **PASS** |
-| Relatórios por operação                                              | **PASS** |
-| Relatórios > Lançamentos com "Faturado = Sim" nos dois apontamentos   | **PASS** |
+| Teste                                                               | Resultado |
+| ------------------------------------------------------------------- | --------- |
+| Gerar fatura via `rpc("gerar_fatura")`                              | **PASS**  |
+| Fatura com 2,00 diárias · 3,25 h · R$ 433,13 · custo R$ 330,94      | **PASS**  |
+| 2 `invoice_items` criados                                           | **PASS**  |
+| 2 `timesheet_entries` vinculados                                    | **PASS**  |
+| Prévia zerou após o faturamento                                     | **PASS**  |
+| Botão de gerar perdeu elegibilidade                                 | **PASS**  |
+| F5 preservou a fatura                                               | **PASS**  |
+| Dashboard permaneceu coerente                                       | **PASS**  |
+| Relatórios por colaborador                                          | **PASS**  |
+| Relatórios por operação                                             | **PASS**  |
+| Relatórios > Lançamentos com "Faturado = Sim" nos dois apontamentos | **PASS**  |
 
 ## Limpeza final
 
@@ -286,9 +287,9 @@ Duas migrations estavam fora de `supabase_migrations.schema_migrations`:
 Antes de qualquer reconciliação, os efeitos das duas foram **auditados no banco**,
 não presumidos:
 
-| Migration | Evidência | Conclusão |
-| --------- | --------- | --------- |
-| `20260903205051` | `has_function_privilege` em `public.rls_auto_enable`: `PUBLIC`, `anon` e `authenticated` com `false`; `postgres` com `true` | efeitos 100% presentes |
+| Migration        | Evidência                                                                                                                                                                                              | Conclusão              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
+| `20260903205051` | `has_function_privilege` em `public.rls_auto_enable`: `PUBLIC`, `anon` e `authenticated` com `false`; `postgres` com `true`                                                                            | efeitos 100% presentes |
 | `20260905163000` | `md5` normalizado de `prosrc` igual ao do arquivo local (`dde73de1372af215620ed28ba2f7f006`), `SECURITY DEFINER`, `search_path = public, pg_temp`, owner `postgres`, `EXECUTE` só para `authenticated` | efeitos 100% presentes |
 
 A diferença de tamanho do corpo entre banco e arquivo — 5721 contra 5567
