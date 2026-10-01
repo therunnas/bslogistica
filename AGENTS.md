@@ -24,8 +24,8 @@ tem relação com o TanStack Router.
 - **A chave `service_role` nunca vai para o cliente.** Nenhuma variável
   `NEXT_PUBLIC_*` pode conter segredo — o prefixo embute o valor no bundle.
 - **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`. O repositório tem 22 migrations: 21 estão
-  aplicadas em Production — a `014` e a `015` inclusive — e a `016` está em PR.
+  `supabase migration new <nome>`. O repositório tem 23 migrations, todas
+  aplicadas em Production — a `014`, a `015` e a `016` inclusive.
   **Nenhuma migration aplicada se edita**, nem para corrigir.
 - **Não alterar regras financeiras** — cálculo de diária, hora extra, custo ou
   faturamento — fora de tarefa com esse escopo explícito.
@@ -128,7 +128,7 @@ tem relação com o TanStack Router.
   `public.is_staff()`, que é verdadeira para qualquer papel. `profiles`,
   `user_roles` e `user_operation_access` ficam de fora, de propósito. A
   interface **consome** as RPCs desde o B2.1 (`src/lib/operacional/`) e o B2.3
-  (tela `/operacional`), e só elas. **A `016` ainda não está em Production.** Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
+  (tela `/operacional`), e só elas. **A `016` está em Production.** Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
   `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
   por linha e recusa a chamada inteira diante de chave inesperada, não existe
   DELETE, e toda função `SECURITY DEFINER` revalida papel + AAL + MFA +
