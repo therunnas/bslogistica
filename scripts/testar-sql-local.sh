@@ -28,14 +28,27 @@ env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@latest start >/dev/null
 echo "Aplicando as migrations do zero (supabase db reset --local)..."
 env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@latest db reset --local
 
-container=$(docker ps --filter "name=supabase_db_" --format "{{.Names}}" | head -1)
-if [ -z "$container" ]; then
-  echo "Não encontrei o container supabase_db_* rodando localmente." >&2
+# O container local segue a convenção supabase_db_<project_id>. Resolve o
+# project_id do config.toml DESTE repositório e monta o nome exato — nunca um
+# filtro parcial (docker ps --filter "name=supabase_db_" | head -1), que
+# pegaria o container de outro projeto Supabase local se houver mais de um
+# rodando ao mesmo tempo na máquina. Sem fallback: se o nome exato não
+# existir e estiver rodando, o script para.
+project_id=$(grep -E '^project_id' supabase/config.toml | sed -E 's/^project_id[[:space:]]*=[[:space:]]*"(.*)"$/\1/')
+if [ -z "$project_id" ]; then
+  echo "Não consegui ler project_id de supabase/config.toml." >&2
   exit 1
 fi
 
-host=$(docker port "$container" 5432/tcp 2>/dev/null || true)
-echo "Container local: $container (porta: ${host:-desconhecida, só acessível via docker exec})"
+container="supabase_db_${project_id}"
+estado=$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null || true)
+if [ "$estado" != "true" ]; then
+  echo "O container $container não existe ou não está rodando." >&2
+  echo "Confira 'supabase start' e 'docker ps' — este script não usa outro container." >&2
+  exit 1
+fi
+
+echo "Container local: $container (project_id: $project_id)"
 
 falhou=""
 for arquivo in supabase/tests/*.sql; do
