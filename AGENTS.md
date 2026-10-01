@@ -1,173 +1,99 @@
-# Instruções operacionais
+# Instruções para agentes — BS Soluções Logística
 
-Documentação do projeto: [README](README.md) ·
+Subconjunto essencial e permanente das regras do projeto. A versão completa, para
+Claude Code, é o [CLAUDE.md](CLAUDE.md); as regras compartilhadas **não podem se
+contradizer**. Detalhes em [README](README.md) ·
 [Arquitetura](docs/ARQUITETURA.md) · [Segurança](docs/SEGURANCA.md) ·
-[Progresso](PROGRESS.md)
+[Estado do projeto](docs/ESTADO_DO_PROJETO.md) · [Progresso](PROGRESS.md).
 
-## Stack definitiva
+## Projeto
+
+Painel interno de gestão de mão de obra terceirizada, em
+`admin.bslogisticas.com.br`. O site institucional (`bslogisticas.com.br`) é
+**outro repositório e outro projeto: nunca tocar nele.**
+
+## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript estrito · Tailwind CSS 4 ·
-Supabase com `@supabase/ssr` · TanStack Query · npm · Vercel.
+Supabase com `@supabase/ssr` · TanStack Query · npm · Vercel. Node ≥ 22.6.
 
-## Não reintroduzir
+**Não reintroduzir** TanStack Start, TanStack Router, Vite, Nitro, Vinxi, Wrangler
+ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
+`middleware.ts` (no Next.js 16 o segundo é ignorado em silêncio).
 
-TanStack Start, TanStack Router, Vite, Nitro, Vinxi, Wrangler ou qualquer
-integração com o Lovable. Foram removidos de propósito.
-
-`@tanstack/react-query` **permanece** — é a camada de dados da aplicação e não
-tem relação com o TanStack Router.
-
-## Regras
+## Segurança
 
 - **A RLS é a proteção real dos dados.** O guard do layout governa o que a
-  interface mostra; nunca o trate como substituto das políticas do banco.
-- **A chave `service_role` nunca vai para o cliente.** Nenhuma variável
-  `NEXT_PUBLIC_*` pode conter segredo — o prefixo embute o valor no bundle.
-- **Nunca editar migration já aplicada.** Criar nova com
-  `supabase migration new <nome>`. O repositório tem 24 migrations; 23 estão
-  aplicadas em Production — a `014`, a `015` e a `016` inclusive —, e a `018`
-  está pendente de deploy. **Nenhuma migration aplicada se edita**, nem para
-  corrigir.
-- **Não alterar regras financeiras** — cálculo de diária, hora extra, custo ou
-  faturamento — fora de tarefa com esse escopo explícito.
-- **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
-  `cost_amount` e os snapshots de diária, hora extra e custo são derivados por
-  trigger a partir de contrato, operação, turno e colaborador. No `INSERT` a
-  derivação sobrescreve o que veio do navegador; um `UPDATE` que mexa **apenas**
-  em campo derivado é **recusado com `42501`**, não corrigido em silêncio; um
-  `UPDATE` aceito **recalcula só se mexeu em coluna motriz** (`status`,
-  `check_in`, `check_out`, `break_minutes`, `employee_id`, `timesheet_id`) e do
-  contrário **preserva** o que estava gravado, descartando o payload — é a
-  preservação que mantém o snapshot congelado. `postgres` e `service_role`
-  escapam desse bloqueio específico, não das demais proteções.
-  `src/lib/billing.ts` serve para a interface prever o número, nunca para
-  decidi-lo; a paridade entre as duas implementações é conferida à mão.
-- **Histórico faturado é imutável.** `timesheet_entries` com `invoice_id`
-  recusa `UPDATE` e `DELETE`. O vínculo só nasce em execução como `postgres`,
-  contexto em que `gerar_fatura` roda — `authenticated`, admin incluído, e
-  `service_role` não criam; sessão `postgres` direta e superusuário estão fora
-  dessa fronteira. Os bloqueios de `DELETE` têm critérios **distintos**, não "em
-  uso": cliente exige **fatura ou apontamento faturado**; contrato, ser o
-  `contract_id` **atual** de uma operação com apontamento — remapear a operação
-  torna o contrato de origem apagável; turno, ser referenciado por **folha** —
-  só por `operation_team` não basta. Com faturamento congelam
-  `operations.client_id`, o
-  `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
-  **Não** congelam `operations.contract_id`, `agreed_amount`, as taxas do
-  contrato nem `employees.daily_cost` — editáveis por admin, sem alterar o já
-  faturado, mas perdendo proveniência. `TRUNCATE` está revogado de `anon` e
-  `authenticated` em `public`, e de `service_role` **nas 10 tabelas de
-  negócio** — `profiles` e `user_roles` **continuam** com ele para
-  `service_role`, porque a `011` não as listou e `ALTER DEFAULT PRIVILEGES` não
-  mexe em grant existente. Não afrouxar fora de tarefa própria.
-- **O `postgres` do Supabase não é superusuário; o do harness local é.** Teste
-  de privilégio que passa localmente não prova nada sobre Production — superusuário
-  pula checagem de ACL. Em especial, `ALTER ... OWNER TO` exige que o **novo dono**
-  tenha `CREATE` no schema: conceder antes e revogar depois, na mesma transação,
-  nunca deixar permanente.
-- **Não tocar no projeto `bs-logisticas`.** É o site institucional, outro
-  repositório e outro projeto na Vercel.
-- **`proxy.ts`, não `middleware.ts`.** No Next.js 16 a convenção foi renomeada;
-  um `middleware.ts` é ignorado em silêncio e a sessão deixa de ser renovada.
-- **Token de uso único não se consome em GET.** Gateways de segurança de e-mail
-  visitam cada link da mensagem sozinhos; um GET que muda estado queima o token
-  antes do usuário. No GET, validar **apenas formato/estrutura e tipo
-  permitido** — nada além disso. Conferir a validade ou a autenticidade do
-  token **é** consumi-lo, então isso só pode acontecer depois de uma ação
-  deliberada do usuário.
-- **MFA é exigido também no banco.** 11 tabelas de negócio têm policy
-  RESTRICTIVE pedindo `aal2`; `user_roles` fica de fora de propósito, porque é
-  lida antes do MFA. Não adicionar AAL2 nela.
-- **O guard do painel é role-aware desde o PR C** (PR #37), e a decisão é uma
-  só, em `lerAcesso()`: **admin** nunca é liberado em AAL1 — sem fator vai
-  cadastrar (`mfa-ausente`), com fator vai desafiar (`mfa-pendente`), e só AAL2
-  libera; **`operacional` sem fator verificado** pode trabalhar em AAL1, e
-  **com** fator verificado é barrado até concluir o TOTP, voltando em AAL2;
-  **`admin`+`operacional` é admin**, com AAL2 obrigatório; sem papel bloqueia; e
-  falha de leitura ou claim `aal` ausente/desconhecida **fecha**. Não recriar
-  essa decisão no layout, em `/mfa`, no dashboard ou nos guards — duas
-  definições de "liberado" produzem laço entre as rotas.
-- **Não remover a policy AAL2 global sem substituição segura.** As **11 tabelas**
-  de negócio continuam exigindo `aal2` por policy RESTRICTIVE **global**, e a
-  exceção do `operacional` **não** entra por policy: ela é a superfície de RPC
-  abaixo. Derrubar a policy reabre uma vulnerabilidade já corrigida.
-- **O que ainda não existe é o autosserviço de MFA do `operacional`** — ativar
-  ou desativar o próprio fator. O _enforcement_ por papel já está implementado;
-  o que falta é a tela Configurações → Segurança, que é o **PR F**. Não escrever
-  que "MFA por papel não foi implementado".
-- **Não criar usuário `operacional` real** antes de concluir o **PR D**, o
-  **PR E**, o **PR F** e a matriz E2E do **PR G**. B2.1, B2.2, B2.3 e o PR C já
-  estão fechados; a proibição continua pelos que faltam. Ver `CLAUDE.md`, seção
-  "AAL por papel", e `PROGRESS.md`, seções 6 e 7.
-- **MFA optativo vale no banco, não só no guard.** Se a conta `operacional`
-  tiver fator verificado, a exceção de AAL1 não pode deixar bypass direto por
-  PostgREST/RPC — papel + `aal` sozinhos não distinguem quem nunca ativou MFA de
-  quem ativou e ainda não fez o TOTP. É por isso que as RPCs revalidam o estado
-  de MFA por dentro e o guard consulta o banco em vez do cookie.
-- **Estado de MFA vindo da sessão não vale para enforcement.**
-  `getAuthenticatorAssuranceLevel()` sem argumento não fala com o servidor:
-  `nextLevel` sai de `session.user.factors`, que é campo do cookie fora da
-  assinatura do JWT — o próprio SDK chama isso de inseguro. Serve para UX. Para
-  autorização, usar `public.mfa_bloqueia_excecao_aal1()` (migration 012), que lê
-  `auth.mfa_factors` e falha fechada. Ela **não** libera AAL1 nem decide papel.
-  É exatamente o que o guard faz desde o PR C: `currentLevel` (claim `aal` do
-  token já validado) mais essa RPC; `nextLevel` **não participa do enforcement
-  do painel**. Ele sobrevive só na recuperação de senha, onde não concede acesso
-  a dado nenhum e quem recusa a troca sem AAL2 é o próprio GoTrue.
-- **A superfície operacional entra por RPC, nunca por policy.** A migration 013
-  criou `public.user_operation_access`, os helpers
-  `operador_elegivel_aal1()`/`operador_autorizado(uuid)` e cinco RPCs de
-  contrato fechado; a migration **015** acrescentou
-  `operador_elegivel_operacional()` — `aal1` sem MFA bloqueando **ou** `aal2` —
-  e reapontou os helpers centrais para ela, **sem** ampliar dado, coluna ou
-  grant. As 11 policies `*_exige_aal2` **não** foram afrouxadas por nenhuma das
-  duas. A `016` fecha o acesso direto: uma RESTRICTIVE `*_exige_admin` por
-  tabela faz o acesso direto de `authenticated` exigir **`aal2` E `admin`**, e
-  com isso o `operacional` lê zero linha de tabela de negócio pelo PostgREST
-  **nos dois níveis** — a RPC passa a ser a única porta dele. Antes dela, o
-  operador em AAL2 alcançava as dez tabelas pela permissiva por
-  `public.is_staff()`, que é verdadeira para qualquer papel. `profiles`,
-  `user_roles` e `user_operation_access` ficam de fora, de propósito. A
-  interface **consome** as RPCs desde o B2.1 (`src/lib/operacional/`) e o B2.3
-  (tela `/operacional`), e só elas. **A `016` está em Production.** Ao mexer nessa superfície: nenhum valor financeiro atravessa (do cliente só
-  `cliente_nome`; "faturado" é boolean derivado), a escrita aceita seis campos
-  por linha e recusa a chamada inteira diante de chave inesperada, não existe
-  DELETE, e toda função `SECURITY DEFINER` revalida papel + AAL + MFA +
-  atribuição por dentro, sempre sobre `auth.uid()` e nunca sobre um `user_id`
-  recebido. Decisão de autorização fecha com `coalesce(..., false)` e
-  `IS NOT TRUE`: NULL não é `false`.
-- **As RPCs operacionais não rodam como `postgres`.** Elas pertencem a
-  `bslog_rpc_operacional` — `NOLOGIN`, sem membership nos papéis da API,
-  `BYPASSRLS` e privilégios mínimos por coluna —, porque sete guardas de 010/011
-  isentam `postgres` e a superfície do papel menos privilegiado não pode escrever
-  com as isenções do mais privilegiado. Esse papel **não tem privilégio** em
-  `invoice_id` nem em coluna financeira, não tem DELETE nem TRUNCATE, e em
-  `timesheets`/`shifts` só atualiza `updated_at`, o mínimo que o PostgreSQL exige
-  para travar linha. **Todos os grants dele são por coluna**, nenhum por tabela:
-  ele não lê `billed_amount`, `cost_amount`, snapshot, `invoice_id`,
-  `employees.daily_cost`, `operations.agreed_amount`, documento ou telefone, e
-  não alcança `contracts`. Não ampliar esses grants, não trocar coluna por
-  tabela, e não trocar o dono das funções.
-  Ele também **não tem nada no schema `auth`**: em Production o `postgres` não
-  consegue conceder `USAGE` ali a outro papel, então RPC que referencie `auth.*`
-  quebra — identidade vem de `public.uid_do_operador()`. O trigger legado
-  `protect_timesheet_invoice_link` foi aposentado pela 013 por forçar esse
-  privilégio e não proteger mais nada; não recriar.
-- **Sem cadastro público.** Contas nascem por convite ou pela mão do admin.
-  Operação administrativa privilegiada é server-side, o último admin é
-  protegido, e alteração de usuário ou papel é auditada. **O backend que
-  implementa isso é o PR D — a próxima etapa oficial**: convite, atribuição e
-  troca de papel, atribuição de operações via `user_operation_access`, proteção
-  do último admin e auditoria, tudo **exclusivamente server-side**, com
-  `service_role` nunca no navegador e o frontend jamais como barreira.
+  interface mostra; nunca o trate como substituto das policies.
+- **`service_role` nunca vai para o cliente.** Nenhuma variável `NEXT_PUBLIC_*`
+  pode conter segredo. Operação administrativa privilegiada é server-side.
+- **Sem cadastro público**, sem bootstrap automático de admin. Papel é atribuição
+  administrativa explícita. O último admin é protegido, e alterações de usuário e
+  papel são auditadas.
+- **MFA TOTP é obrigatório para o admin** (AAL2). Para `operacional` é opcional,
+  mas quem o ativou não acessa dados sem concluir o TOTP. A decisão de acesso é
+  uma só (`lerAcesso()`); não a recriar em outro lugar.
+- **O MFA também é exigido no banco**: 11 tabelas de negócio com policy
+  RESTRICTIVE de `aal2`, e acesso direto exige também `admin`. `user_roles` fica
+  fora de propósito — não adicionar AAL2 nela. Não remover a policy global sem
+  substituição segura.
+- **`operacional` só alcança dados pelas cinco RPCs operacionais**, que revalidam
+  papel, nível de MFA e atribuição por dentro, sempre sobre `auth.uid()`, nunca
+  sobre um `user_id` recebido. Nenhum valor financeiro atravessa essa superfície.
+  Não ampliar grants, não trocar grant de coluna por grant de tabela, não trocar
+  o dono das funções.
+- **A CSP está em enforcement** (`src/proxy.ts`); não a afrouxar. Ver
+  [Segurança](docs/SEGURANCA.md).
+- **Função `SECURITY DEFINER` roda acima da RLS**: a verificação de papel e de
+  `aal2` precisa estar dentro da função.
+- **Falha ao consultar o estado de MFA não é ausência de fator.** Nunca mandar
+  para o cadastro de fator por causa de um erro transitório.
+- **Token de recuperação de senha não se consome em GET.** O GET só confere
+  formato e tipo; quem chama `verifyOtp` é a Server Action, disparada por um
+  clique. A recuperação de conta com MFA exige **um** TOTP, não dois.
 
-## Antes de entregar
+## Migrations e banco
+
+- **Nunca editar migration já aplicada**, nem para corrigir. Criar nova com
+  `supabase migration new <nome>`. O estado de Production está em
+  [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md).
+- **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse escopo
+  explícito.
+- **Nunca `supabase config push`**: apagaria a configuração real de Auth. Nunca
+  `TRUNCATE` nem `DELETE` sem `WHERE`.
+- O `postgres` do Supabase **não é superusuário**; o do harness local é. Teste de
+  privilégio local não prova nada sobre Production.
+- `supabase db query` executa só a primeira linha se o SQL for inline: usar
+  `-f <arquivo>`. Prefixar comandos do CLI com `env -u SUPABASE_ACCESS_TOKEN`.
+
+## Regras financeiras
+
+- **O valor financeiro nasce no banco, não no payload.** `billed_amount`,
+  `cost_amount` e os snapshots são derivados por trigger. Não reintroduzir cálculo
+  no cliente como autoridade: `src/lib/billing.ts` só prevê o número na interface.
+- **Linha faturada é imutável** e o lastro não se destrói. O vínculo de fatura só
+  nasce em execução como `postgres` (`gerar_fatura`).
+- **Não alterar regras financeiras** (diária, hora extra, custo, faturamento) fora
+  de tarefa com esse escopo explícito.
+
+## Limites de escopo
+
+- Não tocar em nada fora da tarefa pedida. Se a premissa não bater com o
+  repositório, **parar e reportar**.
+- Não inventar configuração de terceiro (DNS, provedor de e-mail).
+- Não criar usuário `operacional` real antes da matriz E2E de
+  [PROGRESS.md](PROGRESS.md).
+- Não commitar, fazer push, abrir PR ou fazer merge sem aval explícito. Nunca
+  `force push`, nunca alterar `main` diretamente.
+
+## Validação obrigatória
 
 ```bash
 npm run lint
 npx tsc --noEmit
+npm run test:<nome>   # todas as suítes test:* do package.json
 npm run build
 ```
 
-Quando a tarefa tiver ponto de aprovação definido, **não fazer commit, push ou
-merge** sem o aval — apresentar o resultado e aguardar.
+Várias suítes asseveram a **forma literal** do código. Erro de Prettier se corrige
+à mão, não com `--fix`.

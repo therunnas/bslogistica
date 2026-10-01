@@ -25,8 +25,8 @@ jobs:
         uses: actions/checkout@v4
 
       # Node 24 é o runtime LTS usado na Vercel. Os testes rodam com
-      # --experimental-strip-types, que exige Node 22.6 ou superior — o piso de
-      # engines (20.9) não basta para eles.
+      # --experimental-strip-types, que exige Node 22.6 ou superior — o mesmo
+      # piso declarado em engines no package.json (>=22.6.0).
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

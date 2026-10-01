@@ -1,913 +1,358 @@
 # Segurança
 
-Projeto Supabase **BSLOG** atual: `ehkduqokntemtmqzdrbd`, com banco reconstruído
-e controles de banco revalidados em 10/09/2026. A migration `012` — o estado de
-MFA verificável pelo banco — **já estava em Production antes deste fechamento**,
-pelo PR #25. A `013`, a superfície operacional AAL1, foi aplicada **em
-18/09/2026**, no fechamento do B1. **As 19 migrations locais estão aplicadas em
-Production**, e nenhuma delas pode ser editada.
+Modelo de segurança vigente do painel de **BS Soluções Logística** e riscos
+residuais conhecidos. Este é o documento de referência: onde outro texto divergir
+dele, vale o que está aqui. O estado de implantação (migrations, testes, o que
+está em Production) fica em [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md); o
+histórico de cada mudança, no Git.
 
-As verificações de 04/09/2026 abaixo pertencem ao projeto anterior
-`qaibhlucbpetxrtswulf`. Afirmações datadas sobre configurações do Dashboard,
-contas e MFA permanecem como histórico até a revalidação no gate próprio.
+## Princípios
 
-## Acesso ao sistema
+1. **A RLS é a proteção real.** O guard do layout governa o que a interface
+   mostra; se ele tivesse um defeito, as tabelas continuariam protegidas.
+2. **O banco decide, o frontend não.** Autorização, valor financeiro e
+   invariantes de dado são impostos no Postgres. Corrigir só na interface não
+   resolve.
+3. **Fechar por padrão.** Erro de leitura, claim ausente, estado desconhecido:
+   a decisão é "não liberado". `NULL` não é `false`.
+4. **Operação privilegiada é server-side.** O navegador nunca é autoridade.
 
-**Cadastro público bloqueado.** `disable_signup = true` — confirmado por leitura
-direta da API. Apenas contas existentes conseguem entrar; a criação passa
-exclusivamente pelo administrador no painel do Supabase.
+## Acesso e papéis
 
-O frontend não oferece caminho de cadastro: a tela de login tem apenas e-mail e
-senha. Mover essa criação para dentro do próprio sistema, server-side, é um
-trabalho planejado e ainda não feito.
+**Sem cadastro público.** O signup está desativado no Auth do Supabase
+(`disable_signup = true`), e a tela de login não oferece registro. Contas nascem
+por **convite** ou pela mão do administrador, nunca por autosserviço. As demais
+opções de Auth (providers, confirmação de e-mail, recuperação) são configuração
+externa, do Dashboard do Supabase, e não vêm do repositório: o `config.toml`
+não as descreve. Reconferir no Dashboard antes de mexer em Auth.
 
-| Papel                 | Acesso                                                            |
-| --------------------- | ----------------------------------------------------------------- |
-| `admin` em AAL2       | leitura e escrita em tudo                                         |
-| `admin` em AAL1       | nenhum dado de negócio — as 11 policies `*_exige_aal2` recusam    |
-| `operacional` em AAL2 | lê tudo; escreve operações, turnos, equipe, folhas e apontamentos |
-| `operacional` em AAL1 | nenhuma tabela pelo PostgREST; só as cinco RPCs da `013`          |
-| autenticado sem papel | nenhum dado de negócio                                            |
-| não autenticado       | redirecionado ao login                                            |
+**Papel é explícito.** O trigger de onboarding cria só o `profiles`. O papel, em
+`public.user_roles`, é uma atribuição administrativa separada. O bootstrap
+automático do primeiro admin foi **removido** (migration
+`remove_automatic_admin_bootstrap`) e não deve voltar.
 
-Os quatro perfis foram testados: pela interface e simulando a sessão de cada um
-diretamente no banco. As duas linhas de AAL1 são posteriores, e vêm das
-migrations `009` e `013` — a segunda coberta pelos 180 casos de
-`supabase/tests/009_superficie_operacional.sql`.
+| Papel                 | Acesso                                                               |
+| --------------------- | -------------------------------------------------------------------- |
+| `admin` em AAL2       | leitura e escrita nas tabelas de negócio, pelo painel administrativo |
+| `admin` em AAL1       | nenhum dado de negócio; o guard envia a `/mfa`                       |
+| `operacional`         | **nenhuma** tabela de negócio pelo PostgREST; só as cinco RPCs       |
+| autenticado sem papel | nenhum dado de negócio                                               |
+| não autenticado       | redirecionado ao login                                               |
 
-**Hoje existe um único usuário real, `admin`.** Nenhuma conta `operacional`
-existe ainda, e criar a primeira depende do gate de ponta a ponta descrito no
-`PROGRESS.md`.
-
-## Proteção no servidor
-
-O layout de `(painel)` verifica a sessão **antes de enviar qualquer HTML**. Sem
-sessão, a resposta é HTTP 307 para `/login` — verificado nas sete rotas
-protegidas, e nenhuma vaza dado de negócio no corpo da resposta.
-
-Isso substituiu o guard anterior, que rodava apenas depois do JavaScript
-carregar no navegador.
-
-## RLS
-
-**A RLS é a camada real de proteção.** O guard governa o que a interface mostra;
-se ele tivesse um defeito, as tabelas continuariam protegidas.
-
-- **13** tabelas no schema `public`, **todas com RLS ativa e ao menos uma
-  política** — as 12 originais mais `user_operation_access`, criada pela `013`
-- Um event trigger (`ensure_rls`) habilita RLS automaticamente em tabelas novas
-- **Snapshot histórico, verificado no banco em 13/09/2026:** cinco funções
-  `SECURITY DEFINER` em `public` — `handle_bslog_auth_user_created`,
-  `provision_bslog_user`, `rls_auto_enable`, `gerar_fatura` e
-  `derivar_valores_financeiros`. A lista dizia três até aquela conferência —
-  omitia `gerar_fatura`, que já existia, e ganhou `derivar_valores_financeiros`
-  com a migration `010`. **Esta contagem não é o estado atual:** as migrations
-  `012` e `013` acrescentaram `mfa_bloqueia_excecao_aal1()`, os cinco helpers e
-  as cinco RPCs da superfície operacional, todos `SECURITY DEFINER`. O estado
-  atual dessas funções, com dono e `EXECUTE` de cada uma, está em "Superfície
-  operacional AAL1" abaixo; o inventário completo, em `PROGRESS.md`, seção 7.2
-- `EXECUTE` conferido em 13/09/2026, papel a papel: **nenhuma** delas é
-  executável por `anon`. Só `gerar_fatura` é executável por `authenticated` —
-  é a RPC do faturamento, e confere `aal2` **dentro da função**, porque policy
-  RESTRICTIVE não protege o que roda acima da RLS. Só `provision_bslog_user` é
-  executável por `service_role`. `derivar_valores_financeiros`,
-  `handle_bslog_auth_user_created` e `rls_auto_enable` não são executáveis por
-  nenhum dos três: chega-se a elas apenas por trigger
-- O advisor de segurança do Supabase reporta um único achado, listado nas
-  pendências
-
-## Superfície operacional AAL1 — migration `013`, em Production
-
-Acrescentada em 18/09/2026. **Nenhuma policy foi afrouxada:** as 11
-`*_exige_aal2` continuam RESTRICTIVE e globais, e uma sessão `operacional` em
-AAL1 lê **zero linha** de `operations`, `shifts`, `employees`, `contracts`,
-`timesheets` e `timesheet_entries` pelo PostgREST. A única porta é a RPC.
-
-- `public.user_operation_access` — atribuição usuário → operação. Leitura e
-  escrita só por `admin` em AAL2, por policy permissiva e por RESTRICTIVE de
-  mesmo predicado. O operador não a consulta; ela o autoriza.
-- Cinco RPCs de contrato fechado: `listar_operacoes_do_operador`,
-  `listar_turnos_do_operador`, `listar_equipe_do_operador`,
-  `listar_apontamentos_do_operador` e `salvar_apontamento_operacional`.
-- **Nenhum valor financeiro atravessa.** Do cliente sai apenas `cliente_nome`;
-  "faturado" chega como booleano derivado, nunca como `invoice_id`.
-- A escrita aceita **seis campos** por linha e recusa a chamada inteira com
-  `22023` diante de qualquer outra chave. Não existe `DELETE` na superfície.
-- `SECURITY DEFINER` roda acima da RLS, então cada função revalida por dentro:
-  papel `operacional`, não `admin`, `aal = aal1`,
-  `mfa_bloqueia_excecao_aal1() = false`, conta ainda existente e atribuição em
-  `user_operation_access`. A decisão é sempre sobre `auth.uid()` — nenhuma RPC
-  aceita `user_id` por parâmetro.
-- **`NULL` não é `false`** nessa decisão: os helpers fecham com
-  `coalesce(..., false)` e as RPCs decidem com `IS NOT TRUE`. Um JWT sem o claim
-  `aal` produzia fail-open, medido e corrigido antes do merge.
-
-**As RPCs não rodam como `postgres`.** Pertencem ao papel dedicado
-`bslog_rpc_operacional`: `NOLOGIN`, `BYPASSRLS`, sem membership em `anon`,
-`authenticated` ou `service_role`, **sem nenhum privilégio no schema `auth`** e
-com grants **por coluna** — não tem privilégio de tabela em nada. Sem esse dono
-próprio, as sete guardas de `010`/`011` que isentam `postgres` seriam
-contornadas pela superfície do papel menos privilegiado. Ele não alcança
-`billed_amount`, `cost_amount`, snapshots, `invoice_id`,
-`employees.daily_cost`, `operations.agreed_amount` nem `contracts`: um comando
-que nomeie qualquer um deles é recusado com `42501` pelo próprio PostgreSQL,
-independentemente do que o código diga.
-
-O booleano `faturado` vem de `public.apontamento_faturado()`, helper de
-`postgres` que lê `invoice_id` e devolve só o booleano — é o que permite ao
-papel não ter leitura naquela coluna.
-
-**Estado de MFA verificável pelo banco.** `public.mfa_bloqueia_excecao_aal1()`,
-da migration `012`, lê `auth.mfa_factors` por `SECURITY DEFINER` e responde se o
-estado de MFA da conta **impede** a exceção de AAL1. Responde que impede sem
-sessão, com erro de leitura e quando o `uid` do JWT não existe mais em
-`auth.users` — token ainda não expirado de conta apagada. É o indicador não
-manipulável pelo usuário exigido pela decisão de MFA opcional.
-
-**A interface ainda não consome nada disso.** É o próximo bloco de trabalho, e
-até lá a superfície existe sem nenhum consumidor.
-
-## Segredos
-
-| Item                      | Estado                        |
-| ------------------------- | ----------------------------- |
-| `.env`                    | fora do Git, ignorado         |
-| `.env.local`              | fora do Git, ignorado         |
-| `.env.example`            | versionado, sem valores       |
-| `service_role`            | **usada somente server-side** |
-| Chaves reais no histórico | nenhuma                       |
-| Segredos no bundle        | nenhum                        |
-
-O bundle do navegador foi auditado: zero ocorrências de `service_role`,
-`sb_secret_` com valor, JWT, ou vazamento de `next/headers` e do cliente de
-servidor.
-
-**Nenhuma variável `NEXT_PUBLIC_*` pode conter segredo** — o prefixo faz o Next
-embutir o valor no JavaScript servido ao navegador. As duas variáveis
-`NEXT_PUBLIC_*` em uso são públicas por natureza; quem protege os dados é a RLS.
-A `SUPABASE_SERVICE_ROLE_KEY` é segredo, não tem esse prefixo e é lida somente
-pela integração administrativa server-side, depois da autorização do backend.
-
-## Vercel
-
-- Projeto do sistema: `bs-logistica-sistema`, com **domínio customizado em
-  Production**: `admin.bslogisticas.com.br`
-- **Preview protegida por Vercel Authentication**: exige login na Vercel, não é
-  acessível publicamente
-- Variáveis apenas nos ambientes onde são necessárias
-- Sem as variáveis, o build **falha na pré-renderização** com mensagem nomeando
-  o que falta — em vez de publicar uma aplicação quebrada
-- O site institucional é outro projeto (`bs-logisticas`) e não deve ser tocado
-
-## Dependências
-
-`npm audit`: **0 vulnerabilidades**.
+`admin` + `operacional` é tratado como `admin`. Sem papel, bloqueia.
 
 ## Segundo fator (MFA)
 
-**Estado:** VALIDADO em 06/09/2026.
-
-| Item                 | Estado       |
-| -------------------- | ------------ |
-| MFA / TOTP           | **VALIDADO** |
-| AAL2                 | **VALIDADO** |
-| Proteção server-side | **VALIDADA** |
-
-Implementado e validado em 06/09/2026, na segunda tentativa. O primeiro teste
-manual reprovou — QR quebrado e chave manual recusada pelo autenticador —, a
-causa foi identificada e corrigida, e o segundo teste passou. O histórico fica
-registrado em "Primeiro teste manual" mais abaixo, porque a causa foi uma
-contradição entre duas fontes oficiais e vale a pena não repeti-la.
-
-Confirmado no teste manual: QR funcionando; enrollment TOTP concluído; código de
-seis dígitos aceito; logout e login funcionando; **senha sozinha não libera o
-painel quando existe fator verificado**; TOTP eleva a sessão para AAL2; e o
-painel só abre depois do AAL2.
-
-Antes desta data não havia MFA nenhum: a busca por `mfa`, `totp`, `aal`,
-`enroll`, `challenge` e `factor` em `src/` não devolvia uma única ocorrência
-real. Entrar no painel exigia apenas e-mail e senha.
-
-**O que existe agora.** TOTP pelo MFA oficial do Supabase — nenhum segredo é
-gerado, guardado ou conferido pela aplicação, e não existe tabela própria de
-OTP. `enroll` devolve o QR e o segredo já criados pelo Supabase;
-`challengeAndVerify` confere o código no servidor dele.
-
-**Onde a exigência é aplicada.** Em `src/app/(painel)/_autorizacao.ts`, no
-servidor, dentro da mesma função que já decidia sessão e papel:
-
-```ts
-const { data: nivel } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-if (nivel.nextLevel !== "aal2")    return { situacao: "mfa-ausente", ... };
-if (nivel.currentLevel !== "aal2") return { situacao: "mfa-pendente", ... };
-```
-
-**Correção de 12/09/2026 — como essa verificação realmente funciona.** Este
-texto afirmava que `getAuthenticatorAssuranceLevel()` chama `getUser(jwt)` por
-dentro. Lido o fonte de `@supabase/auth-js` 2.115.0, a função tem **dois
-ramos**, e a afirmação descrevia o outro:
-
-- **com** argumento `jwt` — ela chama `getUser(jwt)`, que valida contra o
-  Supabase;
-- **sem** argumento — que é como o projeto sempre a chama — ela usa
-  `getSession()` e `decodeJWT`, **sem chamada de rede**. `currentLevel` sai da
-  claim `aal` do token armazenado e `nextLevel` sai de `session.user.factors`.
-
-A exigência **continua sendo de servidor**, mas por outro motivo: `lerAcesso()`
-chama `getUser()` logo antes, e é essa chamada que valida o token contra o
-Supabase. O que muda é a premissa — não é a consulta de AAL que faz a validação.
-Registrado aqui porque o desenho da próxima etapa de autorização depende de
-saber exatamente onde a validação acontece. Ver `PROGRESS.md`, ETAPA 1.
-
-O comentário em `src/app/(painel)/_autorizacao.ts:47-49` repete a afirmação
-antiga e ainda não foi ajustado — é código, e fica para a etapa que mexer nele.
-
-O layout de `(painel)` é Server Component: sem AAL2 ele redireciona antes de
-qualquer HTML ser enviado. Não há caminho de "esconder no cliente" a ser burlado
-desativando JavaScript.
-
-**Sem trancar ninguém para fora.** A tela `/mfa` fica fora do grupo `(painel)`,
-justamente para não ser barrada pela guarda que a invoca. Ela exige sessão e
-papel, mas não exige AAL2 — é o que se vem obter ali. Quem não tem fator cadastra
-o primeiro; quem já tem responde ao desafio. O botão Sair continua disponível nas
-duas situações.
-
-**Fatores no projeto anterior, em 06/09/2026:** duas contas admin, **dois
-fatores TOTP `verified`**, nenhum
-fator pendente e nenhum admin sem segundo fator. Conferido por leitura direta de
-`auth.mfa_factors`, sem tocar na coluna de segredo — evidência independente do
-relato do teste manual.
-
-> **Nota de 12/09/2026.** Os números acima são do projeto anterior. No projeto
-> atual `ehkduqokntemtmqzdrbd` existe **um** usuário, admin, com **um** fator
-> TOTP `verified` — conferido por leitura direta em 12/09/2026. Isso **continua
-> valendo em 18/09/2026**: nenhuma conta nova foi criada desde então, e a
-> primeira conta `operacional` só nasce depois do gate de ponta a ponta.
-
-**MFA obrigatório é o estado de hoje, não uma regra eterna.** Existe uma decisão
-arquitetural **aprovada e ainda não implementada** de tornar o MFA **opcional
-para o papel `operacional`**, mantendo-o obrigatório para `admin`. Nada disso
-está no código nem no banco: o guard e as 11 tabelas continuam exigindo AAL2
-para qualquer papel. A mudança é coordenada — guard + papel + RLS — e a policy
-AAL2 global **não pode ser removida sem substituição segura**. Ver
-`PROGRESS.md`, seções 6 e 7.
-
-**Como foi verificado.** Por tipos, lint e build; pela API conferida na versão
-instalada (`@supabase/auth-js`, via supabase-js 2.115.0) em vez de presumida; e
-por teste manual ponta a ponta com as duas contas admin reais. O enrollment TOTP
-estar habilitado no projeto deixou de ser suposição: o cadastro concluiu.
-
-### Primeiro teste manual — reprovado, corrigido
-
-**Sintomas.** QR quebrado na tela `/mfa`; chave manual recusada como inválida
-pelo autenticador.
-
-**Causa do QR.** O campo `totp.qr_code` do Supabase já vem como data URL
-completo — a referência oficial usa `src={data.totp.qr_code}` direto. O
-comentário do tipo em `@supabase/auth-js` afirma o contrário, que é preciso
-prefixar `data:image/svg+xml;utf-8,`. A implementação seguiu o comentário do
-tipo, o prefixo entrou duas vezes, e o `src` virou texto percent-encoded em vez
-de SVG. Confirmado por teste em navegador: o formato de data URL usado não é
-inválido em si — ele carrega normalmente quando aplicado uma vez só.
-
-**Causa da chave.** O valor em si nunca esteve errado. Conferido direto no banco,
-sem ler o segredo: 32 caracteres, apenas o alfabeto Base32 (`[A-Z2-7]`), sem
-espaço, sem quebra de linha e sem caractere invisível. O problema era de entrega
-— a chave era exibida num `<input>` estreito, de onde é fácil copiar só o
-trecho visível, e chave truncada é recusada como inválida.
-
-**Correção.** O `src` do QR passa a respeitar o valor recebido: usa como está
-quando já é data URL, e só monta o data URL quando vier SVG cru — funciona nos
-dois formatos, sem depender de qual das duas fontes está correta hoje. A chave
-manual saiu do `<input>` e virou bloco monoespaçado com quebra, seleção total e
-botão de copiar. A tela passa a avisar que recarregar gera chave nova.
-
-O `alt` do QR é neutro de propósito: a referência do Supabase sugere usar
-`totp.uri` ali, mas essa URI carrega o segredo TOTP e ele ficaria legível no
-DOM. Nenhum log, toast ou atributo registra segredo, QR ou URI.
-
-**Fatores não verificados.** As duas tentativas deixaram um fator `unverified`
-em cada conta admin. Não foram removidos por fora: o próprio fluxo de cadastro
-apaga os fatores TOTP não verificados da conta antes de criar o novo, usando
-`unenroll` com a sessão do próprio usuário. Nenhum fator verificado é tocado, e
-nenhuma outra conta é afetada.
-
-### Segundo teste manual — aprovado
-
-Executado em 06/09/2026, cobrindo os quatro passos que estavam pendentes:
-
-1. TOTP habilitado no projeto — confirmado pelo cadastro ter concluído;
-2. cadastro do fator levado até o fim, nas duas contas admin;
-3. logout e novo login: o painel só abriu depois do código de seis dígitos;
-4. senha sozinha, com fator verificado presente, não libera o painel.
-
-**A operação passa a depender do segundo fator.** Perder o aplicativo
-autenticador de uma conta admin sem ter a outra disponível deixa o painel
-inacessível para aquela conta — a remoção de um fator verificado exige o painel
-do Supabase. Com duas contas admin cadastradas, uma cobre a outra; manter as duas
-ativas é o que evitava esse cenário.
-
-> **Nota de 18/09/2026.** O projeto atual tem **uma única conta admin**, com um
-> fator TOTP `verified`. A cobertura descrita acima **não existe hoje**: perder o
-> autenticador dessa conta deixa o painel inacessível, e a recuperação passa pelo
-> painel do Supabase. Não é defeito de código, é o estado real — e é uma das
-> razões para o backend administrativo de usuários (`PR D`).
-
-## Auditoria final de produção — 06/09/2026
-
-**Resultado: APROVADA.** Leitura completa de banco, aplicação e infraestrutura,
-mais a validação manual do segundo fator. **Zero bloqueios.**
-
-As pendências abaixo seguem abertas e **não bloqueiam produção**, todas por
-decisão registrada: **HSTS** pendente até o domínio final; **CSP** como hardening
-posterior; **SEC-004** (proteção contra senha vazada) como risco aceito no plano
-Free; **SEC-010** adiado, severidade baixa; e **redesign visual** fora do escopo.
-
-**Banco** — 18 verificações, nenhuma classificada como bloqueio:
-
-| Verificação                               | Resultado                       |
-| ----------------------------------------- | ------------------------------- |
-| Tabelas `public` sem RLS                  | nenhuma                         |
-| Tabelas com RLS mas sem policy            | nenhuma                         |
-| Policies que alcançam `anon`              | nenhuma                         |
-| Policies de escrita em `user_roles`       | nenhuma                         |
-| `SECURITY DEFINER` sem `search_path` fixo | nenhuma                         |
-| Funções com `EXECUTE` para `PUBLIC`       | nenhuma                         |
-| Funções com `EXECUTE` para `anon`         | nenhuma                         |
-| `TRUNCATE` para `anon`/`authenticated`    | 0 grants                        |
-| Migrations local × remoto                 | 8 de 8 iguais, zero divergentes |
-
-As quatro funções `SECURITY DEFINER` — `rls_auto_enable`,
-`provision_bslog_user`, `handle_bslog_auth_user_created` e `gerar_fatura` — todas
-com `search_path` fixo.
-
-**Autorização** — a suíte `supabase/tests/002_autorizacao.sql` roda contra o
-banco remoto em transação descartável e passa inteira. 25 controles, 25 PASS,
-0 FAIL: admin lê e escreve; autenticado sem papel não lê nem escreve; `anon` não
-alcança dado de negócio; `user_roles` não aceita autoelevação; `billed_amount`,
-`cost_amount` e `invoice_id` ficam intactos para quem não é autorizado; e
-`gerar_fatura` recusa não-admin com 42501.
-
-**Auth** — `disable_signup: true`, único provider `email`,
-`mailer_autoconfirm: false`, `saml_enabled: false`, `passkeys_enabled: false`,
-`anonymous_users: false` — lidos da API do projeto, não presumidos.
-
-**Frontend** — nenhum `eval`, nenhum `new Function`, nenhum `.innerHTML`. Existe
-um `dangerouslySetInnerHTML` em `src/components/ui/chart.tsx`, componente do
-shadcn **importado por zero arquivos**: não é alcançável, e o que ele injetaria
-são cores de tema escritas no código, nunca dado do banco. O único `src` dinâmico
-é o QR do MFA, entregue como data URI em `<img>` — onde SVG não executa script.
-
-**Segredos** — as duas variáveis públicas do Supabase passam por
-`lerAmbienteSupabase()`. A `SUPABASE_SERVICE_ROLE_KEY` é lida exclusivamente por
-`src/integrations/supabase/admin.ts`, no servidor, para operações administrativas
-autorizadas. `PASSWORD_RECOVERY_PROOF_SECRET` também é server-only. Nenhuma chave
-não pública é referenciada no cliente. O único `.env*` versionado é
-`.env.example`.
-
-**Infra** — zero arquivos `.map` no build do cliente, então nenhum source map é
-servido ao navegador. Sentry com `userInfo: false`, `httpBodies: []`,
-`cookies: false`, headers e query params desligados nos três runtimes.
-
-### Pontos de atenção que não bloqueiam
-
-**`anon` tem grants de tabela nas tabelas de `public`.** Herdados do
-`GRANT ALL` das default privileges do Supabase. Não é acesso: nenhuma policy
-alcança `anon`, e a RLS nega por padrão quem não tem policy — verificado em
-execução, `anon` lê 0 linhas. É superfície desnecessária, não vulnerabilidade.
-Fechar com `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon` é candidato a
-uma etapa própria, porque muda o retorno da API de "vazio" para 42501 e merece
-ser testado antes.
-
-**`authenticated` tem `INSERT`, `UPDATE` e `DELETE` em `user_roles`.** Mesma
-origem. Hoje só a RLS impede manipulação de papel — e impede: `INSERT` levanta
-42501, `UPDATE` e `DELETE` afetam zero linhas, e ninguém se promove. Um
-`REVOKE` seria uma segunda tranca, em defesa em profundidade. Não é urgente
-porque a primeira tranca está provada em execução.
-
-**`admin_audit_log` — grant normalizado localmente, PENDENTE DE DEPLOY EM
-PRODUCTION (migration `018`, PR #55).** Achado inicial na validação local
-das 13 suítes SQL (Postgres 17.6, migrations 001-017 do zero): `anon` e
-`authenticated` tinham, na tabela, o GRANT `arwdxtm` (SELECT/INSERT/UPDATE/
-DELETE/REFERENCES/TRIGGER/MAINTAIN), herdado do default ACL que o Supabase
-CLI **local** configura para tabela nova em `public`. **Checado depois
-direto nos catálogos de Production** (`pg_class.relacl`, `pg_default_acl`):
-Production nunca teve esse GRANT de escrita — o default ACL de lá concede só
-`xtm` (REFERENCES/TRIGGER/MAINTAIN) a `anon`/`authenticated`, superfície não
-usada por nenhuma FK ou trigger do projeto, mas sem INSERT/UPDATE/DELETE. O
-comentário original da `017` ("só `service_role` tem GRANT de escrita")
-estava correto quanto a Production; o problema existiu só no harness local.
-A migration `018` continua valendo como hardening — fecha o `xtm` residual e
-deixa o contrato de privilégio auto-contido na migration, no mesmo padrão
-que a `013` já usa em `user_operation_access` (`REVOKE ALL ... FROM PUBLIC,
-anon, authenticated, service_role` seguido de `GRANT SELECT TO authenticated`
-e `GRANT ALL TO service_role`) — mas não corrige uma falha de dado que
-Production tivesse. Comprovado por
-`supabase/tests/013_administracao_usuarios.sql` (casos A5-A7, A7b-A7d):
-`anon` e `authenticated` recusam INSERT/UPDATE/DELETE com 42501, a leitura de
-admin em AAL2 continua, e `service_role` continua gravando. `scripts/
-testar-sql-local.sh` reproduz essa validação num ambiente Supabase local
-descartável — nunca contra Production.
-
-## Pendências abertas
-
-Nenhuma bloqueia produção. Todas estão documentadas.
-
-**Proteção contra senha vazada desligada** — o Supabase pode checar senhas
-contra a base do HaveIBeenPwned. É o único achado do advisor de segurança.
-Ativa-se no painel, em Authentication → Policies.
-
-**Escrita permissiva em `operation_team`** — única tabela de cadastro cuja
-escrita usa `is_staff()` em vez de `has_role(admin)`. Pode ser intencional, mas
-a tabela não guarda autor nem histórico, então remanejamento de equipe não deixa
-rastro. Ver [dívida técnica](divida-tecnica/escrita-em-operation-team.md).
-
-**Falso sucesso em escrita bloqueada** — um `UPDATE` barrado pela RLS não
-levanta erro, e a interface mostra "Registro salvo." sem ter salvo. Não é falha
-de proteção — os dados ficam íntegros —, mas engana o usuário. Ver
-[dívida técnica](divida-tecnica/falso-sucesso-em-update-bloqueado-por-rls.md).
-
-**Vínculo de fatura gravável por não-admin — FECHADO.** A policy de
-`timesheet_entries` continua exigindo apenas `is_staff()`, mas a coluna
-`invoice_id` deixou de ser alcançável por ela: o trigger
-`protect_timesheet_invoice_link` (migration `20260909175435`) já recusava a
-alteração do vínculo por quem não é admin, e a migration `011`, em Production
-desde 13/09/2026, fechou o resto — a criação do vínculo passou a **exigir
-execução como `postgres`**, que é o contexto em que `gerar_fatura` roda,
-recusando `authenticated` (admin incluído) e `service_role`; e uma linha com
-`invoice_id` preenchido recusa `UPDATE` e `DELETE`, inclusive o `SET NULL` da
-FK. **O que isso não cobre:** o gatilho mede `current_user`, então não distingue
-`gerar_fatura` de uma sessão `postgres` escrevendo à mão. A fronteira protegida
-é a API da aplicação, não o banco contra quem já é seu dono. Ver
-[dívida técnica](divida-tecnica/rls-vinculo-de-fatura-permissivo.md) e
-`PROGRESS.md`, seção 9.
-
-**Sem FK de `profiles` e `user_roles` para `auth.users`** — remover usuário pelo
-painel não limpa essas tabelas e deixa registros órfãos. Ao remover uma conta,
-apagar primeiro as linhas dessas duas tabelas.
-
-## Pendências de segurança rastreadas
-
-Itens da auditoria de 05/09/2026 que ficaram pendentes, parciais, adiados ou
-aceitos como risco. Cada um tem uma condição objetiva de fechamento — o item só
-sai desta lista quando ela for cumprida.
-
-Itens **já encerrados** e que não pertencem mais a esta lista: **SEC-001**
-(reavaliado como falso positivo segundo a regra de negócio atual — só existem
-contas admin, e usuário sem papel ou anônimo não lê nem escreve nada),
-**SEC-002** (corrigido e mergeado) e o **hardening do Sentry** (concluído).
-
-### SEC-003 — Cabeçalhos de segurança HTTP
-
-**Status:** CORRIGIDO — validado em 06/09/2026
-**Severidade original:** média
-
-Os quatro cabeçalhos independentes de domínio estão implementados em
-`next.config.ts`, aplicados a todas as rotas via `headers()`:
-
-- `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `X-Frame-Options: DENY`
-- `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`
-
-**Validação:** executada por requisição HTTP contra o **build local de produção**
-do Next.js (`npm run build` seguido de `npm start`, em `localhost:3000`). Os
-quatro cabeçalhos foram confirmados nas três rotas testadas:
-
-| Rota         | Status         | Cabeçalhos          |
-| ------------ | -------------- | ------------------- |
-| `/login`     | 200            | os quatro presentes |
-| `/dashboard` | 307 → `/login` | os quatro presentes |
-| `/`          | 200            | os quatro presentes |
-
-O `307` em `/dashboard` é o comportamento esperado para requisição não
-autenticada, e confirma que os cabeçalhos acompanham também as respostas de
-redirecionamento.
-
-A validação foi feita contra a aplicação local, e não contra a Preview da
-Vercel, porque a Deployment Protection intercepta as requisições no gateway SSO
-antes de chegarem ao Next — nesse caminho os cabeçalhos observados são os da
-plataforma, não os da aplicação.
-
-Ponto a observar quando houver ambiente publicado sem SSO:
-`X-Frame-Options: DENY` impede que a aplicação seja embutida em iframe. Se a
-funcionalidade de comentários de preview da Vercel depender disso, avaliar
-`SAMEORIGIN` ou uma CSP com `frame-ancestors`.
-
-CSP **não** faz parte deste fechamento e segue pendente. HSTS deixou de ser
-pendência: a plataforma passou a entregá-lo no domínio próprio — ver a seguir.
-
-### SEC-003a — HSTS
-
-**Status:** ATENDIDO NA PLATAFORMA — verificado em 10/09/2026
-**Severidade:** baixa
-
-**Domínios oficiais** (a grafia correta leva **s** em `logisticas`; versões sem
-o `s` que circulavam nesta documentação estavam erradas e foram corrigidas):
-
-| Uso                | Domínio                                                          |
-| ------------------ | ---------------------------------------------------------------- |
-| Site institucional | `https://bslogisticas.com.br` — outro projeto, outro repositório |
-| Painel interno     | `https://admin.bslogisticas.com.br`                              |
-
-**O que mudou:** `admin.bslogisticas.com.br` foi criado na Vercel e está
-operacional. Verificado por consulta direta:
-
-- DNS — `CNAME` para `<hash>.vercel-dns-017.com`, resolvendo para IPs da Vercel;
-- TLS — TLSv1.3, certificado Let's Encrypt com `CN` e `SAN` cobrindo o host,
-  cadeia autorizada;
-- HTTP — `200 OK` servido pela Vercel, com `X-Frame-Options: DENY` e
-  `X-Content-Type-Options: nosniff` do SEC-003 já em produção.
-
-**HSTS vem da plataforma.** O domínio responde com:
+TOTP pelo MFA oficial do Supabase. Nenhum segredo é gerado, guardado ou
+conferido pela aplicação, e não existe tabela própria de OTP.
+
+- **`admin`: MFA obrigatório**, sempre AAL2.
+- **`operacional`: MFA opcional.** Sem fator verificado, trabalha em AAL1; com
+  fator verificado, é barrado em AAL1 até concluir o TOTP. Opcional **não** é
+  dispensável: quem optou pelo segundo fator não continua acessando dados só com
+  a senha.
+- **Conta com fator verificado exige TOTP no login.** Não há caminho que aceite
+  só a senha.
+- **Falha ao consultar o nível de garantia não é ausência de fator.** Erro
+  transitório vai para "não foi possível verificar", nunca para o cadastro de
+  fator — cadastrar sobre conta que já tem fator trava a conta.
+
+### A decisão de acesso
+
+Uma só, em `lerAcesso()` (`src/app/(painel)/_autorizacao.ts`), com a lógica pura
+em `src/lib/mfa.ts`. Layout, `/mfa`, dashboard e guards apenas a leem.
+
+| Papel efetivo | Nível  | Estado do fator | Decisão            |
+| ------------- | ------ | --------------- | ------------------ |
+| `admin`       | `aal2` | qualquer        | liberado           |
+| `admin`       | `aal1` | com fator       | `mfa-pendente`     |
+| `admin`       | `aal1` | sem fator       | `mfa-ausente`      |
+| `operacional` | `aal1` | sem fator       | liberado           |
+| `operacional` | `aal1` | com fator       | `mfa-pendente`     |
+| `operacional` | `aal2` | qualquer        | liberado           |
+| sem papel     | —      | —               | bloqueado          |
+| qualquer      | outro  | qualquer        | `mfa-indisponivel` |
+| qualquer      | `aal1` | indeterminado   | `mfa-indisponivel` |
+
+`mfa-ausente` e `mfa-pendente` fecham o painel do mesmo jeito e mandam para
+`/mfa`; a diferença é o fluxo que a tela abre — cadastrar o primeiro fator ou
+desafiar um já verificado. Trocar um pelo outro quebra o cadastro inicial do
+admin.
+
+### Onde a verdade do MFA mora
+
+`getAuthenticatorAssuranceLevel()` sem argumento **não fala com o servidor**:
+`currentLevel` sai da claim `aal` do token, e `nextLevel` sai de
+`session.user.factors`, campo do cookie fora da assinatura do JWT. Serve para UX,
+não para autorização. Por isso o estado do fator usado no enforcement vem de
+`public.mfa_bloqueia_excecao_aal1()` (migration `012`), que lê `auth.mfa_factors`
+por `SECURITY DEFINER` e responde se o estado de MFA da conta **impede** a
+exceção de AAL1. Ela fecha em quatro casos: fator verificado, sem sessão, erro de
+leitura e `uid` do JWT inexistente em `auth.users` (token ainda válido de conta
+apagada). `nextLevel` não participa do enforcement do painel; sobrevive só na
+recuperação de senha, onde não concede acesso a dado e quem recusa a troca sem
+AAL2 é o próprio GoTrue.
+
+A tela `/mfa` fica fora do grupo `(painel)`, para não ser barrada pela guarda que
+a invoca. Exige sessão e papel, mas não AAL2 — é o que se vem obter ali.
+
+## Recuperação de senha
+
+- **Token de uso único não se consome em GET.** Gateways de segurança de e-mail
+  visitam cada link da mensagem sozinhos, e a varredura queimava a recuperação
+  antes do usuário. O `GET /auth/confirm` confere **apenas formato e `type`** e
+  guarda o token num cookie `httpOnly`. Quem chama `verifyOtp` — e portanto cria
+  a sessão de recuperação — é a Server Action de `/auth/confirmar-recuperacao`,
+  disparada por um clique. Conferir a validade de um token de uso único **é**
+  consumi-lo; vale para qualquer link desse tipo que venha a existir.
+- **Prova HMAC.** Depois do `verifyOtp`, o servidor emite uma prova assinada
+  (HMAC-SHA-256, `PASSWORD_RECOVERY_PROOF_SECRET`, só no servidor) que
+  `/redefinir-senha` revalida. Sem o segredo, o fluxo falha fechado. As funções
+  puras ficam em `src/lib/prova-recuperacao.ts`.
+- **Conta com MFA exige exatamente um TOTP** na recuperação. Depois de uma
+  redefinição bem-sucedida **não se cobra um segundo**: a sessão que chega ali já
+  provou posse do link, da prova e do segundo fator.
+- **Depois que a senha muda, a prova é apagada** e não é reutilizável em nenhum
+  desfecho posterior. Falhas **anteriores** ao `updateUser` podem preservá-la,
+  de propósito, para nova tentativa dentro da validade. A tela nunca diz que a
+  redefinição falhou num caminho em que o `updateUser` teve sucesso.
+
+## RLS e banco
+
+- **Todas as tabelas de `public` têm RLS ativa e ao menos uma policy.** Um event
+  trigger (`ensure_rls`) habilita RLS em tabela nova.
+- Autorização em SQL usa `public.has_role()` e `public.is_staff()`.
+  **`is_staff()` é verdadeira para qualquer papel atribuído**, não distingue
+  `admin` de `operacional`; por isso não é a barreira entre os dois.
+- **MFA também é exigido no banco.** As 11 tabelas de negócio têm policy
+  RESTRICTIVE pedindo `aal2` (`*_exige_aal2`). Papel sozinho não distinguia uma
+  sessão AAL1, e quem tivesse só a senha alcançaria os dados pelo PostgREST.
+- **Acesso direto exige `aal2` E `admin`.** Uma RESTRICTIVE adicional
+  `*_exige_admin` (migration `016`) fecha as dez tabelas de negócio para qualquer
+  papel que não seja `admin`. Sem ela, um `operacional` que concluísse o TOTP
+  alcançava essas tabelas pela policy permissiva de `is_staff()`. Ficam de fora,
+  de propósito: `profiles` (cada conta lê a própria linha), `user_roles` (lida em
+  AAL1, antes do MFA) e `user_operation_access` (já é admin + AAL2).
+- **`user_roles` não recebe policy de AAL2.** O guard lê o papel ainda em AAL1,
+  antes de mandar para o MFA; bloqueá-la cria deadlock — seria preciso AAL2 para
+  chegar à tela que concede AAL2.
+- **Funções `SECURITY DEFINER` rodam acima da RLS**, então policy não as
+  protege: cada uma revalida o que precisa por dentro (papel, `aal2`, atribuição),
+  com `search_path` fixo e `EXECUTE` revogado de `PUBLIC` e `anon`.
+  `gerar_fatura`, por exemplo, confere `aal2` e o papel dentro da função.
+- **`TRUNCATE`** está revogado de `anon` e `authenticated` em `public`, e de
+  `service_role` **nas 10 tabelas de negócio**, com `ALTER DEFAULT PRIVILEGES`
+  para tabelas futuras. Há trigger `BEFORE TRUNCATE` em `timesheet_entries` e
+  `invoice_items`, que recusa o comando quando existe lastro faturado — proteção
+  por estado, que também dispara em tabelas atingidas por `CASCADE`. Ver o
+  resíduo em "Riscos residuais".
+- **`SECURITY DEFINER` não é superusuário.** O `postgres` do Supabase **não** é
+  superusuário, e o do harness local é: teste de privilégio que passa localmente
+  não prova nada sobre Production. `ALTER ... OWNER TO` exige `CREATE` no schema
+  para o **novo dono** — conceder antes e revogar depois, na mesma transação.
+
+## Superfície operacional (RPC)
+
+É a **única** porta do `operacional` para os dados. `operacional` lê **zero
+linha** de tabela de negócio pelo PostgREST, em AAL1 e em AAL2. A tela
+`/operacional` e `src/lib/operacional/` falam exclusivamente com estas funções, e
+os testes asseveram isso na forma dos arquivos.
+
+- `public.user_operation_access`: atribuição usuário → operação. Leitura e
+  escrita só por `admin` em AAL2 (policy permissiva e RESTRICTIVE de mesmo
+  predicado). O operador não a consulta; ela o autoriza.
+- Cinco RPCs de contrato fechado: `listar_operacoes_do_operador`,
+  `listar_turnos_do_operador`, `listar_equipe_do_operador`,
+  `listar_apontamentos_do_operador` e `salvar_apontamento_operacional`.
+- **Elegibilidade** (`operador_elegivel_operacional()`): `aal1` com
+  `mfa_bloqueia_excecao_aal1() = false` **ou** `aal2`; papel `operacional` e **não**
+  `admin`; conta ainda existente; atribuição em `user_operation_access`. A decisão
+  é sempre sobre `auth.uid()` — nenhuma RPC aceita `user_id` por parâmetro.
+- **`NULL` não é `false`.** Os helpers fecham com `coalesce(..., false)` e as RPCs
+  decidem com `IS NOT TRUE`. Um JWT sem a claim `aal` fazia a cadeia de `AND`
+  devolver `NULL` e `IF NOT NULL` não dispara: era fail-open.
+- **O operador não recebe valor financeiro.** Nem `billed_amount`, `cost_amount`,
+  snapshots, `invoice_id`, `daily_cost`, `daily_rate`, `shift_hours`, `ot_factor`,
+  `ot_tolerance_min` ou `agreed_amount`. Do cliente atravessa só `cliente_nome`.
+  "Faturado" chega como booleano derivado de `public.apontamento_faturado()`, um
+  helper de `postgres` que lê `invoice_id` e devolve só o booleano.
+- **A escrita aceita seis campos por linha** (`employee_id`, `status`, `check_in`,
+  `check_out`, `break_minutes`, `notes`) e **recusa a chamada inteira** com
+  `22023` diante de qualquer outra chave. Não existe `DELETE`; linha ausente do
+  payload é linha não tocada.
+- **As RPCs não rodam como `postgres`.** Pertencem a `bslog_rpc_operacional`:
+  `NOLOGIN`, `BYPASSRLS`, sem membership em `anon`, `authenticated` ou
+  `service_role`, e com grants **por coluna** — nenhum privilégio de tabela. Sem
+  dono próprio, as guardas de `010`/`011` que isentam `postgres` seriam
+  contornadas pela superfície do papel menos privilegiado. Um comando que nomeie
+  coluna financeira é recusado com `42501` pelo próprio PostgreSQL. Em `timesheets` e `shifts`
+  o `UPDATE` é só de `updated_at`, apenas porque o PostgreSQL exige privilégio de
+  `UPDATE` para travar linha com `FOR SHARE`, e dois triggers da `011` fazem isso
+  no caminho da escrita.
+- **Esse papel não tem nada no schema `auth`.** Em Production o `postgres` não
+  consegue conceder `USAGE` em `auth` a outro papel; identidade entra por
+  `uid_do_operador()`. Uma RPC desta superfície que referencie `auth.*` quebra.
+- **Não ampliar grants, não trocar grant de coluna por `GRANT ... ON TABLE`, não
+  trocar o dono das funções.** Ao criar helper novo, mantê-lo somente leitura
+  (ou mudar o dono).
+- A exigência de equipe ativa e a recusa de folha fechada dependem **só do
+  contrato da RPC**, não do banco: nenhuma das duas é invariante de banco para
+  papel nenhum. Se virar invariante, é tarefa própria.
+
+## Proteção financeira
+
+- **O payload do cliente não é fonte de valor.** `billed_amount`, `cost_amount` e
+  os três snapshots (diária, hora extra, custo) são **derivados por trigger**
+  (migration `010`) a partir de contrato, operação, turno e colaborador. No
+  `INSERT`, a derivação sobrescreve o payload. Um `UPDATE` só em campo derivado é
+  **recusado com `42501`**. Um `UPDATE` aceito recalcula **só se alterou coluna
+  motriz** (`status`, `check_in`, `check_out`, `break_minutes`, `employee_id`,
+  `timesheet_id`); do contrário preserva o gravado — é isso que mantém o snapshot
+  congelado. `postgres` e `service_role` escapam **desse bloqueio específico**,
+  não das demais proteções.
+- **Linha faturada é imutável e o lastro não se destrói** (migration `011`).
+  `timesheet_entries` com `invoice_id` recusa `UPDATE` e `DELETE`, inclusive o
+  `SET NULL` da FK. O vínculo só nasce em execução como `postgres`, contexto de
+  `gerar_fatura`: `authenticated` (admin incluído) e `service_role` não o criam.
+- **A fronteira é a API da aplicação.** O gatilho mede `current_user`, então não
+  distingue `gerar_fatura` de uma sessão `postgres` escrevendo à mão. Sessão
+  `postgres` direta e superusuário ficam fora; nenhuma proteção aqui promete o
+  contrário.
+- **Bloqueios de `DELETE` com critérios distintos**, não "em uso": cliente só é
+  protegido se tiver fatura ou apontamento faturado; contrato, se for o
+  `contract_id` **atual** de uma operação com apontamento; turno, se alguma folha
+  o referencia. Com faturamento congelam `operations.client_id`, o
+  `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
+- `break_minutes` não pode ser negativo (migration `014`): valor negativo inflava
+  `billed_amount`.
+- `src/lib/billing.ts` serve para a interface mostrar o número **antes** de salvar,
+  nunca para decidi-lo.
+
+## Administração de usuários e auditoria
+
+Convidar, atribuir ou trocar papel, remover acesso e atribuir operações passam
+por `src/lib/admin-usuarios/`, **exclusivamente no servidor**, depois de
+`exigirAdminAal2()` (que reaproveita `lerAcesso()`).
+
+- **`service_role` só no servidor**, instanciada em
+  `src/integrations/supabase/admin.ts` e só depois dos controles de autorização.
+  Nunca em código client, nunca com prefixo `NEXT_PUBLIC_`.
+- **O último admin é protegido** no banco (migration `017`): o trigger
+  `trg_proteger_ultimo_admin` recusa com `42501` qualquer `DELETE`/`UPDATE` que
+  deixaria zero linhas `admin`, **sem isentar `postgres` nem `service_role`**. A
+  decisão é serializada por `pg_advisory_xact_lock`; sem o lock, duas transações
+  concorrentes removendo admins diferentes passavam ambas.
+- **Revogar acesso** segue uma ordem deliberada: remover papéis (único passo que o
+  trigger pode recusar) → limpar as atribuições em `user_operation_access` (pela
+  sessão RLS do admin) → banir a conta pela Admin API. Reativar concede o papel
+  primeiro e só depois desbane; não restaura as operações removidas. Falha no
+  meio de uma sequência já iniciada devolve `"parcial"`, nunca `"erro"`.
+- **Alteração de usuário ou papel é auditada** em `public.admin_audit_log`:
+  leitura só `admin` em AAL2, sem grant de escrita para `authenticated` (a
+  migration `018` normaliza os grants da tabela pelo menor privilégio). Só
+  `service_role` grava, então nem um admin adultera a própria trilha.
+- **A auditoria é best-effort, não garantia transacional.** Se a alteração já
+  ocorreu e a gravação do evento falha, a alteração **não é revertida** — a falha
+  só é registrada no servidor. Não afirmar cobertura absoluta de auditoria.
+
+## Segredos
+
+| Item                             | Regra                                                       |
+| -------------------------------- | ----------------------------------------------------------- |
+| `SUPABASE_SERVICE_ROLE_KEY`      | só servidor; nunca `NEXT_PUBLIC_`; ausente, falha fechada   |
+| `PASSWORD_RECOVERY_PROOF_SECRET` | só servidor; ao menos 32 bytes aleatórios em produção       |
+| `NEXT_PUBLIC_SUPABASE_*`         | públicas por natureza; quem protege os dados é a RLS        |
+| credenciais de SMTP / e-mail     | só no Dashboard do Supabase; nunca em Git, `.env` ou Vercel |
+| `.env`, `.env.local`             | fora do Git; só `.env.example` é versionado, sem valores    |
+
+**Nenhuma variável `NEXT_PUBLIC_*` pode conter segredo:** o prefixo embute o
+valor no bundle do navegador. O Sentry roda com `userInfo`, `httpBodies`, cookies,
+headers e query params desligados, e não há source maps servidos ao navegador.
+
+## Cabeçalhos HTTP e CSP
+
+Em `next.config.ts`, para todas as rotas: `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY` e
+`Permissions-Policy` negando câmera, microfone, geolocalização, pagamento e USB.
+
+**HSTS vem da plataforma** (Vercel, borda do domínio próprio). **Não duplicar na
+aplicação**: criaria duas fontes de verdade. Sem `includeSubDomains` até mapear
+todos os subdomínios, e sem `preload` sem decisão explícita — sair da lista dos
+navegadores leva meses. Se a origem sair da Vercel, o header passa a ser da
+aplicação.
+
+**`Content-Security-Policy` está em enforcement**, montada por requisição em
+`src/proxy.ts` com **nonce** (precisa mudar a cada requisição, por isso não está
+em `next.config.ts`):
 
 ```
-Strict-Transport-Security: max-age=63072000
+default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'unsafe-inline';
+img-src 'self' data:; font-src 'self'; connect-src 'self' <host Supabase>;
+frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none';
+upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
 ```
 
-São dois anos, emitidos pela Vercel na borda, sem `includeSubDomains` e sem
-`preload` — exatamente a postura conservadora que este item pedia.
-
-**Não adicionar o header na aplicação.** Duplicá-lo em `next.config.ts` não
-acrescenta proteção e cria duas fontes de verdade para o mesmo cabeçalho, com o
-risco de divergirem numa mudança futura. O item fecha aqui.
-
-**Se um dia a origem mudar** — sair da Vercel, ou servir o painel por outra
-borda —, este item reabre: aí sim o header passa a ser responsabilidade da
-aplicação. As regras continuam valendo: **não** usar `includeSubDomains` antes
-de mapear todos os subdomínios, e **não** usar `preload` sem decisão explícita,
-porque entrar na lista dos navegadores é rápido e sair leva meses.
-
-### SEC-003b — Content-Security-Policy
-
-**Status:** FECHADO — `Content-Security-Policy` ativa em Production, com
-enforcement (não mais `report-only`).
-**Severidade:** era média; mitigada.
-**Como foi fechada:** nonce por requisição gerado em `src/proxy.ts` (mecanismo
-oficial do Next.js — header na requisição e na resposta; `RootLayout` chama
-`headers()` para forçar renderização dinâmica, necessária para o Next embutir o
-nonce atual em cada resposta). Isso cobre os scripts inline que o próprio Next
-injeta no streaming do RSC (`self.__next_f.push`) sem precisar de
-`unsafe-inline`. O script de tema foi externalizado para
-`public/theme-script.js`, eliminando o único `dangerouslySetInnerHTML`
-alcançável da aplicação. Sentry usa o túnel `/monitoring` (same-origin, não
-precisa de domínio externo em `connect-src`) e reporta violação via
-`report-uri` apontando para o endpoint de segurança do Sentry, derivado do DSN
-já público. `style-src` mantém `'unsafe-inline'` — Radix/shadcn (popover,
-dialog, select) usam estilo inline para posicionamento; apertar isso é etapa
-própria.
-**Validação:** rodou em `report-only` em Production sem nenhuma violação
-legítima — as únicas observadas vieram de `vercel.live`, só em ambiente de
-Preview (não representa o navegador de um usuário real), e não entraram na
-policy.
-**Impacto conhecido:** `/`, `/_not-found`, `/login` e `/esqueci-senha` deixaram
-de ser estáticas e passaram a renderizar por requisição — preço do nonce.
-
-### SEC-004 — Proteção contra senhas vazadas
-
-**Status:** BLOQUEADO PELO PLANO — risco aceito, com controle equivalente em vigor
-**Severidade:** baixa — era média antes da adoção do MFA administrativo
-**Motivo:** a verificação contra o HaveIBeenPwned exige plano **Pro**. O projeto
-está no **Free**. A documentação oficial é explícita: _"Leaked password
-protection is available on the Pro Plan and above."_
-
-**Estado histórico — quando o achado foi levantado (04/09/2026).** Duas contas
-admin com acesso total, autenticação por e-mail e senha, **sem MFA** e com zero
-fatores cadastrados. O vetor realista é credential stuffing: uma senha
-reutilizada e já vazada acerta na primeira tentativa, e o rate limit do Supabase
-não protege nesse caso. A recomendação registrada na época era senha longa e
-exclusiva por gerenciador, mais MFA por TOTP — que o plano Free suporta.
-
-**Estado atual — 18/09/2026.** O controle equivalente **foi adotado**: existe
-**uma** conta admin real, com **fator TOTP `verified`**; o MFA administrativo
-está ativo e o painel exige **AAL2**, no guard e nas 11 policies RESTRICTIVE do
-banco; o signup público segue desativado (`disable_signup = true`), com
-confirmação de e-mail exigida e apenas o provider `email` habilitado. **Não há
-mais conta admin sem segundo fator.**
-
-**Risco que permanece:** a verificação contra senhas vazadas continua indisponível
-no plano Free, então uma senha reutilizada segue aceitável no cadastro e na
-troca. O que mudou é que ela sozinha **não abre o painel** — falta o TOTP.
-
-**Condição para fechamento:** upgrade para Pro com a proteção ativada. A
-alternativa que este próprio achado registrava — "adoção de MFA administrativo
-como controle equivalente" — **está cumprida**, e é o que baixa a severidade de
-média para baixa. O upgrade não é obrigatório.
-
-### SEC-010 — Bootstrap automático do primeiro admin
-
-**Status:** ADIADO
-**Severidade:** baixa
-**Motivo:** `public.provision_bslog_user`, chamada pelo trigger
-`handle_bslog_auth_user_created` a cada usuário criado, concede `admin` ao novo
-usuário **se não existir nenhum admin**:
-
-```sql
-IF NOT EXISTS (SELECT 1 FROM public.user_roles WHERE role = 'admin') THEN
-  INSERT INTO public.user_roles (user_id, role) VALUES (_user_id, 'admin') ...
-END IF;
-```
-
-**Risco atual:** baixo, mas latente. Se `user_roles` ficar sem nenhuma linha
-`admin` — remoção acidental, limpeza de ambiente, restauração parcial de backup
-—, o próximo usuário criado vira administrador automaticamente. Nada alerta
-quando essa condição é atingida.
-**Mitigação atual — e ela encolheu.** Em 18/09/2026 existe **uma única** conta
-admin, não as duas de quando este achado foi escrito. É essa linha que mantém a
-condição do `IF NOT EXISTS` falsa, e ela é uma só: apagar `user_roles` dessa
-conta basta para rearmar o bootstrap. O que continua valendo: o signup está
-fechado, então só quem acessa o painel do Supabase cria conta; e um
-`pg_advisory_xact_lock` impede que dois cadastros simultâneos se auto-promovam.
-Nenhuma proteção nova foi acrescentada — **o bootstrap automático segue como
-dívida técnica aberta**, e a redução de dois admins para um **aumentou** a
-chance de a condição latente ser atingida.
-**Condição para fechamento:** restringir o bootstrap por outro critério — variável
-de ambiente, allowlist de e-mail, ou remoção da função após o provisionamento
-inicial. Obrigatório reavaliar antes de reabrir o signup.
-
-### SEC-011 — `EXECUTE` excessivo em funções auxiliares
-
-**Status:** CORRIGIDO — migration aplicada e grants verificados no banco em 06/09/2026
-**Severidade:** informativa
-
-**Diagnóstico.** `public.is_staff()` e `public.update_updated_at_column()` ficam
-alcançáveis por `anon` e por `PUBLIC`, e portanto expostas em `/rest/v1/rpc/`.
-
-**Evidência.** O Postgres concede `EXECUTE` a `PUBLIC` em toda função nova. A
-migration `20260903175718` revogou de `anon` mas **não de `PUBLIC`**:
-
-```sql
-REVOKE ALL ON FUNCTION public.is_staff() FROM anon;
-GRANT EXECUTE ON FUNCTION public.is_staff() TO authenticated, service_role;
-```
-
-O privilégio continua chegando ao `anon` pela via do `PUBLIC`. Compare com
-`has_role`, que na `20260903173220` foi revogada de `PUBLIC, anon` — ali o padrão
-certo já tinha sido aplicado. `update_updated_at_column` foi criada na
-`20260903173204` sem `REVOKE` nenhum.
-
-**Risco.** Nenhum bypass. `is_staff()` devolve `false` para anônimo e não vaza
-dado; `update_updated_at_column()` é função de trigger e falha fora desse
-contexto. É superfície desnecessária, não falha de autorização.
-
-**Correção.** `supabase/migrations/20260906050000_007_hardening_grants.sql`:
-`REVOKE ALL ... FROM PUBLIC` e `FROM anon` nas duas funções, reafirmando
-`GRANT EXECUTE ... TO authenticated, service_role` em `is_staff()` — as policies
-de SELECT das tabelas de negócio dependem dela.
-
-`authenticated` é preservado em `update_updated_at_column()` de propósito: os
-triggers continuam funcionando de qualquer forma, porque o Postgres exige
-`EXECUTE` de quem **cria** o trigger e não reavalia a cada disparo — mas essa
-premissa não pôde ser testada contra o banco nesta etapa, e errar nela quebraria
-todo `UPDATE` do sistema. O ganho seria nulo; o risco, não.
-
-**Verificado em 06/09/2026:** `is_staff()` — PUBLIC não executa, `anon` não
-executa, `authenticated` executa. `update_updated_at_column()` — PUBLIC não
-executa, `anon` não executa. A consulta abaixo reproduz a conferência.
-
-```sql
-SELECT p.proname, coalesce(array_to_string(p.proacl, ' ~ '), '(NULO = PUBLIC EXECUTA)') AS acl
-FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname = 'public' AND p.proname IN ('is_staff', 'update_updated_at_column');
-```
-
-### SEC-009 — `TRUNCATE` concedido a `anon` e `authenticated`
-
-**Status:** **PARCIAL** — o escopo original (`anon` e `authenticated`) está
-fechado e medido; o `TRUNCATE` de `service_role` foi revogado só nas 10 tabelas
-de negócio pela migration `011`, em Production desde 13/09/2026
-**Severidade:** média se confirmado; o resíduo abaixo é baixo, mas não é zero
-
-**Condição de fechamento, ainda não cumprida:** decidir sobre o `TRUNCATE` de
-`service_role` em `profiles` e `user_roles` — revogar, ou registrar
-explicitamente como risco aceito. Enquanto essa decisão não for tomada, **este
-item não sai da lista**, pela regra desta seção. Não marquei como fechado nem
-aceitei o risco por conta própria: é decisão de quem responde pelo projeto.
-
-**Diagnóstico.** As tabelas de `public` provavelmente concedem `TRUNCATE` a
-`anon` e a `authenticated`.
-
-**Evidência — indireta, e é importante dizer isso.** O achado se apoia no
-bootstrap padrão do Supabase, que deixa configurado:
-
-```sql
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
-```
-
-`ALL` inclui `TRUNCATE`. Os `GRANT` explícitos da `20260903173204` concedem
-apenas `SELECT, INSERT, UPDATE, DELETE`, mas **somam-se** ao default em vez de
-substituí-lo. Não foi possível confirmar o estado real contra o banco nesta
-etapa: a sessão não tinha credencial de acesso, e improvisar autenticação está
-fora das regras do projeto.
-
-**Risco.** `TRUNCATE` **não passa pela RLS**. Um `DELETE` de quem não é staff é
-barrado pela policy; um `TRUNCATE` esvaziaria a tabela inteira sem consultar
-policy nenhuma. Atenuante real: o PostgREST não expõe `TRUNCATE`, então
-alcançá-lo exige conexão direta ao Postgres, que o JWT do painel não dá. O
-privilégio está errado; a via de exploração pela API não existe hoje.
-
-**Correção.** Na mesma migration: `REVOKE TRUNCATE ON ALL TABLES IN SCHEMA
-public` de `anon` e de `authenticated`, mais `ALTER DEFAULT PRIVILEGES ... REVOKE
-TRUNCATE`, para que a próxima tabela criada não volte a nascer com ele.
-`service_role` e `postgres` mantêm `TRUNCATE`: são os papéis de manutenção e
-restauração.
-
-**Verificado em 06/09/2026:** zero grants de `TRUNCATE` para `anon` e para
-`authenticated`. O estado anterior ao `REVOKE` não foi medido e já não pode ser
-— o hardening entra no registro como preventivo. A consulta abaixo reproduz a
-conferência.
-
-```sql
-SELECT table_name, grantee FROM information_schema.role_table_grants
-WHERE table_schema = 'public' AND privilege_type = 'TRUNCATE'
-  AND grantee IN ('anon', 'authenticated');
-```
-
-**Fechamento em 13/09/2026, pela migration `011`.** A auditoria de encerramento
-do PR #23 tratou `TRUNCATE` como **classe**, não como um grant isolado, e achou
-duas coisas que o hardening de 06/09 não cobria.
-
-A primeira contradiz o parágrafo acima, e vale dizer com todas as letras: a
-frase _"`service_role` e `postgres` mantêm `TRUNCATE`: são os papéis de
-manutenção e restauração"_ **estava errada como postura de segurança**.
-`service_role` é a chave que a API expõe a quem a possua; deixá-la com
-`TRUNCATE` mantinha aberto exatamente o caminho que o `REVOKE` de `anon` e
-`authenticated` tentava fechar. A `011` revoga `TRUNCATE` de `service_role` nas
-10 tabelas de negócio, e acrescenta
-`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE TRUNCATE ON TABLES FROM
-service_role` para que tabela nova não volte a nascer com ele. **Conferido em
-Production: 0/10.**
-
-**O que continua fora desse revoke, e é preciso dizer:** a `011` listou as 10
-tabelas de negócio, e `ALTER DEFAULT PRIVILEGES` só alcança tabela **futura** —
-não mexe em grant existente. Então `profiles` e `user_roles` **seguem com
-`TRUNCATE` para `service_role`**, medido em Production em 13/09/2026. Para
-`anon` e `authenticated` o revoke é total: **0 nas 12**. Essas duas tabelas não
-guardam lastro financeiro, mas um `TRUNCATE` nelas derrubaria papéis e perfis. É
-o resíduo que mantém este item em **PARCIAL** — a condição de fechamento está no
-cabeçalho.
-
-**O que atenua, sem zerar:** alcançar esse `TRUNCATE` exige possuir a chave
-`service_role` **e** conexão direta ao Postgres. O PostgREST não expõe
-`TRUNCATE`, e a aplicação usa essa chave somente no backend administrativo, sem
-conexão SQL direta — ela nunca vai para o navegador. O privilégio está errado; a
-via pela API não existe.
-
-A segunda é que `REVOKE` sozinho não é o bastante. `TRUNCATE` **não dispara
-trigger de linha e não consulta a RLS**, e alcança por `CASCADE` tabelas que
-ninguém nomeou no comando. Foi verificado — não presumido — que `BEFORE
-TRUNCATE` **dispara** nas tabelas atingidas por cascata. Por isso a `011`
-instala dois gatilhos de statement, `bloquear_truncate_lastro()` sobre
-`timesheet_entries` e `invoice_items`, que recusam o comando quando existe
-lastro faturado. É proteção **por estado**, não por papel.
-
-**O que isto não promete.** Um superusuário PostgreSQL hostil desabilita
-trigger e recoloca grant. A proteção vale contra a API, contra `service_role`
-vazada e contra engano operacional — não contra quem já é dono do banco.
-
-### SEC-007 — Injeção de fórmula na exportação CSV
-
-**Status:** CORRIGIDO — validado em 06/09/2026
-**Severidade:** média
-
-**Diagnóstico.** As duas exportações CSV do painel montavam o arquivo
-concatenando valores do banco com `;`, sem escape algum e sem neutralizar
-fórmula.
-
-**Evidência.** Em `painel-faturamento.tsx` e `painel-relatorios.tsx`:
-
-```ts
-const lines = period.map((r) => [r.date, r.operationName, ...].join(";"));
-const csv = [header.join(";"), ...lines].join("\n");
-```
-
-`operationName`, `shiftName`, `employeeName` e `clientName` são texto livre
-digitado no painel. Dois problemas somados:
-
-- **quebra estrutural** — um `;`, uma aspa ou uma quebra de linha dentro de um
-  nome desalinha as colunas do arquivo inteiro;
-- **execução de fórmula** — Excel e LibreOffice avaliam célula iniciada por `=`,
-  `+`, `-`, `@`, TAB ou CR. Um colaborador cadastrado como `=SUM(1+1)` vira
-  fórmula na planilha de quem abrir o relatório; a família `=HYPERLINK`,
-  `=WEBSERVICE` e `=cmd|...` chega a exfiltrar dado ou disparar processo. Aspas
-  não protegem: o Excel remove as aspas antes de decidir se a célula é fórmula.
-
-**Correção.** `src/lib/csv.ts` centraliza a montagem. Toda célula sai entre
-aspas com as aspas internas duplicadas (RFC 4180), o registro termina em CRLF, e
-valor que comece com caractere de fórmula recebe apóstrofo inicial — marcador de
-texto que a planilha consome ao exibir, recomendação da OWASP.
-
-Número puro passa intacto de propósito: `-123` é o número -123 em qualquer
-planilha, não uma fórmula, e neutralizá-lo transformaria toda coluna de custo
-negativo em texto que não soma. O que é neutralizado é `-` seguido de conteúdo
-não numérico, como uma chamada de comando embutida.
-
-**Evidência da correção.** 14 casos testados diretamente, sem instalar
-dependência: fórmula clássica, `+123`, `-123`, injeção real usando `-`, prefixo
-`@`, TAB inicial, texto comum, vírgula, aspas, quebra de linha, `;`, acentos,
-decimal brasileiro e `null`. Resultado: 4 células neutralizadas, 10 intactas,
-**14 de 14 reconstruídas com o conteúdo original** ao reler o arquivo, e **zero
-células** ainda iniciando por caractere de fórmula.
-
-### SEC-006 — Mass assignment no CRUD genérico
-
-**Status:** FALSO POSITIVO / RISCO DE DESIGN — sem correção necessária
-**Severidade:** nenhuma no modelo atual
-
-**Diagnóstico.** `useSaveRow` em `src/lib/mutations.ts` desestrutura
-`{ id, ...rest }` e envia `rest` inteiro ao Supabase, sem allowlist de colunas.
-
-**Evidência.** O padrão existe e alimenta `clients`, `contracts`, `employees`,
-`operations` e `shifts`. Mas ele **não é a fronteira de segurança**: é código de
-navegador. Quem quisesse acrescentar campos arbitrários não precisaria passar por
-essa função — bastaria chamar o PostgREST direto com o próprio JWT. Não existe
-handler de servidor que a allowlist estaria protegendo: todo caminho de escrita é
-cliente → PostgREST, e o controle é a RLS.
-
-E a RLS decide sobre a **linha**, não sobre o conjunto de colunas do payload: um
-usuário não autorizado tem a operação inteira recusada, independentemente de
-quais campos tenha enviado.
-
-Verificado nas policies da `20260903175718`:
-
-- `clients`, `contracts`, `employees`, `invoices`, `invoice_items` — escrita
-  exige `has_role(auth.uid(), 'admin')` em `USING` e em `WITH CHECK`;
-- `operations`, `shifts`, `operation_team`, `timesheets`, `timesheet_entries` —
-  exigem `is_staff()`;
-- `user_roles` — só existe policy de `SELECT` de linhas próprias, e o grant de
-  tabela é apenas `SELECT`. Sem `INSERT`, `UPDATE` ou `DELETE`: **não há
-  autoelevação**;
-- todas as policies são `TO authenticated`; `anon` não alcança nenhuma tabela de
-  negócio.
-
-**Resposta à pergunta central** — um usuário não autorizado consegue acrescentar
-campos arbitrários e modificar dados que não deveria? **Não.** Sem papel,
-`is_staff()` e `has_role()` devolvem `false` e toda escrita é recusada, com ou
-sem campos extras.
-
-**Por que continua sendo risco de design — com o escopo já reduzido.** O dia em
-que existir uma conta `operacional`, `is_staff()` passa a ser verdadeiro para
-ela, e as tabelas operacionais aceitam as colunas que o payload trouxer.
-
-A parte **financeira** disso **está fechada** desde 13/09/2026, e o parágrafo
-anterior a esta revisão dizia o contrário: `billed_amount`, `cost_amount` e os
-snapshots são **derivados** pela migration `010` — sobrescritos no `INSERT`, e a
-edição puramente financeira recusada com `42501` —, e `invoice_id` só é criado
-em execução como `postgres` pela `011`. Payload forjado nessas colunas deixou de
-ser caminho. Ver `PROGRESS.md`, seção 9.
-
-**O que permanece:** as demais colunas operacionais continuam vindo do payload,
-o que é legítimo, mas sem allowlist no servidor; e a escrita permissiva em
-`operation_team` segue aberta, em
-[`escrita-em-operation-team.md`](divida-tecnica/escrita-em-operation-team.md). A
-dívida de
-[`rls-vinculo-de-fatura-permissivo.md`](divida-tecnica/rls-vinculo-de-fatura-permissivo.md)
-**foi fechada** — o arquivo em si continua obsoleto no corpo, e não serve como
-especificação. A correção certa segue sendo RLS e privilégio de coluna, nunca
-allowlist no navegador, que o atacante contorna ignorando o navegador.
-
-**Condição para reabertura:** criação da primeira conta não-admin. Antes disso,
-fechar a dívida de `operation_team`.
-
-### Line endings mistos na working tree
-
-**Status:** CORRIGIDO — normalizado em 06/09/2026
-**Severidade:** nenhuma em segurança; bloqueava a validação
-
-**Causa real.** Os blobs versionados já estavam 100% em LF: a verificação byte a
-byte do HEAD mostrou zero CRLF nos 122 arquivos de texto, e a única ocorrência
-de `0d0a` no repositório é dado binário dentro de `public/favicon.ico`.
-
-O CRLF existia apenas no disco, e a cadeia era esta:
-
-- `core.autocrlf = true`, definido pelo Git for Windows em escopo **system**
-  (`C:/Program Files/Git/etc/gitconfig`), gravava CRLF na working tree a cada
-  checkout;
-- não havia `.gitattributes` no repositório para sobrepor essa configuração;
-- o Prettier, cujo `endOfLine` padrão é `lf`, acusava cada `CR` como erro.
-
-O resultado eram 63 arquivos em CRLF e 59 em LF no disco, com `npm run lint`
-falhando com 4955 erros `prettier/prettier` — nenhum deles problema real de
-código.
-
-**Solução aplicada.** `.gitattributes` com `* text=auto eol=lf`. O `eol=lf`
-sobrepõe o `core.autocrlf` e garante LF no disco em qualquer clone, sem depender
-da configuração pessoal de cada máquina; o `text=auto` deixa a detecção de
-binário com o git, a mesma que já classificava `public/favicon.ico` como `-text`
-sem regra explícita.
-
-`git add --renormalize .` alterou **zero blobs**, como esperado de um
-repositório que já estava em LF. A working tree foi regravada a partir do
-índice, e os 123 arquivos permaneceram idênticos ao HEAD hash a hash — o binário
-inclusive. Nenhuma mudança funcional: `prettier --write` e `eslint --fix` não
-foram usados.
-
-**Resultado.** `w/crlf` passou de 63 para 0. `npm run lint` saiu de 4955 erros
-para 0, restando apenas o warning preexistente de `react-hooks/exhaustive-deps`
-em `src/app/(painel)/apontamentos/painel-apontamentos.tsx:107`. `tsc`, `build`,
-`npm audit` e `git diff --check` seguem limpos.
-
-Foi descartada a alternativa de configurar `endOfLine: "auto"` no Prettier: ela
-tolera o estado misto em vez de corrigi-lo, e mascararia o problema no lint em
-vez de resolvê-lo no repositório.
+- O nonce cobre os scripts inline que o Next injeta no streaming do RSC, sem
+  `unsafe-inline` em `script-src`. O `RootLayout` chama `headers()`, o que força
+  renderização por requisição — é o custo do nonce: `/`, `/login` e
+  `/esqueci-senha` deixam de ser estáticas.
+- O script de tema é um arquivo (`public/theme-script.js`), o que elimina o único
+  `dangerouslySetInnerHTML` alcançável.
+- O Sentry usa o túnel `/monitoring` (same-origin) e recebe os relatórios de
+  violação.
+- As fontes são auto-hospedadas por `next/font`, por isso `font-src 'self'`.
+- **`style-src` mantém `'unsafe-inline'`** — Radix/shadcn usam estilo inline para
+  posicionamento. Apertar isso é etapa própria (ver riscos residuais).
+
+## Frontend
+
+- **Exportação CSV** (`src/lib/csv.ts`): toda célula sai entre aspas com aspas
+  internas duplicadas (RFC 4180), registro terminando em CRLF, e valor que comece
+  com caractere de fórmula (`=`, `+`, `-`, `@`, TAB, CR) recebe apóstrofo
+  inicial. Número puro passa intacto: `-123` não é fórmula.
+- **CRUD genérico sem allowlist de colunas** (`useSaveRow`): não é fronteira de
+  segurança — é código de navegador, e quem quisesse enviar campos arbitrários
+  chamaria o PostgREST direto. O controle é a RLS, mais os triggers e guardas de
+  coluna. A correção certa é RLS e privilégio de coluna, nunca allowlist no
+  navegador.
+- **Escrita recusada pela RLS** não pode parecer sucesso: um `UPDATE`/`DELETE`
+  bloqueado afeta zero linhas sem erro, e `exigirLinhaAfetada()`
+  (`src/lib/mutations.ts`) trata `count === 0` como falha.
+- Nenhum `eval`, `new Function` ou `.innerHTML` no código da aplicação. O único
+  `src` dinâmico é o QR do MFA, entregue como data URI em `<img>`, onde SVG não
+  executa script. O `alt` do QR é neutro de propósito: a `totp.uri` carrega o
+  segredo TOTP.
+
+## Infraestrutura
+
+- Vercel, projeto do sistema, com domínio customizado em Production. O site
+  institucional é **outro projeto e outro repositório**.
+- **Preview** não tem as variáveis `NEXT_PUBLIC_SUPABASE_*`, de propósito: o build
+  de Preview falha. Não conectar Preview ao banco de produção para deixar o check
+  verde.
+- Sem as variáveis, o build falha na pré-renderização nomeando o que falta, em
+  vez de publicar uma aplicação quebrada.
+- **Nunca `supabase config push`.** O `config.toml` não descreve a configuração de
+  Auth real; um push aplicaria padrões do CLI e desligaria MFA, confirmação de
+  e-mail e a Site URL de produção.
+- Dependências: `npm audit` deve permanecer em zero; o estado atual está em
+  [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md).
+
+## Riscos residuais
+
+Nenhum bloqueia a operação atual. Cada item tem uma condição objetiva de
+fechamento.
+
+| Risco                                                                            | Severidade  | Situação e condição de fechamento                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Proteção contra senhas vazadas indisponível** (HaveIBeenPwned exige plano Pro) | baixa       | Risco aceito. Controle equivalente em vigor: o MFA do admin é obrigatório, então a senha sozinha não abre o painel. Fecha com upgrade de plano.                                                                                                                                                                                                                                                                                                     |
+| **`TRUNCATE` ainda concedido a `service_role` em `profiles` e `user_roles`**     | baixa       | A migration `011` listou só as 10 tabelas de negócio, e `ALTER DEFAULT PRIVILEGES` não mexe em grant existente. Exige a chave `service_role` **e** conexão direta ao Postgres (o PostgREST não expõe `TRUNCATE`). Fecha revogando, ou registrando como risco aceito: decisão de quem responde pelo projeto.                                                                                                                                         |
+| **Grants herdados dos default privileges do Supabase** em tabelas de `public`    | informativa | `anon` e `authenticated` herdam privilégios de tabela além do necessário. Não é acesso: nenhuma policy alcança `anon` e a RLS nega por padrão, verificado em execução. Um `REVOKE` seria defesa em profundidade, mas muda o retorno da API de "vazio" para `42501` e deve ser testado antes.                                                                                                                                                        |
+| **Sem FK de `profiles` e `user_roles` para `auth.users`**                        | baixa       | Remover usuário pelo painel do Supabase não limpa essas tabelas e deixa registros órfãos. Ao remover uma conta, apagar antes as linhas dessas duas tabelas. A remoção pelo backend administrativo (revogar e banir) não apaga a conta.                                                                                                                                                                                                              |
+| **`style-src 'unsafe-inline'` na CSP**                                           | baixa       | Necessário hoje para Radix/shadcn. Apertar exige nonce ou hash para estilo.                                                                                                                                                                                                                                                                                                                                                                         |
+| **Perda do autenticador do admin**                                               | operacional | Um fator verificado perdido só se remove pelo painel do Supabase. Mitigação organizacional (mais de um admin com MFA); não é defeito de código.                                                                                                                                                                                                                                                                                                     |
+| **Proveniência da taxa faturada não é preservada**                               | baixa       | Um admin ainda altera `operations.contract_id`, `agreed_amount`, as taxas do contrato e `employees.daily_cost`, porque não há gatilho de congelamento em `contracts` e `employees`, e as guardas de `operations` isentam admin. **O valor já cobrado não muda** (a entry carrega os snapshots congelados), mas perde-se a resposta para "de qual contrato e com que taxa saiu esta fatura". Fechar exige decisão de desenho: congelar ou versionar. |
+| **Paridade `calcEntry()` × derivação SQL é manual**                              | baixa       | A regra existe em TypeScript e em trigger; os testes de banco guardam constantes, não executam as duas implementações lado a lado. Toda mudança em `calcEntry()` exige revisão explícita da paridade.                                                                                                                                                                                                                                               |
+| **Auditoria best-effort**                                                        | informativa | Ver "Administração de usuários e auditoria".                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Alocação de equipe sem autor nem histórico**                                   | informativa | `operation_team` não registra quem alocou. Só `admin` escreve nela, mas não há trilha por linha.                                                                                                                                                                                                                                                                                                                                                    |
+| **Mensagens cruas do SDK em `/mfa` e `link-invalido` genérico na recuperação**   | informativa | Melhoria de diagnóstico; separar os desfechos exige mudar mensagens e destinos, em tarefa própria.                                                                                                                                                                                                                                                                                                                                                  |

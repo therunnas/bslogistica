@@ -22,33 +22,38 @@ compilação.
 ```
 src/
 ├── app/
-│   ├── layout.tsx            layout raiz: fontes, metadata, providers
+│   ├── layout.tsx            layout raiz: fontes (next/font), metadata, providers
 │   ├── providers.tsx         TanStack Query e Toaster (client)
-│   ├── page.tsx              landing pública
-│   ├── login/page.tsx        entrada (client)
-│   └── (painel)/
+│   ├── page.tsx              entrada pública, redireciona para /login
+│   ├── login/ · mfa/         entrada e segundo fator
+│   ├── esqueci-senha/ · auth/ · redefinir-senha/
+│   │                         recuperação de senha (ver SEGURANCA.md)
+│   └── (painel)/             área protegida
 │       ├── layout.tsx        guard no servidor
-│       ├── _autorizacao.ts   lê sessão e papel
+│       ├── _autorizacao.ts   decisão de acesso (sessão → papel → MFA)
+│       ├── _papel.ts         papel efetivo
+│       ├── _exigir-admin.tsx · _exigir-operacional.tsx   guards por tela
 │       ├── _acoes.ts         logout (Server Action)
-│       ├── _components/      app-shell, tela de acesso não liberado
+│       ├── _components/      app-shell e telas de acesso não liberado
 │       └── <modulo>/
 │           ├── page.tsx           servidor: exporta metadata
 │           └── painel-<modulo>.tsx cliente: a tela
-├── components/ui/            shadcn/ui
-├── hooks/use-mobile.tsx
+├── components/               ui (shadcn/ui), branding
 ├── integrations/supabase/
-│   ├── browser.ts            cliente de navegador (singleton)
-│   ├── server.ts             cliente de servidor (cookies)
-│   ├── env.ts                leitura das variáveis
-│   └── types.ts              tipos gerados do banco
+│   ├── browser.ts · server.ts   clientes de navegador e de servidor
+│   ├── admin.ts                 cliente privilegiado, só no servidor
+│   ├── env.ts · cookie-options.ts
+│   └── types.ts                 tipos gerados do banco
 ├── lib/
-│   ├── billing.ts            regras de diária, hora extra, custo e margem
+│   ├── billing.ts            diária, hora extra, custo e margem (previsão)
 │   ├── ledger.ts             consolida apontamentos com operação e cliente
-│   ├── queries.ts            leituras (TanStack Query)
-│   ├── mutations.ts          escritas genéricas
-│   ├── format.ts             moeda, número, data, minutos
-│   ├── types.ts · utils.ts
-├── proxy.ts                  renovação de sessão
+│   ├── queries.ts · mutations.ts   leituras e escritas genéricas
+│   ├── mfa.ts                decisões de segundo fator e de acesso, puras
+│   ├── recuperacao-senha.ts · prova-recuperacao.ts
+│   ├── operacional/          contratos e hooks das RPCs do operador
+│   ├── admin-usuarios/       administração de usuários, server-side
+│   └── format.ts · csv.ts · types.ts · utils.ts
+├── proxy.ts                  renovação de sessão e CSP com nonce
 └── styles.css                tema Tailwind
 ```
 
@@ -96,41 +101,45 @@ usuário → Supabase Auth → profiles → user_roles → admin | operacional �
 ```
 
 O layout de `(painel)` chama `lerAcesso()` **no servidor**, antes de enviar
-qualquer HTML:
+qualquer HTML. A decisão é uma só — layout, `/mfa`, dashboard e os guards apenas
+a leem; duas definições de "liberado" produzem laço entre rotas.
 
-| Situação              | Resultado                                   |
-| --------------------- | ------------------------------------------- |
-| sem sessão            | `redirect("/login")` — HTTP 307, sem markup |
-| autenticado sem papel | tela "Acesso não liberado"                  |
-| com papel             | o painel                                    |
+| Situação                                    | Resultado                                            |
+| ------------------------------------------- | ---------------------------------------------------- |
+| sem sessão                                  | `redirect("/login")` — HTTP 307, sem markup          |
+| autenticado sem papel                       | tela "Acesso não liberado"                           |
+| `admin` em AAL2                             | painel administrativo                                |
+| `admin` em AAL1                             | `/mfa`: cadastrar o primeiro fator ou desafiar       |
+| `operacional` sem fator verificado, em AAL1 | tela `/operacional`                                  |
+| `operacional` com fator verificado, em AAL1 | `/mfa` até concluir o TOTP                           |
+| `operacional` em AAL2                       | tela `/operacional`                                  |
+| falha ao consultar o estado de MFA          | tela "não foi possível verificar" (nunca o cadastro) |
 
-A leitura usa `getUser()`, que valida o token contra o Supabase, e não
-`getSession()`, que confiaria no cookie.
+`admin` + `operacional` é tratado como admin. O estado do fator vem do banco
+(`public.mfa_bloqueia_excecao_aal1()`), não do cookie. A leitura usa
+`getUser()`, que valida o token contra o Supabase, e não `getSession()`.
 
 **Isto governa o que a interface mostra. Quem impede o acesso aos dados é a
-RLS** — se este arquivo tivesse um defeito, as tabelas continuariam protegidas.
+RLS** — se este arquivo tivesse um defeito, as tabelas continuariam protegidas. O
+modelo completo, incluindo MFA e recuperação de senha, está em
+[SEGURANCA.md](SEGURANCA.md).
 
-### O que cada papel pode
+### O que cada papel alcança
 
-| Tabela                               | admin              | operacional        |
-| ------------------------------------ | ------------------ | ------------------ |
-| clients · contracts · employees      | ler e escrever     | só ler             |
-| invoices · invoice_items             | ler e escrever     | só ler             |
-| operations · shifts · operation_team | ler e escrever     | **ler e escrever** |
-| timesheets · timesheet_entries       | ler e escrever     | **ler e escrever** |
-| profiles                             | vê todos           | só o próprio       |
-| user_roles                           | só a própria linha | só a própria linha |
-| user_operation_access                | ler e escrever     | **nenhum acesso**  |
+| Superfície                               | admin        | operacional                          |
+| ---------------------------------------- | ------------ | ------------------------------------ |
+| tabelas de negócio, pelo PostgREST       | AAL2         | **nenhuma**, em nenhum nível         |
+| `user_operation_access`                  | AAL2         | nenhuma                              |
+| cinco RPCs operacionais                  | recusadas    | operações atribuídas, sem financeiro |
+| `profiles`                               | vê todos     | só o próprio                         |
+| `user_roles`                             | só a própria | só a própria                         |
+| telas administrativas (`/usuarios` etc.) | sim          | bloqueadas no servidor               |
+| tela `/operacional`                      | bloqueada    | sim                                  |
 
-Um usuário operacional não altera cadastro nem gera fatura, mas **define o que
-será faturado** — cria e altera apontamentos, que viram diária e hora extra.
-
-**Este quadro descreve o acesso em AAL2.** Toda tabela de negócio tem policy
-RESTRICTIVE exigindo `aal2`, então nenhuma linha dele vale para uma sessão AAL1,
-de qualquer papel. Para `operacional` em AAL1 existe uma superfície separada —
-cinco RPCs de contrato fechado criadas pela migration `013`, sem nenhum valor
-financeiro e sem leitura direta de tabela. Ela está no banco e **a interface
-ainda não a consome**; ver `docs/SEGURANCA.md` e `PROGRESS.md`, seção 7.2.
+O `operacional` registra presença e horários **só** pela tela `/operacional`,
+que fala exclusivamente com as RPCs de `src/lib/operacional/`. Nenhum valor
+financeiro atravessa essa superfície. O desenho dela está em
+[SEGURANCA.md](SEGURANCA.md).
 
 ## Fluxo de dados
 
@@ -194,7 +203,7 @@ antes de salvar. A autoridade é o trigger.
 cujos números saíram de uma execução anterior do `calcEntry()` e estão gravados
 como **constantes**. O teste **não** executa as duas implementações lado a lado:
 se o `calcEntry()` mudar, a paridade precisa ser revista à mão. Automatizar esse
-diferencial está registrado como dívida em `PROGRESS.md`.
+diferencial segue como risco registrado em [PROGRESS.md](../PROGRESS.md).
 
 Consequência prática que não mudou: a tela de apontamentos mostra o valor
 **calculado na hora**, não o gravado. Conferir uma alteração pela interface não
@@ -208,7 +217,7 @@ o da linha: valem `operations.client_id` e o
 `agreed_amount`, as taxas do contrato e `employees.daily_cost` continuam
 editáveis por admin. Isso não altera valor já cobrado — a entry guarda os
 snapshots —, mas a proveniência da taxa não é preservada; está registrado como
-dívida em `PROGRESS.md`, seção 10.
+risco em [PROGRESS.md](../PROGRESS.md).
 
 ## Módulos
 
@@ -279,7 +288,8 @@ operações sem turno cadastrado.
 Projeto Supabase **BSLOG**. RLS ativa em todas as tabelas do schema `public`, e
 um event trigger (`ensure_rls`) a habilita automaticamente em tabelas novas.
 
-Migrations em `supabase/migrations/`: **19 arquivos, todos aplicados em
-Production**. **Nunca editar migration já aplicada** — criar nova com
-`supabase migration new <nome>`. Antes de commitar mudança de
-esquema, rodar `supabase db advisors --linked --type security`.
+Migrations em `supabase/migrations/`, aplicadas em Production na ordem; o estado
+atual está em [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md). **Nunca editar
+migration já aplicada** — criar nova com `supabase migration new <nome>`. Antes
+de commitar mudança de esquema, rodar `supabase db advisors --linked --type
+security`. Testes de banco ficam em `supabase/tests/`.
