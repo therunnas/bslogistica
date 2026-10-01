@@ -274,7 +274,7 @@ verificar(
 );
 verificar(
   "E5. a tela existe como entrada da área de conta do admin (não da navegação principal)",
-  /href: "\/usuarios", label: "Usuários"/.test(fontes.shell),
+  /href: "\/usuarios",\s*label: "Usuários"/.test(fontes.shell),
   true,
 );
 // A contagem completa de links da navegação principal e do menu de conta é

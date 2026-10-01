@@ -470,7 +470,7 @@ verificar(
 );
 verificar(
   "L5i. o envio é bloqueado enquanto uma submissão está em curso",
-  String(/if \(enviando\) return/.test(clienteSemComentarios)),
+  String(/if \(enviando\) \{\s*return;?\s*\}/.test(clienteSemComentarios)),
   "true",
 );
 
@@ -562,7 +562,11 @@ const paginaTroca = readFileSync(
 
 verificar(
   "N6. a página redireciona ao desafio quando há fator pendente",
-  String(/decisao === "desafiar-mfa"\) redirect\(ROTA_REDEFINIR_SENHA_MFA\)/.test(paginaTroca)),
+  String(
+    /decisao === "desafiar-mfa"\) \{\s*redirect\(ROTA_REDEFINIR_SENHA_MFA\);?\s*\}/.test(
+      paginaTroca,
+    ),
+  ),
   "true",
 );
 verificar(
@@ -786,7 +790,9 @@ verificar(
 // 8. O comportamento normal continua intacto.
 verificar(
   "M5. fora desse status o login segue redirecionando quem tem sessão",
-  String(/if \(data\.user\) router\.replace\("\/dashboard"\)/.test(loginSemComentarios)),
+  String(
+    /if \(data\.user\) \{\s*router\.replace\("\/dashboard"\);?\s*\}/.test(loginSemComentarios),
+  ),
   "true",
 );
 verificar(

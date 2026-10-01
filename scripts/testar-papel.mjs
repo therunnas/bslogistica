@@ -279,7 +279,7 @@ console.log("\nE'. Usuários e Segurança moram na área de conta, não na naveg
 
 verificar(
   "E9. o item de usuários existe fora do mapa NAVEGACAO",
-  /const ITEM_USUARIOS = \{ href: "\/usuarios", label: "Usuários", icon: UserCog \} as const;/.test(
+  /const ITEM_USUARIOS = \{\s*href: "\/usuarios",\s*label: "Usuários",\s*icon: UserCog,?\s*\} as const;/.test(
     fontes.shell,
   ),
   true,
@@ -288,7 +288,7 @@ verificar(
 // NAVEGACAO — mesma razão do ITEM_USUARIOS, e dos dois papéis desta vez.
 verificar(
   "E9b. o item de segurança também existe fora do mapa NAVEGACAO",
-  /const ITEM_SEGURANCA = \{ href: "\/configuracoes", label: "Segurança", icon: ShieldCheck \} as const;/.test(
+  /const ITEM_SEGURANCA = \{\s*href: "\/configuracoes",\s*label: "Segurança",\s*icon: ShieldCheck,?\s*\} as const;/.test(
     fontes.shell,
   ),
   true,
@@ -301,20 +301,21 @@ verificar(
   true,
 );
 verificar(
-  "E10. o rodapé abre o menu de conta quando o papel tem algum item",
-  /\{itensDeConta\.length > 0 \? \(\s*<DropdownMenu>/.test(fontes.shell),
+  "E10. o rodapé sempre abre o menu de conta, com separador só quando há item de conta",
+  /<DropdownMenu>\s*<DropdownMenuTrigger/.test(fontes.shell) &&
+    /\{itensDeConta\.length > 0 \? <DropdownMenuSeparator \/> : null\}/.test(fontes.shell),
   true,
 );
 verificar(
   "E11. o menu de conta é montado a partir de itensDeConta, não de um link fixo",
-  /\{itensDeConta\.map\(\(item\) => \(\s*<DropdownMenuItem key=\{item\.href\} asChild>\s*<Link href=\{item\.href\}/.test(
+  /\{itensDeConta\.map\(\(\{ href, label, icon: Icon \}\) => \(\s*<DropdownMenuItem key=\{href\} asChild>\s*<Link\s+href=\{href\}/.test(
     fontes.shell,
   ),
   true,
 );
 verificar(
   "E12. e continua oferecendo Sair, no mesmo menu",
-  /<DropdownMenuItem onClick=\{encerrarSessao\} disabled=\{saindo\}>/.test(fontes.shell),
+  /<DropdownMenuItem\s+onClick=\{encerrarSessao\}\s+disabled=\{saindo\}/.test(fontes.shell),
   true,
 );
 // Checkout #17 muda exatamente isto: o operacional passa a ter menu de
@@ -327,9 +328,9 @@ verificar(
   true,
 );
 verificar(
-  "E14. sem papel continua sem menu de conta (fallback só e-mail + Sair)",
+  "E14. sem papel não recebe item de conta (o menu fica só com e-mail + Sair)",
   /"sem-papel": \[\]/.test(fontes.shell) &&
-    /\) : \(\s*<>\s*<p className="truncate px-3 pb-2/.test(fontes.shell),
+    /\{itensDeConta\.length > 0 \? <DropdownMenuSeparator \/> : null\}/.test(fontes.shell),
   true,
 );
 verificar(
