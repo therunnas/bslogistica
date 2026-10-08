@@ -24,7 +24,9 @@
     "test:fechamento-leitura": "node --experimental-strip-types scripts/testar-fechamento-leitura.mjs",
     "test:fechamento-dominio": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-dominio.mjs",
     "test:fechamento-carregamento": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-carregamento.mjs",
-    "test:fechamento-tela": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-tela.mjs"
+    "test:fechamento-tela": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-tela.mjs",
+    "test:fechamento-csv": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-csv.mjs",
+    "test:fechamento-xlsx": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-xlsx.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
@@ -76,7 +78,8 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
     "tw-animate-css": "^1.3.4",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "write-excel-file": "4.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

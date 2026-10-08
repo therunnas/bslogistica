@@ -37,7 +37,13 @@ import {
   ErroDeDadoFinanceiro,
   ErroDeFiltroDoFechamento,
 } from "../src/lib/fechamento/erros.ts";
-import { decidirAcesso, descreverErro, extrairFiltros } from "../src/lib/fechamento/http.ts";
+import { csvDoFechamento } from "../src/lib/fechamento/exportacao.ts";
+import {
+  conferirAssinatura,
+  decidirAcesso,
+  descreverErro,
+  extrairFiltros,
+} from "../src/lib/fechamento/http.ts";
 import { ErroDeLeituraDoFechamento } from "../src/lib/fechamento/leitura.ts";
 import { normalizarLinhas } from "../src/lib/fechamento/normalizar.ts";
 import {
@@ -406,7 +412,12 @@ const BASE = [
   }),
   bruta({ id: "e-4", emp: "emp-4", data: "2026-03-05", inv: "inv-1" }),
 ];
-const ENTRADA = { clienteId: CLIENTE, inicio: "2026-03-01", fim: "2026-03-15" };
+const ENTRADA = {
+  clienteId: CLIENTE,
+  clienteNome: "Cliente Ouro",
+  inicio: "2026-03-01",
+  fim: "2026-03-15",
+};
 const assinar = (brutas, extra = {}) =>
   assinarFechamento({ ...ENTRADA, ...extra, linhas: normalizarLinhas(brutas) });
 const modificar = (indice, mudancas) =>
@@ -540,7 +551,8 @@ const modificar = (indice, mudancas) =>
     true,
   );
 
-  // Texto puramente visual NÃO entra: renomear não invalida o download.
+  // Os textos que a tela e os arquivos mostram ENTRAM (corrigido na v2 da assinatura):
+  // renomear invalida o download, porque o arquivo passaria a ser outro.
   const renomeado = BASE.map((b) => ({
     ...b,
     employees: { ...b.employees, name: "Nome Novo", role: "Cargo Novo" },
@@ -551,9 +563,14 @@ const modificar = (indice, mudancas) =>
     },
   }));
   verificar(
-    "A28. renomear colaborador, função, operação e turno NÃO muda a assinatura",
-    assinar(renomeado),
-    referencia,
+    "A28. renomear colaborador, função, operação e turno MUDA a assinatura (v2)",
+    assinar(renomeado) !== referencia,
+    true,
+  );
+  verificar(
+    "A28b. e o nome do cliente também",
+    assinar(BASE, { clienteNome: "Outro Nome" }) !== referencia,
+    true,
   );
 }
 
@@ -576,8 +593,9 @@ const modificar = (indice, mudancas) =>
     "A29. serialização canônica exata, em ordem de id",
     texto,
     JSON.stringify([
-      "fechamento-v1",
+      "fechamento-v2",
       CLIENTE,
+      "Cliente Ouro",
       "2026-03-01",
       "2026-03-15",
       [
@@ -597,6 +615,10 @@ const modificar = (indice, mudancas) =>
           "06:00:00",
           "15:00:00",
           "ctr-1",
+          "Fulano",
+          "Auxiliar",
+          "Operação 1",
+          "Manhã",
         ],
         [
           "b",
@@ -614,6 +636,10 @@ const modificar = (indice, mudancas) =>
           "06:00:00",
           "15:00:00",
           "ctr-1",
+          "Fulano",
+          "Auxiliar",
+          "Operação 1",
+          "Manhã",
         ],
       ],
     ]),
@@ -624,7 +650,12 @@ const modificar = (indice, mudancas) =>
     createHash("sha256").update(texto, "utf8").digest("hex"),
   );
   verificar("A31. o texto assinado não traz geradoEm", /geradoEm|gerado/i.test(texto), false);
-  verificar("A32. nem nomes", /Fulano|Auxiliar|Manhã|Operação/.test(texto), false);
+  verificar(
+    "A32. os textos exportados fazem parte do que é assinado (v2), mas só o hash sai do servidor",
+    /Fulano/.test(texto) &&
+      !/Fulano/.test(assinarFechamento({ ...ENTRADA, linhas: normalizarLinhas(minima) })),
+    true,
+  );
 }
 
 /* ================================================================== */
@@ -1224,10 +1255,170 @@ verificar(
 );
 verificar("R32. periodo.ts não usa Intl nem toLocale", /Intl\.|toLocale/.test(periodoFonte), false);
 verificar(
-  "R33. nenhum endpoint de XLSX nem de CSV foi criado ainda",
-  /xlsx|write-excel-file/i.test(rota + carregar + http),
+  "R33. o GET /api/fechamento e o carregamento não conhecem XLSX (o download é rota própria, etapa 4.5)",
+  /xlsx|write-excel-file/i.test(rota + carregar),
   false,
 );
+
+/* ================================================================== */
+console.log("\nG. A assinatura cobre tudo o que a tela e os arquivos mostram (etapa 4.6.2)\n");
+
+{
+  // Mesmo FechamentoData que a tela e os arquivos consomem, com relógio e cliente injetáveis.
+  const carregar = (brutas, { cliente = "Cliente Ouro", agora } = {}) => {
+    const { deps } = dependencias(brutas, agora ? { agora } : {});
+    const base = deps.buscarCliente;
+    deps.buscarCliente = async (id) => ({ ...(await base(id)), name: cliente });
+    return carregarFechamento(FILTROS, deps);
+  };
+  const exportado = (d) => csvDoFechamento(d, "colaborador") + "\n" + csvDoFechamento(d, "diario");
+
+  const base = await carregar(BASE);
+  const referencia = base.meta.assinatura;
+
+  // Cada alteração é de um texto que o usuário VÊ na tela e no arquivo.
+  const renomear = (campo, valor) =>
+    BASE.map((b, i) => {
+      if (i !== 0) return b;
+      const c = structuredClone(b);
+      if (campo === "colaborador") c.employees.name = valor;
+      if (campo === "funcao") c.employees.role = valor;
+      if (campo === "operacao") c.timesheets.operations.name = valor;
+      if (campo === "turno") c.timesheets.shifts = { id: "sh-1", name: valor };
+      return c;
+    });
+
+  for (const [campo, valor] of [
+    ["colaborador", "Nome Novo"],
+    ["funcao", "Cargo Novo"],
+    ["operacao", "Operação Renomeada"],
+    ["turno", "Turno Novo"],
+  ]) {
+    const nova = await carregar(renomear(campo, valor));
+    verificar(
+      `G1.${campo}. o arquivo exportado muda quando o ${campo} muda (a lacuna era real)`,
+      exportado(nova) !== exportado(base),
+      true,
+    );
+    verificar(`G2.${campo}. e a assinatura muda junto`, nova.meta.assinatura !== referencia, true);
+  }
+
+  const outroCliente = await carregar(BASE, { cliente: "Cliente Renomeado" });
+  verificar(
+    "G3. o nome do cliente aparece no Resumo e no nome do arquivo",
+    outroCliente.meta.clienteNome !== base.meta.clienteNome,
+    true,
+  );
+  verificar(
+    "G4. e a assinatura muda quando o nome do cliente muda",
+    outroCliente.meta.assinatura !== referencia,
+    true,
+  );
+
+  verificar(
+    "G5. dados idênticos, assinatura idêntica",
+    (await carregar(structuredClone(BASE))).meta.assinatura,
+    referencia,
+  );
+  verificar(
+    "G6. o relógio não entra: outro 'agora', mesma assinatura",
+    (await carregar(BASE, { agora: "2030-01-01T00:00:00.000Z" })).meta.assinatura,
+    referencia,
+  );
+  verificar(
+    "G7. a ordem de leitura não entra",
+    (await carregar([...BASE].reverse())).meta.assinatura,
+    referencia,
+  );
+  verificar(
+    "G8. mudança financeira (+1 centavo) continua mudando a assinatura",
+    (
+      await carregar(
+        modificar(0, { id: "e-1", emp: "emp-1", data: "2026-03-02", faturado: "150.01" }),
+      )
+    ).meta.assinatura !== referencia,
+    true,
+  );
+  verificar(
+    "G9. mudança de status continua mudando a assinatura",
+    (
+      await carregar(
+        modificar(0, { id: "e-1", emp: "emp-1", data: "2026-03-02", status: "replacement" }),
+      )
+    ).meta.assinatura !== referencia,
+    true,
+  );
+
+  // Irrelevante: o que normalizar.ts já iguala não é diferença para o arquivo.
+  const espacos = BASE.map((b, i) => {
+    if (i !== 0) return b;
+    const c = structuredClone(b);
+    c.employees.name = "  Fulano  ";
+    c.timesheets.shifts = { id: "sh-1", name: " Manhã " };
+    return c;
+  });
+  verificar(
+    "G10. espaços nas pontas (que o arquivo já apara) não invalidam o download",
+    (await carregar(espacos)).meta.assinatura,
+    referencia,
+  );
+  const semFuncao = (valor) =>
+    BASE.map((b, i) => {
+      if (i !== 0) return b;
+      const c = structuredClone(b);
+      c.employees.role = valor;
+      return c;
+    });
+  verificar(
+    "G11. função nula e função em branco são o mesmo texto exportado ('Sem função')",
+    (await carregar(semFuncao(null))).meta.assinatura,
+    (await carregar(semFuncao("   "))).meta.assinatura,
+  );
+  const outroIdDeTurno = BASE.map((b, i) => {
+    if (i !== 0) return b;
+    const c = structuredClone(b);
+    c.timesheets.shifts = { id: "sh-OUTRO-ID", name: "Manhã" }; // mesmo nome, outro id
+    return c;
+  });
+  verificar(
+    "G12. id do turno (não exportado) não invalida o download",
+    (await carregar(outroIdDeTurno)).meta.assinatura,
+    referencia,
+  );
+
+  // Texto não pode migrar de um campo para o outro sem mudar a assinatura.
+  const par = (nome, role) =>
+    BASE.map((b, i) => {
+      if (i !== 0) return b;
+      const c = structuredClone(b);
+      c.employees.name = nome;
+      c.employees.role = role;
+      return c;
+    });
+  verificar(
+    "G13. a fronteira entre campos conta: 'A'+'BC' difere de 'AB'+'C'",
+    (await carregar(par("A", "BC"))).meta.assinatura !==
+      (await carregar(par("AB", "C"))).meta.assinatura,
+    true,
+  );
+
+  // HTTP 409 e nova assinatura, pela decisão real do endpoint.
+  const v1 = base.meta.assinatura;
+  const v2 = (await carregar(renomear("colaborador", "Nome Novo"))).meta.assinatura;
+  verificar(
+    "G14. assinatura antiga + dados exportáveis mudaram = 409",
+    conferirAssinatura(v1, v2)?.status,
+    409,
+  );
+  verificar("G15. com a assinatura nova a exportação é liberada", conferirAssinatura(v2, v2), null);
+
+  // O que sai para o navegador é só o hash.
+  verificar(
+    "G16. o navegador recebe só o hash, sem nenhum texto do cadastro",
+    /^[0-9a-f]{64}$/.test(base.meta.assinatura),
+    true,
+  );
+}
 
 /* ================================================================== */
 console.log("\nS. Elo entre a suíte SQL e a fixture ouro\n");

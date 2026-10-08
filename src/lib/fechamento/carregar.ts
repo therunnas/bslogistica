@@ -107,6 +107,7 @@ export async function carregarFechamento(
     geradoEm: dependencias.agora().toISOString(),
     assinatura: assinarFechamento({
       clienteId: filtro.clienteId,
+      clienteNome: cliente.name,
       inicio: filtro.inicio,
       fim: filtro.fim,
       linhas,

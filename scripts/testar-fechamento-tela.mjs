@@ -799,8 +799,10 @@ verificar(
 );
 verificar("E26. o documento pessoal nunca é lido", /\.doc\b|\bdoc:/.test(todaATela), false);
 verificar(
-  "E27. nenhum botão de CSV ou Excel (sem UI morta)",
-  /Baixar|Exportar|\.xlsx|\.csv|xlsx|montarCsv/i.test(todaATela),
+  "E27. fora de _exportar.tsx (etapa 4.5) a tela não tem botão de CSV ou Excel",
+  /Baixar|Exportar|\.xlsx|\.csv|xlsx|montarCsv/i.test(
+    todaATela.replace(/ExportarFechamento|\.\/_exportar/g, ""),
+  ),
   false,
 );
 verificar(

@@ -52,6 +52,7 @@ src/
 │   ├── recuperacao-senha.ts · prova-recuperacao.ts
 │   ├── operacional/          contratos e hooks das RPCs do operador
 │   ├── admin-usuarios/       administração de usuários, server-side
+│   ├── fechamento/           núcleo do fechamento: leitura, domínio, exportação
 │   └── format.ts · csv.ts · types.ts · utils.ts
 ├── proxy.ts                  renovação de sessão e CSP com nonce
 └── styles.css                tema Tailwind
@@ -230,6 +231,43 @@ risco em [PROGRESS.md](../PROGRESS.md).
 | Apontamentos         | presença, horários e intervalo por turno, com cálculo automático                                          |
 | Faturamento          | fechamento por cliente e período, com itens por operação                                                  |
 | Relatórios           | por colaborador, operação e lançamento, com exportação CSV                                                |
+| Fechamento           | conferência por cliente e período, com exportação XLSX e CSV (branch `feat/fechamento-quinzenal`)         |
+
+## Fechamento quinzenal
+
+Três módulos distintos, de propósito: **Faturamento** (ciclo de cobrança:
+lançamentos e faturas), **Relatórios** (indicadores e análises) e **Fechamento**
+(conferência financeira por cliente e período). Não se unificam, e as exportações
+CSV de Faturamento e Relatórios não mudam.
+
+Fluxo de dados, em `src/lib/fechamento/`:
+
+```
+GET /api/fechamento ──► carregar.ts ──► leitura.ts (paginada, provada completa)
+                                    └─► normalizar.ts ► agregar.ts ► FechamentoData
+                                                  assinatura.ts ──┘ (meta.assinatura)
+
+tela /fechamento ──── consome FechamentoData
+exportacao.ts ─────── modelo tabular único (colunas e linhas) para CSV e XLSX
+xlsx.ts ───────────── gerador, só servidor (write-excel-file 4.1.1)
+POST /api/fechamento/xlsx ──► carregar.ts ──► confere assinatura ──► xlsx.ts
+```
+
+`FechamentoData` é a única fonte de tela, CSV e XLSX. Dinheiro em **centavos
+inteiros**, tempo em minutos, margem em milésimos; nada é somado, arredondado nem
+decidido fora do núcleo (`agregar.ts`). A exportação só muda de escala.
+
+**XLSX** (três abas, nesta ordem): _Resumo_, _Por colaborador_ (com linha de
+totais) e _Detalhamento diário_. Dinheiro, horas e margem saem como `Number`
+formatado; datas como `Date`. As abas tabulares têm primeira linha congelada e
+autofiltro, que entra pelo mecanismo oficial de _features_ da biblioteca
+(`files.transform`). **CSV**: dois formatos (por colaborador e detalhamento
+diário), `;` como separador, decimal com vírgula, reutilizando `src/lib/csv.ts`.
+
+Limitações conhecidas: o valor é **previsto** (custo previsto não é pagamento
+realizado); a exportação é de um cliente e um período por vez (no máximo 31
+dias); a leitura é paginada e, em volume alto, lenta (12.400 lançamentos levaram
+~20 s localmente).
 
 ## Regras de cálculo
 

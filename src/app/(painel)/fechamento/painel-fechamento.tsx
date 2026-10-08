@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 
 import { AlertasDoFechamento } from "./_alertas";
 import { DetalheDiario } from "./_detalhe-diario";
+import { ExportarFechamento } from "./_exportar";
 import { useFechamento } from "./_hooks";
 import { ResumoDoFechamento } from "./_resumo";
 import { CARTAO, INPUT_CLASS, SELECT_CLASS } from "./_estilos";
@@ -413,10 +414,18 @@ function Resultado({ dados, onAtualizar }: { dados: FechamentoData; onAtualizar:
           </p>
         </div>
 
-        <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={onAtualizar}>
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          Atualizar
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={onAtualizar}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Atualizar
+          </Button>
+
+          <ExportarFechamento
+            dados={dados}
+            disponivel={estado === "com-lancamentos"}
+            onDesatualizado={onAtualizar}
+          />
+        </div>
       </div>
 
       {estado === "vazio" ? (

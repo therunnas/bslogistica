@@ -228,6 +228,49 @@ os testes asseveram isso na forma dos arquivos.
 - `src/lib/billing.ts` serve para a interface mostrar o número **antes** de salvar,
   nunca para decidi-lo.
 
+## Fechamento e exportação
+
+`GET /api/fechamento` e `POST /api/fechamento/xlsx` são Route Handlers que **se
+protegem sozinhos**: o guard do layout só governa o que a interface mostra, e uma
+rota de API é alcançável sem passar por ele.
+
+- **Acesso:** `lerAcesso()` (a decisão única) — sem sessão 401; sem papel
+  `admin` ou sem segundo fator 403. Para o admin, `liberado` já implica AAL2;
+  não há segunda checagem de nível.
+- **Dados:** leitura pelo cliente Supabase da **sessão**, sob RLS (`aal2` e
+  `admin`). Nunca `service_role`.
+- **Entrada:** o POST aceita só `cliente`, `inicio`, `fim` e `assinatura`, em
+  JSON, com corpo de até 1 KB; campo desconhecido, ausente ou fora do formato é 400.
+  O corpo é lido **por pedaços e cancelado ao passar do teto** (`lerCorpoComLimite`),
+  com ou sem `Content-Length` e mesmo que o cabeçalho minta: nada de acumular o
+  corpo inteiro antes de medir. A autenticação vem antes da leitura. Nenhum valor
+  financeiro viaja do navegador.
+- **Assinatura:** SHA-256 de uma serialização canônica do snapshot financeiro
+  (versão `fechamento-v2`). O servidor relê, recalcula e compara; divergência é
+  **409** com mensagem fixa. É conferência de **frescor**, não segurança contra o
+  navegador. Cobre números, status, datas, fatura, horários e contrato **e os
+  textos que a tela e os arquivos mostram** (nome do cliente, do colaborador,
+  função, operação e turno, já normalizados): o download é exatamente o que a
+  tela exibiu. Não cobre o que não é exibido (ids de turno) nem `geradoEm`. Ao
+  navegador vai só o hash.
+- **Fórmulas:** o CSV neutraliza texto que começa com `=`, `+`, `-` ou `@`
+  (também depois de espaço, TAB ou quebra de linha) em `src/lib/csv.ts`. O XLSX
+  escreve todo texto do banco como `String` com formato de texto e nunca usa
+  `type: "Formula"`: o XML não contém `<f>`.
+- **Resposta:** `Content-Type` do XLSX, `Content-Disposition: attachment` com
+  nome reduzido a ASCII seguro, `Cache-Control: no-store`. A CSP e os demais
+  cabeçalhos vêm do `proxy.ts`/`next.config.ts`. Teto de **4.000.000 bytes**
+  (a Vercel limita a resposta de uma função a 4,5 MB): acima disso é 413, nunca
+  arquivo cortado.
+- **Erros:** código estável e frase fixa; stack, SQL e mensagens do banco vão só
+  para o log do servidor.
+- **Dependência:** `write-excel-file` 4.1.1 (licença MIT, única dependência
+  transitiva: `fflate`), versão exata, usada só no servidor.
+
+Verificado por suítes (`test:fechamento-csv`, `test:fechamento-xlsx`) e por E2E
+contra um Supabase local descartável. Pendências que só o Preview prova estão em
+[PROGRESS.md](../PROGRESS.md).
+
 ## Administração de usuários e auditoria
 
 Convidar, atribuir ou trocar papel, remover acesso e atribuir operações passam
@@ -353,6 +396,8 @@ fechamento.
 | **Perda do autenticador do admin**                                               | operacional | Um fator verificado perdido só se remove pelo painel do Supabase. Mitigação organizacional (mais de um admin com MFA); não é defeito de código.                                                                                                                                                                                                                                                                                                     |
 | **Proveniência da taxa faturada não é preservada**                               | baixa       | Um admin ainda altera `operations.contract_id`, `agreed_amount`, as taxas do contrato e `employees.daily_cost`, porque não há gatilho de congelamento em `contracts` e `employees`, e as guardas de `operations` isentam admin. **O valor já cobrado não muda** (a entry carrega os snapshots congelados), mas perde-se a resposta para "de qual contrato e com que taxa saiu esta fatura". Fechar exige decisão de desenho: congelar ou versionar. |
 | **Paridade `calcEntry()` × derivação SQL é manual**                              | baixa       | A regra existe em TypeScript e em trigger; os testes de banco guardam constantes, não executam as duas implementações lado a lado. Toda mudança em `calcEntry()` exige revisão explícita da paridade.                                                                                                                                                                                                                                               |
+| **Exportação do fechamento: limite de 4 MB e 413 não exercitados**               | baixa       | O teto existe e a decisão é testada como função pura, mas nenhum arquivo chegou perto dele (12.400 lançamentos ≈ 650 KB). Fecha no Preview, ou com um volume que o justifique.                                                                                                                                                                                                                                                                      |
+| **Leitura do fechamento lenta em volume alto**                                   | informativa | A leitura é paginada e provada completa; 12.400 lançamentos levaram ~20 s localmente. Dentro do limite da função, mas é o primeiro lugar a otimizar se o uso crescer.                                                                                                                                                                                                                                                                               |
 | **Auditoria best-effort**                                                        | informativa | Ver "Administração de usuários e auditoria".                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **Alocação de equipe sem autor nem histórico**                                   | informativa | `operation_team` não registra quem alocou. Só `admin` escreve nela, mas não há trilha por linha.                                                                                                                                                                                                                                                                                                                                                    |
 | **Mensagens cruas do SDK em `/mfa` e `link-invalido` genérico na recuperação**   | informativa | Melhoria de diagnóstico; separar os desfechos exige mudar mensagens e destinos, em tarefa própria.                                                                                                                                                                                                                                                                                                                                                  |

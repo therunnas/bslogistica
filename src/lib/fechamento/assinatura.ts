@@ -9,17 +9,23 @@
  *
  * O QUE ENTRA
  *
- * Cliente e período, mais, para CADA lançamento lido (faltas inclusive, porque
- * uma falta que vira presença muda o relatório): id, colaborador, operação,
- * data, status, status da folha, fatura, faturado, custo e taxa em centavos,
- * minutos trabalhados e extras, horário e contrato. É tudo que influencia um
- * número, um agrupamento ou um alerta.
+ * Cliente (id e nome) e período, mais, para CADA lançamento lido (faltas
+ * inclusive, porque uma falta que vira presença muda o relatório): id,
+ * colaborador, operação, data, status, status da folha, fatura, faturado, custo
+ * e taxa em centavos, minutos trabalhados e extras, horário e contrato — e os
+ * TEXTOS que a tela e os arquivos mostram: nome do colaborador, função,
+ * operação e turno, já normalizados (os mesmos que vão para o CSV e o XLSX).
+ *
+ * Os textos entram porque o download deve ser exatamente o que a tela mostrou:
+ * se um colaborador foi renomeado entre uma coisa e outra, o arquivo seria
+ * outro com a mesma assinatura. Na versão anterior (`fechamento-v1`) eles ficavam
+ * de fora, por serem "puramente visuais"; isso foi corrigido na `v2`.
  *
  * O QUE NÃO ENTRA
  *
- * `geradoEm` (muda a cada carga) e texto puramente visual — nome do colaborador,
- * da operação, do turno, função. Renomear alguém não muda um centavo do
- * fechamento e não deve invalidar o download.
+ * `geradoEm` (muda a cada carga) e tudo que não aparece na tela nem nos
+ * arquivos, como ids de turno. A assinatura que vai ao navegador é só o hash:
+ * nenhum desses textos sai do servidor por ela.
  *
  * COMO É CANÔNICA
  *
@@ -35,10 +41,12 @@ import { createHash } from "node:crypto";
 import type { LinhaNormalizada } from "./tipos";
 
 /** Mude ao alterar o material assinado: assinaturas antigas deixam de bater. */
-export const VERSAO_DA_ASSINATURA = "fechamento-v1";
+export const VERSAO_DA_ASSINATURA = "fechamento-v2";
 
 export interface EntradaDaAssinatura {
   clienteId: string;
+  /** O nome que aparece no Resumo e no nome do arquivo. */
+  clienteNome: string;
   inicio: string;
   fim: string;
   linhas: readonly LinhaNormalizada[];
@@ -61,6 +69,10 @@ function tupla(linha: LinhaNormalizada) {
     linha.checkIn,
     linha.checkOut,
     linha.contractId,
+    linha.colaborador,
+    linha.funcao,
+    linha.operacao,
+    linha.turno,
   ];
 }
 
@@ -73,6 +85,7 @@ export function serializarParaAssinatura(entrada: EntradaDaAssinatura): string {
   return JSON.stringify([
     VERSAO_DA_ASSINATURA,
     entrada.clienteId,
+    entrada.clienteNome,
     entrada.inicio,
     entrada.fim,
     ordenadas.map(tupla),

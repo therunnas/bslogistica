@@ -38,6 +38,48 @@ faturamento por período e relatórios. Duas trilhas de uso:
 | Cabeçalhos e CSP                                   | CSP com nonce em enforcement, fontes auto-hospedadas, contraste do login                             |
 | Dependências                                       | `npm audit` zerado                                                                                   |
 
+## Fechamento quinzenal (V1) — pronto na branch, fora de Production
+
+Conferência financeira por cliente e período (`/fechamento`), com exportação
+XLSX (principal) e CSV (secundária). Vive em `feat/fechamento-quinzenal` e
+**ainda não foi mesclado nem publicado**: nada disto está em Production.
+
+| Etapa | Entrega                                                                                               |
+| ----- | ----------------------------------------------------------------------------------------------------- |
+| 4.1   | leitura paginada, provada completa, sob RLS                                                           |
+| 4.2   | domínio financeiro (centavos inteiros, margem em milésimos), sem recalcular regra contratual          |
+| 4.3   | paridade SQL com `gerar_fatura` (`014_paridade_fechamento.sql`), carregamento e `GET /api/fechamento` |
+| 4.4   | tela `/fechamento`: filtros, resumo, alertas, tabela por colaborador, detalhamento diário             |
+| 4.5   | `POST /api/fechamento/xlsx`, CSV (por colaborador e diário), assinatura de frescor e HTTP 409         |
+| 4.6.1 | testes do fechamento na CI e `next typegen` antes do `tsc`                                            |
+| 4.6.2 | assinatura `v2` cobre os textos exibidos; corpo do POST lido com limite efetivo                       |
+
+Estrutura e segurança: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e
+[docs/SEGURANCA.md](docs/SEGURANCA.md) ("Fechamento e exportação").
+
+**Validado:** as 17 suítes Node, as 14 suítes SQL, o E2E do endpoint contra um
+Supabase **local** descartável (sem sessão 401, operacional 403, admin em AAL1
+403, admin em AAL2 200, filtros inválidos 400, cliente inexistente 404,
+assinatura antiga 409 e depois 200) e a conferência manual no Excel pt-BR
+(abertura sem reparação, abas, autofiltro, congelamento, valores).
+
+**Pendente — só no Preview** (nada disto se prova localmente):
+
+- clique real em "Baixar Excel (.xlsx)" e em "Baixar CSV" na tela;
+- feedback visual (toast e atualização) depois de um HTTP 409;
+- permissões com contas reais no ambiente de Preview;
+- cabeçalhos da resposta na Vercel (`Content-Type`, `Content-Disposition`,
+  `Cache-Control: no-store`, CSP);
+- limite de 4.000.000 bytes e a resposta 413: **não foi exercitado** (12.400
+  lançamentos geraram ~650 KB; o teto equivale a ~76 mil);
+- integridade do arquivo baixado pelo navegador;
+- a CI remota no GitHub (o workflow foi só conferido por leitura e por
+  simulação local numa cópia limpa).
+
+**Fluxo de implantação:** revisão final e commit na branch → PR para `main` →
+CI verde → Preview (sem banco de produção) → merge → deploy a partir de `main`.
+Não há migration nova neste conjunto.
+
 ## Etapa atual — matriz E2E
 
 **Objetivo:** provar de ponta a ponta, com contas reais, a política de acesso por
@@ -63,6 +105,7 @@ A matriz aprovada cobre:
 ## Próximas etapas
 
 1. Concluir a matriz E2E acima.
+   (Em paralelo, o fechamento quinzenal aguarda revisão final, PR e Preview.)
 2. Criar o primeiro usuário `operacional` real, pelo fluxo de convite.
 3. Acompanhar o uso real e priorizar os riscos abaixo conforme apareçam.
 
