@@ -27,7 +27,8 @@
     "test:fechamento-tela": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-tela.mjs",
     "test:fechamento-csv": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-csv.mjs",
     "test:fechamento-xlsx": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-xlsx.mjs",
-    "test:isolamento": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-isolamento.mjs"
+    "test:isolamento": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-isolamento.mjs",
+    "test:apontamentos": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-apontamentos.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
