@@ -79,7 +79,7 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 
 | Verificação                     | Estado                                                                                               |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Suítes Node (`test:*`)          | `main`: 11 scripts. Branch do fechamento: 17 (11 + 6 novos), todos no workflow da CI                 |
+| Suítes Node (`test:*`)          | `main`: 11 scripts. Branch do fechamento: 18 (11 + 7 novos), todos no workflow da CI                 |
 | Testes SQL (`supabase/tests`)   | `main`: 13 arquivos; branch do fechamento: 14. Locais (`scripts/testar-sql-local.sh`), **não** na CI |
 | CI (`.github/workflows/ci.yml`) | em PR e push para `main`: lint, `typegen`, `tsc`, suítes e build; sem secret, sem tocar Production   |
 | `npm audit`                     | 0 vulnerabilidades                                                                                   |

@@ -312,6 +312,43 @@ por `src/lib/admin-usuarios/`, **exclusivamente no servidor**, depois de
 valor no bundle do navegador. O Sentry roda com `userInfo`, `httpBodies`, cookies,
 headers e query params desligados, e não há source maps servidos ao navegador.
 
+## Isolamento entre ambientes
+
+`NODE_ENV` **não** identifica o ambiente: um Preview da Vercel também roda com
+`NODE_ENV=production`. O critério é `VERCEL_ENV`, e **só `VERCEL_ENV=production`
+conta como Production** (`src/lib/ambiente.ts`). Ausente, vazio, outro valor ou
+caixa diferente é "não Production" — nunca há promoção por fallback. No navegador
+`VERCEL_ENV` não existe; `next.config.ts` publica o valor no build como
+`NEXT_PUBLIC_AMBIENTE` (não depende de a Vercel expor `NEXT_PUBLIC_VERCEL_ENV`).
+
+| Item                                        | Production                                                             | Preview, Development, local, CI, E2E                                  |
+| ------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Sentry (servidor, edge, navegador)          | habilitado, DSN e 10% de traces como antes, coleta restrita preservada | `enabled: false`, sem DSN, traces 0, Replay sempre 0                  |
+| Túnel `/monitoring`                         | existe                                                                 | não existe (404)                                                      |
+| Source maps, release e telemetria do plugin | como antes                                                             | desligados — **não dependem** de `SENTRY_AUTH_TOKEN` estar ausente    |
+| `report-uri` da CSP                         | presente                                                               | ausente                                                               |
+| Supabase de Production                      | permitido                                                              | **barrado** na Vercel (build e runtime); fora da Vercel não se aplica |
+
+**Gate do Supabase** (`verificarDestinoSupabase`): fora de Production na Vercel, uma
+`NEXT_PUBLIC_SUPABASE_URL` que aponte para o projeto de Production — ou que não
+possa ser lida — faz o **build falhar** (`next.config.ts`) e, de novo, a leitura em
+runtime (`lerAmbienteSupabase`) lançar, com mensagem fixa que não cita URL nem
+chave. A referência de Production usada na comparação é pública (a mesma de
+`supabase/config.toml`) e fica num único arquivo. Limites honestos:
+
+- ele barra o **projeto de Production**; não prova que o destino seja um ambiente
+  de teste. Um Preview só é isolado de fato se tiver um projeto Supabase próprio
+  nas variáveis do escopo Preview;
+- o desenvolvimento **local** (sem `VERCEL_ENV`) continua livre para usar o
+  `.env` de quem o roda, que hoje aponta para Production. Isso é decisão de
+  fluxo, não coberta pelo gate;
+- se a URL de Production um dia passar a um domínio próprio, a comparação por
+  referência deixa de reconhecê-la — atualizar `REFERENCIA_SUPABASE_PRODUCTION`.
+
+**Configuração que continua sendo da Vercel** (não verificada a partir do
+repositório): variáveis do escopo Preview, vínculo do repositório ao projeto e
+deploy automático no push. Ver as pendências em [PROGRESS.md](../PROGRESS.md).
+
 ## Cabeçalhos HTTP e CSP
 
 Em `next.config.ts`, para todas as rotas: `X-Content-Type-Options: nosniff`,
@@ -330,9 +367,9 @@ em `next.config.ts`):
 
 ```
 default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'unsafe-inline';
-img-src 'self' data:; font-src 'self'; connect-src 'self' <host Supabase>;
+img-src 'self' data:; font-src 'self'; connect-src 'self' <origem do Supabase>;
 frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none';
-upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
+upgrade-insecure-requests; report-uri <endpoint do Sentry — só em Production>
 ```
 
 - O nonce cobre os scripts inline que o Next injeta no streaming do RSC, sem
@@ -341,8 +378,13 @@ upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
   `/esqueci-senha` deixam de ser estáticas.
 - O script de tema é um arquivo (`public/theme-script.js`), o que elimina o único
   `dangerouslySetInnerHTML` alcançável.
-- O Sentry usa o túnel `/monitoring` (same-origin) e recebe os relatórios de
-  violação.
+- A origem do Supabase em `connect-src` vem de `NEXT_PUBLIC_SUPABASE_URL`,
+  validada por `origemDoSupabase()` (https, ou http só em loopback; sem
+  credenciais) — não há host fixo no código nem host vindo da requisição. A
+  montagem está em `src/lib/csp.ts`. O `report-uri` do Sentry só existe em
+  Production; ver "Isolamento entre ambientes".
+- O Sentry usa o túnel `/monitoring` (same-origin) **só em Production**; fora dela
+  a rota não existe.
 - As fontes são auto-hospedadas por `next/font`, por isso `font-src 'self'`.
 - **`style-src` mantém `'unsafe-inline'`** — Radix/shadcn usam estilo inline para
   posicionamento. Apertar isso é etapa própria (ver riscos residuais).

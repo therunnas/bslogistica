@@ -1,3 +1,5 @@
+import { verificarDestinoSupabase } from "@/lib/ambiente";
+
 /**
  * Variáveis públicas do Supabase, lidas em um só lugar.
  *
@@ -8,6 +10,9 @@
  * faz o Next embutir o valor no bundle do navegador.
  */
 export function lerAmbienteSupabase() {
+  // Servidor: VERCEL_ENV. Navegador: NEXT_PUBLIC_AMBIENTE (publicado por
+  // next.config.ts a partir de VERCEL_ENV no build). Fora da Vercel, nenhum dos dois.
+  const ambiente = process.env["VERCEL_ENV"] || process.env["NEXT_PUBLIC_AMBIENTE"];
   const url = process.env["NEXT_PUBLIC_SUPABASE_URL"];
   const chave = process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
 
@@ -22,6 +27,10 @@ export function lerAmbienteSupabase() {
         "Defina-as no .env local e nas variáveis de ambiente da hospedagem.",
     );
   }
+
+  // Fora de Production na Vercel, o projeto Supabase de Production é barrado.
+  // Vale no build (que pré-renderiza páginas) e em cada requisição.
+  verificarDestinoSupabase(ambiente, url);
 
   return { url, chave };
 }

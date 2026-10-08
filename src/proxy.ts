@@ -3,12 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { obterOpcoesCookieSupabase } from "@/integrations/supabase/cookie-options";
 import { lerAmbienteSupabase } from "@/integrations/supabase/env";
+import { ehProducao, origemDoSupabase } from "@/lib/ambiente";
+import { construirCsp } from "@/lib/csp";
 
-// Mesmo host usado em next.config.ts — NEXT_PUBLIC_SUPABASE_URL é pública por
-// natureza, não é segredo.
-const SUPABASE_HOST = "https://ehkduqokntemtmqzdrbd.supabase.co";
-
-// Endpoint de segurança do Sentry, derivado do DSN que já está versionado em
+// Endpoint de relatório da CSP no Sentry. SÓ É USADO EM PRODUCTION (ver
+// `reportUri` em `proxy()`): Preview, desenvolvimento local, CI e E2E não
+// relatam violações ao Sentry real. Derivado do DSN que já está versionado em
 // sentry.server.config.ts/sentry.edge.config.ts/src/instrumentation-client.ts
 // (host + id do projeto + chave pública do DSN). DSN do Sentry é público por
 // desenho — é o mesmo valor que já vai para o bundle do navegador — então
@@ -17,23 +17,6 @@ const SUPABASE_HOST = "https://ehkduqokntemtmqzdrbd.supabase.co";
 // https://docs.sentry.io/product/security-policy-reporting/
 const SENTRY_CSP_REPORT_URI =
   "https://o4512036932419584.ingest.us.sentry.io/api/4512036953260032/security/?sentry_key=61af9cd029eab6da3f484461be2f9d7d";
-
-function construirCsp(nonce: string): string {
-  return [
-    "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
-    "font-src 'self'",
-    `connect-src 'self' ${SUPABASE_HOST}`,
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "object-src 'none'",
-    "upgrade-insecure-requests",
-    `report-uri ${SENTRY_CSP_REPORT_URI}`,
-  ].join("; ");
-}
 
 /**
  * Renovação da sessão do Supabase a cada requisição, e CSP com nonce por
@@ -67,7 +50,14 @@ export async function proxy(request: NextRequest) {
   const { url, chave } = lerAmbienteSupabase();
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = construirCsp(nonce);
+  // A origem do Supabase vem da MESMA variável que o cliente usa — nunca de um
+  // host fixo nem da requisição — e é validada (protocolo, credenciais, host).
+  // Em Production o resultado é o mesmo host de antes.
+  const csp = construirCsp({
+    nonce,
+    supabaseOrigem: origemDoSupabase(url),
+    reportUri: ehProducao(process.env["VERCEL_ENV"]) ? SENTRY_CSP_REPORT_URI : null,
+  });
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);

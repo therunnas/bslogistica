@@ -53,6 +53,7 @@ XLSX (principal) e CSV (secundária). Vive em `feat/fechamento-quinzenal` e
 | 4.5   | `POST /api/fechamento/xlsx`, CSV (por colaborador e diário), assinatura de frescor e HTTP 409         |
 | 4.6.1 | testes do fechamento na CI e `next typegen` antes do `tsc`                                            |
 | 4.6.2 | assinatura `v2` cobre os textos exibidos; corpo do POST lido com limite efetivo                       |
+| 4.6.5 | isolamento entre ambientes: Sentry só em Production, CSP por ambiente, gate do Supabase               |
 
 Estrutura e segurança: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e
 [docs/SEGURANCA.md](docs/SEGURANCA.md) ("Fechamento e exportação").
@@ -75,6 +76,23 @@ assinatura antiga 409 e depois 200) e a conferência manual no Excel pt-BR
 - integridade do arquivo baixado pelo navegador;
 - a CI remota no GitHub (o workflow foi só conferido por leitura e por
   simulação local numa cópia limpa).
+
+**Gates antes de enviar a branch ao GitHub** (o push pode disparar um Preview
+sozinho; nada abaixo foi verificado, e a ausência de evidência não é aprovação):
+
+1. qual é o projeto Vercel do `admin.bslogisticas.com.br` e a conta ou equipe dona
+   dele (a CLI consultada só enxergou dois outros projetos);
+2. se este repositório está vinculado a esse projeto;
+3. quais variáveis existem no escopo Preview e se alguma é de Production — o
+   PR #62 recebeu um Preview que terminou com sucesso, o que indica que o Preview
+   tem as variáveis `NEXT_PUBLIC_SUPABASE_*`;
+4. se há deploy automático no push de branches;
+5. se `SENTRY_AUTH_TOKEN` existe no escopo Preview (o código já não depende
+   disso, mas a variável não deveria estar lá);
+6. se existe um projeto Supabase de teste para o Preview. Sem ele, o Preview
+   falha de forma controlada no build — esse é o comportamento esperado;
+7. que o Preview falha de forma segura quando o isolamento não está configurado
+   (o gate cobre o build e o runtime, mas só a Vercel real prova).
 
 **Fluxo de implantação:** revisão final e commit na branch → PR para `main` →
 CI verde → Preview (sem banco de produção) → merge → deploy a partir de `main`.

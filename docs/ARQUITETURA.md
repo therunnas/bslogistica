@@ -53,6 +53,8 @@ src/
 │   ├── operacional/          contratos e hooks das RPCs do operador
 │   ├── admin-usuarios/       administração de usuários, server-side
 │   ├── fechamento/           núcleo do fechamento: leitura, domínio, exportação
+│   ├── ambiente.ts           identificação do ambiente e gate do Supabase (puro)
+│   ├── csp.ts                montagem da CSP por ambiente (pura)
 │   └── format.ts · csv.ts · types.ts · utils.ts
 ├── proxy.ts                  renovação de sessão e CSP com nonce
 └── styles.css                tema Tailwind
