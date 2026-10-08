@@ -23,7 +23,8 @@
     "test:configuracoes": "node --experimental-strip-types scripts/testar-configuracoes.mjs",
     "test:fechamento-leitura": "node --experimental-strip-types scripts/testar-fechamento-leitura.mjs",
     "test:fechamento-dominio": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-dominio.mjs",
-    "test:fechamento-carregamento": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-carregamento.mjs"
+    "test:fechamento-carregamento": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-carregamento.mjs",
+    "test:fechamento-tela": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-tela.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

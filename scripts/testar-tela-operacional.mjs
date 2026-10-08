@@ -214,10 +214,10 @@ verificar(
   2,
 );
 verificar(
-  "B15. o admin mantém os sete links da navegação principal",
+  "B15. o admin mantém os oito links da navegação principal",
   (/admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1]?.match(/href: "\//g) ?? [])
     .length,
-  7,
+  8,
 );
 verificar(
   "B16. e o operacional tem exatamente um",
