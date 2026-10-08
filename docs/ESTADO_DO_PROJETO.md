@@ -16,9 +16,13 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                |
 | Usuário `operacional` | ainda não existe conta real; depende da matriz E2E ([PROGRESS.md](../PROGRESS.md)) |
 
-O **Preview** da Vercel falha de propósito: não tem as variáveis
+O **Preview** da Vercel falha de propósito sem as variáveis
 `NEXT_PUBLIC_SUPABASE_*`, e conectá-lo ao banco de produção para deixar o check
-verde é proibido.
+verde é proibido. Na branch do fechamento isso virou regra de código: fora de
+Production o build recusa o Supabase de Production. Existe uma exceção
+**temporária e explícita** para o Preview (`BS_PREVIEW_SHARED_SUPABASE=true`,
+escopo Preview), só enquanto o banco tiver apenas dados fictícios — ver
+[SEGURANCA.md](SEGURANCA.md). Estado real da Vercel: não verificado.
 
 O site institucional (`bslogisticas.com.br`) é outro projeto, em outro
 repositório, e não faz parte deste.
@@ -46,6 +50,7 @@ camada de dados e não tem relação com o TanStack Router.
 | Apontamentos         | presença, horários e intervalo, com cálculo automático           |
 | Faturamento          | fechamento por cliente e período                                 |
 | Relatórios           | por colaborador, operação e lançamento, com exportação CSV       |
+| Fechamento           | por cliente e período, XLSX e CSV (fora de Production)           |
 | Usuários             | convite, papel, atribuição de operações, revogação e reativação  |
 | Configurações        | segurança da conta: ativar MFA (o `operacional` também desativa) |
 
@@ -76,12 +81,18 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 
 ## Testes e CI
 
-| Verificação                     | Estado                                                                                                               |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Suítes Node (`test:*`)          | 11 scripts, todos exigidos pela CI                                                                                   |
-| Testes SQL (`supabase/tests`)   | 13 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
-| CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 11 suítes e build, sem secret e sem tocar o Supabase de Production |
-| `npm audit`                     | 0 vulnerabilidades                                                                                                   |
+| Verificação                     | Estado                                                                                               |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Suítes Node (`test:*`)          | `main`: 11 scripts. Branch do fechamento: 18 (11 + 7 novos), todos no workflow da CI                 |
+| Testes SQL (`supabase/tests`)   | `main`: 13 arquivos; branch do fechamento: 14. Locais (`scripts/testar-sql-local.sh`), **não** na CI |
+| CI (`.github/workflows/ci.yml`) | em PR e push para `main`: lint, `typegen`, `tsc`, suítes e build; sem secret, sem tocar Production   |
+| `npm audit`                     | 0 vulnerabilidades                                                                                   |
+
+O módulo **Fechamento** (`/fechamento`, `GET /api/fechamento`, `POST
+/api/fechamento/xlsx`) está na branch `feat/fechamento-quinzenal` e **não está em
+Production**. O workflow dessa branch (com `next typegen` antes do `tsc` e as
+seis suítes do fechamento) ainda não rodou no GitHub. Detalhes e pendências de
+Preview em [PROGRESS.md](../PROGRESS.md).
 
 ## Riscos e pendências confirmados
 

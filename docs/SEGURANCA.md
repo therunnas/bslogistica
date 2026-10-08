@@ -228,6 +228,49 @@ os testes asseveram isso na forma dos arquivos.
 - `src/lib/billing.ts` serve para a interface mostrar o número **antes** de salvar,
   nunca para decidi-lo.
 
+## Fechamento e exportação
+
+`GET /api/fechamento` e `POST /api/fechamento/xlsx` são Route Handlers que **se
+protegem sozinhos**: o guard do layout só governa o que a interface mostra, e uma
+rota de API é alcançável sem passar por ele.
+
+- **Acesso:** `lerAcesso()` (a decisão única) — sem sessão 401; sem papel
+  `admin` ou sem segundo fator 403. Para o admin, `liberado` já implica AAL2;
+  não há segunda checagem de nível.
+- **Dados:** leitura pelo cliente Supabase da **sessão**, sob RLS (`aal2` e
+  `admin`). Nunca `service_role`.
+- **Entrada:** o POST aceita só `cliente`, `inicio`, `fim` e `assinatura`, em
+  JSON, com corpo de até 1 KB; campo desconhecido, ausente ou fora do formato é 400.
+  O corpo é lido **por pedaços e cancelado ao passar do teto** (`lerCorpoComLimite`),
+  com ou sem `Content-Length` e mesmo que o cabeçalho minta: nada de acumular o
+  corpo inteiro antes de medir. A autenticação vem antes da leitura. Nenhum valor
+  financeiro viaja do navegador.
+- **Assinatura:** SHA-256 de uma serialização canônica do snapshot financeiro
+  (versão `fechamento-v2`). O servidor relê, recalcula e compara; divergência é
+  **409** com mensagem fixa. É conferência de **frescor**, não segurança contra o
+  navegador. Cobre números, status, datas, fatura, horários e contrato **e os
+  textos que a tela e os arquivos mostram** (nome do cliente, do colaborador,
+  função, operação e turno, já normalizados): o download é exatamente o que a
+  tela exibiu. Não cobre o que não é exibido (ids de turno) nem `geradoEm`. Ao
+  navegador vai só o hash.
+- **Fórmulas:** o CSV neutraliza texto que começa com `=`, `+`, `-` ou `@`
+  (também depois de espaço, TAB ou quebra de linha) em `src/lib/csv.ts`. O XLSX
+  escreve todo texto do banco como `String` com formato de texto e nunca usa
+  `type: "Formula"`: o XML não contém `<f>`.
+- **Resposta:** `Content-Type` do XLSX, `Content-Disposition: attachment` com
+  nome reduzido a ASCII seguro, `Cache-Control: no-store`. A CSP e os demais
+  cabeçalhos vêm do `proxy.ts`/`next.config.ts`. Teto de **4.000.000 bytes**
+  (a Vercel limita a resposta de uma função a 4,5 MB): acima disso é 413, nunca
+  arquivo cortado.
+- **Erros:** código estável e frase fixa; stack, SQL e mensagens do banco vão só
+  para o log do servidor.
+- **Dependência:** `write-excel-file` 4.1.1 (licença MIT, única dependência
+  transitiva: `fflate`), versão exata, usada só no servidor.
+
+Verificado por suítes (`test:fechamento-csv`, `test:fechamento-xlsx`) e por E2E
+contra um Supabase local descartável. Pendências que só o Preview prova estão em
+[PROGRESS.md](../PROGRESS.md).
+
 ## Administração de usuários e auditoria
 
 Convidar, atribuir ou trocar papel, remover acesso e atribuir operações passam
@@ -269,6 +312,104 @@ por `src/lib/admin-usuarios/`, **exclusivamente no servidor**, depois de
 valor no bundle do navegador. O Sentry roda com `userInfo`, `httpBodies`, cookies,
 headers e query params desligados, e não há source maps servidos ao navegador.
 
+## Isolamento entre ambientes
+
+`NODE_ENV` **não** identifica o ambiente: um Preview da Vercel também roda com
+`NODE_ENV=production`. O critério é `VERCEL_ENV`, e **só `VERCEL_ENV=production`
+conta como Production** (`src/lib/ambiente.ts`). Ausente, vazio, outro valor ou
+caixa diferente é "não Production" — nunca há promoção por fallback. No navegador
+`VERCEL_ENV` não existe; `next.config.ts` publica o valor no build como
+`NEXT_PUBLIC_AMBIENTE` (não depende de a Vercel expor `NEXT_PUBLIC_VERCEL_ENV`).
+
+| Item                                        | Production                                                             | Preview, Development, local, CI, E2E                                                                                  |
+| ------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Sentry (servidor, edge, navegador)          | habilitado, DSN e 10% de traces como antes, coleta restrita preservada | `enabled: false`, sem DSN, traces 0, Replay sempre 0                                                                  |
+| Túnel `/monitoring`                         | existe                                                                 | não existe (404)                                                                                                      |
+| Source maps, release e telemetria do plugin | como antes                                                             | desligados — **não dependem** de `SENTRY_AUTH_TOKEN` estar ausente                                                    |
+| `report-uri` da CSP                         | presente                                                               | ausente                                                                                                               |
+| Supabase de Production                      | permitido                                                              | **barrado** na Vercel (build e runtime); fora da Vercel não se aplica. Exceção temporária só para Preview: ver abaixo |
+
+**Gate do Supabase** (`verificarDestinoSupabase`): fora de Production na Vercel, uma
+`NEXT_PUBLIC_SUPABASE_URL` que aponte para o projeto de Production — ou que não
+possa ser lida — faz o **build falhar** (`next.config.ts`) e, de novo, a leitura em
+runtime (`lerAmbienteSupabase`) lançar, com mensagem fixa que não cita URL nem
+chave. A referência de Production usada na comparação é pública (a mesma de
+`supabase/config.toml`) e fica num único arquivo. Limites honestos:
+
+- ele barra o **projeto de Production**; não prova que o destino seja um ambiente
+  de teste. Um Preview só é isolado de fato se tiver um projeto Supabase próprio
+  nas variáveis do escopo Preview;
+- o desenvolvimento **local** (sem `VERCEL_ENV`) continua livre para usar o
+  `.env` de quem o roda, que hoje aponta para Production. Isso é decisão de
+  fluxo, não coberta pelo gate;
+- se a URL de Production um dia passar a um domínio próprio, a comparação por
+  referência deixa de reconhecê-la — atualizar `REFERENCIA_SUPABASE_PRODUCTION`.
+
+### Preview com Supabase compartilhado (exceção TEMPORÁRIA)
+
+**Por quê:** hoje o projeto Supabase só tem dados **fictícios** e ainda não foi
+entregue ao cliente, e os Previews sempre usaram esse mesmo projeto. Enquanto isso
+for verdade, o fluxo pode continuar — mas só por autorização explícita, nunca por
+padrão.
+
+| Item               | Valor                                                                         |
+| ------------------ | ----------------------------------------------------------------------------- |
+| Variável           | `BS_PREVIEW_SHARED_SUPABASE`                                                  |
+| Valor que autoriza | exatamente `true` (`false`, vazio, `TRUE`, `1`, `yes`, com espaço: bloqueiam) |
+| Escopo             | **só Preview** na Vercel; servidor, **nunca** `NEXT_PUBLIC_`                  |
+| Efeito             | libera o Preview a usar o Supabase de Production **e nada mais**              |
+
+Regras do código (`previewCompartilhadoAutorizado`, em `src/lib/ambiente.ts`):
+
+- só vale com `VERCEL_ENV === "preview"` exato **e** a variável `true` exata;
+- Production não a lê (o comportamento original não depende dela); Development,
+  ambiente desconhecido e CI/local (sem `VERCEL_ENV`) não ganham nada com ela;
+- a URL continua validada por inteiro antes de qualquer liberação (https, ou http
+  em loopback; sem credenciais; legível): URL inválida segue bloqueada com a flag;
+- build e runtime usam a mesma regra: o `next.config.ts` avalia no build e **de novo
+  ao subir o servidor**. Um build feito com a flag não sobe sem ela, e vice-versa;
+- o build imprime um **aviso** quando um Preview usa o banco compartilhado;
+- **não** compartilha monitoramento: com a flag, o Sentry continua desligado, sem
+  DSN, sem traces, sem túnel `/monitoring`, sem source maps e sem `report-uri`;
+- no navegador o valor não existe (a variável não é `NEXT_PUBLIC_`); lá o gate não
+  roda, e quem decidiu foi o build.
+
+**Riscos de usar o banco compartilhado:** um deploy de Preview — de qualquer
+branch, de qualquer pessoa com acesso ao repositório — lê e **escreve** nos mesmos
+dados que Production. Contas e papéis são os mesmos. Preview e Production dividem
+Auth, RLS e as RPCs; um Preview com código em teste pode gravar dados inválidos.
+Só é aceitável porque os dados são fictícios.
+
+**É PROIBIDO usar essa exceção quando houver dados reais.**
+
+**ANTES DA ENTRADA DE DADOS REAIS** (procedimento de revogação):
+
+1. Remover `BS_PREVIEW_SHARED_SUPABASE` do escopo Preview na Vercel (Settings →
+   Environment Variables) e, se existirem, de **overrides por branch**. Fazer um
+   novo deploy: variável de ambiente só vale num deploy novo.
+2. Definir um Preview isolado (projeto Supabase de teste, com variáveis próprias no
+   escopo Preview) **ou** interromper os Previews conectados ao banco oficial.
+3. Validar que não restam deploys antigos de Preview com acesso compartilhado
+   (listar os deploys de Preview e removê-los ou desativá-los).
+4. Executar a limpeza controlada dos dados fictícios, em **procedimento separado**
+   (não descrito aqui, não executado automaticamente).
+
+Depois do passo 1, qualquer Preview apontando para o Supabase de Production volta
+a falhar no build — que é o comportamento seguro por padrão.
+
+**Como configurar na Vercel** (feito pelo responsável, no painel; este repositório
+não altera a Vercel): Settings → Environment Variables → Add → nome
+`BS_PREVIEW_SHARED_SUPABASE`, valor `true`, ambiente **somente Preview** (não
+marcar Production nem Development, e **não** usar "All Environments"). Não mexer nas
+variáveis de Production. É preciso um **novo deploy** para aplicar. Se a Vercel
+oferecer a opção de limitar a variável a uma branch de Preview, é uma restrição
+extra bem-vinda; se o projeto já tiver variáveis por branch, conferi-las — não foi
+possível verificar isso a partir daqui.
+
+**Configuração que continua sendo da Vercel** (não verificada a partir do
+repositório): variáveis do escopo Preview, vínculo do repositório ao projeto e
+deploy automático no push. Ver as pendências em [PROGRESS.md](../PROGRESS.md).
+
 ## Cabeçalhos HTTP e CSP
 
 Em `next.config.ts`, para todas as rotas: `X-Content-Type-Options: nosniff`,
@@ -287,9 +428,9 @@ em `next.config.ts`):
 
 ```
 default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'unsafe-inline';
-img-src 'self' data:; font-src 'self'; connect-src 'self' <host Supabase>;
+img-src 'self' data:; font-src 'self'; connect-src 'self' <origem do Supabase>;
 frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none';
-upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
+upgrade-insecure-requests; report-uri <endpoint do Sentry — só em Production>
 ```
 
 - O nonce cobre os scripts inline que o Next injeta no streaming do RSC, sem
@@ -298,8 +439,13 @@ upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
   `/esqueci-senha` deixam de ser estáticas.
 - O script de tema é um arquivo (`public/theme-script.js`), o que elimina o único
   `dangerouslySetInnerHTML` alcançável.
-- O Sentry usa o túnel `/monitoring` (same-origin) e recebe os relatórios de
-  violação.
+- A origem do Supabase em `connect-src` vem de `NEXT_PUBLIC_SUPABASE_URL`,
+  validada por `origemDoSupabase()` (https, ou http só em loopback; sem
+  credenciais) — não há host fixo no código nem host vindo da requisição. A
+  montagem está em `src/lib/csp.ts`. O `report-uri` do Sentry só existe em
+  Production; ver "Isolamento entre ambientes".
+- O Sentry usa o túnel `/monitoring` (same-origin) **só em Production**; fora dela
+  a rota não existe.
 - As fontes são auto-hospedadas por `next/font`, por isso `font-src 'self'`.
 - **`style-src` mantém `'unsafe-inline'`** — Radix/shadcn usam estilo inline para
   posicionamento. Apertar isso é etapa própria (ver riscos residuais).
@@ -353,6 +499,8 @@ fechamento.
 | **Perda do autenticador do admin**                                               | operacional | Um fator verificado perdido só se remove pelo painel do Supabase. Mitigação organizacional (mais de um admin com MFA); não é defeito de código.                                                                                                                                                                                                                                                                                                     |
 | **Proveniência da taxa faturada não é preservada**                               | baixa       | Um admin ainda altera `operations.contract_id`, `agreed_amount`, as taxas do contrato e `employees.daily_cost`, porque não há gatilho de congelamento em `contracts` e `employees`, e as guardas de `operations` isentam admin. **O valor já cobrado não muda** (a entry carrega os snapshots congelados), mas perde-se a resposta para "de qual contrato e com que taxa saiu esta fatura". Fechar exige decisão de desenho: congelar ou versionar. |
 | **Paridade `calcEntry()` × derivação SQL é manual**                              | baixa       | A regra existe em TypeScript e em trigger; os testes de banco guardam constantes, não executam as duas implementações lado a lado. Toda mudança em `calcEntry()` exige revisão explícita da paridade.                                                                                                                                                                                                                                               |
+| **Exportação do fechamento: limite de 4 MB e 413 não exercitados**               | baixa       | O teto existe e a decisão é testada como função pura, mas nenhum arquivo chegou perto dele (12.400 lançamentos ≈ 650 KB). Fecha no Preview, ou com um volume que o justifique.                                                                                                                                                                                                                                                                      |
+| **Leitura do fechamento lenta em volume alto**                                   | informativa | A leitura é paginada e provada completa; 12.400 lançamentos levaram ~20 s localmente. Dentro do limite da função, mas é o primeiro lugar a otimizar se o uso crescer.                                                                                                                                                                                                                                                                               |
 | **Auditoria best-effort**                                                        | informativa | Ver "Administração de usuários e auditoria".                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **Alocação de equipe sem autor nem histórico**                                   | informativa | `operation_team` não registra quem alocou. Só `admin` escreve nela, mas não há trilha por linha.                                                                                                                                                                                                                                                                                                                                                    |
 | **Mensagens cruas do SDK em `/mfa` e `link-invalido` genérico na recuperação**   | informativa | Melhoria de diagnóstico; separar os desfechos exige mudar mensagens e destinos, em tarefa própria.                                                                                                                                                                                                                                                                                                                                                  |

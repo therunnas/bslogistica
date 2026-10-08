@@ -39,6 +39,14 @@ import {
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import {
+  contarNaoApontadas,
+  linhasASalvar,
+  montarLinhasDoServidor,
+  totalizar,
+  valoresDaLinha,
+  type DraftEntry,
+} from "@/lib/apontamentos/rascunho";
+import {
   attendanceLabel,
   calcEntry,
   shiftPlannedMinutes,
@@ -57,16 +65,6 @@ import {
   useTeam,
   useTimesheets,
 } from "@/lib/queries";
-
-interface DraftEntry {
-  employeeId: string;
-  entryId: string | undefined;
-  status: AttendanceStatus;
-  checkIn: string;
-  checkOut: string;
-  breakMinutes: number;
-  notes: string;
-}
 
 /**
  * O rascunho carrega a identidade do contexto que ele representa e o conjunto
@@ -227,41 +225,31 @@ export function PainelApontamentos() {
 
   const contextKey = contextoDe(operationId, turnoId, date);
 
+  const isClosed = timesheet?.status === "closed";
+
+  const inicioDoTurno = shift?.start_time ?? "";
+  const fimDoTurno = shift?.end_time ?? "";
+  const intervaloDoTurno = shift?.break_minutes ?? 0;
+
   useEffect(() => {
     if (carregando) {
       return;
     }
 
-    const base = teamMembers.map((member) => {
-      const existing = existingEntries.find((entry) => entry.employee_id === member.employee_id);
-
-      return {
-        employeeId: member.employee_id,
-        entryId: existing?.id,
-        status: (existing?.status ?? "present") as AttendanceStatus,
-        checkIn: existing?.check_in?.slice(0, 5) ?? shift?.start_time.slice(0, 5) ?? "",
-        checkOut: existing?.check_out?.slice(0, 5) ?? shift?.end_time.slice(0, 5) ?? "",
-        breakMinutes: existing?.break_minutes ?? shift?.break_minutes ?? 0,
-        notes: existing?.notes ?? "",
-      } satisfies DraftEntry;
+    // Quem não tem registro não é "Presente": é não apontado. Num dia fechado
+    // nem aparece, porque a equipe é a de hoje e o dia já acabou.
+    const servidor = montarLinhasDoServidor({
+      membros: teamMembers,
+      registros: existingEntries,
+      turno: { start_time: inicioDoTurno, end_time: fimDoTurno, break_minutes: intervaloDoTurno },
+      fechado: isClosed,
     });
 
-    const extras = existingEntries
-      .filter((entry) => !teamMembers.some((member) => member.employee_id === entry.employee_id))
-      .map((entry) => ({
-        employeeId: entry.employee_id,
-        entryId: entry.id,
-        status: entry.status,
-        checkIn: entry.check_in?.slice(0, 5) ?? "",
-        checkOut: entry.check_out?.slice(0, 5) ?? "",
-        breakMinutes: entry.break_minutes,
-        notes: entry.notes ?? "",
-      }));
-
-    const servidor = [...base, ...extras];
-
     setDraft((atual) => {
-      if (!atual || atual.key !== contextKey) {
+      // Dia fechado não tem edição possível: nada do que estava em andamento
+      // sobrevive a ele, para uma linha editada e nunca salva não ser exibida
+      // (e somada) como se fosse registro do dia.
+      if (!atual || atual.key !== contextKey || isClosed) {
         return {
           key: contextKey,
           rows: servidor,
@@ -297,11 +285,12 @@ export function PainelApontamentos() {
   }, [
     contextKey,
     carregando,
+    isClosed,
     teamMembers,
     existingEntries,
-    shift?.start_time,
-    shift?.end_time,
-    shift?.break_minutes,
+    inicioDoTurno,
+    fimDoTurno,
+    intervaloDoTurno,
   ]);
 
   const linhas = draft?.rows ?? [];
@@ -314,37 +303,40 @@ export function PainelApontamentos() {
   const computed = linhas.map((row) => {
     const employee = employeeMap.get(row.employeeId);
 
-    const calc = calcEntry({
-      status: row.status,
-      checkIn: row.checkIn || null,
-      checkOut: row.checkOut || null,
-      breakMinutes: row.breakMinutes,
-      plannedMinutes,
-      rules,
-      employeeDailyCost: Number(employee?.daily_cost ?? 0),
+    // Não apontado não tem cálculo: sem decisão não há diária.
+    const calc =
+      row.status === null
+        ? null
+        : calcEntry({
+            status: row.status,
+            checkIn: row.checkIn || null,
+            checkOut: row.checkOut || null,
+            breakMinutes: row.breakMinutes,
+            plannedMinutes,
+            rules,
+            employeeDailyCost: Number(employee?.daily_cost ?? 0),
+          });
+
+    // O que está gravado vale mais que o recálculo com o contrato de hoje.
+    const valores = valoresDaLinha({
+      linha: row,
+      registro: existingEntries.find((entry) => entry.id === row.entryId),
+      editada: draft?.dirty.has(row.employeeId) ?? false,
+      fechado: isClosed,
+      previa: calc,
     });
 
     return {
       row,
       employee,
       calc,
+      valores,
     };
   });
 
-  const totals = computed.reduce(
-    (acc, { row, calc }) => ({
-      dailies: acc.dailies + (row.status === "absent" ? 0 : 1),
-      overtime: acc.overtime + calc.overtimeMinutes,
-      billed: acc.billed + calc.billedAmount,
-      cost: acc.cost + calc.costAmount,
-    }),
-    {
-      dailies: 0,
-      overtime: 0,
-      billed: 0,
-      cost: 0,
-    },
-  );
+  const totals = totalizar(computed.map(({ row, valores }) => ({ status: row.status, valores })));
+
+  const naoApontadas = contarNaoApontadas(linhas);
 
   const diariaEmOutraFolha = useMemo(() => {
     const outrasFolhas = new Map(
@@ -389,11 +381,14 @@ export function PainelApontamentos() {
         item.operation_id === operationId && item.work_date === date && item.shift_id === null,
     );
 
-  const isClosed = timesheet?.status === "closed";
+  // Só linha com decisão tomada (Presente, Falta ou Substituição) é gravada.
+  const linhasParaGravar = linhasASalvar(linhas, draft?.dirty ?? new Set<string>());
 
-  const aSalvar = computed.filter(
-    ({ row }) => !row.entryId || (draft?.dirty.has(row.employeeId) ?? false),
-  );
+  const aSalvar = linhasParaGravar.flatMap((row) => {
+    const calc = computed.find((item) => item.row.employeeId === row.employeeId)?.calc;
+
+    return calc ? [{ row, calc }] : [];
+  });
 
   const conflitos = aSalvar.filter(
     ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
@@ -401,6 +396,10 @@ export function PainelApontamentos() {
 
   const saveAll = useMutation({
     mutationFn: async () => {
+      if (isClosed) {
+        throw new Error("Este dia está fechado. Reabra o apontamento para alterá-lo.");
+      }
+
       if (!aSalvar.length) {
         return {
           gravadas: 0,
@@ -534,6 +533,12 @@ export function PainelApontamentos() {
     mutationFn: async (status: "open" | "closed") => {
       if (!timesheet) {
         throw new Error("Salve o apontamento antes de fechar.");
+      }
+
+      // Fechar com linha apontada e não salva deixaria o dia fechado sem ela:
+      // a pessoa veria a decisão na tela, e ela não existiria no banco.
+      if (status === "closed" && aSalvar.length) {
+        throw new Error("Salve as alterações pendentes antes de fechar o dia.");
       }
 
       const { error, count } = await criarClienteNavegador()
@@ -773,8 +778,18 @@ export function PainelApontamentos() {
             </div>
 
             <p className="mt-1 text-xs text-muted-foreground">
-              Presença e horários da equipe alocada no turno selecionado.
+              {isClosed
+                ? "Dia fechado: somente os registros gravados, com os valores do momento do apontamento."
+                : "Presença e horários da equipe alocada no turno selecionado."}
             </p>
+
+            {naoApontadas > 0 ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {naoApontadas === 1
+                  ? "1 colaborador ainda não apontado: não entra em diárias nem em valores até você escolher Presente, Falta ou Substituição."
+                  : `${naoApontadas} colaboradores ainda não apontados: não entram em diárias nem em valores até você escolher Presente, Falta ou Substituição.`}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -847,17 +862,21 @@ export function PainelApontamentos() {
                         </div>
 
                         <p className="mt-4 text-sm font-medium text-foreground">
-                          Nenhum colaborador neste turno
+                          {isClosed
+                            ? "Nenhum registro neste dia"
+                            : "Nenhum colaborador neste turno"}
                         </p>
 
                         <p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">
-                          Configure a equipe desta operação antes de realizar o apontamento.
+                          {isClosed
+                            ? "Este dia está fechado e não tem registro gravado."
+                            : "Configure a equipe desta operação antes de realizar o apontamento."}
                         </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  computed.map(({ row, employee, calc }) => (
+                  computed.map(({ row, employee, valores }) => (
                     <TableRow
                       key={row.employeeId}
                       className="border-border transition-colors hover:bg-secondary/20"
@@ -867,8 +886,17 @@ export function PainelApontamentos() {
                           <AvatarNome nome={employee?.name ?? ""} />
 
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-foreground">
+                            <p className="flex items-center gap-2 truncate text-sm font-medium text-foreground">
                               {employee?.name ?? "—"}
+
+                              {row.status === null ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="border border-border bg-secondary font-medium text-muted-foreground shadow-none"
+                                >
+                                  Não apontado
+                                </Badge>
+                              ) : null}
                             </p>
 
                             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -880,7 +908,7 @@ export function PainelApontamentos() {
 
                       <TableCell>
                         <Select
-                          value={row.status}
+                          value={row.status ?? ""}
                           onValueChange={(value) =>
                             update(row.employeeId, {
                               status: value as AttendanceStatus,
@@ -889,7 +917,7 @@ export function PainelApontamentos() {
                           disabled={isClosed}
                         >
                           <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
-                            <SelectValue />
+                            <SelectValue placeholder="Selecione" />
                           </SelectTrigger>
 
                           <SelectContent>
@@ -908,8 +936,8 @@ export function PainelApontamentos() {
                         <Input
                           type="time"
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
-                          value={row.checkIn}
-                          disabled={isClosed || row.status === "absent"}
+                          value={row.status === null ? "" : row.checkIn}
+                          disabled={isClosed || row.status === null || row.status === "absent"}
                           onChange={(event) =>
                             update(row.employeeId, {
                               checkIn: event.target.value,
@@ -922,8 +950,8 @@ export function PainelApontamentos() {
                         <Input
                           type="time"
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
-                          value={row.checkOut}
-                          disabled={isClosed || row.status === "absent"}
+                          value={row.status === null ? "" : row.checkOut}
+                          disabled={isClosed || row.status === null || row.status === "absent"}
                           onChange={(event) =>
                             update(row.employeeId, {
                               checkOut: event.target.value,
@@ -937,8 +965,8 @@ export function PainelApontamentos() {
                           type="number"
                           min="0"
                           className="h-9 w-20 rounded-xl border-input bg-secondary/40"
-                          value={row.breakMinutes}
-                          disabled={isClosed || row.status === "absent"}
+                          value={row.status === null ? "" : row.breakMinutes}
+                          disabled={isClosed || row.status === null || row.status === "absent"}
                           onChange={(event) =>
                             update(row.employeeId, {
                               breakMinutes: Number(event.target.value),
@@ -948,16 +976,16 @@ export function PainelApontamentos() {
                       </TableCell>
 
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {minutesToLabel(calc.workedMinutes)}
+                        {minutesToLabel(valores.workedMinutes)}
                       </TableCell>
 
                       <TableCell>
-                        {calc.overtimeMinutes > 0 ? (
+                        {valores.overtimeMinutes > 0 ? (
                           <Badge
                             variant="secondary"
                             className="border border-primary/15 bg-primary/10 font-medium text-primary shadow-none"
                           >
-                            {minutesToLabel(calc.overtimeMinutes)}
+                            {minutesToLabel(valores.overtimeMinutes)}
                           </Badge>
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
@@ -965,11 +993,11 @@ export function PainelApontamentos() {
                       </TableCell>
 
                       <TableCell className="whitespace-nowrap text-right text-sm font-medium text-foreground">
-                        {brl(calc.billedAmount)}
+                        {brl(valores.billedAmount)}
                       </TableCell>
 
                       <TableCell className="whitespace-nowrap text-right text-sm text-muted-foreground">
-                        {brl(calc.costAmount)}
+                        {brl(valores.costAmount)}
                       </TableCell>
                     </TableRow>
                   ))

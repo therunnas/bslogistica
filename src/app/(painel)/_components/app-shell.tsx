@@ -6,6 +6,7 @@ import {
   BarChart3,
   Building2,
   CalendarCheck,
+  ClipboardCheck,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -47,6 +48,7 @@ const NAVEGACAO = {
     { href: "/clientes", label: "Clientes e contratos", icon: Building2 },
     { href: "/colaboradores", label: "Colaboradores", icon: Users },
     { href: "/faturamento", label: "Faturamento", icon: FileText },
+    { href: "/fechamento", label: "Fechamento", icon: ClipboardCheck },
     { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
   ],
   operacional: [

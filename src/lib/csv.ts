@@ -30,8 +30,13 @@ const SEPARADOR = ";";
  *  interna fica ambígua para vários leitores quando o registro termina em LF. */
 const FIM_DE_LINHA = "\r\n";
 
-/** Prefixos que uma planilha interpreta como início de fórmula ou de comando. */
-const INICIO_PERIGOSO = /^[=+\-@\t\r]/;
+/**
+ * Prefixos que uma planilha interpreta como início de fórmula ou de comando:
+ * `=`, `+`, `-` ou `@`, mesmo depois de espaços, TAB ou quebras de linha, e
+ * também TAB, CR ou LF logo no início. Espaço antes do operador não protege:
+ * alguns leitores o descartam antes de decidir.
+ */
+const INICIO_PERIGOSO = /^\s*[=+\-@]|^[\t\r\n]/;
 
 /** Número puro, com sinal e com vírgula ou ponto decimal. */
 const NUMERO_SIMPLES = /^[+-]?\d+(?:[.,]\d+)?$/;
