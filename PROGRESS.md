@@ -90,9 +90,20 @@ sozinho; nada abaixo foi verificado, e a ausência de evidência não é aprova�
 5. se `SENTRY_AUTH_TOKEN` existe no escopo Preview (o código já não depende
    disso, mas a variável não deveria estar lá);
 6. se existe um projeto Supabase de teste para o Preview. Sem ele, o Preview
-   falha de forma controlada no build — esse é o comportamento esperado;
+   falha de forma controlada no build — esse é o comportamento esperado — a menos
+   que o responsável autorize explicitamente o banco compartilhado com
+   `BS_PREVIEW_SHARED_SUPABASE=true` (escopo Preview), exceção **temporária** que só
+   cabe enquanto os dados forem fictícios (ver "Preview com Supabase
+   compartilhado" em [docs/SEGURANCA.md](docs/SEGURANCA.md));
 7. que o Preview falha de forma segura quando o isolamento não está configurado
    (o gate cobre o build e o runtime, mas só a Vercel real prova).
+
+**Antes de qualquer dado real entrar no banco:** revogar a exceção do Preview
+(remover `BS_PREVIEW_SHARED_SUPABASE` do escopo Preview e de overrides por branch,
+novo deploy), definir Preview isolado ou interromper Previews ligados ao banco
+oficial, conferir que não restam deploys antigos com acesso compartilhado e só
+então fazer a limpeza dos dados fictícios, em procedimento separado. Detalhes em
+[docs/SEGURANCA.md](docs/SEGURANCA.md).
 
 **Fluxo de implantação:** revisão final e commit na branch → PR para `main` →
 CI verde → Preview (sem banco de produção) → merge → deploy a partir de `main`.

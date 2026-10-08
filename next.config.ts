@@ -1,7 +1,11 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
-import { verificarDestinoSupabase } from "./src/lib/ambiente";
+import {
+  apontaParaProduction,
+  previewCompartilhadoAutorizado,
+  verificarDestinoSupabase,
+} from "./src/lib/ambiente";
 
 /**
  * Baseline de cabeçalhos de segurança.
@@ -46,8 +50,29 @@ const producao = ambienteDeImplantacao === "production";
 // explícita, sem citar URL nem chave. A mesma regra vale de novo em runtime, em
 // lerAmbienteSupabase(). Fora da Vercel (local, CI, E2E) a variável não existe e
 // nada é verificado.
+//
+// Exceção temporária: BS_PREVIEW_SHARED_SUPABASE=true (variável do servidor, escopo
+// Preview) libera só o Preview a usar o Supabase compartilhado. Quando isso
+// acontece o build avisa em voz alta, para o uso não passar despercebido.
 if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  verificarDestinoSupabase(process.env.VERCEL_ENV, process.env.NEXT_PUBLIC_SUPABASE_URL);
+  verificarDestinoSupabase(
+    process.env.VERCEL_ENV,
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.BS_PREVIEW_SHARED_SUPABASE,
+  );
+
+  if (
+    previewCompartilhadoAutorizado(
+      process.env.VERCEL_ENV,
+      process.env.BS_PREVIEW_SHARED_SUPABASE,
+    ) &&
+    apontaParaProduction(process.env.NEXT_PUBLIC_SUPABASE_URL)
+  ) {
+    console.warn(
+      "[isolamento] AVISO: este Preview usa o Supabase COMPARTILHADO (BS_PREVIEW_SHARED_SUPABASE=true). " +
+        "Só é aceitável enquanto o banco tiver apenas dados fictícios.",
+    );
+  }
 }
 
 const nextConfig: NextConfig = {

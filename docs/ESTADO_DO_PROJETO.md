@@ -16,9 +16,13 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                |
 | Usuário `operacional` | ainda não existe conta real; depende da matriz E2E ([PROGRESS.md](../PROGRESS.md)) |
 
-O **Preview** da Vercel falha de propósito: não tem as variáveis
+O **Preview** da Vercel falha de propósito sem as variáveis
 `NEXT_PUBLIC_SUPABASE_*`, e conectá-lo ao banco de produção para deixar o check
-verde é proibido.
+verde é proibido. Na branch do fechamento isso virou regra de código: fora de
+Production o build recusa o Supabase de Production. Existe uma exceção
+**temporária e explícita** para o Preview (`BS_PREVIEW_SHARED_SUPABASE=true`,
+escopo Preview), só enquanto o banco tiver apenas dados fictícios — ver
+[SEGURANCA.md](SEGURANCA.md). Estado real da Vercel: não verificado.
 
 O site institucional (`bslogisticas.com.br`) é outro projeto, em outro
 repositório, e não faz parte deste.

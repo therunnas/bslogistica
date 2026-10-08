@@ -33,6 +33,8 @@ import {
   origemDoSupabase,
   REFERENCIA_SUPABASE_PRODUCTION,
   sentryHabilitado,
+  previewCompartilhadoAutorizado,
+  VARIAVEL_PREVIEW_COMPARTILHADO,
   verificarDestinoSupabase,
 } from "../src/lib/ambiente.ts";
 import { construirCsp } from "../src/lib/csp.ts";
@@ -494,7 +496,7 @@ verificar(
   const codigo = semComentarios(fonte("next.config.ts"));
   verificar(
     "E17. next.config usa o mesmo gate de src/lib/ambiente.ts (uma só regra)",
-    /verificarDestinoSupabase\(process\.env\.VERCEL_ENV, process\.env\.NEXT_PUBLIC_SUPABASE_URL\)/.test(
+    /verificarDestinoSupabase\(\s*process\.env\.VERCEL_ENV,\s*process\.env\.NEXT_PUBLIC_SUPABASE_URL,\s*process\.env\.BS_PREVIEW_SHARED_SUPABASE,?\s*\)/.test(
       codigo,
     ),
     true,
@@ -531,6 +533,287 @@ verificar(
     ["X-Content-Type-Options", "Referrer-Policy", "X-Frame-Options", "Permissions-Policy"].every(
       (h) => codigo.includes(h),
     ),
+    true,
+  );
+}
+
+// --- G. Preview com Supabase compartilhado (exceção temporária) ---------------
+
+console.log("\nG. Exceção temporária: BS_PREVIEW_SHARED_SUPABASE");
+
+{
+  const FLAG = "BS_PREVIEW_SHARED_SUPABASE";
+  const gate = (ambiente, url, flag) => lanca(() => verificarDestinoSupabase(ambiente, url, flag));
+  const barrado = (e) => e instanceof ErroDeIsolamentoDeAmbiente;
+
+  verificar(
+    "G0. o nome da variável é exatamente BS_PREVIEW_SHARED_SUPABASE",
+    VARIAVEL_PREVIEW_COMPARTILHADO,
+    FLAG,
+  );
+  verificar(
+    "G0b. sem prefixo NEXT_PUBLIC_",
+    /NEXT_PUBLIC/.test(VARIAVEL_PREVIEW_COMPARTILHADO),
+    false,
+  );
+
+  // A-D: a matriz pedida.
+  verificar(
+    "G1. A: Preview + Supabase de Production + flag ausente = BLOQUEADO",
+    barrado(gate("preview", PROD, undefined)),
+    true,
+  );
+  verificar(
+    "G2. B: Preview + Production + flag 'false' = BLOQUEADO",
+    barrado(gate("preview", PROD, "false")),
+    true,
+  );
+  verificar(
+    "G3. C: Preview + Production + flag 'true' = PERMITIDO",
+    gate("preview", PROD, "true"),
+    null,
+  );
+  verificar(
+    "G4. D: Preview + projeto de teste + flag ausente = PERMITIDO",
+    gate("preview", TESTE, undefined),
+    null,
+  );
+  verificar(
+    "G5. D2: Preview + projeto de teste + flag 'true' = PERMITIDO",
+    gate("preview", TESTE, "true"),
+    null,
+  );
+
+  // Só o valor exato 'true' vale.
+  for (const valor of [
+    "",
+    "False",
+    "FALSE",
+    "0",
+    "1",
+    "yes",
+    "sim",
+    "on",
+    "True",
+    "TRUE",
+    " true",
+    "true ",
+    "true\n",
+    "tru",
+    "verdadeiro",
+    null,
+  ]) {
+    verificar(
+      `G6. Preview + Production + flag ${JSON.stringify(valor)} = BLOQUEADO`,
+      barrado(gate("preview", PROD, valor)),
+      true,
+    );
+  }
+
+  // E: Production não depende da flag.
+  verificar(
+    "G7. E: Production + Production + sem flag = permitido (original)",
+    gate("production", PROD, undefined),
+    null,
+  );
+  verificar(
+    "G8. E: Production + Production + flag 'true' = permitido (igual)",
+    gate("production", PROD, "true"),
+    null,
+  );
+  verificar(
+    "G9. E: Production + flag 'false' = permitido (a flag não é lida)",
+    gate("production", PROD, "false"),
+    null,
+  );
+
+  // F/G: a flag não dá poder a outros ambientes.
+  verificar(
+    "G10. F: CI/local (sem VERCEL_ENV) + flag 'true': nada muda",
+    gate(undefined, PROD, "true"),
+    gate(undefined, PROD, undefined),
+  );
+  verificar(
+    "G11. G: development + Production + flag 'true' = BLOQUEADO",
+    barrado(gate("development", PROD, "true")),
+    true,
+  );
+  verificar(
+    "G12. ambiente desconhecido ('staging') + flag 'true' = BLOQUEADO",
+    barrado(gate("staging", PROD, "true")),
+    true,
+  );
+  verificar(
+    "G13. 'Preview' com caixa errada + flag 'true' = BLOQUEADO",
+    barrado(gate("Preview", PROD, "true")),
+    true,
+  );
+  verificar(
+    "G14. 'preview ' com espaço + flag 'true' = BLOQUEADO",
+    barrado(gate("preview ", PROD, "true")),
+    true,
+  );
+  verificar(
+    "G15. 'PREVIEW' + flag 'true' = BLOQUEADO",
+    barrado(gate("PREVIEW", PROD, "true")),
+    true,
+  );
+
+  // H: a exceção não afrouxa a validação da URL.
+  for (const [nome, url] of [
+    ["URL ilegível", "não é url"],
+    ["http fora de loopback", "http://abc.supabase.co"],
+    ["credenciais embutidas", `https://u:p@${REFERENCIA_SUPABASE_PRODUCTION}.supabase.co`],
+    ["protocolo estranho", "javascript:alert(1)"],
+    ["vazia", ""],
+  ]) {
+    verificar(
+      `G16. H: Preview + ${nome} + flag 'true' = BLOQUEADO`,
+      barrado(gate("preview", url, "true")),
+      true,
+    );
+  }
+  verificar(
+    "G17. com a flag, uma variação do host de Production também é permitida (mesmo destino)",
+    gate("preview", `https://x.${REFERENCIA_SUPABASE_PRODUCTION}.supabase.co`, "true"),
+    null,
+  );
+  verificar(
+    "G18. a flag não torna válida uma URL com credenciais de um projeto de teste",
+    barrado(gate("preview", "https://u:p@abc.supabase.co", "true")),
+    true,
+  );
+
+  verificar(
+    "G19. previewCompartilhadoAutorizado: só preview + 'true'",
+    previewCompartilhadoAutorizado("preview", "true"),
+    true,
+  );
+  for (const [a, v] of [
+    ["production", "true"],
+    ["development", "true"],
+    [undefined, "true"],
+    ["", "true"],
+    ["preview", undefined],
+    ["preview", "false"],
+    ["preview", "TRUE"],
+  ]) {
+    verificar(
+      `G20. previewCompartilhadoAutorizado(${JSON.stringify(a)}, ${JSON.stringify(v)}) = false`,
+      previewCompartilhadoAutorizado(a, v),
+      false,
+    );
+  }
+
+  const msg = String(gate("preview", PROD, undefined)?.message);
+  verificar(
+    "G21. a mensagem do bloqueio cita a variável, sem URL nem referência",
+    msg.includes(FLAG) && !msg.includes(REFERENCIA_SUPABASE_PRODUCTION) && !/https?:\/\//.test(msg),
+    true,
+  );
+  verificar(
+    "G22. e continua dizendo que o ideal é um projeto de teste",
+    /projeto Supabase de teste/.test(msg),
+    true,
+  );
+
+  // I/J: o compartilhamento do banco não compartilha o monitoramento (config real carregada).
+  for (const arquivo of ["sentry.server.config.ts", "sentry.edge.config.ts"]) {
+    const r = inicializarSentry(arquivo, {
+      VERCEL_ENV: "preview",
+      NODE_ENV: "production",
+      [FLAG]: "true",
+    });
+    verificar(`G23. I: ${arquivo} / Preview + flag: Sentry desabilitado`, r.enabled, false);
+    verificar(`G24. I: ${arquivo} / Preview + flag: sem DSN`, r.dsn, null);
+    verificar(`G25. I: ${arquivo} / Preview + flag: traces zerados`, r.traces, 0);
+  }
+  const cfg = configPara({ VERCEL_ENV: "preview", NEXT_PUBLIC_SUPABASE_URL: PROD, [FLAG]: "true" });
+  verificar("G26. J: Preview + flag: /monitoring continua inexistente", cfg.tunel, false);
+  verificar(
+    "G27. Preview + flag: o ambiente publicado ao navegador continua 'preview'",
+    cfg.ambiente,
+    "preview",
+  );
+  verificar("G28. Preview + flag: typedRoutes continua ligado", cfg.typedRoutes, true);
+  verificar("G29. a flag não é publicada ao navegador", JSON.stringify(cfg).includes(FLAG), false);
+
+  // O config (build) respeita a mesma regra.
+  verificar(
+    "G30. build: Preview + Production + flag 'true' carrega o config",
+    configFalha({ VERCEL_ENV: "preview", NEXT_PUBLIC_SUPABASE_URL: PROD, [FLAG]: "true" }).falhou,
+    false,
+  );
+  for (const valor of ["false", "", "1", "TRUE"]) {
+    verificar(
+      `G31. build: Preview + Production + flag ${JSON.stringify(valor)} FALHA`,
+      configFalha({ VERCEL_ENV: "preview", NEXT_PUBLIC_SUPABASE_URL: PROD, [FLAG]: valor }).falhou,
+      true,
+    );
+  }
+  verificar(
+    "G32. build: Development + Production + flag 'true' FALHA",
+    configFalha({ VERCEL_ENV: "development", NEXT_PUBLIC_SUPABASE_URL: PROD, [FLAG]: "true" })
+      .falhou,
+    true,
+  );
+  verificar(
+    "G33. build: Preview + URL inválida + flag 'true' FALHA",
+    configFalha({
+      VERCEL_ENV: "preview",
+      NEXT_PUBLIC_SUPABASE_URL: "http://abc.supabase.co",
+      [FLAG]: "true",
+    }).falhou,
+    true,
+  );
+  verificar(
+    "G34. build: Preview + projeto de teste, sem flag, carrega",
+    configFalha({ VERCEL_ENV: "preview", NEXT_PUBLIC_SUPABASE_URL: TESTE }).falhou,
+    false,
+  );
+
+  // Forma literal: sem NEXT_PUBLIC, sem exposição, sem outro uso.
+  const amb = semComentarios(fonte("src/lib/ambiente.ts"));
+  verificar(
+    "G35. ambiente.ts não lê process.env (a flag chega por parâmetro)",
+    /process\.env/.test(amb),
+    false,
+  );
+  const nextCfg = semComentarios(fonte("next.config.ts"));
+  verificar(
+    "G36. next.config não põe a flag em `env` (não vai ao navegador)",
+    /env:\s*\{[^}]*BS_PREVIEW/.test(nextCfg),
+    false,
+  );
+  verificar(
+    "G37. a flag só é lida em next.config.ts e env.ts",
+    [
+      "src/proxy.ts",
+      "src/instrumentation-client.ts",
+      "sentry.server.config.ts",
+      "sentry.edge.config.ts",
+      "src/lib/csp.ts",
+      "src/integrations/supabase/browser.ts",
+      "src/integrations/supabase/server.ts",
+    ].every((a) => !/BS_PREVIEW_SHARED_SUPABASE/.test(fonte(a))),
+    true,
+  );
+  verificar(
+    "G38. nenhum arquivo do código usa NEXT_PUBLIC_BS_PREVIEW",
+    arquivosDe(join(raiz, "src"))
+      .filter((a) => /\.(ts|tsx)$/.test(a))
+      .every((a) => !/NEXT_PUBLIC_BS_PREVIEW/.test(readFileSync(a, "utf8"))),
+    true,
+  );
+  verificar(
+    "G39. o build avisa quando o Preview usa o banco compartilhado",
+    /apontaParaProduction\(process\.env\.NEXT_PUBLIC_SUPABASE_URL\)/.test(nextCfg) &&
+      /AVISO/.test(fonte("next.config.ts")),
+    true,
+  );
+  verificar(
+    "G40. nenhuma exceção equivalente para Production, Development ou CI",
+    !/previewCompartilhadoAutorizado\([^)]*(production|development)/.test(amb),
     true,
   );
 }
@@ -583,12 +866,14 @@ verificar(
 const env = semComentarios(fonte("src/integrations/supabase/env.ts"));
 verificar(
   "F9. lerAmbienteSupabase aplica o gate depois de validar as variáveis",
-  env.indexOf("verificarDestinoSupabase(ambiente, url)") > env.indexOf("if (!url || !chave)"),
+  env.indexOf(
+    'verificarDestinoSupabase(ambiente, url, process.env["BS_PREVIEW_SHARED_SUPABASE"])',
+  ) > env.indexOf("if (!url || !chave)"),
   true,
 );
 verificar(
-  "F10. o ambiente vem de VERCEL_ENV (servidor) ou NEXT_PUBLIC_AMBIENTE (navegador)",
-  env.includes('process.env["VERCEL_ENV"] || process.env["NEXT_PUBLIC_AMBIENTE"]'),
+  "F10. o gate lê só VERCEL_ENV (servidor); no navegador o gate do build é quem decide",
+  env.includes('const ambiente = process.env["VERCEL_ENV"];') && !/NEXT_PUBLIC_AMBIENTE/.test(env),
   true,
 );
 verificar(

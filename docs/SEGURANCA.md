@@ -321,13 +321,13 @@ caixa diferente é "não Production" — nunca há promoção por fallback. No n
 `VERCEL_ENV` não existe; `next.config.ts` publica o valor no build como
 `NEXT_PUBLIC_AMBIENTE` (não depende de a Vercel expor `NEXT_PUBLIC_VERCEL_ENV`).
 
-| Item                                        | Production                                                             | Preview, Development, local, CI, E2E                                  |
-| ------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Sentry (servidor, edge, navegador)          | habilitado, DSN e 10% de traces como antes, coleta restrita preservada | `enabled: false`, sem DSN, traces 0, Replay sempre 0                  |
-| Túnel `/monitoring`                         | existe                                                                 | não existe (404)                                                      |
-| Source maps, release e telemetria do plugin | como antes                                                             | desligados — **não dependem** de `SENTRY_AUTH_TOKEN` estar ausente    |
-| `report-uri` da CSP                         | presente                                                               | ausente                                                               |
-| Supabase de Production                      | permitido                                                              | **barrado** na Vercel (build e runtime); fora da Vercel não se aplica |
+| Item                                        | Production                                                             | Preview, Development, local, CI, E2E                                                                                  |
+| ------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Sentry (servidor, edge, navegador)          | habilitado, DSN e 10% de traces como antes, coleta restrita preservada | `enabled: false`, sem DSN, traces 0, Replay sempre 0                                                                  |
+| Túnel `/monitoring`                         | existe                                                                 | não existe (404)                                                                                                      |
+| Source maps, release e telemetria do plugin | como antes                                                             | desligados — **não dependem** de `SENTRY_AUTH_TOKEN` estar ausente                                                    |
+| `report-uri` da CSP                         | presente                                                               | ausente                                                                                                               |
+| Supabase de Production                      | permitido                                                              | **barrado** na Vercel (build e runtime); fora da Vercel não se aplica. Exceção temporária só para Preview: ver abaixo |
 
 **Gate do Supabase** (`verificarDestinoSupabase`): fora de Production na Vercel, uma
 `NEXT_PUBLIC_SUPABASE_URL` que aponte para o projeto de Production — ou que não
@@ -344,6 +344,67 @@ chave. A referência de Production usada na comparação é pública (a mesma de
   fluxo, não coberta pelo gate;
 - se a URL de Production um dia passar a um domínio próprio, a comparação por
   referência deixa de reconhecê-la — atualizar `REFERENCIA_SUPABASE_PRODUCTION`.
+
+### Preview com Supabase compartilhado (exceção TEMPORÁRIA)
+
+**Por quê:** hoje o projeto Supabase só tem dados **fictícios** e ainda não foi
+entregue ao cliente, e os Previews sempre usaram esse mesmo projeto. Enquanto isso
+for verdade, o fluxo pode continuar — mas só por autorização explícita, nunca por
+padrão.
+
+| Item               | Valor                                                                         |
+| ------------------ | ----------------------------------------------------------------------------- |
+| Variável           | `BS_PREVIEW_SHARED_SUPABASE`                                                  |
+| Valor que autoriza | exatamente `true` (`false`, vazio, `TRUE`, `1`, `yes`, com espaço: bloqueiam) |
+| Escopo             | **só Preview** na Vercel; servidor, **nunca** `NEXT_PUBLIC_`                  |
+| Efeito             | libera o Preview a usar o Supabase de Production **e nada mais**              |
+
+Regras do código (`previewCompartilhadoAutorizado`, em `src/lib/ambiente.ts`):
+
+- só vale com `VERCEL_ENV === "preview"` exato **e** a variável `true` exata;
+- Production não a lê (o comportamento original não depende dela); Development,
+  ambiente desconhecido e CI/local (sem `VERCEL_ENV`) não ganham nada com ela;
+- a URL continua validada por inteiro antes de qualquer liberação (https, ou http
+  em loopback; sem credenciais; legível): URL inválida segue bloqueada com a flag;
+- build e runtime usam a mesma regra: o `next.config.ts` avalia no build e **de novo
+  ao subir o servidor**. Um build feito com a flag não sobe sem ela, e vice-versa;
+- o build imprime um **aviso** quando um Preview usa o banco compartilhado;
+- **não** compartilha monitoramento: com a flag, o Sentry continua desligado, sem
+  DSN, sem traces, sem túnel `/monitoring`, sem source maps e sem `report-uri`;
+- no navegador o valor não existe (a variável não é `NEXT_PUBLIC_`); lá o gate não
+  roda, e quem decidiu foi o build.
+
+**Riscos de usar o banco compartilhado:** um deploy de Preview — de qualquer
+branch, de qualquer pessoa com acesso ao repositório — lê e **escreve** nos mesmos
+dados que Production. Contas e papéis são os mesmos. Preview e Production dividem
+Auth, RLS e as RPCs; um Preview com código em teste pode gravar dados inválidos.
+Só é aceitável porque os dados são fictícios.
+
+**É PROIBIDO usar essa exceção quando houver dados reais.**
+
+**ANTES DA ENTRADA DE DADOS REAIS** (procedimento de revogação):
+
+1. Remover `BS_PREVIEW_SHARED_SUPABASE` do escopo Preview na Vercel (Settings →
+   Environment Variables) e, se existirem, de **overrides por branch**. Fazer um
+   novo deploy: variável de ambiente só vale num deploy novo.
+2. Definir um Preview isolado (projeto Supabase de teste, com variáveis próprias no
+   escopo Preview) **ou** interromper os Previews conectados ao banco oficial.
+3. Validar que não restam deploys antigos de Preview com acesso compartilhado
+   (listar os deploys de Preview e removê-los ou desativá-los).
+4. Executar a limpeza controlada dos dados fictícios, em **procedimento separado**
+   (não descrito aqui, não executado automaticamente).
+
+Depois do passo 1, qualquer Preview apontando para o Supabase de Production volta
+a falhar no build — que é o comportamento seguro por padrão.
+
+**Como configurar na Vercel** (feito pelo responsável, no painel; este repositório
+não altera a Vercel): Settings → Environment Variables → Add → nome
+`BS_PREVIEW_SHARED_SUPABASE`, valor `true`, ambiente **somente Preview** (não
+marcar Production nem Development, e **não** usar "All Environments"). Não mexer nas
+variáveis de Production. É preciso um **novo deploy** para aplicar. Se a Vercel
+oferecer a opção de limitar a variável a uma branch de Preview, é uma restrição
+extra bem-vinda; se o projeto já tiver variáveis por branch, conferi-las — não foi
+possível verificar isso a partir daqui.
 
 **Configuração que continua sendo da Vercel** (não verificada a partir do
 repositório): variáveis do escopo Preview, vínculo do repositório ao projeto e

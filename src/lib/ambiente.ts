@@ -30,9 +30,31 @@ export const AMBIENTE_PRODUCTION = "production";
  */
 export const REFERENCIA_SUPABASE_PRODUCTION = "ehkduqokntemtmqzdrbd";
 
+/**
+ * Exceção TEMPORÁRIA e explícita: permite que o Preview da Vercel use o Supabase
+ * compartilhado (o mesmo projeto de Production) enquanto o banco só tiver dados
+ * fictícios. É variável do servidor — nunca `NEXT_PUBLIC_` — e só vale com o
+ * valor exato `true`, no ambiente exato `preview`. Ver "Preview com Supabase
+ * compartilhado" em docs/SEGURANCA.md, incluindo o procedimento para revogá-la.
+ */
+export const VARIAVEL_PREVIEW_COMPARTILHADO = "BS_PREVIEW_SHARED_SUPABASE";
+
 /** `true` só quando o valor é exatamente `production`. */
 export function ehProducao(ambiente: string | null | undefined): boolean {
   return ambiente === AMBIENTE_PRODUCTION;
+}
+
+/**
+ * A exceção do Supabase compartilhado só vale para `preview` com o valor
+ * `true`, ambos exatos (sem caixa alternativa, espaços, `1` ou `yes`).
+ * Development, CI, local, Production e qualquer ambiente desconhecido não
+ * ganham nada com ela.
+ */
+export function previewCompartilhadoAutorizado(
+  ambiente: string | null | undefined,
+  valor: string | null | undefined,
+): boolean {
+  return ambiente === "preview" && valor === "true";
 }
 
 /** O Sentry só envia eventos em Production. */
@@ -105,21 +127,33 @@ export function apontaParaProduction(urlTexto: string): boolean {
  *
  * Fail-closed: se o ambiente é da Vercel e não é Production, e a URL aponta
  * para Production — ou não pode ser lida —, lança. Production não é afetado.
+ *
+ * EXCEÇÃO: `previewCompartilhado` (o valor de BS_PREVIEW_SHARED_SUPABASE) igual a
+ * `true` em `preview` libera SÓ o destino compartilhado. A URL continua sendo
+ * validada por inteiro (formato, protocolo, credenciais) antes de qualquer
+ * liberação: a exceção não afrouxa validação nenhuma, não vale para outro
+ * ambiente e não é lida por Production, Development nem CI.
  */
 export function verificarDestinoSupabase(
   ambiente: string | null | undefined,
   urlTexto: string,
+  previewCompartilhado?: string | null,
 ): void {
   const naVercel = ambiente !== undefined && ambiente !== null && ambiente !== "";
   if (!naVercel || ehProducao(ambiente)) return;
 
-  // Fail-closed: uma URL ilegível fora de Production também é recusada.
+  // Fail-closed: uma URL ilegível fora de Production também é recusada,
+  // inclusive com a exceção ligada.
   origemDoSupabase(urlTexto);
 
   if (apontaParaProduction(urlTexto)) {
+    if (previewCompartilhadoAutorizado(ambiente, previewCompartilhado)) return;
+
     throw new ErroDeIsolamentoDeAmbiente(
       "Este ambiente não é Production e não pode usar o projeto Supabase de Production. " +
-        "Configure um projeto Supabase de teste nas variáveis do escopo Preview.",
+        "Configure um projeto Supabase de teste nas variáveis do escopo Preview " +
+        `(ou, enquanto o banco só tiver dados fictícios, autorize o compartilhamento ` +
+        `temporário com ${VARIAVEL_PREVIEW_COMPARTILHADO}=true, apenas no escopo Preview).`,
     );
   }
 }
