@@ -64,6 +64,25 @@ Supabase **local** descartável (sem sessão 401, operacional 403, admin em AAL1
 assinatura antiga 409 e depois 200) e a conferência manual no Excel pt-BR
 (abertura sem reparação, abas, autofiltro, congelamento, valores).
 
+**Homologação do Operacional (5.4), concluída exclusivamente em ambiente local:**
+
+- colaborador sem apontamento permanece com status nulo; somente decisões
+  manuais entram no salvamento, sem presenças ou payloads artificiais;
+- sincronização normaliza horários `HH:mm`/`HH:mm:ss`, preserva edições pendentes
+  do mesmo escopo e respeita fechamento, reabertura e bloqueios financeiros;
+- históricos permanecem visíveis após desalocação, inclusive com equipe vazia,
+  com os colaboradores desalocados inativos e somente para leitura;
+- Equipe conta as alocações atuais da operação/turno, mesmo em folha fechada;
+  Presentes e Faltas incluem os históricos da data selecionada, e Alterações
+  conta as decisões pendentes de salvamento.
+
+A migration `20261015111816_019_historico_operacional_desalocado.sql` estende
+`listar_apontamentos_do_operador` com `employee_name` e `employee_role`. Foi
+aplicada e validada **somente no PostgreSQL local** durante a homologação
+(31 cenários SQL aprovados). O ambiente Supabase local foi descartado após os
+testes e a configuração temporária de MFA foi restaurada. A aplicação remota da
+019 **permanece pendente**.
+
 **Pendente — só no Preview** (nada disto se prova localmente):
 
 - clique real em "Baixar Excel (.xlsx)" e em "Baixar CSV" na tela;
@@ -106,8 +125,12 @@ então fazer a limpeza dos dados fictícios, em procedimento separado. Detalhes 
 [docs/SEGURANCA.md](docs/SEGURANCA.md).
 
 **Fluxo de implantação:** revisão final e commit na branch → PR para `main` →
-CI verde → Preview (sem banco de produção) → merge → deploy a partir de `main`.
-Não há migration nova neste conjunto.
+CI verde → Preview com a dependência de banco resolvida → merge → deploy a partir
+de `main`.
+O conjunto inclui a migration 019, ainda não aplicada remotamente. Sua aplicação
+exige autorização própria e deve preceder a publicação do código que utiliza o
+contrato estendido. Como o Preview compartilha o Supabase de Production, ele não
+constitui um banco isolado para aplicar ou testar essa migration.
 
 ## Etapa atual — matriz E2E
 

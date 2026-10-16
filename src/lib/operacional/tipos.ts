@@ -2,7 +2,10 @@
  * Contratos TypeScript da superfície operacional AAL1.
  *
  * Cada tipo aqui é a transcrição de um `RETURNS TABLE` da migration
- * `20260918160000_013_superficie_operacional_aal1.sql`, que é a fonte canônica.
+ * `20260918160000_013_superficie_operacional_aal1.sql`, com o contrato de
+ * `listar_apontamentos_do_operador` estendido por
+ * `20261015111816_019_historico_operacional_desalocado.sql` para retornar
+ * `employee_name` e `employee_role`. Essas migrations são as fontes canônicas.
  * Nada é mais largo que a assinatura: o que não está no retorno da RPC não
  * existe para quem chama, e esta camada não inventa campo nenhum.
  *
@@ -82,6 +85,9 @@ export interface ApontamentoDoOperador {
   notes: string | null;
   /** Nunca nulo: o helper do banco fecha com `coalesce(..., false)`. */
   faturado: boolean;
+  /** Identidade atual; nula na linha-sentinela de folha sem apontamentos. */
+  employee_name: string | null;
+  employee_role: string | null;
 }
 
 /** Os seis campos que a RPC de escrita aceita por linha. Ver `rpc.ts`. */

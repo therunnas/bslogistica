@@ -25,7 +25,9 @@
  */
 
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 
+import * as dominioOperacional from "../src/app/(painel)/operacional/_dominio.ts";
 import {
   apontamentosPorColaborador,
   escolhaAutomatica,
@@ -316,6 +318,8 @@ const folha = (extra = {}) => ({
   break_minutes: null,
   notes: null,
   faturado: false,
+  employee_name: null,
+  employee_role: null,
   ...extra,
 });
 
@@ -323,7 +327,7 @@ const folha = (extra = {}) => ({
   const rascunho = montarRascunho(EQUIPE, [], 60);
   verificar("E1. só a equipe ativa entra quando não há apontamento", rascunho.length, 2);
   verificar("E2. o intervalo padrão vem do turno", rascunho[0].break_minutes, 60);
-  verificar("E3. o padrão de situação é presente", rascunho[0].status, "present");
+  verificar("E3. colaborador sem registro começa não apontado", rascunho[0].status, null);
   verificar("E4. horários começam vazios", rascunho[0].check_in + "|" + rascunho[0].check_out, "|");
   verificar("E5. nada nasce faturado", rascunho[0].faturado, false);
 }
@@ -381,19 +385,79 @@ verificar(
   0,
 );
 
+{
+  const gravados = [folha({ employee_id: "e1", status: "present" })];
+  const fechado = montarRascunho(EQUIPE, gravados, 60, true);
+  verificar("E18. folha fechada mostra só registros persistidos", fechado.length, 1);
+  verificar("E19. presença persistida continua presente", fechado[0].status, "present");
+}
+
+{
+  const gravados = [folha({ employee_id: "e2", status: "absent" })];
+  const fechado = montarRascunho(EQUIPE, gravados, 60, true);
+  verificar("E20. falta persistida continua ausente", fechado[0].status, "absent");
+}
+
+{
+  const equipePosterior = [
+    ...EQUIPE,
+    { employee_id: "e4", employee_name: "Entrou depois", employee_role: null, active: true },
+  ];
+  const fechado = montarRascunho(
+    equipePosterior,
+    [folha({ employee_id: "e1", status: "present" })],
+    60,
+    true,
+  );
+  verificar(
+    "E21. colaborador adicionado depois não aparece retroativamente em folha fechada",
+    fechado.some((linha) => linha.employee_id === "e4"),
+    false,
+  );
+}
+
 console.log("\nF. Payload: só o que mudou, só os seis campos\n");
 
 {
   const rascunho = montarRascunho(EQUIPE, [], 60);
   const pendentes = linhasAlteradas(rascunho, []);
-  verificar("F1. linha nova entra no payload", pendentes.length, 2);
+  verificar("F1. folha vazia não gera alterações pendentes", pendentes.length, 0);
   verificar(
-    "F2. e carrega exatamente os seis campos",
+    "F2. sem decisão explícita o botão salvar permanece desabilitado",
+    podeSalvar({ fase: "pronto", fechada: false, pendentes: pendentes.length, salvando: false }),
+    false,
+  );
+}
+
+{
+  const rascunho = montarRascunho(EQUIPE, [], 60).map((linha) =>
+    linha.employee_id === "e1" ? { ...linha, status: "present" } : linha,
+  );
+  const pendentes = linhasAlteradas(rascunho, []);
+  verificar("F3. somente Ana marcada presente entra no payload", pendentes.length, 1);
+  verificar("F4. a presença explícita é da colaboradora certa", pendentes[0].employee_id, "e1");
+  verificar("F5. presença explícita preserva o status", pendentes[0].status, "present");
+  verificar(
+    "F6. linha explícita carrega exatamente os seis campos",
     Object.keys(pendentes[0]).sort().join(","),
     "break_minutes,check_in,check_out,employee_id,notes,status",
   );
-  verificar("F3. horário vazio vira nulo explícito", pendentes[0].check_in, null);
-  verificar("F4. observação vazia vira nulo explícito", pendentes[0].notes, null);
+  verificar("F7. horário vazio vira nulo explícito", pendentes[0].check_in, null);
+  verificar("F8. observação vazia vira nulo explícito", pendentes[0].notes, null);
+  verificar(
+    "F9. Bruno não apontado não acompanha o salvamento de Ana",
+    pendentes.some((linha) => linha.employee_id === "e2"),
+    false,
+  );
+}
+
+{
+  const rascunho = montarRascunho(EQUIPE, [], 60).map((linha) =>
+    linha.employee_id === "e2" ? { ...linha, status: "absent" } : linha,
+  );
+  const pendentes = linhasAlteradas(rascunho, []);
+  verificar("F10. ausência explícita gera uma alteração legítima", pendentes.length, 1);
+  verificar("F11. ausência explícita preserva o status", pendentes[0].status, "absent");
 }
 
 {
@@ -402,14 +466,14 @@ console.log("\nF. Payload: só o que mudou, só os seis campos\n");
     folha({ employee_id: "e2", status: "present", check_in: "08:00:00", break_minutes: 60 }),
   ];
   const rascunho = montarRascunho(EQUIPE, gravados, 60);
-  verificar("F5. nada mudou -> payload vazio", linhasAlteradas(rascunho, gravados).length, 0);
+  verificar("F12. nada mudou -> payload vazio", linhasAlteradas(rascunho, gravados).length, 0);
 
   const editado = rascunho.map((l) =>
     l.employee_id === "e2" ? { ...l, notes: "chegou tarde" } : l,
   );
   const pendentes = linhasAlteradas(editado, gravados);
-  verificar("F6. só a linha editada entra", pendentes.length, 1);
-  verificar("F7. e é a linha certa", pendentes[0].employee_id, "e2");
+  verificar("F13. só a linha editada entra", pendentes.length, 1);
+  verificar("F14. e é a linha certa", pendentes[0].employee_id, "e2");
 }
 
 {
@@ -418,7 +482,7 @@ console.log("\nF. Payload: só o que mudou, só os seis campos\n");
   // "08:00" e "08:00:00" são o mesmo horário: sem isso toda linha gravada
   // pareceria alterada e o payload reescreveria a folha inteira.
   verificar(
-    "F8. segundos no horário não contam como alteração",
+    "F15. segundos no horário não contam como alteração",
     linhasAlteradas(rascunho, gravados).some((l) => l.employee_id === "e1"),
     false,
   );
@@ -430,7 +494,7 @@ console.log("\nF. Payload: só o que mudou, só os seis campos\n");
     l.employee_id === "e1" ? { ...l, notes: "tentando editar" } : l,
   );
   verificar(
-    "F9. linha faturada nunca entra no payload",
+    "F16. linha faturada nunca entra no payload",
     linhasAlteradas(rascunho, gravados).some((l) => l.employee_id === "e1"),
     false,
   );
@@ -442,7 +506,7 @@ console.log("\nF. Payload: só o que mudou, só os seis campos\n");
     l.employee_id === "e3" ? { ...l, notes: "tentando editar" } : l,
   );
   verificar(
-    "F10. colaborador fora da equipe ativa também não entra",
+    "F17. colaborador fora da equipe ativa também não entra",
     linhasAlteradas(rascunho, gravados).some((l) => l.employee_id === "e3"),
     false,
   );
@@ -451,7 +515,15 @@ console.log("\nF. Payload: só o que mudou, só os seis campos\n");
 {
   const rascunho = montarRascunho(EQUIPE, [], 60).map((l) => ({ ...l, break_minutes: -90 }));
   const pendentes = linhasAlteradas(rascunho, []);
-  verificar("F11. intervalo negativo é normalizado antes de subir", pendentes[0].break_minutes, 0);
+  const apontado = rascunho.map((linha) =>
+    linha.employee_id === "e1" ? { ...linha, status: "present" } : linha,
+  );
+  const pendentesApontados = linhasAlteradas(apontado, []);
+  verificar(
+    "F18. intervalo negativo é normalizado antes de subir",
+    pendentesApontados[0].break_minutes,
+    0,
+  );
 }
 
 console.log("\nG. Folha fechada e linha faturada travam a edição\n");
@@ -735,6 +807,23 @@ verificar(
   /if \(!operationId \|\| !shiftId \|\| !pronto\) return;/.test(fontes.tela),
   true,
 );
+verificar(
+  "K4.1. o montador recebe o estado fechado para não inventar histórico",
+  /montarRascunho\(equipe\.data, apontamentos\.data, turno\?\.break_minutes \?\? 0, fechada\)/.test(
+    fontes.tela,
+  ),
+  true,
+);
+verificar(
+  "K4.2. não apontado aparece como valor vazio no seletor",
+  /value=\{linha\.status \?\? ""\}/.test(fontes.tela),
+  true,
+);
+verificar(
+  "K4.3. campos de jornada exigem uma decisão explícita",
+  (fontes.tela.match(/linha\.status === null \|\| linha\.status === "absent"/g) ?? []).length,
+  3,
+);
 verificar("K5. a tabela só existe na fase pronta", /\{pronto \? \(/.test(fontes.tela), true);
 for (const [rotulo, marcador] of [
   ["turnos", 'fase === "erro-turnos"'],
@@ -778,8 +867,8 @@ verificar(
 console.log("\nL. O rascunho sobrevive ao refetch e morre com o escopo\n");
 
 verificar(
-  "L1. o rascunho guarda o escopo a que pertence",
-  /useState<\{\s*escopo: string;\s*linhas: LinhaDoRascunho\[\];\s*\} \| null>\(null\)/.test(
+  "L1. o rascunho guarda o escopo e o estado da folha a que pertence",
+  /useState<\{\s*escopo: string;\s*fechada: boolean;\s*linhas: LinhaDoRascunho\[\];\s*editados: ReadonlySet<string>;\s*\} \| null>\(null\)/.test(
     fontes.tela,
   ),
   true,
@@ -790,11 +879,9 @@ verificar(
   true,
 );
 verificar(
-  "L3. e preserva o rascunho do mesmo escopo",
-  /setRascunho\(\(atual\) => \(atual\?\.escopo === escopo \? atual : \{ escopo, linhas: base \}\)\)/.test(
-    fontes.tela,
-  ),
-  true,
+  "L3. a transição da folha é decidida pelo domínio",
+  typeof dominioOperacional.sincronizarRascunho,
+  "function",
 );
 verificar(
   "L4. não existe mais substituição incondicional por `base`",
@@ -819,8 +906,8 @@ verificar(
   true,
 );
 verificar(
-  "L8. as linhas exibidas pertencem ao escopo atual",
-  /const linhas = rascunho\?\.escopo === escopo \? rascunho\.linhas : base;/.test(fontes.tela),
+  "L8. o rascunho exibido pertence ao escopo atual e ao estado aberto",
+  /rascunho\?\.escopo === escopo && !rascunho\.fechada/.test(fontes.tela),
   true,
 );
 verificar(
@@ -855,6 +942,698 @@ verificar(
     linhasAlteradas(rascunhoEditado, gravadosDepois).length,
     0,
   );
+}
+
+const sincronizarRascunho = dominioOperacional.sincronizarRascunho;
+
+if (typeof sincronizarRascunho === "function") {
+  const baseAberta = montarRascunho(EQUIPE, [], 60, false);
+  const aberto = sincronizarRascunho(null, {
+    escopo: "o1|s1|2026-09-18",
+    fechada: false,
+    base: baseAberta,
+  });
+  const abertoEditado = {
+    ...aberto,
+    editados: new Set(["e1"]),
+    linhas: aberto.linhas.map((linha) =>
+      linha.employee_id === "e1" ? { ...linha, status: "present" } : linha,
+    ),
+  };
+  const fechado = sincronizarRascunho(abertoEditado, {
+    escopo: aberto.escopo,
+    fechada: true,
+    base: [],
+  });
+  verificar(
+    "L13. open -> closed retém a decisão local sem exibi-la como histórico",
+    fechado.linhas.find((linha) => linha.employee_id === "e1")?.status,
+    "present",
+  );
+
+  const reaberto = sincronizarRascunho(fechado, {
+    escopo: aberto.escopo,
+    fechada: false,
+    base: baseAberta,
+  });
+  verificar(
+    "L14. closed -> open restaura a decisão legítima ainda não salva",
+    reaberto.linhas.find((linha) => linha.employee_id === "e1")?.status,
+    "present",
+  );
+  verificar(
+    "L15. closed -> open reapresenta os demais elegíveis como não apontados",
+    reaberto.linhas.find((linha) => linha.employee_id === "e2")?.status,
+    null,
+  );
+  verificar(
+    "L16. a reabertura envia somente a decisão explícita preservada",
+    linhasAlteradas(reaberto.linhas, [])
+      .map((linha) => linha.employee_id)
+      .join(","),
+    "e1",
+  );
+
+  const abertoSemEdicao = sincronizarRascunho(null, {
+    escopo: "o1|s1|2026-09-19",
+    fechada: false,
+    base: baseAberta,
+  });
+  const fechadoSemEdicao = sincronizarRascunho(abertoSemEdicao, {
+    escopo: abertoSemEdicao.escopo,
+    fechada: true,
+    base: [],
+  });
+  const reabertoSemEdicao = sincronizarRascunho(fechadoSemEdicao, {
+    escopo: abertoSemEdicao.escopo,
+    fechada: false,
+    base: baseAberta,
+  });
+  verificar(
+    "L17. closed -> open sem decisão não cria pendência artificial",
+    linhasAlteradas(reabertoSemEdicao.linhas, []).length,
+    0,
+  );
+
+  const gravados = [
+    folha({ employee_id: "e1", status: "present" }),
+    folha({ employee_id: "e2", status: "absent" }),
+  ];
+  const estadoFechado = sincronizarRascunho(null, {
+    escopo: "o1|s1|2026-09-20",
+    fechada: true,
+    base: montarRascunho(EQUIPE, gravados, 60, true),
+  });
+  const estadoReaberto = sincronizarRascunho(estadoFechado, {
+    escopo: estadoFechado.escopo,
+    fechada: false,
+    base: montarRascunho(EQUIPE, gravados, 60, false),
+  });
+  verificar(
+    "L18. reabrir preserva presença persistida",
+    estadoReaberto.linhas.find((linha) => linha.employee_id === "e1")?.status,
+    "present",
+  );
+  verificar(
+    "L19. reabrir preserva falta persistida",
+    estadoReaberto.linhas.find((linha) => linha.employee_id === "e2")?.status,
+    "absent",
+  );
+  verificar(
+    "L20. registros preservados não viram pendência após reabrir",
+    linhasAlteradas(estadoReaberto.linhas, gravados).length,
+    0,
+  );
+} else {
+  for (const caso of [
+    "L13. open -> closed retém a decisão local sem exibi-la como histórico",
+    "L14. closed -> open restaura a decisão legítima ainda não salva",
+    "L15. closed -> open reapresenta os demais elegíveis como não apontados",
+    "L16. a reabertura envia somente a decisão explícita preservada",
+    "L17. closed -> open sem decisão não cria pendência artificial",
+    "L18. reabrir preserva presença persistida",
+    "L19. reabrir preserva falta persistida",
+    "L20. registros preservados não viram pendência após reabrir",
+  ]) {
+    verificar(caso, false, true);
+  }
+}
+
+verificar(
+  "L21. folha fechada renderiza a base persistida, não o rascunho aberto retido",
+  /const linhas = fechada\s*\? base/.test(fontes.tela),
+  true,
+);
+
+if (typeof sincronizarRascunho === "function") {
+  const gravadoPresente = [folha({ employee_id: "e1", status: "present" })];
+  const gravadoAusente = [folha({ employee_id: "e1", status: "absent" })];
+  const abertoPresente = sincronizarRascunho(null, {
+    escopo: "o1|s1|2026-09-21",
+    fechada: false,
+    base: montarRascunho(EQUIPE, gravadoPresente, 60, false),
+  });
+  const fechadoAtualizado = sincronizarRascunho(abertoPresente, {
+    escopo: abertoPresente.escopo,
+    fechada: true,
+    base: montarRascunho(EQUIPE, gravadoAusente, 60, true),
+  });
+  const reabertoAtualizado = sincronizarRascunho(fechadoAtualizado, {
+    escopo: abertoPresente.escopo,
+    fechada: false,
+    base: montarRascunho(EQUIPE, gravadoAusente, 60, false),
+  });
+  verificar(
+    "L22. linha intocada usa o status persistido mais recente ao reabrir",
+    reabertoAtualizado.linhas.find((linha) => linha.employee_id === "e1")?.status,
+    "absent",
+  );
+  verificar(
+    "L23. atualização persistida durante a transição não cria payload artificial",
+    linhasAlteradas(reabertoAtualizado.linhas, gravadoAusente).length,
+    0,
+  );
+
+  const abertoEditado = {
+    ...abertoPresente,
+    editados: new Set(["e1"]),
+    linhas: abertoPresente.linhas.map((linha) =>
+      linha.employee_id === "e1" ? { ...linha, notes: "decisão local" } : linha,
+    ),
+  };
+  const baseFaturada = montarRascunho(
+    EQUIPE,
+    [folha({ employee_id: "e1", status: "present", faturado: true })],
+    60,
+    false,
+  );
+  const refetchFaturado = sincronizarRascunho(abertoEditado, {
+    escopo: abertoEditado.escopo,
+    fechada: false,
+    base: baseFaturada,
+  });
+  verificar(
+    "L24. refetch aberto aplica o bloqueio faturado do servidor",
+    refetchFaturado.linhas.find((linha) => linha.employee_id === "e1")?.faturado,
+    true,
+  );
+  verificar(
+    "L25. linha faturada no refetch sai do payload",
+    linhasAlteradas(refetchFaturado.linhas, [
+      folha({ employee_id: "e1", status: "present", faturado: true }),
+    ]).length,
+    0,
+  );
+
+  const equipeComUmInativo = EQUIPE.map((membro) =>
+    membro.employee_id === "e1" ? { ...membro, active: false } : membro,
+  );
+  const baseInativa = montarRascunho(equipeComUmInativo, gravadoPresente, 60, false);
+  const refetchInativo = sincronizarRascunho(abertoEditado, {
+    escopo: abertoEditado.escopo,
+    fechada: false,
+    base: baseInativa,
+  });
+  verificar(
+    "L26. refetch aberto aplica a inativação do servidor",
+    refetchInativo.linhas.find((linha) => linha.employee_id === "e1")?.ativo,
+    false,
+  );
+  verificar(
+    "L27. linha inativada no refetch sai do payload",
+    linhasAlteradas(refetchInativo.linhas, gravadoPresente).length,
+    0,
+  );
+
+  const equipeAmpliada = [
+    ...EQUIPE,
+    { employee_id: "e4", employee_name: "Quatro", employee_role: null, active: true },
+  ];
+  const refetchComNovoMembro = sincronizarRascunho(abertoPresente, {
+    escopo: abertoPresente.escopo,
+    fechada: false,
+    base: montarRascunho(equipeAmpliada, gravadoPresente, 60, false),
+  });
+  verificar(
+    "L28. refetch aberto inclui novo elegível como não apontado",
+    refetchComNovoMembro.linhas.find((linha) => linha.employee_id === "e4")?.status,
+    null,
+  );
+  verificar(
+    "L29. novo elegível recebido no refetch não cria pendência",
+    linhasAlteradas(refetchComNovoMembro.linhas, gravadoPresente).length,
+    0,
+  );
+} else {
+  for (const caso of [
+    "L22. linha intocada usa o status persistido mais recente ao reabrir",
+    "L23. atualização persistida durante a transição não cria payload artificial",
+    "L24. refetch aberto aplica o bloqueio faturado do servidor",
+    "L25. linha faturada no refetch sai do payload",
+    "L26. refetch aberto aplica a inativação do servidor",
+    "L27. linha inativada no refetch sai do payload",
+    "L28. refetch aberto inclui novo elegível como não apontado",
+    "L29. novo elegível recebido no refetch não cria pendência",
+  ]) {
+    verificar(caso, false, true);
+  }
+}
+
+{
+  const gravados = [
+    folha({
+      employee_id: "e1",
+      status: "present",
+      check_in: "08:00:00",
+      check_out: "17:00:00",
+      break_minutes: 60,
+    }),
+  ];
+  const entrada = {
+    escopo: "o1|s1|2026-09-18",
+    fechada: false,
+    base: montarRascunho(EQUIPE, gravados, 60, false),
+  };
+  const inicial = sincronizarRascunho(null, entrada);
+  const gravadosAtualizados = [folha({ employee_id: "e1", status: "absent", break_minutes: 60 })];
+  const baseAtualizada = montarRascunho(EQUIPE, gravadosAtualizados, 60, false);
+
+  for (const [caso, mudanca] of [
+    ["entrada", { check_in: "08:00" }],
+    ["saída", { check_out: "17:00" }],
+    ["ambos", { check_in: "08:00", check_out: "17:00" }],
+  ]) {
+    const local = {
+      ...inicial,
+      editados: new Set(["e1"]),
+      linhas: inicial.linhas.map((linha) =>
+        linha.employee_id === "e1" ? { ...linha, ...mudanca } : linha,
+      ),
+    };
+    const sincronizado = sincronizarRascunho(local, entrada);
+    verificar(
+      `L30.${caso}. HH:mm equivalente a HH:mm:ss deixa de ser edição local`,
+      sincronizado.editados.has("e1"),
+      false,
+    );
+    const refetch = sincronizarRascunho(sincronizado, { ...entrada, base: baseAtualizada });
+    verificar(
+      `L31.${caso}. refetch posterior respeita a falta persistida`,
+      refetch.linhas.find((linha) => linha.employee_id === "e1")?.status,
+      "absent",
+    );
+    verificar(
+      `L32.${caso}. refetch posterior não cria payload artificial`,
+      linhasAlteradas(refetch.linhas, gravadosAtualizados).length,
+      0,
+    );
+  }
+
+  for (const [campo, valor] of [
+    ["check_in", "09:00"],
+    ["check_out", "18:00"],
+  ]) {
+    const local = {
+      ...inicial,
+      editados: new Set(["e1"]),
+      linhas: inicial.linhas.map((linha) =>
+        linha.employee_id === "e1" ? { ...linha, [campo]: valor } : linha,
+      ),
+    };
+    const sincronizado = sincronizarRascunho(local, entrada);
+    verificar(
+      `L33.${campo}. horário realmente alterado continua marcado como editado`,
+      sincronizado.editados.has("e1"),
+      true,
+    );
+    verificar(
+      `L34.${campo}. sincronização preserva o horário realmente alterado`,
+      sincronizado.linhas.find((linha) => linha.employee_id === "e1")?.[campo],
+      valor,
+    );
+  }
+}
+
+console.log("\nM. Histórico após desalocação\n");
+
+verificar(
+  "M1. equipe vazia com histórico permite consulta",
+  fase({ equipe: OK(0), apontamentos: OK(1) }),
+  "pronto",
+);
+verificar(
+  "M2. equipe vazia ainda aguarda a leitura da folha",
+  fase({ equipe: OK(0), apontamentos: PENDENTE }),
+  "carregando",
+);
+verificar(
+  "M3. equipe vazia não esconde erro da folha",
+  fase({ equipe: OK(0), apontamentos: ERRO }),
+  "erro-apontamentos",
+);
+verificar(
+  "M4. linha-sentinela não conta como histórico",
+  fase({ equipe: OK(0), apontamentos: OK(apontamentosPorColaborador([folha()]).size) }),
+  "sem-equipe",
+);
+verificar("M5. linha-sentinela não cria colaborador", montarRascunho([], [folha()], 60).length, 0);
+
+{
+  const historico = [
+    folha({
+      employee_id: "e4",
+      employee_name: "Desalocado",
+      employee_role: "conferente",
+      status: "absent",
+      break_minutes: 30,
+      notes: "registro anterior",
+    }),
+    folha({
+      employee_id: "e5",
+      employee_name: "Substituto",
+      status: "replacement",
+      check_in: "08:00:00",
+      check_out: "17:00:00",
+      break_minutes: 45,
+      faturado: true,
+    }),
+  ];
+
+  for (const fechada of [false, true]) {
+    const rotulo = fechada ? "fechada" : "aberta";
+    const rascunho = montarRascunho([], historico, 60, fechada);
+    const desalocado = rascunho.find((linha) => linha.employee_id === "e4");
+    const substituto = rascunho.find((linha) => linha.employee_id === "e5");
+    verificar(`M6.${rotulo}. equipe vazia mantém todos os históricos`, rascunho.length, 2);
+    verificar(`M7.${rotulo}. nome vem do apontamento`, desalocado?.employee_name, "Desalocado");
+    verificar(`M8.${rotulo}. função vem do apontamento`, desalocado?.employee_role, "conferente");
+    verificar(`M9.${rotulo}. desalocado fica inativo`, desalocado?.ativo, false);
+    verificar(`M10.${rotulo}. falta persistida continua falta`, desalocado?.status, "absent");
+    verificar(`M11.${rotulo}. intervalo persistido não vira padrão`, desalocado?.break_minutes, 30);
+    verificar(`M12.${rotulo}. observação é preservada`, desalocado?.notes, "registro anterior");
+    verificar(
+      `M13.${rotulo}. substituição continua substituição`,
+      substituto?.status,
+      "replacement",
+    );
+    verificar(`M14.${rotulo}. horário é preservado`, substituto?.check_in, "08:00:00");
+    verificar(`M15.${rotulo}. faturamento é preservado`, substituto?.faturado, true);
+    verificar(`M16.${rotulo}. função nula continua nula`, substituto?.employee_role, null);
+    verificar(
+      `M17.${rotulo}. histórico não gera payload`,
+      linhasAlteradas(rascunho, historico).length,
+      0,
+    );
+  }
+
+  const misto = montarRascunho(EQUIPE, historico, 60);
+  verificar("M18. equipe atual e históricos se unem", misto.length, 4);
+  verificar(
+    "M19. elegível sem registro continua não apontado",
+    misto.find((linha) => linha.employee_id === "e1")?.status,
+    null,
+  );
+  verificar(
+    "M20. união não gera presença nem payload automático",
+    linhasAlteradas(misto, historico).length,
+    0,
+  );
+
+  const equipeComHistorico = [
+    ...EQUIPE,
+    { employee_id: "e4", employee_name: "Desalocado", employee_role: "conferente", active: true },
+  ];
+  const alocado = montarRascunho(equipeComHistorico, historico, 60);
+  verificar(
+    "M21. colaborador ainda alocado não duplica",
+    alocado.filter((linha) => linha.employee_id === "e4").length,
+    1,
+  );
+  verificar(
+    "M22. equipe atual governa a elegibilidade",
+    alocado.find((linha) => linha.employee_id === "e4")?.ativo,
+    true,
+  );
+
+  let estado = sincronizarRascunho(null, {
+    escopo: "o1|s1|2026-09-18",
+    fechada: false,
+    base: alocado,
+  });
+  estado = {
+    ...estado,
+    editados: new Set(["e4"]),
+    linhas: estado.linhas.map((linha) =>
+      linha.employee_id === "e4" ? { ...linha, status: "present", notes: "não salvo" } : linha,
+    ),
+  };
+  for (const fechada of [false, true, false]) {
+    estado = sincronizarRascunho(estado, {
+      escopo: estado.escopo,
+      fechada,
+      base: montarRascunho([], historico, 60, fechada),
+    });
+    const linha = estado.linhas.find((item) => item.employee_id === "e4");
+    verificar(
+      `M23.${fechada}. desalocação/refetch/transição conserva histórico`,
+      linha?.status,
+      "absent",
+    );
+    verificar(
+      `M24.${fechada}. histórico não conserva edição local`,
+      estado.editados.has("e4"),
+      false,
+    );
+    verificar(
+      `M25.${fechada}. histórico não volta ao payload`,
+      linhasAlteradas(estado.linhas, historico).length,
+      0,
+    );
+  }
+}
+
+console.log("\nN. Indicadores da data selecionada, incluindo históricos\n");
+
+// Executa os cálculos reais da tela: não replica os filtros no teste nem
+// exige extrair um módulo novo para uma mudança restrita aos indicadores.
+const indicatorCalculation = fontes.tela.match(
+  /const linhasAtivas =[^;]+;\s*const presentes =[^;]+;\s*const faltas =[^;]+;/,
+)?.[0];
+const pendingCalculation = fontes.tela.match(/const pendentes =[^;]+;/)?.[0];
+const lockCalculation = fontes.tela.match(/const travada =[^;]+;/)?.[0];
+if (!indicatorCalculation || !pendingCalculation || !lockCalculation) {
+  throw new Error("Não foi possível localizar os cálculos reais do painel operacional.");
+}
+
+function checkIndicators(name, rows, persisted, expected, currentTeam) {
+  const result = runInNewContext(
+    `${indicatorCalculation}\n${pendingCalculation}\n` +
+      "({ equipe: linhasAtivas, presentes, faltas, alteracoes: pendentes.length })",
+    {
+      linhas: rows,
+      equipe: { data: currentTeam },
+      apontamentos: { data: persisted },
+      pronto: true,
+      linhasAlteradas,
+    },
+  );
+  for (const field of ["equipe", "presentes", "faltas", "alteracoes"]) {
+    verificar(`${name}.${field}`, result[field], expected[field]);
+  }
+}
+
+const indicatorHistory = [
+  folha({
+    employee_id: "e1",
+    employee_name: "Alfa",
+    status: "present",
+    work_date: "2026-10-15",
+  }),
+  folha({
+    employee_id: "e2",
+    employee_name: "Beta",
+    status: "absent",
+    work_date: "2026-10-15",
+  }),
+];
+checkIndicators(
+  "R01 — equipe ativa com presença e falta",
+  montarRascunho(EQUIPE, indicatorHistory, 60),
+  indicatorHistory,
+  { equipe: 2, presentes: 1, faltas: 1, alteracoes: 0 },
+  EQUIPE,
+);
+const historyWithoutTeam = montarRascunho([], indicatorHistory, 60);
+checkIndicators(
+  "R02 — equipe vazia com históricos",
+  historyWithoutTeam,
+  indicatorHistory,
+  { equipe: 0, presentes: 1, faltas: 1, alteracoes: 0 },
+  [],
+);
+checkIndicators(
+  "R03 — equipe vazia sem históricos",
+  montarRascunho([], [], 60),
+  [],
+  { equipe: 0, presentes: 0, faltas: 0, alteracoes: 0 },
+  [],
+);
+const unrecordedRows = montarRascunho(EQUIPE, [], 60);
+checkIndicators(
+  "R04 — não apontado não conta presença",
+  unrecordedRows,
+  [],
+  { equipe: 2, presentes: 0, faltas: 0, alteracoes: 0 },
+  EQUIPE,
+);
+verificar(
+  "R04 — status continua nulo",
+  unrecordedRows.every((row) => row.status === null),
+  true,
+);
+const manualDecision = unrecordedRows.map((row) =>
+  row.employee_id === "e1" ? { ...row, status: "present" } : row,
+);
+checkIndicators(
+  "R05 — decisão manual ainda não salva",
+  manualDecision,
+  [],
+  { equipe: 2, presentes: 1, faltas: 0, alteracoes: 1 },
+  EQUIPE,
+);
+verificar(
+  "R05 — somente decisão explícita entra no payload",
+  linhasAlteradas(manualDecision, [])[0]?.employee_id,
+  "e1",
+);
+verificar("R05 — segundo colaborador continua não apontado", manualDecision[1].status, null);
+
+let indicatorDraft = sincronizarRascunho(null, {
+  escopo: "o1|s1|2026-10-15",
+  fechada: false,
+  base: historyWithoutTeam,
+});
+indicatorDraft = sincronizarRascunho(indicatorDraft, {
+  escopo: "o1|s1|2026-10-16",
+  fechada: false,
+  base: montarRascunho([], [], 60),
+});
+checkIndicators(
+  "R06 — data B não herda contagens de A",
+  indicatorDraft.linhas,
+  [],
+  { equipe: 0, presentes: 0, faltas: 0, alteracoes: 0 },
+  [],
+);
+indicatorDraft = sincronizarRascunho(indicatorDraft, {
+  escopo: "o1|s1|2026-10-15",
+  fechada: false,
+  base: historyWithoutTeam,
+});
+checkIndicators(
+  "R06 — retorno a A recupera os históricos",
+  indicatorDraft.linhas,
+  indicatorHistory,
+  { equipe: 0, presentes: 1, faltas: 1, alteracoes: 0 },
+  [],
+);
+for (const row of historyWithoutTeam) {
+  const locked = runInNewContext(`${lockCalculation}\ntravada`, { linha: row, fechada: false });
+  verificar(`R07 — ${row.employee_id} desalocado permanece bloqueado`, locked, true);
+}
+verificar(
+  "R07 — históricos não geram payload",
+  linhasAlteradas(historyWithoutTeam, indicatorHistory).length,
+  0,
+);
+
+console.log("\nO. Equipe atual independe dos apontamentos e do fechamento\n");
+
+const singleEntry = [indicatorHistory[0]];
+for (const [name, team, persisted, closed, expected] of [
+  [
+    "F3-B1.R01 — aberta, dois alocados e um apontamento",
+    EQUIPE,
+    singleEntry,
+    false,
+    { equipe: 2, presentes: 1, faltas: 0, alteracoes: 0 },
+  ],
+  [
+    "F3-B1.R02 — fechada, dois alocados e um apontamento",
+    EQUIPE,
+    singleEntry,
+    true,
+    { equipe: 2, presentes: 1, faltas: 0, alteracoes: 0 },
+  ],
+  [
+    "F3-B1.R03 — fechada, sem equipe e dois históricos",
+    [],
+    indicatorHistory,
+    true,
+    { equipe: 0, presentes: 1, faltas: 1, alteracoes: 0 },
+  ],
+  [
+    "F3-B1.R04 — fechada, alocado sem apontamento",
+    [EQUIPE[0]],
+    [],
+    true,
+    { equipe: 1, presentes: 0, faltas: 0, alteracoes: 0 },
+  ],
+]) {
+  const rows = montarRascunho(team, persisted, 60, closed);
+  checkIndicators(name, rows, persisted, expected, team);
+  verificar(`${name}: nenhum payload artificial`, linhasAlteradas(rows, persisted).length, 0);
+  if (closed) {
+    verificar(`${name}: somente históricos exibidos`, rows.length, persisted.length);
+    verificar(
+      `${name}: edição bloqueada`,
+      rows.every((linha) =>
+        runInNewContext(`${lockCalculation}\ntravada`, { linha, fechada: true }),
+      ),
+      true,
+    );
+    verificar(
+      `${name}: salvamento bloqueado`,
+      podeSalvar({ fase: "pronto", fechada: true, pendentes: 1, salvando: false }),
+      false,
+    );
+  }
+}
+
+let teamDraft = null;
+for (const [scope, team, count] of [
+  ["o1|s1|2026-10-15", EQUIPE, 2],
+  ["o2|s1|2026-10-15", [EQUIPE[0]], 1],
+  ["o1|s2|2026-10-15", [], 0],
+  ["o1|s1|2026-10-16", EQUIPE, 2],
+  ["o1|s1|2026-10-15", EQUIPE, 2],
+]) {
+  teamDraft = sincronizarRascunho(teamDraft, {
+    escopo: scope,
+    fechada: true,
+    base: montarRascunho(team, [], 60, true),
+  });
+  checkIndicators(
+    `F3-B1.R05 — troca de contexto ${scope}`,
+    teamDraft.linhas,
+    [],
+    { equipe: count, presentes: 0, faltas: 0, alteracoes: 0 },
+    team,
+  );
+}
+
+const mixedHistory = [singleEntry[0], folha({ employee_id: "e3", status: "absent" })];
+let transitionDraft = null;
+for (const closed of [false, true, false]) {
+  const base = montarRascunho(EQUIPE, mixedHistory, 60, closed);
+  transitionDraft = sincronizarRascunho(transitionDraft, {
+    escopo: "o1|s1|2026-10-15",
+    fechada: closed,
+    base,
+  });
+  const rows = closed ? base : transitionDraft.linhas;
+  checkIndicators(
+    `F3-B1.R06 — transição ${closed ? "fechada" : "aberta"}`,
+    rows,
+    mixedHistory,
+    { equipe: 2, presentes: 1, faltas: 1, alteracoes: 0 },
+    EQUIPE,
+  );
+  verificar(
+    "F3-B1.R06 — histórico do desalocado preservado",
+    rows.find((row) => row.employee_id === "e3")?.status,
+    "absent",
+  );
+  verificar(
+    "F3-B1.R06 — bloqueios acompanham fechamento e alocação",
+    rows.every(
+      (linha) =>
+        runInNewContext(`${lockCalculation}\ntravada`, { linha, fechada: closed }) ===
+        (closed || !linha.ativo),
+    ),
+    true,
+  );
+  verificar("F3-B1.R06 — nenhum payload artificial", linhasAlteradas(rows, mixedHistory).length, 0);
 }
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);

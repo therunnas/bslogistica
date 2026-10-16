@@ -41,8 +41,8 @@ export interface Leitura {
  * por cima de um estado do servidor que a tela não conhece.
  *
  * A ordem das perguntas é a do fluxo: sem operação não se pergunta por turno,
- * sem turno não se pergunta por equipe, e sem equipe não se pergunta pela
- * folha.
+ * sem turno não se pergunta por equipe. A folha também é consultada com equipe
+ * vazia, pois pode conter histórico de colaboradores já desalocados.
  */
 export type FaseDaTela =
   | "selecionar"
@@ -76,12 +76,11 @@ export function faseDaTela(entrada: {
 
   if (equipe.erro) return "erro-equipe";
   if (semSnapshot(equipe)) return "carregando";
-  if (equipe.quantidade === 0) return "sem-equipe";
-
   // A folha é a última pergunta e a mais importante: é ela que diz o que já
   // existe no servidor. Sem a resposta, nada é editável.
   if (apontamentos.erro) return "erro-apontamentos";
   if (semSnapshot(apontamentos)) return "carregando";
+  if (equipe.quantidade === 0 && apontamentos.quantidade === 0) return "sem-equipe";
 
   return "pronto";
 }
@@ -114,7 +113,8 @@ export interface LinhaDoRascunho {
   employee_role: string | null;
   /** Está na equipe ativa do turno? Só quem está pode ser gravado. */
   ativo: boolean;
-  status: "present" | "absent" | "replacement";
+  /** `null` é colaborador ainda não apontado e nunca entra no payload. */
+  status: "present" | "absent" | "replacement" | null;
   /** Vazio em vez de nulo: são campos de formulário controlado. */
   check_in: string;
   check_out: string;
@@ -122,6 +122,13 @@ export interface LinhaDoRascunho {
   notes: string;
   /** Linha já vinculada a uma fatura. Booleano derivado, nunca o id. */
   faturado: boolean;
+}
+
+export interface EstadoDoRascunho {
+  escopo: string;
+  fechada: boolean;
+  linhas: LinhaDoRascunho[];
+  editados: ReadonlySet<string>;
 }
 
 /**
@@ -180,17 +187,35 @@ export function apontamentosPorColaborador(
  * Quem está **inativo** na equipe só aparece se já tiver apontamento: a escrita
  * exige equipe ativa, então oferecer uma linha nova para quem saiu produziria
  * um `23514` garantido. O histórico, esse, continua visível — some da tela
- * quem nunca esteve, não quem deixou de estar.
+ * quem nunca esteve, não quem deixou de estar. Vínculos removidos fisicamente
+ * são reconstruídos pelos apontamentos, sempre como inativos.
  */
 export function montarRascunho(
   equipe: readonly MembroDaEquipeDoOperador[] | undefined,
   apontamentos: readonly ApontamentoDoOperador[] | undefined,
   intervaloPadrao: number,
+  fechado = false,
 ): LinhaDoRascunho[] {
   const gravados = apontamentosPorColaborador(apontamentos);
+  const membros = new Map((equipe ?? []).map((membro) => [membro.employee_id, membro]));
 
-  return (equipe ?? [])
-    .filter((membro) => membro.active || gravados.has(membro.employee_id))
+  for (const [employeeId, gravado] of gravados) {
+    if (!membros.has(employeeId)) {
+      membros.set(employeeId, {
+        employee_id: employeeId,
+        employee_name: gravado.employee_name ?? "Colaborador",
+        employee_role: gravado.employee_role ?? null,
+        active: false,
+      });
+    }
+  }
+
+  return [...membros.values()]
+    .filter((membro) =>
+      fechado
+        ? gravados.has(membro.employee_id)
+        : membro.active || gravados.has(membro.employee_id),
+    )
     .map((membro) => {
       const gravado = gravados.get(membro.employee_id);
       return {
@@ -198,7 +223,7 @@ export function montarRascunho(
         employee_name: membro.employee_name,
         employee_role: membro.employee_role,
         ativo: membro.active,
-        status: gravado?.status ?? "present",
+        status: gravado?.status ?? null,
         check_in: gravado?.check_in ?? "",
         check_out: gravado?.check_out ?? "",
         // Linha gravada manda no seu próprio intervalo; o padrão do turno
@@ -210,6 +235,84 @@ export function montarRascunho(
         faturado: gravado?.faturado ?? false,
       };
     });
+}
+
+/**
+ * Sincroniza o rascunho quando o servidor muda o estado da folha.
+ *
+ * Refetches no mesmo estado preservam a edição em andamento. Ao fechar, as
+ * linhas locais continuam guardadas, mas a tela usa a base persistida. Ao
+ * reabrir, a equipe atual volta pela base e as linhas locais que continuam
+ * editáveis são reaplicadas. A base sempre prevalece para faturados e inativos.
+ */
+export function sincronizarRascunho(
+  atual: EstadoDoRascunho | null,
+  entrada: {
+    escopo: string;
+    fechada: boolean;
+    base: readonly LinhaDoRascunho[];
+  },
+): EstadoDoRascunho {
+  const { escopo, fechada, base } = entrada;
+
+  if (!atual || atual.escopo !== escopo) {
+    return { escopo, fechada, linhas: [...base], editados: new Set() };
+  }
+
+  const anteriores = new Map(atual.linhas.map((linha) => [linha.employee_id, linha]));
+  const idsDaBase = new Set(base.map((linha) => linha.employee_id));
+  const editados = new Set<string>();
+
+  const linhas = base.map((linha) => {
+    const anterior = anteriores.get(linha.employee_id);
+
+    if (!anterior || !atual.editados.has(linha.employee_id) || !linha.ativo || linha.faturado) {
+      return linha;
+    }
+
+    const local = {
+      ...linha,
+      status: anterior.status,
+      check_in: anterior.check_in,
+      check_out: anterior.check_out,
+      break_minutes: anterior.break_minutes,
+      notes: anterior.notes,
+    };
+
+    if (
+      local.status === linha.status &&
+      soHoraEMinuto(local.check_in) === soHoraEMinuto(linha.check_in) &&
+      soHoraEMinuto(local.check_out) === soHoraEMinuto(linha.check_out) &&
+      local.break_minutes === linha.break_minutes &&
+      local.notes === linha.notes
+    ) {
+      return linha;
+    }
+
+    editados.add(linha.employee_id);
+    return local;
+  });
+
+  if (fechada) {
+    for (const anterior of atual.linhas) {
+      if (
+        atual.editados.has(anterior.employee_id) &&
+        !idsDaBase.has(anterior.employee_id) &&
+        anterior.ativo &&
+        !anterior.faturado
+      ) {
+        editados.add(anterior.employee_id);
+        linhas.push(anterior);
+      }
+    }
+  }
+
+  return {
+    escopo,
+    fechada,
+    linhas,
+    editados,
+  };
 }
 
 /** `"08:00"` e `"08:00:00"` são o mesmo horário para quem aponta. */
@@ -235,6 +338,13 @@ export function linhasAlteradas(
 
   return rascunho
     .filter((linha) => !linha.faturado && linha.ativo)
+    .filter(
+      (
+        linha,
+      ): linha is LinhaDoRascunho & {
+        status: Exclude<LinhaDoRascunho["status"], null>;
+      } => linha.status !== null,
+    )
     .filter((linha) => {
       const gravado = gravados.get(linha.employee_id);
       if (!gravado) return true;

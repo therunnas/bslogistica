@@ -46,6 +46,7 @@ import {
 } from "@/lib/operacional/queries";
 
 import {
+  apontamentosPorColaborador,
   escolhaAutomatica,
   faseDaTela,
   folhaEstaFechada,
@@ -55,6 +56,7 @@ import {
   montarRascunho,
   normalizarIntervalo,
   podeSalvar,
+  sincronizarRascunho,
   type Leitura,
   type LinhaDoRascunho,
 } from "./_dominio";
@@ -162,7 +164,9 @@ export function PainelOperacional() {
 
   const [rascunho, setRascunho] = useState<{
     escopo: string;
+    fechada: boolean;
     linhas: LinhaDoRascunho[];
+    editados: ReadonlySet<string>;
   } | null>(null);
 
   const operacoes = useOperacoesDoOperador();
@@ -194,7 +198,12 @@ export function PainelOperacional() {
     shiftId,
     turnos: comoLeitura(turnos),
     equipe: comoLeitura(equipe),
-    apontamentos: comoLeitura(apontamentos),
+    apontamentos: {
+      ...comoLeitura(apontamentos),
+      quantidade: apontamentos.data
+        ? apontamentosPorColaborador(apontamentos.data).size
+        : undefined,
+    },
   });
 
   const pronto = leituraConcluida(fase);
@@ -204,17 +213,21 @@ export function PainelOperacional() {
   const escopo = `${operationId ?? ""}|${shiftId ?? ""}|${workDate}`;
 
   const base = useMemo(
-    () => montarRascunho(equipe.data, apontamentos.data, turno?.break_minutes ?? 0),
-    [equipe.data, apontamentos.data, turno],
+    () => montarRascunho(equipe.data, apontamentos.data, turno?.break_minutes ?? 0, fechada),
+    [equipe.data, apontamentos.data, turno, fechada],
   );
 
   useEffect(() => {
     if (!pronto) return;
 
-    setRascunho((atual) => (atual?.escopo === escopo ? atual : { escopo, linhas: base }));
-  }, [pronto, escopo, base]);
+    setRascunho((atual) => sincronizarRascunho(atual, { escopo, fechada, base }));
+  }, [pronto, escopo, base, fechada]);
 
-  const linhas = rascunho?.escopo === escopo ? rascunho.linhas : base;
+  const linhas = fechada
+    ? base
+    : rascunho?.escopo === escopo && !rascunho.fechada
+      ? rascunho.linhas
+      : base;
 
   function trocarOperacao(valor: string) {
     setOperationId(valor);
@@ -233,17 +246,24 @@ export function PainelOperacional() {
   }
 
   function editar(employeeId: string, mudanca: Partial<LinhaDoRascunho>) {
-    setRascunho((atual) => ({
-      escopo,
-      linhas: (atual?.escopo === escopo ? atual.linhas : base).map((linha) =>
-        linha.employee_id === employeeId
-          ? {
-              ...linha,
-              ...mudanca,
-            }
-          : linha,
-      ),
-    }));
+    setRascunho((atual) => {
+      const estado = sincronizarRascunho(atual, { escopo, fechada, base });
+      const editados = new Set(estado.editados);
+      editados.add(employeeId);
+
+      return {
+        ...estado,
+        editados,
+        linhas: estado.linhas.map((linha) =>
+          linha.employee_id === employeeId
+            ? {
+                ...linha,
+                ...mudanca,
+              }
+            : linha,
+        ),
+      };
+    });
   }
 
   const pendentes = pronto ? linhasAlteradas(linhas, apontamentos.data) : [];
@@ -287,11 +307,11 @@ export function PainelOperacional() {
   const operacaoSelecionada =
     operacoes.data.find((operacao) => operacao.id === operationId) ?? null;
 
-  const linhasAtivas = linhas.filter((linha) => linha.ativo).length;
+  const linhasAtivas = equipe.data?.filter((membro) => membro.active).length ?? 0;
 
-  const presentes = linhas.filter((linha) => linha.ativo && linha.status === "present").length;
+  const presentes = linhas.filter((linha) => linha.status === "present").length;
 
-  const faltas = linhas.filter((linha) => linha.ativo && linha.status === "absent").length;
+  const faltas = linhas.filter((linha) => linha.status === "absent").length;
 
   return (
     <>
@@ -562,7 +582,7 @@ export function PainelOperacional() {
 
                           <TableCell>
                             <Select
-                              value={linha.status}
+                              value={linha.status ?? ""}
                               disabled={travada}
                               onValueChange={(valor) =>
                                 editar(linha.employee_id, {
@@ -571,7 +591,7 @@ export function PainelOperacional() {
                               }
                             >
                               <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
-                                <SelectValue />
+                                <SelectValue placeholder="Não apontado" />
                               </SelectTrigger>
 
                               <SelectContent>
@@ -589,7 +609,9 @@ export function PainelOperacional() {
                               type="time"
                               className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                               value={linha.check_in.slice(0, 5)}
-                              disabled={travada || linha.status === "absent"}
+                              disabled={
+                                travada || linha.status === null || linha.status === "absent"
+                              }
                               onChange={(event) =>
                                 editar(linha.employee_id, {
                                   check_in: event.target.value,
@@ -603,7 +625,9 @@ export function PainelOperacional() {
                               type="time"
                               className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                               value={linha.check_out.slice(0, 5)}
-                              disabled={travada || linha.status === "absent"}
+                              disabled={
+                                travada || linha.status === null || linha.status === "absent"
+                              }
                               onChange={(event) =>
                                 editar(linha.employee_id, {
                                   check_out: event.target.value,
@@ -618,7 +642,9 @@ export function PainelOperacional() {
                               min={0}
                               className="h-9 w-24 rounded-xl border-input bg-secondary/40"
                               value={linha.break_minutes}
-                              disabled={travada || linha.status === "absent"}
+                              disabled={
+                                travada || linha.status === null || linha.status === "absent"
+                              }
                               onChange={(event) =>
                                 editar(linha.employee_id, {
                                   break_minutes: normalizarIntervalo(event.target.value),
