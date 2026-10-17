@@ -43,7 +43,14 @@ next-env.d.ts
 
 # Restos de outras plataformas e de ferramentas locais
 .wrangler
-.claude/
+# .claude/ segue ignorado (settings locais, historico, sessoes, credenciais).
+# Excecao estreita, por NOME: so estas duas skills de projeto sao versionadas aqui,
+# porque o Claude Code nao le .agents/skills. Skill nova exige liberar o nome abaixo.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/web-design-guidelines/
+!.claude/skills/writing-guidelines/
 
 # Sentry Config File
 .env.sentry-build-plugin
