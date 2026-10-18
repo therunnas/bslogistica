@@ -125,6 +125,20 @@ insert into public.user_roles (user_id, role) values
   ('11111111-1111-4111-8111-111111111111', 'admin'),
   ('88888888-8888-4888-8888-888888888888', 'operacional');
 
+-- C02 (migration 020): has_role()/is_staff() só autorizam uma identidade UTILIZÁVEL — conta
+-- existente em auth.users, não banida nem excluída, e com a sessão do JWT viva em
+-- auth.sessions. Por isso as contas das claims abaixo existem de verdade e cada claim
+-- carrega o `session_id` da sessão correspondente (o UUID da conta com o primeiro
+-- caractere trocado por 'e'). Não há exceção para fixture sem conta: isso seria
+-- reproduzir o comportamento que a migration 020 removeu.
+insert into auth.users (id) values
+  ('11111111-1111-4111-8111-111111111111'),
+  ('88888888-8888-4888-8888-888888888888')
+on conflict (id) do nothing;
+insert into auth.sessions (id, user_id) values
+  ('e1111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111'),
+  ('e8888888-8888-4888-8888-888888888888', '88888888-8888-4888-8888-888888888888');
+
 -- Cliente B existe só como DESTINO: é para onde os casos de `client_id` tentam
 -- mover a operação. Nunca recebe fatura nem apontamento.
 insert into public.clients (id, name) values
@@ -263,7 +277,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -395,7 +409,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- Remapear o turno para outra operação é recusado por CHECK, não por guard:
@@ -452,7 +466,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -536,7 +550,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -614,7 +628,7 @@ declare
 begin
   -- J22. operacional
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     delete from public.timesheet_entries where id = '77777777-7777-4777-8777-7777777777a1';
@@ -632,7 +646,7 @@ begin
 
   -- J23, J25, J26, J27. ADMIN também não pode
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
 
   begin
     delete from public.timesheet_entries where id = '77777777-7777-4777-8777-7777777777a1';
@@ -707,7 +721,7 @@ declare
 begin
   -- J41. admin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries set invoice_id = null
@@ -782,7 +796,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -863,7 +877,7 @@ begin
 
   -- J35/J36. Ataque completo: inflar a fonte, gravar, restaurar.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -907,7 +921,7 @@ begin
   -- pela policy `clients_write_admin`, anterior a esta migration. O caso existe
   -- para que uma futura mudança naquela policy não passe despercebida.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -947,7 +961,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J49 continua sendo sobre o OPERADOR, e o motivo mudou de lugar: o `42501`
@@ -956,7 +970,7 @@ begin
   -- em J52). Desde a `016` ele nem alcança a linha. O congelamento de verdade,
   -- para o admin, é J52; o lado administrativo legítimo é J51.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   begin
     update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
      where id = '44444444-4444-4444-8444-4444444444b1';
@@ -966,7 +980,7 @@ begin
   perform pg_temp.registrar('J49. operacional NAO muda operations.client_id', '0 linhas', _e);
 
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
 
   -- Mesmo falso positivo de J18: a tela reenvia o objeto inteiro, e reenviar
   -- `client_id` IGUAL ao OLD junto de uma edição legítima não pode ser recusado.
@@ -992,7 +1006,7 @@ begin
   -- J51. Admin continua podendo: é decisão administrativa, não proibição.
   -- OP-C é descartável e não tem histórico faturado.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   begin
     update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
      where id = '44444444-4444-4444-8444-4444444444c1';
@@ -1018,7 +1032,7 @@ declare
   _e text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J53. Par VÁLIDO: é o fluxo diário e continua livre.
@@ -1053,7 +1067,7 @@ begin
 
   -- J56. ADMIN também não monta par inválido.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   begin
     insert into public.timesheets (id, operation_id, shift_id, work_date, status)
     values ('66666666-6666-4666-8666-66666666e004', '44444444-4444-4444-8444-4444444444b1',
@@ -1096,7 +1110,7 @@ declare
   _c numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -1158,7 +1172,7 @@ begin
 
   -- J66..J68. E não é questão de papel.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   begin
     update public.timesheet_entries set status = 'absent'
      where id = '77777777-7777-4777-8777-7777777777a1';
@@ -1199,7 +1213,7 @@ begin
   -- J69. Falso positivo: a tela reenvia o objeto inteiro. Reenviar os MESMOS
   -- valores não pode virar 42501, nem em linha faturada.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries
@@ -1235,7 +1249,7 @@ begin
   -- J72. Folha SEM apontamento faturado continua editável. `...e001` foi criada
   -- em J53 e não tem apontamento nenhum.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheets set work_date = current_date - 10
@@ -1263,7 +1277,7 @@ begin
 
   -- J73. operacional
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   begin
     update public.timesheets set work_date = current_date - 41
      where id = '66666666-6666-4666-8666-6666666666a1';
@@ -1319,7 +1333,7 @@ declare
   _incoerentes integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J79. Turno C não é referenciado por folha nenhuma: mover é legítimo.
@@ -1380,7 +1394,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -1448,7 +1462,7 @@ declare
   _incoerentes integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J89. Só equipe, sem folha nenhuma: basta isso para recusar.
@@ -1541,7 +1555,7 @@ begin
           current_date, 'present', '06:00:00', '15:00:00', 60);
 
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999991'
@@ -1578,7 +1592,7 @@ begin
   -- J96. operacional continua barrado, como já era.
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries set invoice_id = '99999999-9999-4999-8999-999999999991'
@@ -1620,7 +1634,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -1701,7 +1715,7 @@ declare
   _n integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J105. Par VÁLIDO: alocação na OP-F com turno da OP-F.
@@ -1731,7 +1745,7 @@ begin
 
   -- J107. E o UPDATE que produziria par inválido, também para o ADMIN.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   -- `get diagnostics` é obrigatório aqui: sem ele, um UPDATE que não encontra
   -- linha alguma passaria por sucesso e o caso mediria nada. Foi o que
   -- aconteceu na primeira escrita deste teste.
@@ -1786,7 +1800,7 @@ begin
           current_date - 20, 'present', '06:00:00', '17:00:00', 60);
 
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J109. O caso do achado: entry ainda NÃO faturada.
@@ -1825,7 +1839,7 @@ begin
   values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaab0', '44444444-4444-4444-8444-4444444444f1',
           'Turno F9 sem uso', '06:00:00', '15:00:00', 60, false);
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     delete from public.shifts where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaab0';
@@ -1844,7 +1858,7 @@ begin
   -- está registrada aqui para não passar despercebida. J32 continua provando
   -- que operação SEM folha é excluível.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     delete from public.operations where id = '44444444-4444-4444-8444-4444444444f1';
@@ -1884,7 +1898,7 @@ begin
           'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa1a', current_date - 8);
 
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J114. Folha vazia: mover é correção administrativa legítima. O turno vai
@@ -1922,7 +1936,7 @@ begin
           current_date - 60, 'present', '06:00:00', '15:00:00', 60);
 
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -2003,7 +2017,7 @@ begin
           'Contrato sem uso', 300, 8, 1.5, 10);
 
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- J121. Sem uso: continua excluível. Sem este caso a guarda poderia estar
@@ -2045,7 +2059,7 @@ begin
   -- UPDATE que muda só `notes` e reenvia o resto igual continua recusado —
   -- é a comparação da linha inteira funcionando sob o payload real.
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     update public.timesheet_entries
@@ -2068,7 +2082,7 @@ begin
     ('66666666-6666-4666-8666-66666666f9a2', '44444444-4444-4444-8444-4444444444a1',
      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', current_date - 92);
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
   begin
     delete from public.shifts where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
@@ -2186,7 +2200,7 @@ declare
 begin
   execute 'reset role';
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin

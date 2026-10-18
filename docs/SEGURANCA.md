@@ -140,6 +140,37 @@ a invoca. Exige sessão e papel, mas não AAL2 — é o que se vem obter ali.
   protege: cada uma revalida o que precisa por dentro (papel, `aal2`, atribuição),
   com `search_path` fixo e `EXECUTE` revogado de `PUBLIC` e `anon`.
   `gerar_fatura`, por exemplo, confere `aal2` e o papel dentro da função.
+- **Identidade utilizável (C02, migration `020`).** `has_role()` e `is_staff()`
+  só autorizam quando o chamador é uma identidade **utilizável**: a conta existe
+  em `auth.users`, não está banida (`banned_until` no futuro) nem excluída
+  (`deleted_at`), **e** a sessão do JWT (`session_id`) existe em `auth.sessions`,
+  é da mesma conta e não venceu (`not_after`). Falha fechada: JWT sem
+  `session_id`, malformado ou de outra conta é recusado, nunca vira exceção.
+  O PostgREST só valida a assinatura do JWT, então sem isto um token anterior a
+  banimento, exclusão ou `signOut` seguia autorizado até o `exp` (reproduzido na
+  homologação local, L2-C02-B). **A remoção do papel já revogava na hora** e
+  continua assim: o papel é lido ao vivo.
+  - `has_role()` **continua `SECURITY INVOKER`** (migration `49252bbc`: sem
+    bypass de RLS, só enxerga a própria linha). A leitura de `auth.users` e
+    `auth.sessions` fica em `identidade_atual_utilizavel()`, `SECURITY DEFINER`
+    **sem parâmetro**: só responde sobre o chamador, então não serve de oráculo.
+    `conta_ativa(uuid)`, que aceita UUID qualquer, é executável **só por
+    `service_role`** (o trigger do último admin).
+  - As RPCs operacionais não chamam `has_role()` diretamente: passam por
+    `operador_elegivel_*`, `DEFINER` do `postgres`. `bslog_rpc_operacional` não
+    ganhou `EXECUTE` em nada novo.
+  - A `020` também reescreve a **expressão** de 29 policies (`ALTER POLICY`; nome,
+    comando, `PERMISSIVE`/`RESTRICTIVE` e `TO authenticated` ficam iguais).
+    25 delas só trocam `has_role(...)`/`is_staff()` solto por `(SELECT ...)`: a
+    verificação não depende da linha, então o Postgres a calcula uma vez por
+    comando em vez de uma por linha. As 4 de linha própria (`profiles_insert_own`,
+    `profiles_update_own`, `profiles_select_own_or_admin`, `user_roles_select_own`)
+    passam a exigir `identidade_atual_utilizavel()`, para que um JWT revogado não
+    leia nem altere a própria linha. `user_roles` continua **fora do enforcement de
+    AAL2** (o guard lê o papel em AAL1): a identidade utilizável não depende do
+    nível `aal`.
+  - **Enquanto a migration `020` não estiver aplicada** em um ambiente, vale o
+    comportamento anterior descrito em "Riscos residuais".
 - **`TRUNCATE`** está revogado de `anon` e `authenticated` em `public`, e de
   `service_role` **nas 10 tabelas de negócio**, com `ALTER DEFAULT PRIVILEGES`
   para tabelas futuras. Há trigger `BEFORE TRUNCATE` em `timesheet_entries` e
@@ -239,7 +270,11 @@ por `src/lib/admin-usuarios/`, **exclusivamente no servidor**, depois de
   Nunca em código client, nunca com prefixo `NEXT_PUBLIC_`.
 - **O último admin é protegido** no banco (migration `017`): o trigger
   `trg_proteger_ultimo_admin` recusa com `42501` qualquer `DELETE`/`UPDATE` que
-  deixaria zero linhas `admin`, **sem isentar `postgres` nem `service_role`**. A
+  deixaria zero linhas `admin`, **sem isentar `postgres` nem `service_role`**.
+  Desde a migration `020` a contagem considera só admins com **conta ativa**
+  (`conta_ativa`): uma linha de conta banida, excluída ou sem registro em
+  `auth.users` não conta como "sobrou admin", e remover a linha de uma conta já
+  inutilizável é permitido (é o que deixa limpar um papel órfão). A
   decisão é serializada por `pg_advisory_xact_lock`; sem o lock, duas transações
   concorrentes removendo admins diferentes passavam ambas.
 - **Revogar acesso** segue uma ordem deliberada: remover papéis (único passo que o
@@ -348,7 +383,10 @@ fechamento.
 | **Proteção contra senhas vazadas indisponível** (HaveIBeenPwned exige plano Pro) | baixa       | Risco aceito. Controle equivalente em vigor: o MFA do admin é obrigatório, então a senha sozinha não abre o painel. Fecha com upgrade de plano.                                                                                                                                                                                                                                                                                                     |
 | **`TRUNCATE` ainda concedido a `service_role` em `profiles` e `user_roles`**     | baixa       | A migration `011` listou só as 10 tabelas de negócio, e `ALTER DEFAULT PRIVILEGES` não mexe em grant existente. Exige a chave `service_role` **e** conexão direta ao Postgres (o PostgREST não expõe `TRUNCATE`). Fecha revogando, ou registrando como risco aceito: decisão de quem responde pelo projeto.                                                                                                                                         |
 | **Grants herdados dos default privileges do Supabase** em tabelas de `public`    | informativa | `anon` e `authenticated` herdam privilégios de tabela além do necessário. Não é acesso: nenhuma policy alcança `anon` e a RLS nega por padrão, verificado em execução. Um `REVOKE` seria defesa em profundidade, mas muda o retorno da API de "vazio" para `42501` e deve ser testado antes.                                                                                                                                                        |
-| **Sem FK de `profiles` e `user_roles` para `auth.users`**                        | baixa       | Remover usuário pelo painel do Supabase não limpa essas tabelas e deixa registros órfãos. Ao remover uma conta, apagar antes as linhas dessas duas tabelas. A remoção pelo backend administrativo (revogar e banir) não apaga a conta.                                                                                                                                                                                                              |
+| **Sem FK de `profiles` e `user_roles` para `auth.users`**                        | baixa       | Remover usuário pelo painel do Supabase deixa registros órfãos nessas tabelas. Com a migration `020` o papel órfão **deixa de autorizar**, mas a linha continua lá e **não aparece na tela de usuários** (que parte de `auth.users`). Limpeza controlada (trigger ou rotina administrativa): pendência do C02, não implementada. Até lá, apagar antes as linhas das duas tabelas.                                                                   |
+| **`mfa_bloqueia_excecao_aal1()` de conta revogada**                              | informativa | `SECURITY DEFINER`, responde só sobre o **próprio** chamador (boolean sobre fator verificado): uma conta revogada ainda pode perguntar. Não expõe dado alheio, e fechá-la mudaria o contrato (ela **bloqueia** a exceção de AAL1). Fixado pelo caso I11 da `015`. As 4 policies de linha própria de `profiles`/`user_roles` já exigem a identidade utilizável.                                                                                      |
+| **Custo por linha de `has_role()`/`is_staff()` após a `020`**                    | média       | A versão anterior da `020` mediu ~20x em leituras sob RLS (L2-C02-C2: 101 ms -> 2.002 ms em 12,4 mil linhas), pois as policies chamavam as funções por linha. A corrigida usa `(SELECT ...)` (uma avaliação por comando) e helper PL/pgSQL. **Ainda não remedido**; amostra anterior sintética, sem concorrência. Plano em [PROGRESS.md](../PROGRESS.md).                                                                                           |
+| **`postgres` ler `auth.sessions` em Production**                                 | média       | O precedente das migrations `012` e `015` é `auth.users` e `auth.mfa_factors`, não `auth.sessions`. Conferir `has_table_privilege('postgres', 'auth.sessions', 'SELECT')` em Production **antes** de aplicar a `020`; sem esse privilégio, as helpers falham em tempo de execução.                                                                                                                                                                  |
 | **`style-src 'unsafe-inline'` na CSP**                                           | baixa       | Necessário hoje para Radix/shadcn. Apertar exige nonce ou hash para estilo.                                                                                                                                                                                                                                                                                                                                                                         |
 | **Perda do autenticador do admin**                                               | operacional | Um fator verificado perdido só se remove pelo painel do Supabase. Mitigação organizacional (mais de um admin com MFA); não é defeito de código.                                                                                                                                                                                                                                                                                                     |
 | **Proveniência da taxa faturada não é preservada**                               | baixa       | Um admin ainda altera `operations.contract_id`, `agreed_amount`, as taxas do contrato e `employees.daily_cost`, porque não há gatilho de congelamento em `contracts` e `employees`, e as guardas de `operations` isentam admin. **O valor já cobrado não muda** (a entry carrega os snapshots congelados), mas perde-se a resposta para "de qual contrato e com que taxa saiu esta fatura". Fechar exige decisão de desenho: congelar ou versionar. |

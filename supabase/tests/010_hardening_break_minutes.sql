@@ -51,7 +51,7 @@ create or replace function pg_temp.executar(_uid text, _aal text, _sql text)
 returns text language plpgsql as $$
 declare _claims jsonb;
 begin
-  _claims := jsonb_build_object('sub', _uid, 'role', 'authenticated', 'aal', _aal);
+  _claims := jsonb_build_object('sub', _uid, 'session_id', 'e' || substr(_uid::text, 2), 'role', 'authenticated', 'aal', _aal);
   perform set_config('request.jwt.claims', _claims::text, true);
   set local role authenticated;
   begin
@@ -71,7 +71,7 @@ returns text language plpgsql as $$
 declare _r text;
 begin
   perform set_config('request.jwt.claims',
-    jsonb_build_object('sub', _uid, 'role', 'authenticated', 'aal', _aal)::text, true);
+    jsonb_build_object('sub', _uid, 'session_id', 'e' || substr(_uid::text, 2), 'role', 'authenticated', 'aal', _aal)::text, true);
   set local role authenticated;
   begin
     execute _sql into _r;
@@ -97,6 +97,16 @@ $$;
 insert into auth.users (id) values
   ('0a000000-0000-4000-8000-000000000001'),   -- operacional, sem MFA
   ('0a000000-0000-4000-8000-000000000003');   -- admin
+
+-- C02 (migration 020): has_role()/is_staff() só autorizam uma identidade UTILIZÁVEL — conta
+-- existente em auth.users, não banida nem excluída, e com a sessão do JWT viva em
+-- auth.sessions. Por isso as contas das claims abaixo existem de verdade e cada claim
+-- carrega o `session_id` da sessão correspondente (o UUID da conta com o primeiro
+-- caractere trocado por 'e'). Não há exceção para fixture sem conta: isso seria
+-- reproduzir o comportamento que a migration 020 removeu.
+insert into auth.sessions (id, user_id) values
+  ('ea000000-0000-4000-8000-000000000001', '0a000000-0000-4000-8000-000000000001'),
+  ('ea000000-0000-4000-8000-000000000003', '0a000000-0000-4000-8000-000000000003');
 
 insert into public.user_roles (user_id, role) values
   ('0a000000-0000-4000-8000-000000000001', 'operacional'),

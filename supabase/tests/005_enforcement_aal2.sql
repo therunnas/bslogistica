@@ -57,6 +57,20 @@ insert into public.user_roles (user_id, role) values
   ('11111111-1111-4111-8111-111111111111', 'admin'),
   ('88888888-8888-4888-8888-888888888888', 'operacional');
 
+-- C02 (migration 020): has_role()/is_staff() só autorizam uma identidade UTILIZÁVEL — conta
+-- existente em auth.users, não banida nem excluída, e com a sessão do JWT viva em
+-- auth.sessions. Por isso as contas das claims abaixo existem de verdade e cada claim
+-- carrega o `session_id` da sessão correspondente (o UUID da conta com o primeiro
+-- caractere trocado por 'e'). Não há exceção para fixture sem conta: isso seria
+-- reproduzir o comportamento que a migration 020 removeu.
+insert into auth.users (id) values
+  ('11111111-1111-4111-8111-111111111111'),
+  ('88888888-8888-4888-8888-888888888888')
+on conflict (id) do nothing;
+insert into auth.sessions (id, user_id) values
+  ('e1111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111'),
+  ('e8888888-8888-4888-8888-888888888888', '88888888-8888-4888-8888-888888888888');
+
 -- Dois clientes: o principal sustenta operação, folha e apontamentos; o
 -- descartável existe só para os DELETE de teste.
 --
@@ -114,7 +128,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal1')::text, true);
   execute 'set local role authenticated';
 
   select count(*) into _n from public.clients;
@@ -184,7 +198,7 @@ declare
   _afetadas integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   select count(*) into _n from public.clients;
@@ -235,7 +249,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal1')::text, true);
   execute 'set local role authenticated';
 
   select count(*) into _n from public.timesheet_entries;
@@ -290,7 +304,7 @@ declare
   _bloqueou boolean;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '88888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '88888888-8888-4888-8888-888888888888', 'session_id', 'e8888888-8888-4888-8888-888888888888', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   select count(*) into _n from public.timesheet_entries;
@@ -346,7 +360,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated')::text, true);
   execute 'set local role authenticated';
 
   select count(*) into _n from public.clients;
@@ -381,7 +395,7 @@ declare
   _n bigint;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal1')::text, true);
   execute 'set local role authenticated';
 
   select count(*) into _n from public.user_roles;
@@ -406,7 +420,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal1')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal1')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -428,7 +442,7 @@ declare
   _fatura public.invoices;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
