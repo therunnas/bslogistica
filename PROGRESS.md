@@ -65,6 +65,7 @@ A matriz aprovada cobre:
 1. Concluir a matriz E2E acima.
 2. Criar o primeiro usuário `operacional` real, pelo fluxo de convite.
 3. Acompanhar o uso real e priorizar os riscos abaixo conforme apareçam.
+4. Auditoria de segurança: **C03** é a próxima prioridade (não iniciada).
 
 ## Riscos e pendências abertos
 
@@ -74,55 +75,48 @@ da taxa faturada, paridade manual `calcEntry()` × SQL, `TRUNCATE` de
 `service_role` em `profiles` e `user_roles`, grants herdados, ausência de FK para
 `auth.users`, e outros.
 
-### C02 — revogação de identidade (implementado localmente, NÃO aplicado)
+### Auditoria de segurança — andamento
 
-Migration `20261018120000_020_revogacao_de_identidade.sql` e suíte
-`supabase/tests/015_revogacao_de_identidade.sql`, na branch
-`fix/security-c02-auth-revocation` (base `d06b849`). Nada foi aplicado a banco
-algum; as suítes só passaram por análise estática. Pendente:
+Inventário original preservado: **21 frentes** (P0: 0 · P1: 7 · P2: 13 · P3: 1).
+Concluídas em Production: **2** (C01, C02). Restantes: **19**. Próxima prioridade
+de tratamento: **C03** (não iniciada). A severidade original não foi alterada.
 
-- **Aplicar e testar na homologação isolada**, primeiro em `ROLLBACK`, depois a
-  migration, comparando impressão digital do catálogo antes e depois.
-- **Pré-condição das suítes `013` e `015` (bloco F):** assumem **nenhum admin fora
-  da fixture**. A homologação tem o U1; a `015` pula o bloco F nesse caso, mas a
-  `013` (`B_setup`, `B2`) **falharia** e mexeria transitoriamente no papel do U1.
-  Rodar em banco limpo ou decidir antes.
-- **Suítes `002`, `005`–`007` e `009`–`013` foram adaptadas** (contas reais em
-  `auth.users`, `auth.sessions` e `session_id` em cada claim). Nenhuma expectativa
-  foi alterada, mas **nenhuma foi executada** depois da adaptação.
-- **Medido na L2-C02-C2 (versão anterior da 020) e corrigido na L2-C02-C3A:**
-  1. `session_id` inválido dava `22P02` (a chave do índice é avaliada antes do
-     `CASE`). A helper virou PL/pgSQL, com o cast depois do `IF`.
-  2. Regressão de ~20x em leituras sob RLS (count de `timesheet_entries`, 12,4 mil
-     linhas: 101 ms -> 2.002 ms), porque 25 policies chamavam `has_role()`/`is_staff()`
-     **por linha**. Viraram `(SELECT ...)` (InitPlan, uma avaliação por comando);
-     isolada, essa troca levou o count a ~1,4 ms. Equivalência coberta pelo bloco H
-     da `015` (matriz identidade x tabela x operação).
-  3. JWT revogado ainda lia/editava a própria linha de `profiles` e lia o próprio
-     papel em `user_roles`. As 4 policies de linha própria agora exigem
-     `identidade_atual_utilizavel()` (bloco I da `015`).
-- **Estado da correção:** tudo isso **só foi revisado estaticamente**. Nenhum SQL com
-  escrita rodou, a `020` corrigida **não foi aplicada em lugar nenhum** e a `015`
-  ampliada **nunca foi executada**. A instância `bs-c02-hml-132969` tem a `020`
-  ANTIGA aplicada: não reaplicar a corrigida nela.
-- **Próximo passo (C3B): validar a `020` corrigida em instância NOVA, do zero**, a
-  partir das 24 migrations da `main`, sem reaproveitar volume nem a instância
-  anterior: baseline das 13 suítes, `020`, as 14 adaptadas (incl. a `015`
-  ampliada), T1-T5 com JWTs reais, e remedir (`count` de `timesheet_entries`, soma
-  por período, `count` de `profiles` e `employees`, busca por id, `has_role`/`is_staff`
-  por linha, RPCs operacionais) com `EXPLAIN (ANALYZE, BUFFERS)` antes/depois. Os
-  números da C2 são de amostra sintética (12,4 mil apontamentos, um container, sem
-  concorrência): servem para comparar versões, não para prever Production.
-- **Papéis e profiles órfãos:** a `020` os faz **negar**, mas não os remove, e a
-  tela de usuários não os mostra. Limpeza controlada e visibilidade na tela são
-  pendência do C02 (trigger `AFTER DELETE` em `auth.users` **não** foi
-  implementado de propósito).
-- **Antes de aplicar em Production:** inventário somente leitura de admins
-  banidos com papel e papéis órfãos, e conferência de
-  `has_table_privilege('postgres','auth.sessions','SELECT')`.
-- **Integração com a feature:** a feature tem a migration `019` e a suíte `014`;
-  a `020` e a `015` foram numeradas depois delas e não dependem de nada do
-  fechamento.
+### C02 — revogação de identidade e sessões (P1) — CONCLUÍDA EM PRODUCTION
+
+- **Data:** 18/10/2026. **PR:** #65. **Merge commit:**
+  `37bd0a9ded7de97ec3965a6a1bd17361c1f500ae`. **Migration:**
+  `20261018120000_020_revogacao_de_identidade.sql`, aplicada por `supabase db push`
+  (código 0) no projeto `ehkduqokntemtmqzdrbd`; 25 migrations registradas; a `019`
+  **não** foi aplicada.
+- **Resultado técnico:** `has_role()` e `is_staff()` só autorizam identidade
+  utilizável (conta existente, não banida, sessão do JWT viva em `auth.sessions`);
+  29 policies atualizadas; trigger do último admin conta só admins utilizáveis;
+  privilégios previstos preservados. Modelo em [docs/SEGURANCA.md](docs/SEGURANCA.md).
+- **Validação:** homologação local em instância isolada (14 suítes SQL, 1.235
+  asserções, JWT/MFA/revogação com tokens reais); 15 verificações SQL de catálogo em
+  Production; login de admin e tela `/operacional` funcionando; operador barrado no
+  dashboard e levado a `/operacional`; deployment e checks da CI aprovados; sem erro
+  identificado nos logs de Vercel, PostgreSQL e Auth **nas janelas que os planos
+  atuais permitem consultar** (não é cobertura de todo o período desde a publicação).
+- **O que NÃO foi feito em Production:** nenhum teste destrutivo. Banimento,
+  exclusão e logout de contas reais **não** foram exercitados na publicação; esses
+  comportamentos estão provados só na homologação local.
+- **Recuperação:** `docs/runbooks/recuperacao-c02-020.md`. Reabre a C02; só com
+  autorização expressa. Foi feito um backup técnico preventivo antes da `020`; ele
+  **não** é backup integral restaurável comprovado.
+
+#### Pendências relacionadas (não são regressões da C02)
+
+- **Backup integral restaurável não comprovado** (plano Free).
+- **Último admin:** banimento direto pela Auth Admin API não passa pelo trigger.
+- **Registros órfãos** em `profiles` e `user_roles` (a `020` os faz negar, não os
+  remove): exigem análise própria de retenção e limpeza controlada.
+- **Revisão de segurança específica (Codex) não executada.**
+- **Isolamento Preview/Production** ainda não completamente comprovado.
+- **Observabilidade histórica incompleta**, limitada pelas janelas de log dos planos.
+- **Custo do trigger do último admin em Production** não medido.
+- **Migration `019`** (fechamento): fora da C02; exige reordenar o timestamp, adaptar
+  a suíte `014` e resolver conflitos nas branches da feature.
 
 Outros itens, de menor gravidade:
 

@@ -12,7 +12,7 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 | Aplicação             | publicada em `admin.bslogisticas.com.br`                                           |
 | Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                  |
 | Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                           |
-| Migrations            | todas as de `supabase/migrations/` aplicadas (24 de 24)                            |
+| Migrations            | todas as de `supabase/migrations/` aplicadas (25 de 25); a última é a `020` (C02)  |
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                |
 | Usuário `operacional` | ainda não existe conta real; depende da matriz E2E ([PROGRESS.md](../PROGRESS.md)) |
 
@@ -68,6 +68,8 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 
 ## Segurança relevante em vigor
 
+- Identidade utilizável exigida pelo banco (C02, migration `020`, aplicada em
+  18/10/2026): conta existente e não banida, e sessão do JWT viva.
 - RLS em todas as tabelas de `public`, com RESTRICTIVE de `aal2` e de `admin`.
 - Valores financeiros derivados por trigger; linha faturada imutável.
 - Content-Security-Policy com nonce, em enforcement, mais cabeçalhos de segurança
@@ -79,7 +81,7 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 | Verificação                     | Estado                                                                                                               |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Suítes Node (`test:*`)          | 11 scripts, todos exigidos pela CI                                                                                   |
-| Testes SQL (`supabase/tests`)   | 13 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
+| Testes SQL (`supabase/tests`)   | 14 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
 | CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 11 suítes e build, sem secret e sem tocar o Supabase de Production |
 | `npm audit`                     | 0 vulnerabilidades                                                                                                   |
 
