@@ -62,7 +62,7 @@ begin
     _claims := jsonb_build_object('role', 'anon');
     _papel  := 'anon';
   else
-    _claims := jsonb_build_object('sub', _uid, 'role', 'authenticated');
+    _claims := jsonb_build_object('sub', _uid, 'session_id', 'e' || substr(_uid::text, 2), 'role', 'authenticated');
     if _aal is not null then
       _claims := _claims || jsonb_build_object('aal', _aal);
     end if;
@@ -166,6 +166,20 @@ insert into auth.users (id) values
   ('0a000000-0000-4000-8000-000000000004'),  -- sem papel                 (SEM)
   ('0a000000-0000-4000-8000-000000000005'),  -- operacional, sera apagado (DEL)
   ('0a000000-0000-4000-8000-000000000006');  -- admin + operacional       (DUP)
+
+-- C02 (migration 020): has_role()/is_staff() só autorizam uma identidade UTILIZÁVEL — conta
+-- existente em auth.users, não banida nem excluída, e com a sessão do JWT viva em
+-- auth.sessions. Por isso as contas das claims abaixo existem de verdade e cada claim
+-- carrega o `session_id` da sessão correspondente (o UUID da conta com o primeiro
+-- caractere trocado por 'e'). Não há exceção para fixture sem conta: isso seria
+-- reproduzir o comportamento que a migration 020 removeu.
+insert into auth.sessions (id, user_id) values
+  ('ea000000-0000-4000-8000-000000000001', '0a000000-0000-4000-8000-000000000001'),
+  ('ea000000-0000-4000-8000-000000000002', '0a000000-0000-4000-8000-000000000002'),
+  ('ea000000-0000-4000-8000-000000000003', '0a000000-0000-4000-8000-000000000003'),
+  ('ea000000-0000-4000-8000-000000000004', '0a000000-0000-4000-8000-000000000004'),
+  ('ea000000-0000-4000-8000-000000000005', '0a000000-0000-4000-8000-000000000005'),
+  ('ea000000-0000-4000-8000-000000000006', '0a000000-0000-4000-8000-000000000006');
 
 insert into auth.mfa_factors
   (id, user_id, friendly_name, factor_type, status, created_at, updated_at)

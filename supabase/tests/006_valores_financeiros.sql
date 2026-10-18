@@ -67,6 +67,18 @@ insert into public.user_roles (user_id, role) values
   ('11111111-1111-4111-8111-111111111111', 'admin'),
   ('88888888-8888-4888-8888-888888888888', 'operacional');
 
+-- C02 (migration 020): has_role()/is_staff() só autorizam uma identidade UTILIZÁVEL — conta
+-- existente em auth.users, não banida nem excluída, e com a sessão do JWT viva em
+-- auth.sessions. Por isso as contas das claims abaixo existem de verdade e cada claim
+-- carrega o `session_id` da sessão correspondente (o UUID da conta com o primeiro
+-- caractere trocado por 'e'). Não há exceção para fixture sem conta: isso seria
+-- reproduzir o comportamento que a migration 020 removeu.
+insert into auth.users (id) values
+  ('11111111-1111-4111-8111-111111111111')
+on conflict (id) do nothing;
+insert into auth.sessions (id, user_id) values
+  ('e1111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111');
+
 insert into public.clients (id, name) values
   ('33333333-3333-4333-8333-333333333333', 'Cliente de Teste');
 
@@ -146,7 +158,7 @@ declare
   _worked integer;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- B1/B2. INSERT mandando valores inventados nas duas colunas.
@@ -179,7 +191,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   begin
@@ -226,7 +238,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- Nasce sem hora extra: 06:00–15:00 -> billed 200.00.
@@ -276,7 +288,7 @@ declare
   _billed numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   insert into public.timesheet_entries
@@ -310,7 +322,7 @@ declare
   _estado text;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   insert into public.timesheet_entries
@@ -370,7 +382,7 @@ declare
   _n bigint;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   insert into public.operation_team (operation_id, employee_id)
@@ -396,7 +408,7 @@ declare
   _b numeric; _c numeric; _w integer; _o integer; _r numeric; _h numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- A. jornada exata -> billed 200.00 / cost 120.00
@@ -496,7 +508,7 @@ declare
   _rate   numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object(
-    'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+    'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
   execute 'set local role authenticated';
 
   -- G1. Folha da operação COM CONTRATO (diária 200), payload apontando para a

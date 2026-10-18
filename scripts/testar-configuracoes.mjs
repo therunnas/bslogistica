@@ -420,17 +420,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. nenhuma migration nova foi criada para este PR (continuam 24, até a 018)",
+  "G10. conjunto de migrations contém 25 arquivos, até a 020",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  24,
+  25,
 );
 verificar(
-  "G10b. e a mais recente continua sendo a 018",
+  "G10b. a migration mais recente é a 020",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_018_"),
+    .includes("_020_"),
   true,
 );
 

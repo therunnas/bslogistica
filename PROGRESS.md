@@ -74,6 +74,56 @@ da taxa faturada, paridade manual `calcEntry()` × SQL, `TRUNCATE` de
 `service_role` em `profiles` e `user_roles`, grants herdados, ausência de FK para
 `auth.users`, e outros.
 
+### C02 — revogação de identidade (implementado localmente, NÃO aplicado)
+
+Migration `20261018120000_020_revogacao_de_identidade.sql` e suíte
+`supabase/tests/015_revogacao_de_identidade.sql`, na branch
+`fix/security-c02-auth-revocation` (base `d06b849`). Nada foi aplicado a banco
+algum; as suítes só passaram por análise estática. Pendente:
+
+- **Aplicar e testar na homologação isolada**, primeiro em `ROLLBACK`, depois a
+  migration, comparando impressão digital do catálogo antes e depois.
+- **Pré-condição das suítes `013` e `015` (bloco F):** assumem **nenhum admin fora
+  da fixture**. A homologação tem o U1; a `015` pula o bloco F nesse caso, mas a
+  `013` (`B_setup`, `B2`) **falharia** e mexeria transitoriamente no papel do U1.
+  Rodar em banco limpo ou decidir antes.
+- **Suítes `002`, `005`–`007` e `009`–`013` foram adaptadas** (contas reais em
+  `auth.users`, `auth.sessions` e `session_id` em cada claim). Nenhuma expectativa
+  foi alterada, mas **nenhuma foi executada** depois da adaptação.
+- **Medido na L2-C02-C2 (versão anterior da 020) e corrigido na L2-C02-C3A:**
+  1. `session_id` inválido dava `22P02` (a chave do índice é avaliada antes do
+     `CASE`). A helper virou PL/pgSQL, com o cast depois do `IF`.
+  2. Regressão de ~20x em leituras sob RLS (count de `timesheet_entries`, 12,4 mil
+     linhas: 101 ms -> 2.002 ms), porque 25 policies chamavam `has_role()`/`is_staff()`
+     **por linha**. Viraram `(SELECT ...)` (InitPlan, uma avaliação por comando);
+     isolada, essa troca levou o count a ~1,4 ms. Equivalência coberta pelo bloco H
+     da `015` (matriz identidade x tabela x operação).
+  3. JWT revogado ainda lia/editava a própria linha de `profiles` e lia o próprio
+     papel em `user_roles`. As 4 policies de linha própria agora exigem
+     `identidade_atual_utilizavel()` (bloco I da `015`).
+- **Estado da correção:** tudo isso **só foi revisado estaticamente**. Nenhum SQL com
+  escrita rodou, a `020` corrigida **não foi aplicada em lugar nenhum** e a `015`
+  ampliada **nunca foi executada**. A instância `bs-c02-hml-132969` tem a `020`
+  ANTIGA aplicada: não reaplicar a corrigida nela.
+- **Próximo passo (C3B): validar a `020` corrigida em instância NOVA, do zero**, a
+  partir das 24 migrations da `main`, sem reaproveitar volume nem a instância
+  anterior: baseline das 13 suítes, `020`, as 14 adaptadas (incl. a `015`
+  ampliada), T1-T5 com JWTs reais, e remedir (`count` de `timesheet_entries`, soma
+  por período, `count` de `profiles` e `employees`, busca por id, `has_role`/`is_staff`
+  por linha, RPCs operacionais) com `EXPLAIN (ANALYZE, BUFFERS)` antes/depois. Os
+  números da C2 são de amostra sintética (12,4 mil apontamentos, um container, sem
+  concorrência): servem para comparar versões, não para prever Production.
+- **Papéis e profiles órfãos:** a `020` os faz **negar**, mas não os remove, e a
+  tela de usuários não os mostra. Limpeza controlada e visibilidade na tela são
+  pendência do C02 (trigger `AFTER DELETE` em `auth.users` **não** foi
+  implementado de propósito).
+- **Antes de aplicar em Production:** inventário somente leitura de admins
+  banidos com papel e papéis órfãos, e conferência de
+  `has_table_privilege('postgres','auth.sessions','SELECT')`.
+- **Integração com a feature:** a feature tem a migration `019` e a suíte `014`;
+  a `020` e a `015` foram numeradas depois delas e não dependem de nada do
+  fechamento.
+
 Outros itens, de menor gravidade:
 
 - **Diagnóstico P3 no banco** — `sincronizar_chave_da_diaria` pode devolver

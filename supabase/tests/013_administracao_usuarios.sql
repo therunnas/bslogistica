@@ -55,7 +55,7 @@ begin
   if _uid is null then
     _claims := jsonb_build_object('role', 'anon');
   else
-    _claims := jsonb_build_object('sub', _uid, 'role', 'authenticated');
+    _claims := jsonb_build_object('sub', _uid, 'session_id', 'e' || substr(_uid::text, 2), 'role', 'authenticated');
     if _aal is not null then
       _claims := _claims || jsonb_build_object('aal', _aal);
     end if;
@@ -95,6 +95,19 @@ insert into auth.users (id) values
   ('17000000-0000-4000-8000-000000000003'),  -- OP
   ('17000000-0000-4000-8000-000000000004'),  -- ACUMULADOR (admin + operacional)
   ('17000000-0000-4000-8000-000000000005');  -- NOVO_ADMIN, só para o caso B9
+
+-- C02 (migration 020): has_role()/is_staff() só autorizam uma identidade UTILIZÁVEL — conta
+-- existente em auth.users, não banida nem excluída, e com a sessão do JWT viva em
+-- auth.sessions. Por isso as contas das claims abaixo existem de verdade e cada claim
+-- carrega o `session_id` da sessão correspondente (o UUID da conta com o primeiro
+-- caractere trocado por 'e'). Não há exceção para fixture sem conta: isso seria
+-- reproduzir o comportamento que a migration 020 removeu.
+insert into auth.sessions (id, user_id) values
+  ('e7000000-0000-4000-8000-000000000001', '17000000-0000-4000-8000-000000000001'),
+  ('e7000000-0000-4000-8000-000000000002', '17000000-0000-4000-8000-000000000002'),
+  ('e7000000-0000-4000-8000-000000000003', '17000000-0000-4000-8000-000000000003'),
+  ('e7000000-0000-4000-8000-000000000004', '17000000-0000-4000-8000-000000000004'),
+  ('e7000000-0000-4000-8000-000000000005', '17000000-0000-4000-8000-000000000005');
 
 insert into public.user_roles (user_id, role) values
   ('17000000-0000-4000-8000-000000000001', 'admin'),
