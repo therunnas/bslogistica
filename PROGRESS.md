@@ -58,12 +58,27 @@ A matriz aprovada cobre:
   que ainda não foi exercitada com conta real;
 - logout/login e MFA.
 
-**Gate:** o primeiro usuário `operacional` real só é criado depois da matriz.
+**Gate:** o primeiro usuário `operacional` definitivo (do cliente) só é criado depois
+da matriz.
+
+**Situação do perfil operacional:**
+
+- **Homologação do perfil (feita):** uma conta existente, que era admin, teve o papel
+  de admin revogado e o `operacional` atribuído pela administração de usuários. Com
+  ela, `/operacional` e a interface de apontamentos abriram, e o acesso direto a
+  `/dashboard` foi barrado com redirecionamento para `/operacional`. Valida a
+  navegação por perfil; **não** cria conta definitiva e **não** testa o fluxo de
+  convite de operadores.
+- **Criação por convite:** não exercitada nessa operação; segue na matriz E2E.
+- **Contas definitivas do cliente:** preparação futura, depois da matriz.
+- **Dados fictícios:** limpeza controlada antes da entrega, ainda pendente.
+- A matriz E2E **não** está concluída.
 
 ## Próximas etapas
 
 1. Concluir a matriz E2E acima.
-2. Criar o primeiro usuário `operacional` real, pelo fluxo de convite.
+2. Criar as contas `operacional` definitivas, pelo fluxo de convite, e limpar os
+   dados fictícios antes da entrega.
 3. Acompanhar o uso real e priorizar os riscos abaixo conforme apareçam.
 4. Auditoria de segurança: **C03** é a próxima prioridade (não iniciada).
 

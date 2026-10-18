@@ -7,14 +7,14 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
 ## Production
 
-| Item                  | Estado                                                                             |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| Aplicação             | publicada em `admin.bslogisticas.com.br`                                           |
-| Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                  |
-| Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                           |
-| Migrations            | todas as de `supabase/migrations/` aplicadas (25 de 25); a última é a `020` (C02)  |
-| Cadastro público      | bloqueado (`disable_signup = true`)                                                |
-| Usuário `operacional` | ainda não existe conta real; depende da matriz E2E ([PROGRESS.md](../PROGRESS.md)) |
+| Item                  | Estado                                                                                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Aplicação             | publicada em `admin.bslogisticas.com.br`                                                                                                      |
+| Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                                                                             |
+| Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                                                                                      |
+| Migrations            | todas as de `supabase/migrations/` aplicadas (25 de 25); a última é a `020` (C02)                                                             |
+| Cadastro público      | bloqueado (`disable_signup = true`)                                                                                                           |
+| Usuário `operacional` | perfil homologado com uma conta existente que era admin e foi rebaixada; contas definitivas ainda não criadas ([PROGRESS.md](../PROGRESS.md)) |
 
 O **Preview** da Vercel falha de propósito: não tem as variáveis
 `NEXT_PUBLIC_SUPABASE_*`, e conectá-lo ao banco de produção para deixar o check
