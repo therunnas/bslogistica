@@ -329,3 +329,152 @@ export async function lerTudoPaginado<T extends object>(
     { detalhes },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Adaptador para a Data API (PostgREST) e ordem de apresentação
+// ---------------------------------------------------------------------------
+//
+// O adaptador fala com um cliente de forma ESTRUTURAL (o `supabase-js` satisfaz
+// esta forma), então o módulo continua sem importar nada e testável sem rede.
+//
+// A leitura é sempre `id ASC` (cursor). A ordem que a tela mostra é outra
+// (`name`, `created_at`...), e uma coluna mutável não serve de cursor: se um
+// registro mudasse de valor entre duas páginas, ele poderia sumir ou repetir.
+// Por isso a ordem de apresentação é aplicada DEPOIS, sobre o conjunto inteiro,
+// reproduzindo o `ORDER BY` que o banco fazia (ver `ordenarApresentacao`).
+
+export interface RespostaPostgrest {
+  readonly data: readonly unknown[] | null;
+  readonly error: { readonly message: string } | null;
+  readonly count?: number | null;
+}
+
+export interface ConsultaPostgrest extends PromiseLike<RespostaPostgrest> {
+  gt(coluna: string, valor: string): ConsultaPostgrest;
+  order(coluna: string, opcoes: { ascending: boolean }): ConsultaPostgrest;
+  limit(quantidade: number): ConsultaPostgrest;
+}
+
+export interface ClientePostgrest {
+  from(tabela: string): {
+    select(colunas: string, opcoes?: { count?: "exact"; head?: boolean }): ConsultaPostgrest;
+  };
+}
+
+/**
+ * Como comparar a coluna de apresentação.
+ *  - `texto`: colação do banco (`en_US.UTF-8`), via `Intl.Collator("en-US")`;
+ *  - `instante`: `timestamptz` em texto ISO, com precisão de microssegundo;
+ *  - `literal`: `date` e `time` em texto ISO, que ordenam como texto.
+ */
+export type TipoDeOrdem = "texto" | "instante" | "literal";
+
+export interface CriterioDeOrdem {
+  readonly coluna: string;
+  readonly tipo: TipoDeOrdem;
+  readonly ascendente: boolean;
+}
+
+export interface LeituraDeTabela {
+  readonly tabela: string;
+  /** Ordem de apresentação. O desempate final é sempre `id` crescente. */
+  readonly ordem: readonly CriterioDeOrdem[];
+}
+
+const colacao = new Intl.Collator("en-US");
+
+/** [milissegundos, microssegundos restantes] de um `timestamptz` em ISO; `null` se não for. */
+function chaveDeInstante(valor: string): readonly [number, number] | null {
+  const partes =
+    /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}(?::?\d{2})?)$/.exec(valor);
+  if (!partes) return null;
+  const dia = partes[1] ?? "";
+  const hora = partes[2] ?? "";
+  const fracao = (partes[3] ?? "").padEnd(6, "0").slice(0, 6);
+  const fuso = partes[4] ?? "Z";
+  const compacto = fuso.replace(":", "");
+  const deslocamento =
+    fuso === "Z"
+      ? "Z"
+      : `${compacto.slice(0, 3)}:${compacto.length > 3 ? compacto.slice(3) : "00"}`;
+  const segundos = Date.parse(`${dia}T${hora}${deslocamento}`);
+  if (Number.isNaN(segundos)) return null;
+  return [segundos + Number(fracao.slice(0, 3)), Number(fracao.slice(3))];
+}
+
+function comparar(a: string, b: string, tipo: TipoDeOrdem): number {
+  if (tipo === "texto") return colacao.compare(a, b);
+  if (tipo === "instante") {
+    const ka = chaveDeInstante(a);
+    const kb = chaveDeInstante(b);
+    if (ka && kb) return ka[0] - kb[0] || ka[1] - kb[1];
+  }
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Ordena como o `ORDER BY` do PostgreSQL: `NULL` por último em ordem crescente e
+ * por primeiro em ordem decrescente, e desempate por `id` crescente (antes o
+ * empate ficava a critério do banco, sem garantia).
+ *
+ * Verificado contra o Postgres local (`en_US.UTF-8`) com nomes acentuados, de
+ * caixa mista, com hífen, apóstrofo e números. A colação do banco de Production
+ * não foi consultada daqui: se ela não for `en_US.UTF-8`, a ordem de texto pode
+ * diferir em casos de borda, e isso se confere com `select datcollate from
+ * pg_database`.
+ */
+export function ordenarApresentacao<T extends object>(
+  linhas: readonly T[],
+  ordem: readonly CriterioDeOrdem[],
+): T[] {
+  const valor = (linha: T, coluna: string): string | null => {
+    const v = (linha as Record<string, unknown>)[coluna];
+    return v === null || v === undefined ? null : String(v);
+  };
+  return [...linhas].sort((x, y) => {
+    for (const criterio of ordem) {
+      const a = valor(x, criterio.coluna);
+      const b = valor(y, criterio.coluna);
+      if (a === null && b === null) continue;
+      if (a === null) return criterio.ascendente ? 1 : -1;
+      if (b === null) return criterio.ascendente ? -1 : 1;
+      const r = comparar(a, b, criterio.tipo);
+      if (r !== 0) return criterio.ascendente ? r : -r;
+    }
+    const ia = String((x as { id?: unknown }).id);
+    const ib = String((y as { id?: unknown }).id);
+    return ia < ib ? -1 : ia > ib ? 1 : 0;
+  });
+}
+
+/**
+ * Lê uma tabela inteira pela Data API: cursor por `id`, contagem exata antes e
+ * depois (mesma tabela, sem filtro), e depois a ordem de apresentação.
+ *
+ * Erro de PostgREST, página ausente, contagem ausente ou inválida e divergência
+ * persistente lançam `ErroPaginacao`; nunca devolve resultado parcial.
+ */
+export async function lerTabelaPaginada<T extends object>(
+  cliente: ClientePostgrest,
+  leitura: LeituraDeTabela,
+): Promise<T[]> {
+  const resultado = await lerTudoPaginado<T>({
+    lerPagina: async ({ depoisDe, limite }) => {
+      let consulta = cliente.from(leitura.tabela).select("*");
+      if (depoisDe !== null) consulta = consulta.gt("id", depoisDe);
+      const resposta = await consulta.order("id", { ascending: true }).limit(limite);
+      if (resposta.error) throw resposta.error;
+      // `data` nulo sem erro é "página ausente": o paginador recusa.
+      return { linhas: resposta.data as readonly T[] };
+    },
+    contar: async () => {
+      const resposta = await cliente
+        .from(leitura.tabela)
+        .select("*", { count: "exact", head: true });
+      if (resposta.error) throw resposta.error;
+      // `count` ausente (null/undefined) não é número: o paginador recusa.
+      return resposta.count as number;
+    },
+  });
+  return ordenarApresentacao(resultado.linhas, leitura.ordem);
+}
