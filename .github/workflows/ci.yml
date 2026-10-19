@@ -81,6 +81,9 @@ jobs:
       - name: Teste queries-paginacao
         run: npm run test:queries-paginacao
 
+      - name: Teste ledger-estados
+        run: npm run test:ledger-estados
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

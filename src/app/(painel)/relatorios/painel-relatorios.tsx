@@ -34,6 +34,8 @@ import { attendanceLabel, marginPct } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
 import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
+import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
+import type { AvisoDoLedger } from "@/lib/ledger-estado";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -44,7 +46,9 @@ export function PainelRelatorios() {
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
 
-  const { rows } = useLedger();
+  const ledger = useLedger();
+  const exibicao = decidirExibicao(ledger);
+  const rows = linhasParaExibicao(ledger);
 
   const period = useMemo(
     () => rows.filter((row) => inPeriod(row.date, start, end)),
@@ -140,6 +144,8 @@ export function PainelRelatorios() {
   }, [period]);
 
   function exportCsv() {
+    if (!exibicao.podeAgir) return;
+
     const header = [
       "Data",
       "Cliente",
@@ -194,7 +200,7 @@ export function PainelRelatorios() {
             variant="outline"
             className="h-10 rounded-xl"
             onClick={exportCsv}
-            disabled={!period.length}
+            disabled={!period.length || !exibicao.podeAgir}
           >
             <Download className="h-4 w-4" />
             Exportar CSV
@@ -228,412 +234,423 @@ export function PainelRelatorios() {
         </CardContent>
       </Card>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Resumo
-          label="Diárias"
-          value={num(totals.dailies, 0)}
-          description={`${totals.absences} falta${totals.absences === 1 ? "" : "s"}`}
-          icon={CalendarDays}
+      {exibicao.aviso && (
+        <AvisoLedger
+          aviso={exibicao.aviso}
+          onTentarNovamente={exibicao.podeTentarNovamente ? ledger.tentarNovamente : undefined}
         />
+      )}
 
-        <Resumo
-          label="Horas extras"
-          value={minutesToLabel(totals.overtime)}
-          description="Excedente acumulado"
-          icon={Clock3}
-        />
+      {exibicao.mostrarValores && (
+        <>
+          <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Resumo
+              label="Diárias"
+              value={num(totals.dailies, 0)}
+              description={`${totals.absences} falta${totals.absences === 1 ? "" : "s"}`}
+              icon={CalendarDays}
+            />
 
-        <Resumo
-          label="Receita"
-          value={brl(totals.billed)}
-          description="Receita gerada"
-          icon={BadgeDollarSign}
-        />
+            <Resumo
+              label="Horas extras"
+              value={minutesToLabel(totals.overtime)}
+              description="Excedente acumulado"
+              icon={Clock3}
+            />
 
-        <Resumo
-          label="Margem"
-          value={brl(totals.margin)}
-          description={`${pct(marginPct(totals.billed, totals.cost))} · custo ${brl(totals.cost)}`}
-          icon={TrendingUp}
-        />
-      </div>
+            <Resumo
+              label="Receita"
+              value={brl(totals.billed)}
+              description="Receita gerada"
+              icon={BadgeDollarSign}
+            />
 
-      <Tabs defaultValue="employees">
-        <TabsList className="mb-5 h-auto flex-wrap rounded-xl border border-border bg-secondary/50 p-1">
-          <TabsTrigger
-            value="employees"
-            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Por colaborador
-          </TabsTrigger>
+            <Resumo
+              label="Margem"
+              value={brl(totals.margin)}
+              description={`${pct(marginPct(totals.billed, totals.cost))} · custo ${brl(totals.cost)}`}
+              icon={TrendingUp}
+            />
+          </div>
 
-          <TabsTrigger
-            value="operations"
-            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Por operação
-          </TabsTrigger>
+          <Tabs defaultValue="employees">
+            <TabsList className="mb-5 h-auto flex-wrap rounded-xl border border-border bg-secondary/50 p-1">
+              <TabsTrigger
+                value="employees"
+                className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                Por colaborador
+              </TabsTrigger>
 
-          <TabsTrigger
-            value="entries"
-            className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Lançamentos
-          </TabsTrigger>
-        </TabsList>
+              <TabsTrigger
+                value="operations"
+                className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                Por operação
+              </TabsTrigger>
 
-        <TabsContent value="employees" className="mt-0">
-          <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
-            <CardHeader className="border-b border-border px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-                  <Users className="h-4 w-4" />
-                </div>
+              <TabsTrigger
+                value="entries"
+                className="min-h-9 rounded-lg px-4 text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                Lançamentos
+              </TabsTrigger>
+            </TabsList>
 
-                <div>
-                  <CardTitle className="text-sm font-semibold tracking-tight">
-                    Desempenho por colaborador
-                  </CardTitle>
+            <TabsContent value="employees" className="mt-0">
+              <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+                <CardHeader className="border-b border-border px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                      <Users className="h-4 w-4" />
+                    </div>
 
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Diárias, faltas, horas extras e custo individual.
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
+                    <div>
+                      <CardTitle className="text-sm font-semibold tracking-tight">
+                        Desempenho por colaborador
+                      </CardTitle>
 
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
-                      <TableHead className="h-12 min-w-52 text-xs font-semibold text-muted-foreground">
-                        Colaborador
-                      </TableHead>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Diárias, faltas, horas extras e custo individual.
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Diárias
-                      </TableHead>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                          <TableHead className="h-12 min-w-52 text-xs font-semibold text-muted-foreground">
+                            Colaborador
+                          </TableHead>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Faltas
-                      </TableHead>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Diárias
+                          </TableHead>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Horas extras
-                      </TableHead>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Faltas
+                          </TableHead>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Receita gerada
-                      </TableHead>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Horas extras
+                          </TableHead>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Custo
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Receita gerada
+                          </TableHead>
 
-                  <TableBody>
-                    {byEmployee.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6}>
-                          <EstadoVazio />
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      byEmployee.map((employee) => (
-                        <TableRow
-                          key={employee.name}
-                          className="border-border transition-colors hover:bg-secondary/20"
-                        >
-                          <TableCell className="py-4">
-                            <div className="flex items-center gap-3">
-                              <AvatarNome nome={employee.name} />
-
-                              <span className="text-sm font-medium text-foreground">
-                                {employee.name}
-                              </span>
-                            </div>
-                          </TableCell>
-
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {num(employee.dailies, 0)}
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            {employee.absences > 0 ? (
-                              <Badge
-                                variant="secondary"
-                                className="border border-destructive/15 bg-destructive/10 font-medium text-destructive shadow-none"
-                              >
-                                {num(employee.absences, 0)}
-                              </Badge>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">0</span>
-                            )}
-                          </TableCell>
-
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {minutesToLabel(employee.otMinutes)}
-                          </TableCell>
-
-                          <TableCell className="text-right text-sm font-medium text-foreground">
-                            {brl(employee.billed)}
-                          </TableCell>
-
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {brl(employee.cost)}
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Custo
+                          </TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      </TableHeader>
 
-        <TabsContent value="operations" className="mt-0">
-          <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
-            <CardHeader className="border-b border-border px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-                  <ReceiptText className="h-4 w-4" />
-                </div>
+                      <TableBody>
+                        {byEmployee.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6}>
+                              <EstadoVazio />
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          byEmployee.map((employee) => (
+                            <TableRow
+                              key={employee.name}
+                              className="border-border transition-colors hover:bg-secondary/20"
+                            >
+                              <TableCell className="py-4">
+                                <div className="flex items-center gap-3">
+                                  <AvatarNome nome={employee.name} />
 
-                <div>
-                  <CardTitle className="text-sm font-semibold tracking-tight">
-                    Resultado por operação
-                  </CardTitle>
+                                  <span className="text-sm font-medium text-foreground">
+                                    {employee.name}
+                                  </span>
+                                </div>
+                              </TableCell>
 
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Receita, custo e margem de cada operação no período.
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {num(employee.dailies, 0)}
+                              </TableCell>
 
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
-                      <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
-                        Operação
-                      </TableHead>
+                              <TableCell className="text-right">
+                                {employee.absences > 0 ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className="border border-destructive/15 bg-destructive/10 font-medium text-destructive shadow-none"
+                                  >
+                                    {num(employee.absences, 0)}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
 
-                      <TableHead className="min-w-40 text-xs font-semibold text-muted-foreground">
-                        Cliente
-                      </TableHead>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {minutesToLabel(employee.otMinutes)}
+                              </TableCell>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Diárias
-                      </TableHead>
+                              <TableCell className="text-right text-sm font-medium text-foreground">
+                                {brl(employee.billed)}
+                              </TableCell>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Horas extras
-                      </TableHead>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {brl(employee.cost)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Receita
-                      </TableHead>
+            <TabsContent value="operations" className="mt-0">
+              <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+                <CardHeader className="border-b border-border px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                      <ReceiptText className="h-4 w-4" />
+                    </div>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Custo
-                      </TableHead>
+                    <div>
+                      <CardTitle className="text-sm font-semibold tracking-tight">
+                        Resultado por operação
+                      </CardTitle>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Margem
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Receita, custo e margem de cada operação no período.
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
 
-                  <TableBody>
-                    {byOperation.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7}>
-                          <EstadoVazio />
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      byOperation.map((operation) => (
-                        <TableRow
-                          key={operation.name}
-                          className="border-border transition-colors hover:bg-secondary/20"
-                        >
-                          <TableCell className="py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-                                <ReceiptText className="h-4 w-4" />
-                              </div>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                          <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
+                            Operação
+                          </TableHead>
 
-                              <span className="text-sm font-medium text-foreground">
-                                {operation.name}
-                              </span>
-                            </div>
-                          </TableCell>
+                          <TableHead className="min-w-40 text-xs font-semibold text-muted-foreground">
+                            Cliente
+                          </TableHead>
 
-                          <TableCell className="text-sm text-muted-foreground">
-                            {operation.client}
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Diárias
+                          </TableHead>
 
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {num(operation.dailies, 0)}
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Horas extras
+                          </TableHead>
 
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {minutesToLabel(operation.otMinutes)}
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Receita
+                          </TableHead>
 
-                          <TableCell className="text-right text-sm font-medium text-foreground">
-                            {brl(operation.billed)}
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Custo
+                          </TableHead>
 
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {brl(operation.cost)}
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            <p className="text-sm font-medium text-foreground">
-                              {brl(operation.billed - operation.cost)}
-                            </p>
-
-                            <p className="mt-0.5 text-[11px] text-primary">
-                              {pct(marginPct(operation.billed, operation.cost))}
-                            </p>
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Margem
+                          </TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      </TableHeader>
 
-        <TabsContent value="entries" className="mt-0">
-          <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
-            <CardHeader className="border-b border-border px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-                  <FileSpreadsheet className="h-4 w-4" />
-                </div>
+                      <TableBody>
+                        {byOperation.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7}>
+                              <EstadoVazio />
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          byOperation.map((operation) => (
+                            <TableRow
+                              key={operation.name}
+                              className="border-border transition-colors hover:bg-secondary/20"
+                            >
+                              <TableCell className="py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                                    <ReceiptText className="h-4 w-4" />
+                                  </div>
 
-                <div>
-                  <CardTitle className="text-sm font-semibold tracking-tight">
-                    Lançamentos detalhados
-                  </CardTitle>
+                                  <span className="text-sm font-medium text-foreground">
+                                    {operation.name}
+                                  </span>
+                                </div>
+                              </TableCell>
 
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Histórico individual de apontamentos e faturamento.
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {operation.client}
+                              </TableCell>
 
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
-                      <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
-                        Data
-                      </TableHead>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {num(operation.dailies, 0)}
+                              </TableCell>
 
-                      <TableHead className="text-xs font-semibold text-muted-foreground">
-                        Cliente
-                      </TableHead>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {minutesToLabel(operation.otMinutes)}
+                              </TableCell>
 
-                      <TableHead className="text-xs font-semibold text-muted-foreground">
-                        Operação
-                      </TableHead>
+                              <TableCell className="text-right text-sm font-medium text-foreground">
+                                {brl(operation.billed)}
+                              </TableCell>
 
-                      <TableHead className="text-xs font-semibold text-muted-foreground">
-                        Turno
-                      </TableHead>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {brl(operation.cost)}
+                              </TableCell>
 
-                      <TableHead className="text-xs font-semibold text-muted-foreground">
-                        Colaborador
-                      </TableHead>
+                              <TableCell className="text-right">
+                                <p className="text-sm font-medium text-foreground">
+                                  {brl(operation.billed - operation.cost)}
+                                </p>
 
-                      <TableHead className="text-xs font-semibold text-muted-foreground">
-                        Presença
-                      </TableHead>
+                                <p className="mt-0.5 text-[11px] text-primary">
+                                  {pct(marginPct(operation.billed, operation.cost))}
+                                </p>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Hora extra
-                      </TableHead>
+            <TabsContent value="entries" className="mt-0">
+              <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+                <CardHeader className="border-b border-border px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                      <FileSpreadsheet className="h-4 w-4" />
+                    </div>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Receita
-                      </TableHead>
+                    <div>
+                      <CardTitle className="text-sm font-semibold tracking-tight">
+                        Lançamentos detalhados
+                      </CardTitle>
 
-                      <TableHead className="text-xs font-semibold text-muted-foreground">
-                        Faturado
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Histórico individual de apontamentos e faturamento.
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
 
-                  <TableBody>
-                    {period.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9}>
-                          <EstadoVazio />
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      period.map((row) => (
-                        <TableRow
-                          key={row.entryId}
-                          className="border-border transition-colors hover:bg-secondary/20"
-                        >
-                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                            {dateBR(row.date)}
-                          </TableCell>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                          <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
+                            Data
+                          </TableHead>
 
-                          <TableCell className="text-sm text-muted-foreground">
-                            {row.clientName}
-                          </TableCell>
+                          <TableHead className="text-xs font-semibold text-muted-foreground">
+                            Cliente
+                          </TableHead>
 
-                          <TableCell className="text-sm font-medium text-foreground">
-                            {row.operationName}
-                          </TableCell>
+                          <TableHead className="text-xs font-semibold text-muted-foreground">
+                            Operação
+                          </TableHead>
 
-                          <TableCell className="text-sm text-muted-foreground">
-                            {row.shiftName}
-                          </TableCell>
+                          <TableHead className="text-xs font-semibold text-muted-foreground">
+                            Turno
+                          </TableHead>
 
-                          <TableCell className="text-sm text-muted-foreground">
-                            {row.employeeName}
-                          </TableCell>
+                          <TableHead className="text-xs font-semibold text-muted-foreground">
+                            Colaborador
+                          </TableHead>
 
-                          <TableCell>
-                            <PresencaBadge status={row.status} />
-                          </TableCell>
+                          <TableHead className="text-xs font-semibold text-muted-foreground">
+                            Presença
+                          </TableHead>
 
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {minutesToLabel(row.overtimeMinutes)}
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Hora extra
+                          </TableHead>
 
-                          <TableCell className="text-right text-sm font-medium text-foreground">
-                            {brl(row.billed)}
-                          </TableCell>
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Receita
+                          </TableHead>
 
-                          <TableCell>
-                            <FaturadoBadge faturado={!!row.invoiceId} />
-                          </TableCell>
+                          <TableHead className="text-xs font-semibold text-muted-foreground">
+                            Faturado
+                          </TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                      </TableHeader>
+
+                      <TableBody>
+                        {period.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9}>
+                              <EstadoVazio />
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          period.map((row) => (
+                            <TableRow
+                              key={row.entryId}
+                              className="border-border transition-colors hover:bg-secondary/20"
+                            >
+                              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                                {dateBR(row.date)}
+                              </TableCell>
+
+                              <TableCell className="text-sm text-muted-foreground">
+                                {row.clientName}
+                              </TableCell>
+
+                              <TableCell className="text-sm font-medium text-foreground">
+                                {row.operationName}
+                              </TableCell>
+
+                              <TableCell className="text-sm text-muted-foreground">
+                                {row.shiftName}
+                              </TableCell>
+
+                              <TableCell className="text-sm text-muted-foreground">
+                                {row.employeeName}
+                              </TableCell>
+
+                              <TableCell>
+                                <PresencaBadge status={row.status} />
+                              </TableCell>
+
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {minutesToLabel(row.overtimeMinutes)}
+                              </TableCell>
+
+                              <TableCell className="text-right text-sm font-medium text-foreground">
+                                {brl(row.billed)}
+                              </TableCell>
+
+                              <TableCell>
+                                <FaturadoBadge faturado={!!row.invoiceId} />
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
     </div>
   );
 }
@@ -742,6 +759,33 @@ function EstadoVazio() {
       <p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">
         Ajuste o intervalo de datas ou registre novos apontamentos para visualizar os dados.
       </p>
+    </div>
+  );
+}
+
+function AvisoLedger({
+  aviso,
+  onTentarNovamente,
+}: {
+  aviso: AvisoDoLedger;
+  onTentarNovamente?: (() => void) | undefined;
+}) {
+  return (
+    <div role="alert" className="mb-5 rounded-2xl border border-border bg-secondary/40 p-5">
+      <p className="text-sm font-semibold text-foreground">{aviso.titulo}</p>
+
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{aviso.descricao}</p>
+
+      {onTentarNovamente ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3 h-9 rounded-xl"
+          onClick={onTentarNovamente}
+        >
+          Tentar novamente
+        </Button>
+      ) : null}
     </div>
   );
 }

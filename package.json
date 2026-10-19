@@ -22,7 +22,8 @@
     "test:tela-usuarios": "node --experimental-strip-types scripts/testar-tela-usuarios.mjs",
     "test:configuracoes": "node --experimental-strip-types scripts/testar-configuracoes.mjs",
     "test:paginacao": "node --experimental-strip-types scripts/testar-paginacao.mjs",
-    "test:queries-paginacao": "node --experimental-strip-types scripts/testar-queries-paginacao.mjs"
+    "test:queries-paginacao": "node --experimental-strip-types scripts/testar-queries-paginacao.mjs",
+    "test:ledger-estados": "node --experimental-strip-types scripts/testar-ledger-estados.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
