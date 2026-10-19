@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
+import { sinaisDe, verificarChaveDeServico } from "@/lib/ambiente";
+
 import { lerAmbienteSupabase } from "./env";
 import type { Database } from "./types";
 
@@ -51,6 +53,19 @@ function lerChaveDeServico(): string {
         "ambiente da hospedagem — sem ela, nenhuma operação administrativa de usuários funciona.",
     );
   }
+
+  // Fora de Production na Vercel, a chave privilegiada de Production é barrada.
+  verificarChaveDeServico(
+    sinaisDe({
+      VERCEL_ENV: process.env["VERCEL_ENV"],
+      VERCEL: process.env["VERCEL"],
+      VERCEL_URL: process.env["VERCEL_URL"],
+      VERCEL_REGION: process.env["VERCEL_REGION"],
+      VERCEL_DEPLOYMENT_ID: process.env["VERCEL_DEPLOYMENT_ID"],
+      VERCEL_PROJECT_ID: process.env["VERCEL_PROJECT_ID"],
+    }),
+    chave,
+  );
 
   return chave;
 }

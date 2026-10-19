@@ -45,6 +45,7 @@ src/
 │   ├── env.ts · cookie-options.ts
 │   └── types.ts                 tipos gerados do banco
 ├── lib/
+│   ├── ambiente.ts · csp.ts  isolamento entre ambientes e montagem da CSP, puros
 │   ├── billing.ts            diária, hora extra, custo e margem (previsão)
 │   ├── ledger.ts             consolida apontamentos com operação e cliente
 │   ├── queries.ts · mutations.ts   leituras e escritas genéricas

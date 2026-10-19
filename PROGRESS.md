@@ -127,7 +127,11 @@ de tratamento: **C03** (não iniciada). A severidade original não foi alterada.
 - **Registros órfãos** em `profiles` e `user_roles` (a `020` os faz negar, não os
   remove): exigem análise própria de retenção e limpeza controlada.
 - **Revisão de segurança específica (Codex) não executada.**
-- **Isolamento Preview/Production** ainda não completamente comprovado.
+- **Isolamento Preview/Production:** a proteção em código (gate no build e no
+  runtime, CSP por ambiente, Sentry só em Production) foi implementada e testada
+  localmente, sem exceção por variável. Falta comprovar com um Preview real na
+  Vercel depois do merge e tratar os Previews anteriores à contenção, que seguem
+  publicados.
 - **Observabilidade histórica incompleta**, limitada pelas janelas de log dos planos.
 - **Custo do trigger do último admin em Production** não medido.
 - **Migration `019`** (fechamento): fora da C02; exige reordenar o timestamp, adaptar
