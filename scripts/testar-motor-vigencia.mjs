@@ -242,8 +242,8 @@ verificar(
   true,
 );
 verificar(
-  "D4. só apontamento novo ou que muda de folha lê as versões; a edição usa os snapshots gravados",
-  /_precificar := tg_op = 'insert' or new\.timesheet_id is distinct from old\.timesheet_id;/.test(
+  "D4. só apontamento novo, que muda de folha ou que SAI DE FALTA lê as versões; a edição usa os snapshots gravados",
+  /_precificar := case\s+when tg_op = 'insert' then true\s+else new\.timesheet_id is distinct from old\.timesheet_id or old\.status = 'absent'\s+end;/.test(
     lcNovo,
   ) &&
     /_daily_rate := new\.daily_rate_snapshot;/.test(lcNovo) &&
@@ -331,6 +331,89 @@ verificar(
   /current_user in \('postgres', 'service_role'\)/.test(bloqueioOperacao) &&
     /new\.contract_id is distinct from old\.contract_id/.test(bloqueioOperacao) &&
     /new\.agreed_amount is distinct from old\.agreed_amount/.test(bloqueioOperacao),
+  true,
+);
+
+// ---------------------------------------------------------------------------
+// D2. Falta (absent) não exige vigência
+// ---------------------------------------------------------------------------
+
+console.log("D2. Falta não exige vigência e não inventa preço");
+
+const iFalta = lcNovo.indexOf("if new.status = 'absent' then");
+const iBuscaFolha = lcNovo.indexOf("from public.timesheets t");
+const iPreco = lcNovo.indexOf("motor_fonte_do_dia(");
+const blocoFalta = lcNovo.slice(iFalta, iBuscaFolha);
+verificar(
+  "D16. o tratamento de falta vem ANTES de qualquer leitura de folha, versão ou fonte de preço",
+  iFalta > 0 && iFalta < iBuscaFolha && iBuscaFolha < iPreco,
+  true,
+);
+verificar(
+  "D17. o bloco da falta nunca chama as funções de preço (fonte, custo, minutos previstos) nem recusa por falta de vigência",
+  /motor_fonte_do_dia|motor_custo_do_dia|motor_minutos_previstos|raise exception/.test(blocoFalta),
+  false,
+);
+verificar(
+  "D18. falta nova não fixa referência, snapshot novo nem origem; os três snapshots antigos (NOT NULL) ficam 0",
+  [
+    "contract_terms_id",
+    "operation_terms_id",
+    "employee_cost_terms_id",
+    "shift_hours_snapshot",
+    "ot_factor_snapshot",
+    "ot_tolerance_snapshot",
+    "planned_minutes_snapshot",
+    "terms_origin",
+  ].every((c) => new RegExp(`new\\.${c}\\s+:= null;`).test(blocoFalta)) &&
+    /new\.daily_rate_snapshot\s+:= 0;/.test(blocoFalta) &&
+    /new\.ot_hour_rate_snapshot\s+:= 0;/.test(blocoFalta) &&
+    /new\.daily_cost_snapshot\s+:= 0;/.test(blocoFalta),
+  true,
+);
+verificar(
+  "D19. presença -> falta preserva origem, referências e snapshots (sem reprecificar); troca de colaborador limpa só o custo do anterior",
+  [
+    "terms_origin",
+    "contract_terms_id",
+    "operation_terms_id",
+    "shift_hours_snapshot",
+    "planned_minutes_snapshot",
+    "daily_rate_snapshot",
+  ].every((c) => new RegExp(`new\\.${c}\\s+:= old\\.${c};`).test(blocoFalta)) &&
+    /new\.employee_cost_terms_id := null;\s+new\.daily_cost_snapshot\s+:= 0;/.test(blocoFalta),
+  true,
+);
+verificar(
+  "D20. falta zera minutos, extras, receita e custo",
+  /new\.worked_minutes\s+:= 0;\s+new\.overtime_minutes := 0;\s+new\.billed_amount\s+:= 0;\s+new\.cost_amount\s+:= 0;\s+return new;/.test(
+    blocoFalta,
+  ),
+  true,
+);
+verificar(
+  "D21a. presença legada (sem origem) segue congelada, inclusive para virar falta; só a regularização (que muda a origem) passa",
+  /if tg_op = 'update' and old\.status <> 'absent'\s+and old\.terms_origin is null and new\.terms_origin is null then\s+raise exception[^;]*errcode = '55000'/.test(
+    lcNovo,
+  ) && lcNovo.indexOf("and old.terms_origin is null and new.terms_origin is null") < iFalta,
+  true,
+);
+verificar(
+  "D21. falta não é legado na regra de data anterior à ativação, e a regularização recusa falta",
+  /e\.terms_origin is null\s+and e\.status <> 'absent'/.test(lcNovo) &&
+    /if e\.status = 'absent' then\s+raise exception 'falta não gera cobrança/i.test(
+      corpoDe("regularizar_apontamento_legado"),
+    ),
+  true,
+);
+verificar(
+  "D22. a migration documenta a falta e a jornada <= 0 (constraint de contract_terms preservada)",
+  /^-- FALTA \(`absent`\)/m.test(migration) &&
+    /^-- JORNADA <= 0 NO CONTRATO ANTIGO/m.test(migration) &&
+    !/alter table public\.contract_terms[^;]*shift_hours/i.test(texto) &&
+    /contract_terms_jornada_positiva/.test(
+      ler("supabase/migrations/20261020150000_022_condicoes_financeiras_expansao.sql"),
+    ),
   true,
 );
 
@@ -711,6 +794,50 @@ for (const rotulo of [
 ]) {
   verificar(
     `H2. a suíte SQL cobre o caso ${rotulo}`,
+    sql.includes(`registrar('${rotulo}`) || sql.includes(`registrar(format('${rotulo}`),
+    true,
+  );
+}
+for (const rotulo of [
+  "A0e.",
+  "A0f.",
+  "A5b.",
+  "G1b.",
+  "G1c.",
+  "G1d.",
+  "G1e.",
+  "G1f.",
+  "G2b.",
+  "G2c.",
+  "G2d.",
+  "G2e.",
+  "G3b.",
+  "G3c.",
+  "G3d.",
+  "G4.",
+  "H3b.",
+  "H3c.",
+  "I5.",
+  "I6.",
+  "I7.",
+  "J9c.",
+  "J9d.",
+  "J9e.",
+  "J9f.",
+  "J9g.",
+  "J9h.",
+  "J9i.",
+  "K4c.",
+  "K4d.",
+  "M11c.",
+  "P1.",
+  "P2.",
+  "P3.",
+  "P4.",
+  "P5.",
+]) {
+  verificar(
+    `H2b. a suíte SQL cobre o caso ${rotulo}`,
     sql.includes(`registrar('${rotulo}`) || sql.includes(`registrar(format('${rotulo}`),
     true,
   );

@@ -16,7 +16,7 @@
 --   D  hora extra recalculada com preços congelados; custo histórico; troca de colaborador
 --   E  operação sem contrato (valor acordado versionado)
 --   F  sem vigência: recusa P0002, sem fallback para a taxa atual
---   G  falta sem remuneração (zera, mas fixa preço e origem)
+--   G  falta sem remuneração: sem vigência exigida, zerada, sem inventar preço; falta <-> presença
 --   H  legado: o que continua livre, o que é recusado, e a regularização com prévia
 --   I  faturado imutável
 --   J  upsert do PostgREST (lote misto, só nota, sem alteração) e RPC do operador
@@ -25,6 +25,7 @@
 --   L  bloqueios de edição direta e congelamento de turno (só ligados)
 --   M  desligar: colunas antigas ressincronizadas, motor antigo de volta, bloqueios soltos
 --   N  as RPCs das migrations 023 e 024 seguem íntegras com o motor ligado
+--   P  jornada histórica <= 0 (contrato antigo): vigência normalizada reproduz o motor antigo
 --   O  permissões e inventário
 --
 -- O QUE ESTE ARQUIVO NÃO PROVA
@@ -125,13 +126,17 @@ insert into public.user_roles (user_id, role) values
 insert into public.clients (id, name) values ('5c10c000-0000-4000-8000-0000000000c1', 'C05B43C cliente');
 insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
   ('5c10d000-0000-4000-8000-0000000000d1', '5c10c000-0000-4000-8000-0000000000c1', 'K1', 120, 8, 1.5, 10),
-  ('5c10d000-0000-4000-8000-0000000000d2', '5c10c000-0000-4000-8000-0000000000c1', 'K2', 150, 8, 1.5, 10);
+  ('5c10d000-0000-4000-8000-0000000000d2', '5c10c000-0000-4000-8000-0000000000c1', 'K2', 150, 8, 1.5, 10),
+  -- K3 e K4: contratos antigos com jornada <= 0 (a tabela `contracts` não tem CHECK); o motor antigo usa 8.
+  ('5c10d000-0000-4000-8000-0000000000d3', '5c10c000-0000-4000-8000-0000000000c1', 'K3 jornada zero', 100, 0, 1.5, 10),
+  ('5c10d000-0000-4000-8000-0000000000d4', '5c10c000-0000-4000-8000-0000000000c1', 'K4 jornada negativa', 90, -3, 1, 10);
 insert into public.employees (id, name, daily_cost) values
   ('5c10f000-0000-4000-8000-000000000001', 'E1', 80),
   ('5c10f000-0000-4000-8000-000000000002', 'E2', 60),
   ('5c10f000-0000-4000-8000-000000000003', 'E3', 80),
   ('5c10f000-0000-4000-8000-000000000004', 'E4 sem vigencia', 70),
-  ('5c10f000-0000-4000-8000-000000000005', 'E5 com custo desde 2020', 66);
+  ('5c10f000-0000-4000-8000-000000000005', 'E5 com custo desde 2020', 66),
+  ('5c10f000-0000-4000-8000-000000000006', 'E6 jornada historica', 50);
 
 -- a1 OP-K (K1), a2 OP-A (K1), a3 OP-E (K1, sem apontamento), a4 OP-X (K2), a5 OP-L (K1, legado), a6 OP-N (sem contrato)
 insert into public.operations (id, client_id, contract_id, name, agreed_amount) values
@@ -140,7 +145,9 @@ insert into public.operations (id, client_id, contract_id, name, agreed_amount) 
   ('5c10e000-0000-4000-8000-0000000000a3', '5c10c000-0000-4000-8000-0000000000c1', '5c10d000-0000-4000-8000-0000000000d1', 'OP-E', null),
   ('5c10e000-0000-4000-8000-0000000000a4', '5c10c000-0000-4000-8000-0000000000c1', '5c10d000-0000-4000-8000-0000000000d2', 'OP-X', null),
   ('5c10e000-0000-4000-8000-0000000000a5', '5c10c000-0000-4000-8000-0000000000c1', '5c10d000-0000-4000-8000-0000000000d1', 'OP-L', null),
-  ('5c10e000-0000-4000-8000-0000000000a6', '5c10c000-0000-4000-8000-0000000000c1', null, 'OP-N', 250);
+  ('5c10e000-0000-4000-8000-0000000000a6', '5c10c000-0000-4000-8000-0000000000c1', null, 'OP-N', 250),
+  ('5c10e000-0000-4000-8000-0000000000a7', '5c10c000-0000-4000-8000-0000000000c1', '5c10d000-0000-4000-8000-0000000000d3', 'OP-Z', null),
+  ('5c10e000-0000-4000-8000-0000000000a8', '5c10c000-0000-4000-8000-0000000000c1', '5c10d000-0000-4000-8000-0000000000d4', 'OP-W', null);
 insert into public.shifts (id, operation_id, name, start_time, end_time, break_minutes) values
   ('5c10a000-0000-4000-8000-0000000000a1', '5c10e000-0000-4000-8000-0000000000a1', 'SK', '06:00', '15:00', 60),
   ('5c10a000-0000-4000-8000-0000000000a2', '5c10e000-0000-4000-8000-0000000000a2', 'SA', '06:00', '15:00', 60),
@@ -153,6 +160,11 @@ create or replace function pg_temp.folha(_cod text, _op text, _turno text, _data
   insert into public.timesheets (id, operation_id, shift_id, work_date)
   values (('5c10b000-0000-4000-8000-0000000000' || _cod)::uuid, ('5c10e000-0000-4000-8000-0000000000' || _op)::uuid,
           ('5c10a000-0000-4000-8000-0000000000' || _turno)::uuid, _data)
+$$;
+
+create or replace function pg_temp.folha_sem_turno(_cod text, _op text, _data date) returns void language sql as $$
+  insert into public.timesheets (id, operation_id, shift_id, work_date)
+  values (('5c10b000-0000-4000-8000-0000000000' || _cod)::uuid, ('5c10e000-0000-4000-8000-0000000000' || _op)::uuid, null, _data)
 $$;
 
 create or replace function pg_temp.entrada(_cod text, _folha text, _colab text, _status text default 'present', _in text default '06:00', _out text default '17:00')
@@ -248,6 +260,15 @@ select pg_temp.registrar('A0c. legado L3 (OP-L, 02/02, E3): 165,00 / 100,00', 'o
 select pg_temp.registrar('A0d. legado L4 (OP-L, 01/11/2025, E4): data e colaborador que NUNCA terão vigência', 'ok|present|06:00:00|17:00:00|165.00|87.50',
   pg_temp.entrada('04', '0e', '4') || '|' || pg_temp.linha('04'));
 
+select pg_temp.folha('1b', 'a5', 'a5', date '2026-01-17');
+select pg_temp.registrar('A0e. legado L5 (OP-L, 17/01, E1, presença 06:00-17:00) e L6 (E2, FALTA): o motor antigo grava a falta zerada com as taxas atuais', 'ok|present|06:00:00|17:00:00|165.00|100.00|ok|absent|-|-|0.00|0.00|-|120.00|60.00|-|-|-|-',
+  pg_temp.entrada('06', '1b', '1') || '|' || pg_temp.linha('06') || '|' || pg_temp.entrada('07', '1b', '2', 'absent', '', '') || '|' || pg_temp.linha('07') || '|' || pg_temp.fixado('07'));
+
+select pg_temp.folha_sem_turno('1c', 'a7', date '2026-01-20');
+select pg_temp.folha_sem_turno('1d', 'a8', date '2026-01-20');
+select pg_temp.registrar('A0f. motor ANTIGO, contrato com jornada 0 (K3) e -3 (K4), sem turno: usa 8 h. K3: 100 + 2h*18,75 = 137,50; K4: 90 + 2h*11,25 = 112,50; custo 50 + 2h*6,25 = 62,50', 'ok|137.50|62.50|ok|112.50|62.50',
+  pg_temp.entrada('91', '1c', '6') || '|' || pg_temp.valores('91') || '|' || pg_temp.entrada('92', '1d', '6') || '|' || pg_temp.valores('92'));
+
 select pg_temp.registrar('A1. a chave nasce DESLIGADA, sem data de ativação', 'false|nulo',
   (select vigencia_ativa::text || '|' || coalesce(ativada_em::text, 'nulo') from public.financial_engine_settings));
 select pg_temp.registrar('A2. desligado: motor antigo habilitado; motor novo, bloqueios e congelamento DESABILITADOS', 'O|D|D|D|D|D', pg_temp.gatilhos());
@@ -262,6 +283,10 @@ select pg_temp.registrar('A5. custo E1 v1 [01/01, 01/07): 70; v2 [01/07, aberta)
   || '|' || pg_temp.adm($q$public.registrar_custo_colaborador('5c10f000-0000-4000-8000-000000000001', date '2026-07-01', 90, 'v2 E1')$q$)
   || '|' || pg_temp.adm($q$public.registrar_custo_colaborador('5c10f000-0000-4000-8000-000000000002', date '2026-01-01', 50, 'E2')$q$)
   || '|' || pg_temp.adm($q$public.registrar_custo_colaborador('5c10f000-0000-4000-8000-000000000003', date '2026-01-01', 80, 'E3')$q$));
+select pg_temp.registrar('A5b. K3 e K4 ganham vigência ADMINISTRATIVA com a jornada já normalizada (8 h = o que o motor antigo usava); E6 tem custo 50', '1|1|1',
+  pg_temp.adm($q$public.registrar_condicao_contrato('5c10d000-0000-4000-8000-0000000000d3', date '2026-01-01', 100, 8, 1.5, 10, 'Jornada 0 normalizada para 8 h, como o motor antigo')$q$)
+  || '|' || pg_temp.adm($q$public.registrar_condicao_contrato('5c10d000-0000-4000-8000-0000000000d4', date '2026-01-01', 90, 8, 1, 10, 'Jornada -3 normalizada para 8 h, como o motor antigo')$q$)
+  || '|' || pg_temp.adm($q$public.registrar_custo_colaborador('5c10f000-0000-4000-8000-000000000006', date '2026-01-01', 50, 'E6')$q$));
 select pg_temp.registrar('A6. OP-N (sem contrato) v1 [01/01, 01/07): 200; v2 [01/07, aberta): 260', '1|1',
   pg_temp.adm($q$public.registrar_valor_acordado_operacao('5c10e000-0000-4000-8000-0000000000a6', date '2026-01-01', 200, 'v1 OP-N', date '2026-07-01')$q$)
   || '|' || pg_temp.adm($q$public.registrar_valor_acordado_operacao('5c10e000-0000-4000-8000-0000000000a6', date '2026-07-01', 260, 'v2 OP-N')$q$));
@@ -425,17 +450,50 @@ select pg_temp.registrar('F4. a mensagem diz a data e orienta o cadastro, sem n�
 select pg_temp.registrar('F5. sem apontamentos criados por essas tentativas', '0', (select count(*)::text from public.timesheet_entries where id::text like '5c10b100-0000-4000-8000-0000000000_4' and id::text not like '%24' and id::text not like '%04'));
 
 -- ---------------------------------------------------------------------------
--- G. Falta sem remuneração
+-- G. Falta: sem vigência exigida, zerada e sem inventar preço
 -- ---------------------------------------------------------------------------
 
 select pg_temp.folha('14', 'a1', 'a1', date '2026-02-11');
-select pg_temp.registrar('G1. falta em 11/02: valores zerados, mas fixa preço (versão corrigida da v1 = 105), origem e referências', 'ok|absent|-|-|0.00|0.00|versao|105.00|70.00|8.00|1.50|10|480.00|true/false/true',
+select pg_temp.folha('c0', 'a1', 'a1', date '2025-12-30');
+select pg_temp.registrar('G1. falta em 11/02 (HÁ vigência): valores zerados e NADA fixado — nem origem, nem referências, nem snapshots novos', 'ok|absent|-|-|0.00|0.00|-|0.00|0.00|-|-|-|-|false/false/false',
   pg_temp.entrada('51', '14', '1', 'absent', '', '') || '|' || pg_temp.linha('51') || '|' || pg_temp.fixado('51') || '|' || pg_temp.refs('51'));
-select pg_temp.registrar('G2. virar presente 06:00-15:00 usa o preço fixado (105/70), sem hora extra', '1|present|06:00:00|15:00:00|105.00|70.00',
-  pg_temp.editar('51', $s$status = 'present', check_in = '06:00', check_out = '15:00'$s$) || '|' || pg_temp.linha('51'));
-select pg_temp.registrar('G3. voltar a falta zera de novo e mantém a origem', '1|absent|-|-|0.00|0.00|versao',
-  pg_temp.editar('51', $s$status = 'absent', check_in = null, check_out = null$s$) || '|' || pg_temp.linha('51') || '|' || split_part(pg_temp.fixado('51'), '|', 1));
-select pg_temp.registrar('G4. falta SEM vigência também é recusada (a origem tem de ser rastreável)', 'P0002', pg_temp.entrada('52', '12', '3', 'absent', '', ''));
+select pg_temp.registrar('G1b. falta SEM vigência de contrato (OP-K, 30/12/2025): aceita, zerada, sem referência', 'ok|absent|-|-|0.00|0.00|-|0.00|0.00|-|-|-|-|false/false/false',
+  pg_temp.entrada('52', 'c0', '3', 'absent', '', '') || '|' || pg_temp.linha('52') || '|' || pg_temp.fixado('52') || '|' || pg_temp.refs('52'));
+select pg_temp.registrar('G1c. falta de colaborador SEM custo vigente (E4), em data coberta pelo contrato: aceita', 'ok|absent|-|-|0.00|0.00|-|false/false/false',
+  pg_temp.entrada('53', '04', '4', 'absent', '', '') || '|' || pg_temp.linha('53') || '|' || split_part(pg_temp.fixado('53'), '|', 1) || '|' || pg_temp.refs('53'));
+select pg_temp.registrar('G1d. falta em OP-N antes do valor acordado (01/06/2025): aceita', 'ok|absent|-|-|0.00|0.00',
+  pg_temp.entrada('54', '13', '5', 'absent', '', '') || '|' || pg_temp.linha('54'));
+select pg_temp.registrar('G1e. a falta sem vigência não deixou nada no banco além da própria linha', '4|0',
+  (select count(*)::text from public.timesheet_entries where id in ('5c10b100-0000-4000-8000-000000000051', '5c10b100-0000-4000-8000-000000000052', '5c10b100-0000-4000-8000-000000000053', '5c10b100-0000-4000-8000-000000000054'))
+  || '|' || (select count(*)::text from public.timesheet_entries where id in ('5c10b100-0000-4000-8000-000000000051', '5c10b100-0000-4000-8000-000000000052', '5c10b100-0000-4000-8000-000000000053', '5c10b100-0000-4000-8000-000000000054')
+       and (terms_origin is not null or contract_terms_id is not null or operation_terms_id is not null or employee_cost_terms_id is not null or planned_minutes_snapshot is not null)));
+select pg_temp.registrar('G1f. UPSERT de falta nova sem vigência (formato do PostgREST): grava, zerada', '1|absent|-|-|0.00|0.00',
+  pg_temp.upsert(pg_temp.carga('55', 'c0', 'a1', '2025-12-30', '1', 'absent', null, null)) || '|' || pg_temp.linha('55'));
+
+select pg_temp.registrar('G2. falta -> presença COM vigência: precifica pela data (versão corrigida da v1 = 105 / 70), fixa origem e referências', '1|present|06:00:00|15:00:00|105.00|70.00|versao|105.00|70.00|8.00|1.50|10|480.00|true/false/true',
+  pg_temp.editar('51', $s$status = 'present', check_in = '06:00', check_out = '15:00'$s$) || '|' || pg_temp.linha('51') || '|' || pg_temp.fixado('51') || '|' || pg_temp.refs('51'));
+select pg_temp.registrar('G2b. falta -> presença SEM vigência de contrato: recusada (P0002) e a falta NÃO é modificada', 'erro P0002|absent|-|-|0.00|0.00|-|0.00|0.00|-|-|-|-|false/false/false',
+  pg_temp.editar('52', $s$status = 'present', check_in = '06:00', check_out = '15:00'$s$) || '|' || pg_temp.linha('52') || '|' || pg_temp.fixado('52') || '|' || pg_temp.refs('52'));
+select pg_temp.registrar('G2c. falta -> reposição de colaborador SEM custo (E4): recusada (P0002), linha intacta', 'erro P0002|absent|-|-|0.00|0.00|-',
+  pg_temp.editar('53', $s$status = 'replacement', check_in = '06:00', check_out = '15:00'$s$) || '|' || pg_temp.linha('53') || '|' || split_part(pg_temp.fixado('53'), '|', 1));
+select pg_temp.registrar('G2d. falta -> presença em OP-N antes do valor acordado: recusada (P0002), linha intacta', 'erro P0002|absent|-|-|0.00|0.00',
+  pg_temp.editar('54', $s$status = 'present', check_in = '06:00', check_out = '15:00'$s$) || '|' || pg_temp.linha('54'));
+select pg_temp.registrar('G2e. o mesmo pelo UPSERT do PostgREST: P0002 e a falta segue intacta', 'erro P0002|absent|-|-|0.00|0.00',
+  pg_temp.upsert(pg_temp.carga('55', 'c0', 'a1', '2025-12-30', '1', 'present', '06:00:00', '15:00:00')) || '|' || pg_temp.linha('55'));
+
+select pg_temp.registrar('G3. presença -> falta: zera e PRESERVA origem, referências e snapshots (não reprecifica)', '1|absent|-|-|0.00|0.00|versao|105.00|70.00|8.00|1.50|10|480.00|true/false/true',
+  pg_temp.editar('51', $s$status = 'absent', check_in = null, check_out = null$s$) || '|' || pg_temp.linha('51') || '|' || pg_temp.fixado('51') || '|' || pg_temp.refs('51'));
+select pg_temp.registrar('G3b. falta -> presença de novo: reprecifica pela vigência da data (06:00-17:00: 105 + 2h*19,6875 = 144,38; custo 87,50)', '1|present|06:00:00|17:00:00|144.38|87.50|versao',
+  pg_temp.editar('51', $s$status = 'present', check_in = '06:00', check_out = '17:00'$s$) || '|' || pg_temp.linha('51') || '|' || split_part(pg_temp.fixado('51'), '|', 1));
+select pg_temp.registrar('G3c. presença -> falta COM troca de colaborador (E1 -> E3): zera, preserva o preço da receita e limpa só o custo do colaborador anterior', '1|absent|-|-|0.00|0.00|versao|105.00|0.00|true/false/false',
+  pg_temp.editar('51', $s$status = 'absent', check_in = null, check_out = null, employee_id = '5c10f000-0000-4000-8000-000000000003'$s$) || '|' || pg_temp.linha('51')
+  || '|' || split_part(pg_temp.fixado('51'), '|', 1) || '|' || split_part(pg_temp.fixado('51'), '|', 2) || '|' || split_part(pg_temp.fixado('51'), '|', 3) || '|' || pg_temp.refs('51'));
+select pg_temp.registrar('G3d. o horário digitado em uma falta é ignorado (valores seguem zerados)', '1|0.00|0.00',
+  pg_temp.editar('51', $s$check_in = '06:00', check_out = '23:00'$s$) || '|' || pg_temp.valores('51'));
+select pg_temp.registrar('G3e. nota da falta: livre, sem alterar nada', '1|absent|0.00|0.00',
+  pg_temp.editar('51', $s$notes = 'atestado'$s$) || '|' || (select status::text from public.timesheet_entries where id = '5c10b100-0000-4000-8000-000000000051') || '|' || pg_temp.valores('51'));
+select pg_temp.registrar('G4. a regularização de legado recusa falta (55000): não há preço a regularizar', 'erro 55000',
+  pg_temp.adm(format($q$public.regularizar_apontamento_legado(%L, 'x', true)$q$, '5c10b100-0000-4000-8000-000000000052')));
 
 -- ---------------------------------------------------------------------------
 -- H. Legado
@@ -445,7 +503,12 @@ select pg_temp.registrar('H1. legado: editar só a NOTA segue livre e não toca 
   pg_temp.editar('01', $s$notes = 'conferido'$s$) || '|' || pg_temp.linha('01') || '|' || split_part(pg_temp.fixado('01'), '|', 1));
 select pg_temp.registrar('H2. legado: editar o horário é recusado (55000): exigiria um preço não comprovado', 'erro 55000|165.00|100.00',
   pg_temp.editar('01', $s$check_out = '18:00'$s$) || '|' || split_part(pg_temp.valores('01'), '|', 1) || '|' || split_part(pg_temp.valores('01'), '|', 2));
-select pg_temp.registrar('H3. legado: mudar o status é recusado (55000)', 'erro 55000', pg_temp.editar('01', $s$status = 'absent', check_in = null, check_out = null$s$));
+select pg_temp.registrar('H3. legado: mudar o status (inclusive virar FALTA) é recusado (55000) e a linha segue como estava', 'erro 55000|present|06:00:00|17:00:00|165.00|100.00|-',
+  pg_temp.editar('06', $s$status = 'absent', check_in = null, check_out = null$s$) || '|' || pg_temp.linha('06') || '|' || split_part(pg_temp.fixado('06'), '|', 1));
+select pg_temp.registrar('H3b. falta legada (valor já zero) -> presença: preço novo pelas versões, recusado (55000) em operação com legado anterior à ativação; linha intacta', 'erro 55000|absent|-|-|0.00|0.00',
+  pg_temp.editar('07', $s$status = 'present', check_in = '06:00', check_out = '15:00'$s$) || '|' || pg_temp.linha('07'));
+select pg_temp.registrar('H3c. legado: a falta (07) NÃO conta como legado na regra de data: ela não impede lançar nem é regularizável (55000)', 'erro 55000',
+  pg_temp.adm(format($q$public.regularizar_apontamento_legado(%L, 'x', true)$q$, '5c10b100-0000-4000-8000-000000000007')));
 select pg_temp.registrar('H4. legado: trocar o colaborador é recusado (55000)', 'erro 55000', pg_temp.editar('01', $s$employee_id = '5c10f000-0000-4000-8000-000000000003'$s$));
 select pg_temp.registrar('H5. legado: mudar só o intervalo é recusado (55000)', 'erro 55000', pg_temp.editar('01', $s$break_minutes = 30$s$));
 select pg_temp.registrar('H6. o coincidir da taxa atual NÃO libera o legado: L3 (E3) tem versões na data (100/80) e continua recusado', 'erro 55000', pg_temp.editar('03', $s$check_out = '18:00'$s$));
@@ -495,6 +558,15 @@ select pg_temp.registrar('I3. apagar o faturado é recusado, 42501', 'erro 42501
 select pg_temp.registrar('I4. a fatura segue fechada e o vínculo intacto', 'closed|2',
   (select status::text from public.invoices where id = '5c10b200-0000-4000-8000-000000000001') || '|' || (select count(*)::text from public.timesheet_entries where invoice_id = '5c10b200-0000-4000-8000-000000000001'));
 
+update public.timesheet_entries set invoice_id = '5c10b200-0000-4000-8000-000000000001' where id = '5c10b100-0000-4000-8000-000000000051';
+select pg_temp.registrar('I5. faturado: presença -> falta é recusada (42501) e o valor fica', 'erro 42501|203.13',
+  pg_temp.editar('22', $s$status = 'absent', check_in = null, check_out = null$s$) || '|' || split_part(pg_temp.valores('22'), '|', 1));
+select pg_temp.registrar('I6. faturado: falta (já vinculada a fatura) -> presença é recusada (42501) e segue falta zerada', 'erro 42501|absent|06:00:00|23:00:00|0.00|0.00',
+  pg_temp.editar('51', $s$status = 'present', check_in = '06:00', check_out = '15:00'$s$) || '|' || pg_temp.linha('51'));
+select pg_temp.registrar('I7. faturado: nem a falta pode ser apagada ou trocar de colaborador (42501)', 'erro 42501|erro 42501',
+  pg_temp.editar('51', $s$employee_id = '5c10f000-0000-4000-8000-000000000001'$s$) || '|'
+  || pg_temp.adm_valor($q$with d as (delete from public.timesheet_entries where id = '5c10b100-0000-4000-8000-000000000051' returning 1) select count(*)::text from d$q$));
+
 -- ---------------------------------------------------------------------------
 -- J. Upsert do PostgREST e RPC do operador
 -- ---------------------------------------------------------------------------
@@ -539,6 +611,32 @@ select pg_temp.registrar('J9. RPC do operador em data SEM vigência (31/12/2025)
       '[{"employee_id":"5c10f000-0000-4000-8000-000000000001","status":"present","check_in":"06:00","check_out":"17:00","break_minutes":60}]'::jsonb)) x$q$));
 select pg_temp.registrar('J9b. e nada foi gravado naquela data', '0',
   (select count(*)::text from public.timesheet_entries e join public.timesheets t on t.id = e.timesheet_id where t.work_date = date '2025-12-31' and t.operation_id = '5c10e000-0000-4000-8000-0000000000a1'));
+select pg_temp.registrar('J9c. RPC do operador registra FALTA em data SEM vigência (29/12/2025): aceita', '1',
+  pg_temp.como('5c100000-0000-4000-8000-0000000000a2', 'aal1', $q$select count(*)::text from (select public.salvar_apontamento_operacional('5c10e000-0000-4000-8000-0000000000a1', '5c10a000-0000-4000-8000-0000000000a1', date '2025-12-29',
+      '[{"employee_id":"5c10f000-0000-4000-8000-000000000001","status":"absent","break_minutes":0}]'::jsonb)) x$q$));
+select pg_temp.registrar('J9d. a falta saiu zerada e sem origem nem referências', 'absent|0.00|0.00|nulo|false',
+  (select e.status::text || '|' || e.billed_amount::text || '|' || e.cost_amount::text || '|' || coalesce(e.terms_origin, 'nulo') || '|' || (e.contract_terms_id is not null or e.employee_cost_terms_id is not null)::text
+     from public.timesheet_entries e join public.timesheets t on t.id = e.timesheet_id
+    where t.operation_id = '5c10e000-0000-4000-8000-0000000000a1' and t.work_date = date '2025-12-29'));
+select pg_temp.registrar('J9e. o operador tenta virar essa falta em presença na mesma data sem vigência: P0002 e a falta fica como estava', 'erro P0002|absent|0.00',
+  pg_temp.como('5c100000-0000-4000-8000-0000000000a2', 'aal1', $q$select count(*)::text from (select public.salvar_apontamento_operacional('5c10e000-0000-4000-8000-0000000000a1', '5c10a000-0000-4000-8000-0000000000a1', date '2025-12-29',
+      '[{"employee_id":"5c10f000-0000-4000-8000-000000000001","status":"present","check_in":"06:00","check_out":"17:00","break_minutes":60}]'::jsonb)) x$q$)
+  || '|' || (select e.status::text || '|' || e.billed_amount::text from public.timesheet_entries e join public.timesheets t on t.id = e.timesheet_id
+    where t.operation_id = '5c10e000-0000-4000-8000-0000000000a1' and t.work_date = date '2025-12-29'));
+select pg_temp.registrar('J9f. com vigência (04/03), o operador vira presença -> falta: a chamada é aceita', '1',
+  pg_temp.como('5c100000-0000-4000-8000-0000000000a2', 'aal1', $q$select count(*)::text from (select public.salvar_apontamento_operacional('5c10e000-0000-4000-8000-0000000000a1', '5c10a000-0000-4000-8000-0000000000a1', date '2026-03-04',
+      '[{"employee_id":"5c10f000-0000-4000-8000-000000000001","status":"absent","break_minutes":0}]'::jsonb)) x$q$));
+select pg_temp.registrar('J9g. e a linha zerou, preservando o preço congelado (origem versao, 105)', 'absent|0.00|0.00|versao|105.00',
+  (select e.status::text || '|' || e.billed_amount::text || '|' || e.cost_amount::text || '|' || e.terms_origin || '|' || e.daily_rate_snapshot::text
+     from public.timesheet_entries e join public.timesheets t on t.id = e.timesheet_id
+    where t.operation_id = '5c10e000-0000-4000-8000-0000000000a1' and t.work_date = date '2026-03-04'));
+select pg_temp.registrar('J9h. o operador volta a presença: aceita', '1',
+  pg_temp.como('5c100000-0000-4000-8000-0000000000a2', 'aal1', $q$select count(*)::text from (select public.salvar_apontamento_operacional('5c10e000-0000-4000-8000-0000000000a1', '5c10a000-0000-4000-8000-0000000000a1', date '2026-03-04',
+      '[{"employee_id":"5c10f000-0000-4000-8000-000000000001","status":"present","check_in":"06:00","check_out":"17:00","break_minutes":60}]'::jsonb)) x$q$));
+select pg_temp.registrar('J9i. e reprecifica pela vigência da data: 144,38 / 87,50', 'present|144.38|87.50',
+  (select e.status::text || '|' || e.billed_amount::text || '|' || e.cost_amount::text
+     from public.timesheet_entries e join public.timesheets t on t.id = e.timesheet_id
+    where t.operation_id = '5c10e000-0000-4000-8000-0000000000a1' and t.work_date = date '2026-03-04'));
 select pg_temp.registrar('J10. o operador não lê nenhuma tabela de versões nem a chave', '0|0|0|0|0',
   pg_temp.como('5c100000-0000-4000-8000-0000000000a2', 'aal1', 'select count(*)::text from public.contract_terms') || '|'
   || pg_temp.como('5c100000-0000-4000-8000-0000000000a2', 'aal1', 'select count(*)::text from public.employee_cost_terms') || '|'
@@ -573,6 +671,10 @@ select pg_temp.folha('17', 'a5', 'a5', date '2026-02-10');
 select pg_temp.registrar('K4. retroativo anterior à ativação em operação que já tinha apontamento LEGADO (OP-L): recusado (55000); o vínculo daquele período é desconhecido', '55000|0',
   pg_temp.entrada('72', '17', '1') || '|' || (select count(*)::text from public.timesheet_entries where timesheet_id = '5c10b000-0000-4000-8000-000000000017'));
 select pg_temp.registrar('K4b. a mesma data em OP-K (sem legado) é aceita normalmente', 'ok', pg_temp.entrada('73', '04', '3'));
+select pg_temp.registrar('K4c. FALTA na mesma data em OP-L: aceita (falta não é precificada nem depende do vínculo)', 'ok|absent|-|-|0.00|0.00',
+  pg_temp.entrada('74', '17', '2', 'absent', '', '') || '|' || pg_temp.linha('74') );
+select pg_temp.registrar('K4d. mas virar presença nela é recusado (55000): voltaria a precisar do vínculo desconhecido', 'erro 55000|absent',
+  pg_temp.editar('74', $s$status = 'present', check_in = '06:00', check_out = '15:00'$s$) || '|' || (select status::text from public.timesheet_entries where id = '5c10b100-0000-4000-8000-000000000074'));
 
 -- ---------------------------------------------------------------------------
 -- L. Bloqueios de edição direta e congelamento de turno (ligados)
@@ -643,6 +745,9 @@ select pg_temp.registrar('M11. sincronizar_colunas_legadas à mão (admin): idem
                   pg_temp.adm_valor($q$select public.sincronizar_colunas_legadas('Sincronização manual 2')::text$q$)::jsonb y) q));
 select pg_temp.registrar('M11b. e deixou 2 eventos na trilha', '2', (select count(*)::text from public.financial_terms_audit where action = 'colunas_legadas_sincronizadas'));
 
+select pg_temp.registrar('M11c. desligar normalizou as colunas antigas com jornada <= 0 (K3: 0 -> 8; K4: -3 -> 8): a mesma jornada que o motor antigo já usava', '8.00|8.00',
+  (select shift_hours::text from public.contracts where id = '5c10d000-0000-4000-8000-0000000000d3') || '|' || (select shift_hours::text from public.contracts where id = '5c10d000-0000-4000-8000-0000000000d4'));
+
 select pg_temp.folha('19', 'a3', 'a3', date '2026-03-10');
 select pg_temp.folha('1a', 'a1', 'a1', date '2026-03-11');
 select pg_temp.registrar('M12. LIGAR de novo (sem pendências)', '1', pg_temp.motor(true));
@@ -669,6 +774,35 @@ select pg_temp.registrar('N3. a consulta por data e as funções internas seguem
 select pg_temp.registrar('N4. o aposentar bloqueia versão referenciada, mesmo com o motor novo (55000)', 'erro 55000',
   pg_temp.adm(format($q$public.aposentar_condicao_contrato(%L, 'x')$q$,
     (select contract_terms_id from public.timesheet_entries where id = '5c10b100-0000-4000-8000-000000000022'))));
+
+-- ---------------------------------------------------------------------------
+-- P. Jornada histórica <= 0 (contrato antigo): a vigência administrativa normalizada
+--    reproduz o motor antigo
+-- ---------------------------------------------------------------------------
+
+-- Datas posteriores à ativação: a regra R7 (retroativo em operação com legado) não se aplica.
+select pg_temp.folha_sem_turno('c1', 'a7', date '2099-01-05');
+select pg_temp.folha_sem_turno('c2', 'a8', date '2099-01-05');
+select pg_temp.registrar('P1. motor NOVO ligado, jornada normalizada (8 h): os mesmos números do motor antigo (K3 137,50 / 62,50; K4 112,50 / 62,50)', 'ok|137.50|62.50|ok|112.50|62.50',
+  pg_temp.entrada('93', 'c1', '6') || '|' || pg_temp.valores('93') || '|' || pg_temp.entrada('94', 'c2', '6') || '|' || pg_temp.valores('94'));
+select pg_temp.registrar('P2. idêntico, linha a linha, ao que o motor antigo gravou (91 e 92): receita, custo, minutos, extras e diária-base', 'true|true',
+  (select (a.billed_amount, a.cost_amount, a.worked_minutes, a.overtime_minutes, a.daily_rate_snapshot, a.ot_hour_rate_snapshot, a.daily_cost_snapshot)
+          = (b.billed_amount, b.cost_amount, b.worked_minutes, b.overtime_minutes, b.daily_rate_snapshot, b.ot_hour_rate_snapshot, b.daily_cost_snapshot)
+     from public.timesheet_entries a, public.timesheet_entries b where a.id = '5c10b100-0000-4000-8000-000000000091' and b.id = '5c10b100-0000-4000-8000-000000000093')::text
+  || '|' || (select (a.billed_amount, a.cost_amount, a.worked_minutes, a.overtime_minutes, a.daily_rate_snapshot, a.ot_hour_rate_snapshot, a.daily_cost_snapshot)
+          = (b.billed_amount, b.cost_amount, b.worked_minutes, b.overtime_minutes, b.daily_rate_snapshot, b.ot_hour_rate_snapshot, b.daily_cost_snapshot)
+     from public.timesheet_entries a, public.timesheet_entries b where a.id = '5c10b100-0000-4000-8000-000000000092' and b.id = '5c10b100-0000-4000-8000-000000000094')::text);
+select pg_temp.registrar('P3. a jornada gravada no apontamento é a normalizada (8 h, 480 min previstos), com origem e referência da vigência administrativa', 'versao|8.00|480.00|true',
+  (select terms_origin || '|' || shift_hours_snapshot::text || '|' || (shift_hours_snapshot * 60)::text || '|' || (contract_terms_id is not null)::text
+     from public.timesheet_entries where id = '5c10b100-0000-4000-8000-000000000093'));
+select pg_temp.registrar('P4. a constraint NÃO foi afrouxada: versão com jornada 0 ou negativa é recusada (23514)', 'sem 23514 -> 23514|23514',
+  'sem 23514 -> ' || pg_temp.erro_de($q$insert into public.contract_terms (contract_id, valid_from, valid_to, daily_rate, shift_hours, ot_factor, ot_tolerance_min, origin, reason)
+      values ('5c10d000-0000-4000-8000-0000000000d3', date '2000-01-01', date '2000-02-01', 100, 0, 1.5, 10, 'informada', 'x')$q$)
+  || '|' || pg_temp.erro_de($q$insert into public.contract_terms (contract_id, valid_from, valid_to, daily_rate, shift_hours, ot_factor, ot_tolerance_min, origin, reason)
+      values ('5c10d000-0000-4000-8000-0000000000d4', date '2000-01-01', date '2000-02-01', 100, -3, 1.5, 10, 'informada', 'x')$q$)
+  );
+select pg_temp.registrar('P5. nem a RPC administrativa aceita registrar jornada 0 (a normalização é explícita, nunca silenciosa)', 'erro 23514',
+  pg_temp.adm($q$public.registrar_condicao_contrato('5c10d000-0000-4000-8000-0000000000d3', date '2000-01-01', 100, 0, 1.5, 10, 'x', date '2000-02-01')$q$));
 
 -- ---------------------------------------------------------------------------
 -- O. Permissões e inventário

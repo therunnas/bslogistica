@@ -172,6 +172,8 @@ em silêncio. Ordem das migrations:
   fallback para a taxa atual; edição usa os preços congelados; apontamento legado só muda
   por `regularizar_apontamento_legado`; operação com legado recusa data anterior à ativação
   (R7); operação com apontamento não troca de contrato (R6).
+  Falta não exige vigência (zerada, sem preço inventado); voltar a presença exige vigência na data;
+  contrato antigo com jornada <= 0 entra no histórico com a jornada já normalizada (8 h).
 
 Dependências da ativação (ligar o motor da 025, não antes):
 

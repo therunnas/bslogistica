@@ -39,8 +39,21 @@
 --       minutos trabalhados, extras e valores;
 --     * troca de COLABORADOR: custo da versão do novo colaborador na data; receita preservada;
 --     * `UPDATE` sem coluna motriz: preserva tudo, como a 010.
---   Falta (`absent`) tem os valores zerados, mas também fixa referências e snapshots.
 --   Sem versão vigente na data: recusa com P0002, sem fallback para a taxa atual.
+--
+-- FALTA (`absent`)
+--
+--   Falta não gera diária trabalhada nem cobrança, então não há preço a comprovar: registrar
+--   uma falta NÃO exige vigência e nunca lê versão. Os valores saem zerados e nada é inventado
+--   (referências e snapshots novos ficam vazios; os três snapshots antigos, NOT NULL, ficam 0).
+--     * falta -> presença/reposição: é apontamento a precificar, como um novo. Exige versões
+--       vigentes na data trabalhada; sem elas, P0002 e o apontamento NÃO é modificado;
+--     * presença/reposição -> falta: valores zerados; referências e snapshots já gravados são
+--       PRESERVADOS (não há reprecificação). Se o colaborador também mudou, a referência e o
+--       snapshot de custo do colaborador anterior são limpos, porque descreveriam outra pessoa;
+--     * presença LEGADA (sem origem) continua congelada, inclusive para virar falta: só a
+--       regularização a libera (zerar apagaria o valor antigo; voltar reprecificaria sem trilha);
+--     * falta não é legado: não conta para a regra de data anterior à ativação.
 --
 -- FONTE DO PREÇO E `operations.contract_id` MUTÁVEL
 --
@@ -52,11 +65,23 @@
 --
 -- LEGADO
 --
---   Apontamento sem origem (`terms_origin` nulo) é legado. Nota e faturamento continuam
---   livres. Edição de horário, intervalo, status ou colaborador é RECUSADA (55000): exigiria
---   um preço que ninguém comprovou. NÃO se presume taxa histórica por coincidir com a atual.
+--   Apontamento de presença/reposição sem origem (`terms_origin` nulo) é legado. Nota e
+--   faturamento continuam livres. Edição de horário, intervalo, status (inclusive virar falta)
+--   ou colaborador é RECUSADA (55000): exigiria um preço que ninguém comprovou. NÃO se presume
+--   taxa histórica por coincidir com a atual. A falta legada (valor já zero) pode voltar a
+--   presença: é um preço novo pelas versões da data, sujeito à regra de data anterior à ativação.
 --   A saída é `regularizar_apontamento_legado(entry, motivo, aplicar)` (admin AAL2): adota as
 --   versões cadastradas para a data, com PRÉVIA (aplicar = false não grava nada) e trilha.
+--
+-- JORNADA <= 0 NO CONTRATO ANTIGO
+--
+--   `contracts.shift_hours` não tem CHECK; o motor antigo trata valor <= 0 como 8 horas
+--   (`derivar_valores_financeiros`). As versões (`contract_terms`) exigem jornada positiva
+--   (`contract_terms_jornada_positiva`), e essa constraint não é afrouxada. Um contrato com
+--   jornada <= 0 não tem como ser "migrado" literalmente: a vigência administrativa é
+--   registrada com a jornada JÁ NORMALIZADA (8), que é exatamente o que o motor antigo usava,
+--   e o resultado financeiro é idêntico. A aritmética abaixo mantém o mesmo tratamento
+--   defensivo, mas não é alcançada por versão alguma.
 --
 -- TAXAS ATUAIS NAS COLUNAS ANTIGAS
 --
@@ -493,6 +518,62 @@ begin
     end if;
   end if;
 
+  -- Apontamento LEGADO de presença/reposição (sem origem de preço) segue congelado para
+  -- qualquer edição motriz, inclusive virar falta: zerá-lo apagaria o único registro do valor
+  -- antigo, e voltar a presença o reprecificaria sem a prévia e a trilha da regularização.
+  -- Só `regularizar_apontamento_legado` (que muda a origem) passa por aqui.
+  if tg_op = 'UPDATE' and old.status <> 'absent'
+     and old.terms_origin is null and new.terms_origin is null then
+    raise exception 'Apontamento anterior ao histórico de vigências: alterar horário, intervalo, status ou colaborador exigiria um preço que não foi comprovado.'
+      using errcode = '55000',
+            hint = 'Um administrador pode regularizá-lo com regularizar_apontamento_legado (prévia, motivo e trilha). Notas e faturamento seguem livres.';
+  end if;
+
+  -- Falta não gera diária trabalhada nem cobrança: não há preço a comprovar, então não exige
+  -- vigência, não lê versão e não inventa referência nem snapshot. Valores zerados.
+  --   * falta nova: nada é fixado (os três snapshots antigos, NOT NULL, ficam 0);
+  --   * presença -> falta: referências e snapshots já gravados são PRESERVADOS (sem
+  --     reprecificar). Se o colaborador mudou, a referência e o snapshot de custo do anterior
+  --     descreveriam outra pessoa e são limpos.
+  -- A volta para presença é tratada como apontamento a precificar (abaixo).
+  if new.status = 'absent' then
+    if tg_op = 'INSERT' then
+      new.contract_terms_id       := null;
+      new.operation_terms_id      := null;
+      new.employee_cost_terms_id  := null;
+      new.shift_hours_snapshot    := null;
+      new.ot_factor_snapshot      := null;
+      new.ot_tolerance_snapshot   := null;
+      new.planned_minutes_snapshot := null;
+      new.terms_origin            := null;
+      new.daily_rate_snapshot     := 0;
+      new.ot_hour_rate_snapshot   := 0;
+      new.daily_cost_snapshot     := 0;
+    else
+      new.contract_terms_id       := old.contract_terms_id;
+      new.operation_terms_id      := old.operation_terms_id;
+      new.shift_hours_snapshot    := old.shift_hours_snapshot;
+      new.ot_factor_snapshot      := old.ot_factor_snapshot;
+      new.ot_tolerance_snapshot   := old.ot_tolerance_snapshot;
+      new.planned_minutes_snapshot := old.planned_minutes_snapshot;
+      new.terms_origin            := old.terms_origin;
+      new.daily_rate_snapshot     := old.daily_rate_snapshot;
+      new.ot_hour_rate_snapshot   := old.ot_hour_rate_snapshot;
+      if new.employee_id is distinct from old.employee_id then
+        new.employee_cost_terms_id := null;
+        new.daily_cost_snapshot    := 0;
+      else
+        new.employee_cost_terms_id := old.employee_cost_terms_id;
+        new.daily_cost_snapshot    := old.daily_cost_snapshot;
+      end if;
+    end if;
+    new.worked_minutes   := 0;
+    new.overtime_minutes := 0;
+    new.billed_amount    := 0;
+    new.cost_amount      := 0;
+    return new;
+  end if;
+
   -- Data, operação e turno vêm da FOLHA, nunca do payload.
   select t.work_date, t.operation_id, t.shift_id
     into _work_date, _operation, _shift
@@ -502,7 +583,12 @@ begin
     return new; -- o trigger de chave recusa a folha inexistente (23503)
   end if;
 
-  _precificar := tg_op = 'INSERT' or new.timesheet_id is distinct from old.timesheet_id;
+  -- Apontamento NOVO, que MUDA DE FOLHA ou que SAI DE FALTA é precificado pelas versões da
+  -- data trabalhada; os demais mantêm o preço já gravado.
+  _precificar := case
+    when tg_op = 'INSERT' then true
+    else new.timesheet_id is distinct from old.timesheet_id or old.status = 'absent'
+  end;
 
   _origem := new.terms_origin;
   _contract_terms_id := new.contract_terms_id;
@@ -517,6 +603,7 @@ begin
        and exists (select 1 from public.timesheet_entries e
                      join public.timesheets s on s.id = e.timesheet_id
                     where s.operation_id = _operation and e.terms_origin is null
+                      and e.status <> 'absent'
                       and e.id is distinct from new.id) then
       raise exception 'Esta operação tem apontamentos anteriores à ativação do histórico de vigências; o vínculo de contrato daquele período é desconhecido.'
         using errcode = '55000',
@@ -914,6 +1001,9 @@ begin
   end if;
   if e.invoice_id is not null then
     raise exception 'Apontamento faturado é imutável.' using errcode = '55000';
+  end if;
+  if e.status = 'absent' then
+    raise exception 'Falta não gera cobrança: não há preço a regularizar.' using errcode = '55000';
   end if;
   if e.terms_origin in ('versao', 'valor_acordado') then
     raise exception 'O apontamento já tem origem de preço (%); não é legado.', e.terms_origin using errcode = '55000';
