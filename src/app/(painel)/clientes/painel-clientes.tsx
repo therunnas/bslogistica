@@ -47,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { brl, dateBR, num, todayISO } from "@/lib/format";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
-import { useClients, useContracts } from "@/lib/queries";
+import { useClients, useContracts, useOperations } from "@/lib/queries";
 import type { Client, Contract } from "@/lib/types";
 
 const emptyClient = {
@@ -86,6 +86,7 @@ const CARD_CLASS =
 export function PainelClientes() {
   const clients = useClients();
   const contracts = useContracts();
+  const operations = useOperations();
 
   const saveClient = useSaveRow("clients");
   const removeClient = useDeleteRow("clients");
@@ -100,6 +101,12 @@ export function PainelClientes() {
   const [contractForm, setContractForm] = useState(emptyContract);
 
   const clientName = (id: string) => clients.data?.find((client) => client.id === id)?.name ?? "—";
+
+  // O banco recusa trocar o cliente de um contrato que já tem operação (migration 021);
+  // a tela evita oferecer a troca. Quem decide continua sendo o banco.
+  const contratoEmUso =
+    Boolean(contractForm.id) &&
+    (operations.data ?? []).some((operation) => operation.contract_id === contractForm.id);
 
   const totalClientes = clients.data?.length ?? 0;
 
@@ -706,6 +713,7 @@ export function PainelClientes() {
 
               <Select
                 value={contractForm.client_id}
+                disabled={contratoEmUso}
                 onValueChange={(value) =>
                   setContractForm({
                     ...contractForm,
@@ -725,6 +733,13 @@ export function PainelClientes() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {contratoEmUso && (
+                <p className="text-xs text-muted-foreground">
+                  Este contrato já é usado por operações, então o cliente não pode ser trocado. Para
+                  outro cliente, crie um novo contrato.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
