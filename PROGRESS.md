@@ -163,11 +163,17 @@ em silêncio. Ordem das migrations:
 - **024**: vigência do valor acordado por operação (`operation_terms`, `operation_terms_id`
   no apontamento, RPCs espelho das da 023) e o **congelamento de jornada de turno usado,
   criado DESABILITADO**. Pronta em branch local; nenhum efeito sobre o cálculo.
-- **Derivação por vigência** (substituir `derivar_valores_financeiros`): migration
-  posterior à 024 (número livre, a definir), a única que muda o cálculo. Só depois de
-  todas as fontes terem onde guardar sua história.
+- **025**: motor financeiro por vigência, **desligado por padrão** e reversível
+  (`financial_engine_settings`, `alterar_motor_vigencia`). Ligar troca 6 triggers de uma vez
+  (motor antigo desabilitado; motor novo, 3 bloqueios de edição direta e congelamento de
+  turno habilitados); desligar volta ao motor antigo, ressincroniza as colunas das taxas pela
+  versão vigente hoje e deixa a trilha. Pronta em branch local; não aplicada em nenhum
+  ambiente hospedado. Regras do motor ligado: preço pela versão da data trabalhada, sem
+  fallback para a taxa atual; edição usa os preços congelados; apontamento legado só muda
+  por `regularizar_apontamento_legado`; operação com legado recusa data anterior à ativação
+  (R7); operação com apontamento não troca de contrato (R6).
 
-Dependências da ativação (a derivação, não antes):
+Dependências da ativação (ligar o motor da 025, não antes):
 
 1. **Bloqueio da edição direta** de `contracts`, `employees` e `operations.agreed_amount`:
    hoje as telas gravam esses campos por `UPDATE`; bloquear antes quebra os formulários.

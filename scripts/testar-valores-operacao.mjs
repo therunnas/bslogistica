@@ -62,8 +62,10 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations",
-  arquivos.filter((a) => a !== NOME).every((a) => a.split("_")[0] < NOME.split("_")[0]),
+  "A3. o timestamp é posterior ao de todas as migrations numeradas antes da 024",
+  arquivos
+    .filter((a) => /_0(0\d|1\d|2[0-3])_/.test(a))
+    .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
 );
 verificar(
@@ -72,8 +74,8 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existe a 025 (a derivação por vigência ganha número livre posterior)",
-  arquivos.some((a) => a.includes("_025_")),
+  "A5. não existe a 026 (a 025 é o motor por vigência, que usa as versões desta migration)",
+  arquivos.some((a) => a.includes("_026_")),
   false,
 );
 

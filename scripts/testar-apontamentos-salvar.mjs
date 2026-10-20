@@ -600,11 +600,13 @@ verificar(
   true,
 );
 verificar(
-  "F4. nenhuma migration nova nesta correção: a última continua sendo a 024",
-  readdirSync(new URL("../supabase/migrations/", import.meta.url))
-    .sort()
-    .at(-1)
-    .includes("_024_"),
+  "F4. a correção do salvamento não depende de migration: as 021 a 024 existem e a 026 não",
+  ["_021_", "_022_", "_023_", "_024_"].every((n) =>
+    readdirSync(new URL("../supabase/migrations/", import.meta.url)).some((a) => a.includes(n)),
+  ) &&
+    !readdirSync(new URL("../supabase/migrations/", import.meta.url)).some((a) =>
+      a.includes("_026_"),
+    ),
   true,
 );
 

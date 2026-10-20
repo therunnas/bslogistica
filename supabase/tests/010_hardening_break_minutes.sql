@@ -407,7 +407,9 @@ begin
   -- criação — passa a 16, pelo mesmo critério. A 023 acrescenta `financial_terms_audit`
   -- (trilha das vigências financeiras), também com RLS desde a criação — passa a 17. A 024
   -- acrescenta `operation_terms` (versões do valor acordado), com RLS desde a criação — 18.
-  perform pg_temp.registrar('F3. as 18 tabelas de public seguem com RLS ativa', '18',
+  -- A 025 acrescenta `financial_engine_settings` (a chave do motor por vigência), também com
+  -- RLS desde a criação — 19.
+  perform pg_temp.registrar('F3. as 19 tabelas de public seguem com RLS ativa', '19',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -513,14 +515,17 @@ begin
   -- ou renomeado pela 014 apareceria. Os dois conjuntos são os do schema com as
   -- 19 migrations, lidos do catálogo antes da 014. A 022 acrescenta um (o guard das
   -- colunas de condições financeiras): são 11, e os 10 originais seguem intactos. A 024
-  -- acrescenta o da coluna `operation_terms_id` (valor acordado versionado): são 12.
-  perform pg_temp.registrar('I1. os 12 triggers de timesheet_entries, intactos',
+  -- acrescenta o da coluna `operation_terms_id` (valor acordado versionado): são 12. A 025
+  -- acrescenta o motor por vigência, criado DESABILITADO (a lista conta o trigger, esteja
+  -- habilitado ou não): são 13.
+  perform pg_temp.registrar('I1. os 13 triggers de timesheet_entries, intactos (um deles dormente)',
     'trg_timesheet_entries_ancora_folha, trg_timesheet_entries_bloqueia_condicoes, '
     'trg_timesheet_entries_bloqueia_condicoes_operacao, '
     'trg_timesheet_entries_bloqueia_delete_faturado, '
     'trg_timesheet_entries_bloqueia_desvinculo, trg_timesheet_entries_bloqueia_edicao_faturada, '
     'trg_timesheet_entries_bloqueia_truncate, trg_timesheet_entries_bloqueia_vinculo_direto, '
     'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_calculo_financeiro, '
+    'trg_timesheet_entries_calculo_vigencia, '
     'trg_timesheet_entries_chave, trg_timesheet_entries_updated',
     (select string_agg(t.tgname, ', ' order by t.tgname)
        from pg_trigger t join pg_class c on c.oid = t.tgrelid

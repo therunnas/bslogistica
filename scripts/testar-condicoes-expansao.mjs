@@ -64,8 +64,8 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existe a 025 (a derivação por vigência é etapa seguinte)",
-  arquivos.some((a) => a.includes("_025_")),
+  "A5. não existe a 026 (a 025 é o motor por vigência; a próxima ainda não foi desenhada)",
+  arquivos.some((a) => a.includes("_026_")),
   false,
 );
 
