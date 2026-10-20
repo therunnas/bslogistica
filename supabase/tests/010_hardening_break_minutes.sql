@@ -404,8 +404,9 @@ begin
   -- não relaxada: continua contando TODAS as tabelas com RLS ativa, e uma
   -- tabela nova sem RLS faria este caso FALHAR do mesmo jeito que antes. A 022
   -- acrescenta `contract_terms` e `employee_cost_terms`, ambas com RLS ativa desde a
-  -- criação — passa a 16, pelo mesmo critério.
-  perform pg_temp.registrar('F3. as 16 tabelas de public seguem com RLS ativa', '16',
+  -- criação — passa a 16, pelo mesmo critério. A 023 acrescenta `financial_terms_audit`
+  -- (trilha das vigências financeiras), também com RLS desde a criação — passa a 17.
+  perform pg_temp.registrar('F3. as 17 tabelas de public seguem com RLS ativa', '17',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));

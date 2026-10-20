@@ -52,8 +52,10 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations",
-  arquivos.filter((a) => a !== NOME).every((a) => a.split("_")[0] < NOME.split("_")[0]),
+  "A3. o timestamp é posterior ao de todas as migrations numeradas antes da 022",
+  arquivos
+    .filter((a) => /_0(0\d|1\d|2[01])_/.test(a))
+    .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
 );
 verificar(
@@ -62,8 +64,8 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existem as migrations 023 e 024 (RPCs e derivação são etapas seguintes)",
-  arquivos.some((a) => a.includes("_023_") || a.includes("_024_")),
+  "A5. não existe a 024 (a derivação por vigência é etapa seguinte); a 023 só registra vigências",
+  arquivos.some((a) => a.includes("_024_")),
   false,
 );
 

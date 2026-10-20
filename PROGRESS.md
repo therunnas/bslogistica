@@ -151,6 +151,31 @@ Outros itens, de menor gravidade:
   não distingue bloqueio de ausência de dado; testes em Production provam menos
   do que parecem. Os testes SQL locais é que medem as proteções.
 
+### C05-B — vigências financeiras (staging/homologação; fora de Production)
+
+Regra de negócio: cada apontamento preserva as condições vigentes na data trabalhada;
+reajuste futuro não reescreve diária anterior; faturado é imutável; nada é recalculado
+em silêncio. Estado e ordem das migrations:
+
+- **022** (expansão do esquema) e **021** aplicadas na homologação.
+- **023** (registro de vigências por RPC admin AAL2, trilha `financial_terms_audit`,
+  imutabilidade das versões): pronta em branch local, **sem** efeito sobre o cálculo.
+- **Derivação por vigência** (substituir `derivar_valores_financeiros`): etapa
+  posterior, que também decide o bloqueio da edição direta de `contracts` e `employees`
+  (hoje as telas gravam por `UPDATE`; bloquear antes quebra os formulários).
+
+Dependências identificadas antes dessa ativação (não resolvidas, não improvisar):
+
+1. **Valor acordado (`operations.agreed_amount`)** — sem contrato, a diária vem dele
+   (jornada 8 h, fator 1, tolerância 10). Versioná-lo exige tabela própria de vigência
+   por operação, mais a referência no apontamento, **antes** da derivação. Fica a ordem:
+   expansão do valor acordado → derivação.
+2. **Turnos** — a jornada prevista é lida do turno a cada recálculo. Congelar a
+   configuração de turno já usado (ou versioná-la) e gravar `planned_minutes_snapshot`
+   é regra da ativação; a edição de turno pela tela de Operações tem de tratar o erro.
+3. **Legado** — valores existentes são preservados; regularizar condição antiga exige
+   admin, motivo e trilha (as RPCs da 023 já fazem isso), nunca recálculo automático.
+
 ## Decisões que não se reabrem
 
 - **Não** reconstruir o Supabase, nem reaplicar migration já aplicada, nem editar
