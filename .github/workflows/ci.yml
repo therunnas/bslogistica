@@ -99,6 +99,9 @@ jobs:
       - name: Teste integridade-contratos
         run: npm run test:integridade-contratos
 
+      - name: Teste condicoes-expansao
+        run: npm run test:condicoes-expansao
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

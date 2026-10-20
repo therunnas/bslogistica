@@ -211,8 +211,10 @@ verificar(
   1,
 );
 verificar(
-  "C3. o timestamp é posterior ao de todas as outras migrations",
-  arquivos.filter((a) => a !== NOME).every((a) => a.split("_")[0] < NOME.split("_")[0]),
+  "C3. o timestamp é posterior ao de todas as migrations numeradas antes da 021",
+  arquivos
+    .filter((a) => /_0(0\d|1\d|20)_/.test(a))
+    .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
 );
 

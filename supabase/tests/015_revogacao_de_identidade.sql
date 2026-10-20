@@ -773,12 +773,14 @@ $bloco_h$;
 -- H. A FORMA: nenhuma policy foi criada, removida ou trocada de tipo; RLS e FORCE RLS
 -- ficam como estavam; e nenhuma chamada a has_role()/is_staff() ficou solta (por
 -- linha) nas policies de public.
+-- O inventário inclui as 4 policies e as 2 tabelas da migration 022 (contract_terms e
+-- employee_cost_terms, leitura só de admin em AAL2); sem a 022 aplicada, H-F1 a H-F7 divergem.
 do $bloco_h_forma$
 declare _n int; _sobra int;
 begin
-  perform pg_temp.registrar('H-F1. public tem 50 policies', '50',
+  perform pg_temp.registrar('H-F1. public tem 54 policies', '54',
     (select count(*)::text from pg_policies where schemaname = 'public'));
-  perform pg_temp.registrar('H-F2. 23 RESTRICTIVE e 27 PERMISSIVE', '23/27',
+  perform pg_temp.registrar('H-F2. 25 RESTRICTIVE e 29 PERMISSIVE', '25/29',
     (select count(*) filter (where permissive = 'RESTRICTIVE') || '/' || count(*) filter (where permissive = 'PERMISSIVE')
        from pg_policies where schemaname = 'public'));
 
@@ -791,10 +793,14 @@ begin
       ('clients', 'clients_exige_admin', 'RESTRICTIVE', 'ALL'),
       ('clients', 'clients_select_staff', 'PERMISSIVE', 'SELECT'),
       ('clients', 'clients_write_admin', 'PERMISSIVE', 'ALL'),
+      ('contract_terms', 'contract_terms_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
+      ('contract_terms', 'contract_terms_leitura_admin', 'PERMISSIVE', 'SELECT'),
       ('contracts', 'contracts_exige_aal2', 'RESTRICTIVE', 'ALL'),
       ('contracts', 'contracts_exige_admin', 'RESTRICTIVE', 'ALL'),
       ('contracts', 'contracts_select_staff', 'PERMISSIVE', 'SELECT'),
       ('contracts', 'contracts_write_admin', 'PERMISSIVE', 'ALL'),
+      ('employee_cost_terms', 'employee_cost_terms_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
+      ('employee_cost_terms', 'employee_cost_terms_leitura_admin', 'PERMISSIVE', 'SELECT'),
       ('employees', 'employees_exige_aal2', 'RESTRICTIVE', 'ALL'),
       ('employees', 'employees_exige_admin', 'RESTRICTIVE', 'ALL'),
       ('employees', 'employees_select_staff', 'PERMISSIVE', 'SELECT'),
@@ -843,18 +849,18 @@ begin
     into _n;
   perform pg_temp.registrar('H-F3. inventario de policies identico ao anterior (tabela, nome, tipo, comando)', '0', _n::text);
 
-  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated', '50',
+  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated', '54',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and roles = array['authenticated']::name[]));
 
-  perform pg_temp.registrar('H-F5. as 14 tabelas seguem com RLS ligada', '14',
+  perform pg_temp.registrar('H-F5. as 16 tabelas seguem com RLS ligada', '16',
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relrowsecurity));
   perform pg_temp.registrar('H-F6. e nenhuma passou a FORCE RLS', '0',
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relforcerowsecurity));
 
-  perform pg_temp.registrar('H-F7. 36 policies seguem chamando has_role()/is_staff()', '36',
+  perform pg_temp.registrar('H-F7. 40 policies seguem chamando has_role()/is_staff()', '40',
     (select count(*)::text from pg_policies
       where schemaname = 'public'
         and (coalesce(qual, '') || coalesce(with_check, '')) ~ '(has_role|is_staff)\('));
