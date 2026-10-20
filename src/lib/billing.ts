@@ -107,7 +107,23 @@ export function calcEntry(input: EntryCalcInput): EntryCalcResult {
   };
 }
 
-export const round2 = (v: number) => Math.round((Number(v) || 0) * 100) / 100;
+/**
+ * Arredonda para o centavo do MESMO jeito que o banco grava.
+ *
+ * `derivar_valores_financeiros()` (migration 010) faz `ROUND((valor * 100)::numeric) / 100`.
+ * O cast de `double precision` para `numeric` mantém 15 dígitos significativos, o que
+ * absorve o ruído binário do produto; depois o `ROUND` de `numeric` arredonda o meio
+ * centavo para cima. `Math.round` direto sobre o produto cru não tem essa etapa: um
+ * empate exato como 120,825 chega como 12082,499999999998 e cai para 120,82, um
+ * centavo abaixo do que o banco grava (120,83).
+ *
+ * `toPrecision(15)` reproduz o cast. Valores negativos mantêm a semântica anterior
+ * do `Math.round` (meio para +infinito): o domínio monetário é não-negativo por
+ * constraint, e o `numeric` do banco arredondaria o meio negativo para longe do zero.
+ * Vale só para a prévia: o valor gravado continua sendo o derivado pelo banco.
+ */
+export const round2 = (v: number) =>
+  Math.round(Number(((Number(v) || 0) * 100).toPrecision(15))) / 100;
 
 export const margin = (revenue: number, cost: number) => round2(revenue - cost);
 export const marginPct = (revenue: number, cost: number) =>

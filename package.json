@@ -26,7 +26,8 @@
     "test:queries-paginacao": "node --experimental-strip-types scripts/testar-queries-paginacao.mjs",
     "test:ledger-estados": "node --experimental-strip-types scripts/testar-ledger-estados.mjs",
     "test:admin-paginacao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-admin-paginacao.mjs",
-    "test:apontamentos-leitura": "node --experimental-strip-types scripts/testar-apontamentos-leitura.mjs"
+    "test:apontamentos-leitura": "node --experimental-strip-types scripts/testar-apontamentos-leitura.mjs",
+    "test:paridade-financeira": "node --experimental-strip-types scripts/testar-paridade-financeira.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
