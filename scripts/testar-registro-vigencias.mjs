@@ -76,8 +76,10 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations",
-  arquivos.filter((a) => a !== NOME).every((a) => a.split("_")[0] < NOME.split("_")[0]),
+  "A3. o timestamp é posterior ao de todas as migrations numeradas antes da 023",
+  arquivos
+    .filter((a) => /_0(0\d|1\d|2[0-2])_/.test(a))
+    .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
 );
 verificar(
@@ -86,8 +88,8 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existe a 024 (a derivação por vigência é a etapa seguinte)",
-  arquivos.some((a) => a.includes("_024_")),
+  "A5. não existe a 025 (a derivação por vigência é a etapa seguinte)",
+  arquivos.some((a) => a.includes("_025_")),
   false,
 );
 verificar(
@@ -136,7 +138,7 @@ verificar(
   false,
 );
 verificar(
-  "B4. nenhum trigger novo nas tabelas de origem (o bloqueio da edição direta fica para a 024)",
+  "B4. nenhum trigger novo nas tabelas de origem (o bloqueio da edição direta fica para a migration de ativação)",
   /create trigger[^;]*\bon public\.(contracts|employees|operations|shifts|timesheets|timesheet_entries)\b/.test(
     codigo,
   ),

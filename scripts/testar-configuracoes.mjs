@@ -420,17 +420,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. conjunto de migrations contém 28 arquivos, até a 023 (a 023 é a C05-B, registro de vigências financeiras)",
+  "G10. conjunto de migrations contém 29 arquivos, até a 024 (a 024 é a C05-B, valor acordado por operação)",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  28,
+  29,
 );
 verificar(
-  "G10b. a migration mais recente é a 023",
+  "G10b. a migration mais recente é a 024",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_023_"),
+    .includes("_024_"),
   true,
 );
 

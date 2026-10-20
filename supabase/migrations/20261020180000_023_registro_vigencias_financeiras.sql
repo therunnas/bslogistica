@@ -28,11 +28,12 @@
 --
 --   * Não substitui `derivar_valores_financeiros`, não altera `gerar_fatura`, não recalcula
 --     nem preenche nenhum apontamento. As versões existem e são consultáveis; o dinheiro
---     continua sendo calculado exatamente como antes. A ativação é a migration 024.
+--     continua sendo calculado exatamente como antes. A ativação é a migration de derivação
+--     por vigência, posterior à expansão do valor acordado (024).
 --   * Não bloqueia a edição direta de `contracts.daily_rate` etc. nem de `employees.daily_cost`.
 --     As telas de Clientes/Contratos e Colaboradores gravam esses campos por `UPDATE` direto
 --     (`useSaveRow`); um bloqueio isolado quebraria os formulários. O bloqueio, junto com o
---     mecanismo de compatibilidade da interface, fica para a fase coordenada com a 024.
+--     mecanismo de compatibilidade da interface, fica para a migration de ativação.
 --   * Não cria versão nenhuma: as tabelas continuam vazias. Não há versão fictícia para datas
 --     históricas desconhecidas e não há fallback para a taxa atual.
 --   * Não mexe em `operations.agreed_amount` nem em `shifts`. Versionar o valor acordado

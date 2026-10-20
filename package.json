@@ -30,7 +30,8 @@
     "test:paridade-financeira": "node --experimental-strip-types scripts/testar-paridade-financeira.mjs",
     "test:integridade-contratos": "node --experimental-strip-types scripts/testar-integridade-contratos.mjs",
     "test:condicoes-expansao": "node --experimental-strip-types scripts/testar-condicoes-expansao.mjs",
-    "test:registro-vigencias": "node --experimental-strip-types scripts/testar-registro-vigencias.mjs"
+    "test:registro-vigencias": "node --experimental-strip-types scripts/testar-registro-vigencias.mjs",
+    "test:valores-operacao": "node --experimental-strip-types scripts/testar-valores-operacao.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

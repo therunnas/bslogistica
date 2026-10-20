@@ -155,26 +155,35 @@ Outros itens, de menor gravidade:
 
 Regra de negócio: cada apontamento preserva as condições vigentes na data trabalhada;
 reajuste futuro não reescreve diária anterior; faturado é imutável; nada é recalculado
-em silêncio. Estado e ordem das migrations:
+em silêncio. Ordem das migrations:
 
-- **022** (expansão do esquema) e **021** aplicadas na homologação.
-- **023** (registro de vigências por RPC admin AAL2, trilha `financial_terms_audit`,
-  imutabilidade das versões): pronta em branch local, **sem** efeito sobre o cálculo.
-- **Derivação por vigência** (substituir `derivar_valores_financeiros`): etapa
-  posterior, que também decide o bloqueio da edição direta de `contracts` e `employees`
-  (hoje as telas gravam por `UPDATE`; bloquear antes quebra os formulários).
+- **021** e **022** (expansão do esquema): aplicadas na homologação.
+- **023**: registro de vigências de contrato e de custo por RPC admin AAL2, trilha
+  `financial_terms_audit` e imutabilidade das versões. Pronta em branch local.
+- **024**: vigência do valor acordado por operação (`operation_terms`, `operation_terms_id`
+  no apontamento, RPCs espelho das da 023) e o **congelamento de jornada de turno usado,
+  criado DESABILITADO**. Pronta em branch local; nenhum efeito sobre o cálculo.
+- **Derivação por vigência** (substituir `derivar_valores_financeiros`): migration
+  posterior à 024 (número livre, a definir), a única que muda o cálculo. Só depois de
+  todas as fontes terem onde guardar sua história.
 
-Dependências identificadas antes dessa ativação (não resolvidas, não improvisar):
+Dependências da ativação (a derivação, não antes):
 
-1. **Valor acordado (`operations.agreed_amount`)** — sem contrato, a diária vem dele
-   (jornada 8 h, fator 1, tolerância 10). Versioná-lo exige tabela própria de vigência
-   por operação, mais a referência no apontamento, **antes** da derivação. Fica a ordem:
-   expansão do valor acordado → derivação.
-2. **Turnos** — a jornada prevista é lida do turno a cada recálculo. Congelar a
-   configuração de turno já usado (ou versioná-la) e gravar `planned_minutes_snapshot`
-   é regra da ativação; a edição de turno pela tela de Operações tem de tratar o erro.
-3. **Legado** — valores existentes são preservados; regularizar condição antiga exige
-   admin, motivo e trilha (as RPCs da 023 já fazem isso), nunca recálculo automático.
+1. **Bloqueio da edição direta** de `contracts`, `employees` e `operations.agreed_amount`:
+   hoje as telas gravam esses campos por `UPDATE`; bloquear antes quebra os formulários.
+   Exige trocar os formulários pelas RPCs de vigência (data de início e motivo).
+2. **Congelamento de turno usado:** habilitar `trg_shifts_congela_jornada_usada` junto com a
+   tela de turnos, que tem de traduzir o erro `23514` e oferecer "novo turno" (hoje o
+   formulário reenvia o objeto inteiro e funciona porque o trigger está desabilitado). A
+   derivação grava `planned_minutes_snapshot` e o reaproveita enquanto o turno da folha
+   não mudar.
+3. **`operations.contract_id` é mutável:** trocar uma operação de sem contrato para com
+   contrato muda a fonte (valor acordado x contrato) dos apontamentos novos. A origem de
+   cada apontamento já derivado fica em `terms_origin`; decidir se a troca de fonte
+   exige data de corte.
+4. **Legado:** valores existentes são preservados; regularizar condição antiga exige
+   admin, motivo e trilha (as RPCs da 023 e da 024 já fazem isso), nunca recálculo
+   automático. Apontamento sem versão na data é recusado, sem fallback para a taxa atual.
 
 ## Decisões que não se reabrem
 

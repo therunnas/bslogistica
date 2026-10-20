@@ -64,8 +64,8 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existe a 024 (a derivação por vigência é etapa seguinte); a 023 só registra vigências",
-  arquivos.some((a) => a.includes("_024_")),
+  "A5. não existe a 025 (a derivação por vigência é etapa seguinte)",
+  arquivos.some((a) => a.includes("_025_")),
   false,
 );
 
