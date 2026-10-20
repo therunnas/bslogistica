@@ -136,6 +136,99 @@ function mensagemDeDiariaDuplicada(detalhe?: string) {
 const contextoDe = (operationId: string, turnoId: string, date: string) =>
   `${operationId}|${turnoId}|${date}`;
 
+// === leitura-de-apontamentos:inicio ===
+// Bloco autocontido (só tipos e funções puras): `scripts/testar-apontamentos-leitura.mjs`
+// o extrai deste arquivo e o executa de verdade. Não importe nada para dentro dele.
+
+/** Retrato mínimo de uma consulta do React Query. */
+interface ConsultaDeLeitura {
+  status: "pending" | "error" | "success";
+  fetchStatus: "fetching" | "paused" | "idle";
+  data: unknown;
+}
+
+const ROTULOS_DA_LEITURA = {
+  operations: "operações",
+  shifts: "turnos",
+  employees: "colaboradores",
+  team: "equipe",
+  timesheets: "folhas",
+  entries: "lançamentos",
+} as const;
+
+type NomeDaLeitura = keyof typeof ROTULOS_DA_LEITURA;
+
+type LeituraDeApontamentos =
+  | { estado: "carregando" }
+  | { estado: "erro"; falhas: NomeDaLeitura[] }
+  | { estado: "atualizando" }
+  | { estado: "pronto" };
+
+/**
+ * Decide se os dados que a tela usa para achar a folha, a equipe, os turnos e os
+ * colaboradores são confiáveis. Só `pronto` autoriza salvar ou fechar/reabrir.
+ *
+ * Por que não basta `isLoading`: ele só vale na primeira carga. Uma consulta que
+ * falha deixa `data` indefinido, o `?? []` da tela a trata como "não há folha" e o
+ * salvamento criaria uma folha nova por cima da que existe. Erro com dado antigo
+ * em cache também é `erro` (não dá para provar que o dado ainda vale), e refetch em
+ * andamento é `atualizando` (a folha pode ter mudado). O rascunho não passa por
+ * aqui: este controle só habilita ou bloqueia ações, não toca nas linhas.
+ */
+function avaliarLeituraDeApontamentos(
+  consultas: Record<NomeDaLeitura, ConsultaDeLeitura>,
+): LeituraDeApontamentos {
+  const nomes = Object.keys(ROTULOS_DA_LEITURA) as NomeDaLeitura[];
+
+  const falhas = nomes.filter((nome) => consultas[nome].status === "error");
+  if (falhas.length > 0) {
+    return { estado: "erro", falhas };
+  }
+
+  if (
+    nomes.some((nome) => consultas[nome].status === "pending" || consultas[nome].data === undefined)
+  ) {
+    return { estado: "carregando" };
+  }
+
+  if (nomes.some((nome) => consultas[nome].fetchStatus !== "idle")) {
+    return { estado: "atualizando" };
+  }
+
+  return { estado: "pronto" };
+}
+
+function avisoDaLeitura(
+  leitura: LeituraDeApontamentos,
+): { titulo: string; descricao: string } | null {
+  switch (leitura.estado) {
+    case "pronto":
+      return null;
+    case "carregando":
+      return {
+        titulo: "Carregando os dados do apontamento…",
+        descricao: "Salvar e fechar o dia ficam indisponíveis até a leitura terminar.",
+      };
+    case "atualizando":
+      return {
+        titulo: "Atualizando os dados…",
+        descricao:
+          "Salvar e fechar o dia ficam indisponíveis até a leitura terminar. O que você digitou foi mantido.",
+      };
+    case "erro":
+      return {
+        titulo: "Não foi possível carregar todos os dados",
+        descricao: `Falha ao ler: ${leitura.falhas
+          .map((nome) => ROTULOS_DA_LEITURA[nome])
+          .join(
+            ", ",
+          )}. Salvar e fechar o dia ficam bloqueados para não criar nem alterar apontamentos sobre dados incompletos. O que você digitou foi mantido.`,
+      };
+  }
+}
+
+// === leitura-de-apontamentos:fim ===
+
 export function PainelApontamentos() {
   const queryClient = useQueryClient();
 
@@ -146,6 +239,29 @@ export function PainelApontamentos() {
   const team = useTeam();
   const timesheets = useTimesheets();
   const entries = useEntries();
+
+  const leitura = avaliarLeituraDeApontamentos({
+    operations,
+    shifts,
+    employees,
+    team,
+    timesheets,
+    entries,
+  });
+  const avisoDeLeitura = avisoDaLeitura(leitura);
+
+  function tentarLerDeNovo() {
+    for (const chave of [
+      "operations",
+      "shifts",
+      "employees",
+      "operation_team",
+      "timesheets",
+      "timesheet_entries",
+    ]) {
+      void queryClient.invalidateQueries({ queryKey: [chave], exact: true });
+    }
+  }
 
   const [operationId, setOperationId] = useState("");
 
@@ -401,6 +517,11 @@ export function PainelApontamentos() {
 
   const saveAll = useMutation({
     mutationFn: async () => {
+      // Sem leitura confiável, "não há folha" pode ser só uma consulta que falhou.
+      if (leitura.estado !== "pronto") {
+        throw new Error("Aguarde a leitura dos dados terminar antes de salvar.");
+      }
+
       if (!aSalvar.length) {
         return {
           gravadas: 0,
@@ -532,6 +653,10 @@ export function PainelApontamentos() {
 
   const toggleStatus = useMutation({
     mutationFn: async (status: "open" | "closed") => {
+      if (leitura.estado !== "pronto") {
+        throw new Error("Aguarde a leitura dos dados terminar antes de alterar o status.");
+      }
+
       if (!timesheet) {
         throw new Error("Salve o apontamento antes de fechar.");
       }
@@ -607,7 +732,7 @@ export function PainelApontamentos() {
               variant="outline"
               className="h-10 rounded-xl"
               onClick={() => toggleStatus.mutate(isClosed ? "open" : "closed")}
-              disabled={!timesheet}
+              disabled={!timesheet || leitura.estado !== "pronto"}
             >
               {isClosed ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
 
@@ -619,7 +744,12 @@ export function PainelApontamentos() {
               className="h-10 rounded-xl"
               onClick={() => saveAll.mutate()}
               disabled={
-                isClosed || carregando || saveAll.isPending || !linhas.length || !!conflitos.length
+                isClosed ||
+                carregando ||
+                leitura.estado !== "pronto" ||
+                saveAll.isPending ||
+                !linhas.length ||
+                !!conflitos.length
               }
             >
               <Save className="h-4 w-4" />
@@ -629,6 +759,32 @@ export function PainelApontamentos() {
           </div>
         }
       />
+
+      {avisoDeLeitura ? (
+        <div
+          role="alert"
+          className={`mb-5 rounded-xl border px-4 py-3 ${
+            leitura.estado === "erro"
+              ? "border-destructive/30 bg-destructive/[0.07] text-destructive"
+              : "border-border bg-secondary/40 text-foreground"
+          }`}
+        >
+          <p className="text-sm font-medium">{avisoDeLeitura.titulo}</p>
+
+          <p className="mt-1 text-xs leading-5">{avisoDeLeitura.descricao}</p>
+
+          {leitura.estado === "erro" ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 h-9 rounded-xl"
+              onClick={tentarLerDeNovo}
+            >
+              Tentar novamente
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Resumo

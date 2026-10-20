@@ -30,6 +30,7 @@ import {
 
 import { PageHeader } from "../_components/app-shell";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { marginPct } from "@/lib/billing";
 import { brl, dateBR, minutesToHours, monthRange, num, pct } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
+import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
+import type { AvisoDoLedger } from "@/lib/ledger-estado";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -48,7 +51,9 @@ export function PainelDashboard() {
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
 
-  const { rows, isLoading } = useLedger();
+  const ledger = useLedger();
+  const exibicao = decidirExibicao(ledger);
+  const rows = linhasParaExibicao(ledger);
 
   const period = useMemo(
     () => rows.filter((row) => inPeriod(row.date, start, end)),
@@ -187,10 +192,19 @@ export function PainelDashboard() {
         }
       />
 
-      {isLoading ? (
+      {ledger.estado === "carregando" ? (
         <DashboardSkeleton />
+      ) : !exibicao.mostrarValores ? (
+        exibicao.aviso && (
+          <AvisoLedger
+            aviso={exibicao.aviso}
+            onTentarNovamente={exibicao.podeTentarNovamente ? ledger.tentarNovamente : undefined}
+          />
+        )
       ) : (
         <>
+          {exibicao.aviso && <AvisoLedger aviso={exibicao.aviso} />}
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi
               label="Receita"
@@ -619,5 +633,32 @@ function DashboardSkeleton() {
         ))}
       </div>
     </>
+  );
+}
+
+function AvisoLedger({
+  aviso,
+  onTentarNovamente,
+}: {
+  aviso: AvisoDoLedger;
+  onTentarNovamente?: (() => void) | undefined;
+}) {
+  return (
+    <div role="alert" className="mb-5 rounded-2xl border border-border bg-secondary/40 p-5">
+      <p className="text-sm font-semibold text-foreground">{aviso.titulo}</p>
+
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{aviso.descricao}</p>
+
+      {onTentarNovamente ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3 h-9 rounded-xl"
+          onClick={onTentarNovamente}
+        >
+          Tentar novamente
+        </Button>
+      ) : null}
+    </div>
   );
 }

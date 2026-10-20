@@ -23,6 +23,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { ACAO_AUDITORIA } from "./tipos";
 import type { Papel } from "./tipos";
 import type { PapelBruto, UsuarioBruto } from "./dominio";
+import { ErroPaginacao, lerTudoPaginado } from "../paginacao";
+import type { OpcoesDePaginacao } from "../paginacao";
 
 export interface ErroDaResposta {
   message: string;
@@ -59,12 +61,142 @@ function exigirSucesso<T>(
   return resposta.data as T;
 }
 
+interface LinhaDePapel {
+  id: string;
+  user_id: string;
+  role: Papel;
+}
+
 interface AdminApiUser {
   id: string;
   email?: string | null | undefined;
   created_at: string;
   last_sign_in_at?: string | null | undefined;
   banned_until?: string | null | undefined;
+}
+
+/**
+ * Lê uma tabela inteira pelo paginador da C03 e converte a falha para
+ * `ErroAdministrativo`, o tipo que o resto deste módulo já lança. Erro do
+ * PostgREST mantém a mensagem e o `code` originais; qualquer outra falha de
+ * leitura (contagem divergente, resposta inválida, limite de páginas) vira
+ * `ErroAdministrativo` com o código do paginador. Nunca devolve lista parcial.
+ */
+export async function lerTudoOuFalhar<T extends object>(
+  opcoes: OpcoesDePaginacao<T>,
+  operacao: string,
+): Promise<T[]> {
+  try {
+    return (await lerTudoPaginado<T>(opcoes)).linhas;
+  } catch (erro) {
+    if (erro instanceof ErroPaginacao) {
+      const causa = erro.cause as Partial<ErroDaResposta> | undefined;
+      if (typeof causa?.message === "string") {
+        throw new ErroAdministrativo(causa as ErroDaResposta, operacao);
+      }
+      throw new ErroAdministrativo({ message: erro.message, code: erro.codigo }, operacao);
+    }
+    throw erro;
+  }
+}
+
+/** Contas por página da Auth Admin API e teto de páginas (10 mil contas). */
+export const CONTAS_POR_PAGINA = 200;
+export const MAX_PAGINAS_DE_CONTAS = 50;
+
+/**
+ * Lê TODAS as contas da Auth Admin API, página a página.
+ *
+ * A API pagina por número de página (`page`/`per_page`), não por cursor, então
+ * uma conta criada ou removida durante a leitura desloca as páginas seguintes.
+ * Por isso: o fim é provado por uma página VAZIA (página curta não basta), contas
+ * repetidas entre páginas denunciam o deslocamento, e o total informado pela API
+ * (`x-total-count`, quando existe) é conferido contra o lido. Divergência manda
+ * reler UMA vez; persistindo, falha. Nunca devolve lista parcial.
+ *
+ * Os metadados `nextPage`/`lastPage` do `supabase-js` NÃO são usados: ele lê só o
+ * primeiro dígito do número da página (`substring(0, 1)`), então passam a mentir
+ * a partir da página 10. O `total` é lido por inteiro e é confiável; quando a API
+ * não o informa (0), a leitura segue sem essa conferência.
+ */
+export async function lerTodasAsContas(
+  buscarPagina: (
+    pagina: number,
+    porPagina: number,
+  ) => PromiseLike<{ data: unknown; error: ErroDaResposta | null }>,
+  opcoes: { porPagina?: number; maxPaginas?: number } = {},
+): Promise<AdminApiUser[]> {
+  const porPagina = opcoes.porPagina ?? CONTAS_POR_PAGINA;
+  const maxPaginas = opcoes.maxPaginas ?? MAX_PAGINAS_DE_CONTAS;
+  const operacao = "listar usuários";
+
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    const vistas = new Map<string, AdminApiUser>();
+    let repetidas = 0;
+    let total: number | null = null;
+
+    for (let pagina = 1; ; pagina++) {
+      if (pagina > maxPaginas) {
+        throw new ErroAdministrativo(
+          {
+            message: `Limite de ${maxPaginas} páginas de contas atingido sem confirmar o fim da lista.`,
+            code: "LIMITE_PAGINAS",
+          },
+          operacao,
+        );
+      }
+
+      const resposta = await buscarPagina(pagina, porPagina);
+      if (resposta.error) {
+        throw new ErroAdministrativo(resposta.error, operacao);
+      }
+
+      const dados = resposta.data as { users?: unknown; total?: unknown } | null | undefined;
+      const contas = dados?.users;
+      if (!Array.isArray(contas) || contas.length > porPagina) {
+        throw new ErroAdministrativo(
+          { message: `A página ${pagina} de contas veio inválida.`, code: "RESPOSTA_INVALIDA" },
+          operacao,
+        );
+      }
+
+      if (
+        typeof dados?.total === "number" &&
+        Number.isSafeInteger(dados.total) &&
+        dados.total > 0
+      ) {
+        total = dados.total;
+      }
+
+      if (contas.length === 0) break;
+
+      for (const conta of contas as AdminApiUser[]) {
+        if (typeof conta?.id !== "string" || conta.id === "") {
+          throw new ErroAdministrativo(
+            {
+              message: `A página ${pagina} trouxe uma conta sem identificador.`,
+              code: "RESPOSTA_INVALIDA",
+            },
+            operacao,
+          );
+        }
+        if (vistas.has(conta.id)) repetidas++;
+        else vistas.set(conta.id, conta);
+      }
+    }
+
+    const confere = repetidas === 0 && (total === null || vistas.size === total);
+    if (confere) return [...vistas.values()];
+  }
+
+  throw new ErroAdministrativo(
+    {
+      message:
+        "A lista de contas mudou durante a leitura e não estabilizou após reler; a leitura não está comprovadamente completa.",
+      code: "LEITURA_INCOMPLETA",
+    },
+    operacao,
+  );
 }
 
 export interface EntradaDeAuditoria {
@@ -125,9 +257,6 @@ interface ClienteComAuditoria {
   };
 }
 
-/** No máximo 200 contas por página: folga generosa para uma equipe pequena. */
-const CONTAS_POR_PAGINA = 200;
-
 export function criarClienteAdministrativo(
   supabase: SupabaseClient<Database>,
 ): ClienteAdministrativo {
@@ -135,12 +264,10 @@ export function criarClienteAdministrativo(
 
   return {
     async listarUsuarios() {
-      const resposta = await supabase.auth.admin.listUsers({
-        page: 1,
-        perPage: CONTAS_POR_PAGINA,
-      });
-      const dados = exigirSucesso<{ users: AdminApiUser[] }>(resposta, "listar usuários");
-      return dados.users.map((usuario) => ({
+      const contas = await lerTodasAsContas((page, perPage) =>
+        supabase.auth.admin.listUsers({ page, perPage }),
+      );
+      return contas.map((usuario) => ({
         id: usuario.id,
         email: usuario.email ?? null,
         created_at: usuario.created_at,
@@ -175,8 +302,28 @@ export function criarClienteAdministrativo(
     },
 
     async listarPapeis() {
-      const resposta = await supabase.from("user_roles").select("user_id, role");
-      return exigirSucesso<PapelBruto[]>(resposta, "listar papéis");
+      // Cursor por `id` (a tabela tem `id` único); a saída continua sendo só
+      // `{ user_id, role }`, o que `PapelBruto` e o consumidor esperam.
+      const linhas = await lerTudoOuFalhar<LinhaDePapel>(
+        {
+          lerPagina: async ({ depoisDe, limite }) => {
+            let consulta = supabase.from("user_roles").select("id, user_id, role");
+            if (depoisDe !== null) consulta = consulta.gt("id", depoisDe);
+            const resposta = await consulta.order("id", { ascending: true }).limit(limite);
+            if (resposta.error) throw resposta.error;
+            return { linhas: resposta.data as LinhaDePapel[] };
+          },
+          contar: async () => {
+            const resposta = await supabase
+              .from("user_roles")
+              .select("id", { count: "exact", head: true });
+            if (resposta.error) throw resposta.error;
+            return resposta.count as number;
+          },
+        },
+        "listar papéis",
+      );
+      return linhas.map(({ user_id, role }) => ({ user_id, role }));
     },
 
     async concederPapel(userId, papel) {

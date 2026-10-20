@@ -41,6 +41,8 @@ import { marginPct, round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
 import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
+import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
+import type { AvisoDoLedger } from "@/lib/ledger-estado";
 import { toast } from "@/lib/notificacoes";
 import { useClients, useInvoices } from "@/lib/queries";
 
@@ -56,7 +58,9 @@ export function PainelFaturamento() {
 
   const clients = useClients();
   const invoices = useInvoices();
-  const { rows } = useLedger();
+  const ledger = useLedger();
+  const exibicao = decidirExibicao(ledger);
+  const rows = linhasParaExibicao(ledger);
 
   const [clientId, setClientId] = useState("");
   const [start, setStart] = useState(initial.start);
@@ -148,6 +152,12 @@ export function PainelFaturamento() {
         throw new Error("Selecione um cliente.");
       }
 
+      // A prévia é só informativa, mas gerar sobre uma leitura incompleta ou em
+      // andamento esconderia do usuário o que será faturado.
+      if (!exibicao.podeAgir) {
+        throw new Error("Aguarde a conclusão da leitura dos dados antes de gerar a fatura.");
+      }
+
       const { data, error } = await criarClienteNavegador().rpc("gerar_fatura", {
         _client_id: selectedClient,
         _period_start: start,
@@ -192,6 +202,8 @@ export function PainelFaturamento() {
   });
 
   function exportCsv() {
+    if (!exibicao.podeAgir) return;
+
     const header = [
       "Data",
       "Operação",
@@ -247,7 +259,7 @@ export function PainelFaturamento() {
               variant="outline"
               className="h-10 rounded-xl"
               onClick={exportCsv}
-              disabled={!period.length}
+              disabled={!period.length || !exibicao.podeAgir}
             >
               <Download className="h-4 w-4" />
               Exportar CSV
@@ -257,7 +269,7 @@ export function PainelFaturamento() {
               type="button"
               className="h-10 rounded-xl"
               onClick={() => generate.mutate()}
-              disabled={!period.length || generate.isPending}
+              disabled={!period.length || !exibicao.podeAgir || generate.isPending}
             >
               <FileText className="h-4 w-4" />
 
@@ -311,146 +323,159 @@ export function PainelFaturamento() {
         </CardContent>
       </Card>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Resumo
-          label="Diárias"
-          value={num(totals.dailies, 0)}
-          description={brl(dailiesValue)}
-          icon={CalendarDays}
+      {exibicao.aviso && (
+        <AvisoLedger
+          aviso={exibicao.aviso}
+          onTentarNovamente={exibicao.podeTentarNovamente ? ledger.tentarNovamente : undefined}
         />
+      )}
 
-        <Resumo
-          label="Horas extras"
-          value={minutesToLabel(totals.otMinutes)}
-          description={brl(overtimeValue)}
-          icon={Clock3}
-        />
+      {exibicao.mostrarValores && (
+        <>
+          <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Resumo
+              label="Diárias"
+              value={num(totals.dailies, 0)}
+              description={brl(dailiesValue)}
+              icon={CalendarDays}
+            />
 
-        <Resumo
-          label="Total a faturar"
-          value={brl(totals.billed)}
-          description="Lançamentos elegíveis"
-          icon={ReceiptText}
-        />
+            <Resumo
+              label="Horas extras"
+              value={minutesToLabel(totals.otMinutes)}
+              description={brl(overtimeValue)}
+              icon={Clock3}
+            />
 
-        <Resumo
-          label="Margem"
-          value={brl(totals.billed - totals.cost)}
-          description={`${num(
-            marginPct(totals.billed, totals.cost),
-            1,
-          )}% · custo ${brl(totals.cost)}`}
-          icon={TrendingUp}
-        />
-      </div>
+            <Resumo
+              label="Total a faturar"
+              value={brl(totals.billed)}
+              description="Lançamentos elegíveis"
+              icon={ReceiptText}
+            />
 
-      <Card className="mb-6 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
-        <CardHeader className="border-b border-border px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-              <WalletCards className="h-4 w-4" />
-            </div>
-
-            <div>
-              <CardTitle className="text-sm font-semibold tracking-tight">
-                Prévia por operação
-              </CardTitle>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                Valores ainda disponíveis para faturamento no período selecionado.
-              </p>
-            </div>
+            <Resumo
+              label="Margem"
+              value={brl(totals.billed - totals.cost)}
+              description={`${num(
+                marginPct(totals.billed, totals.cost),
+                1,
+              )}% · custo ${brl(totals.cost)}`}
+              icon={TrendingUp}
+            />
           </div>
-        </CardHeader>
 
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
-                  <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
-                    Operação
-                  </TableHead>
+          <Card className="mb-6 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+            <CardHeader className="border-b border-border px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                  <WalletCards className="h-4 w-4" />
+                </div>
 
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Diárias
-                  </TableHead>
+                <div>
+                  <CardTitle className="text-sm font-semibold tracking-tight">
+                    Prévia por operação
+                  </CardTitle>
 
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Horas extras
-                  </TableHead>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Valores ainda disponíveis para faturamento no período selecionado.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
 
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Total
-                  </TableHead>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                      <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
+                        Operação
+                      </TableHead>
 
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Custo
-                  </TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Diárias
+                      </TableHead>
 
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Margem
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Horas extras
+                      </TableHead>
 
-              <TableBody>
-                {byOperation.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6}>
-                      <EstadoVazio
-                        title="Nenhum lançamento faturável"
-                        description="Não existem apontamentos elegíveis para faturamento neste cliente e período."
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  byOperation.map((operation) => {
-                    const margem = operation.billed - operation.cost;
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Total
+                      </TableHead>
 
-                    return (
-                      <TableRow
-                        key={operation.id}
-                        className="border-border transition-colors hover:bg-secondary/20"
-                      >
-                        <TableCell className="py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-                              <ReceiptText className="h-4 w-4" />
-                            </div>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Custo
+                      </TableHead>
 
-                            <p className="text-sm font-medium text-foreground">{operation.name}</p>
-                          </div>
-                        </TableCell>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                        Margem
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
 
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {num(operation.dailies, 0)}
-                        </TableCell>
-
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {minutesToLabel(operation.otMinutes)}
-                        </TableCell>
-
-                        <TableCell className="text-right text-sm font-semibold text-foreground">
-                          {brl(operation.billed)}
-                        </TableCell>
-
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {brl(operation.cost)}
-                        </TableCell>
-
-                        <TableCell className="text-right text-sm font-medium text-foreground">
-                          {brl(margem)}
+                  <TableBody>
+                    {byOperation.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6}>
+                          <EstadoVazio
+                            title="Nenhum lançamento faturável"
+                            description="Não existem apontamentos elegíveis para faturamento neste cliente e período."
+                          />
                         </TableCell>
                       </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                    ) : (
+                      byOperation.map((operation) => {
+                        const margem = operation.billed - operation.cost;
+
+                        return (
+                          <TableRow
+                            key={operation.id}
+                            className="border-border transition-colors hover:bg-secondary/20"
+                          >
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                                  <ReceiptText className="h-4 w-4" />
+                                </div>
+
+                                <p className="text-sm font-medium text-foreground">
+                                  {operation.name}
+                                </p>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {num(operation.dailies, 0)}
+                            </TableCell>
+
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {minutesToLabel(operation.otMinutes)}
+                            </TableCell>
+
+                            <TableCell className="text-right text-sm font-semibold text-foreground">
+                              {brl(operation.billed)}
+                            </TableCell>
+
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {brl(operation.cost)}
+                            </TableCell>
+
+                            <TableCell className="text-right text-sm font-medium text-foreground">
+                              {brl(margem)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardHeader className="border-b border-border px-5 py-4">
@@ -507,7 +532,24 @@ export function PainelFaturamento() {
               </TableHeader>
 
               <TableBody>
-                {(invoices.data ?? []).length === 0 ? (
+                {invoices.isError || invoices.data === undefined ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>
+                      <EstadoVazio
+                        title={
+                          invoices.isError
+                            ? "Não foi possível carregar as faturas"
+                            : "Carregando faturas…"
+                        }
+                        description={
+                          invoices.isError
+                            ? "A lista não é exibida como vazia porque a leitura falhou. Recarregue a página para tentar de novo."
+                            : "A lista aparece quando a leitura terminar."
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : invoices.data.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>
                       <EstadoVazio
@@ -517,7 +559,7 @@ export function PainelFaturamento() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (invoices.data ?? []).map((invoice) => (
+                  invoices.data.map((invoice) => (
                     <TableRow
                       key={invoice.id}
                       className="border-border transition-colors hover:bg-secondary/20"
@@ -645,6 +687,33 @@ function EstadoVazio({ title, description }: { title: string; description: strin
       <p className="mt-4 text-sm font-medium text-foreground">{title}</p>
 
       <p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function AvisoLedger({
+  aviso,
+  onTentarNovamente,
+}: {
+  aviso: AvisoDoLedger;
+  onTentarNovamente?: (() => void) | undefined;
+}) {
+  return (
+    <div role="alert" className="mb-5 rounded-2xl border border-border bg-secondary/40 p-5">
+      <p className="text-sm font-semibold text-foreground">{aviso.titulo}</p>
+
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{aviso.descricao}</p>
+
+      {onTentarNovamente ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3 h-9 rounded-xl"
+          onClick={onTentarNovamente}
+        >
+          Tentar novamente
+        </Button>
+      ) : null}
     </div>
   );
 }

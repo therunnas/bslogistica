@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useClients,
   useContracts,
@@ -8,96 +9,98 @@ import {
   useShifts,
   useTimesheets,
 } from "./queries";
-import type { AttendanceStatus } from "./types";
+import {
+  CHAVES_DAS_CONSULTAS,
+  NOMES_DAS_CONSULTAS,
+  avaliarLedger,
+  planoDeReconciliacao,
+} from "./ledger-estado";
+import type { ConsultaDoLedger, EntradaDoLedger, LedgerAvaliacao } from "./ledger-estado";
 
-export interface LedgerRow {
-  entryId: string;
-  timesheetId: string;
-  date: string;
-  clientId: string;
-  clientName: string;
-  operationId: string;
-  operationName: string;
-  operationType: "fixed" | "spot";
-  shiftName: string;
-  employeeId: string;
-  employeeName: string;
-  status: AttendanceStatus;
-  workedMinutes: number;
-  overtimeMinutes: number;
-  dailies: number;
-  billed: number;
-  otValue: number;
-  cost: number;
-  invoiceId: string | null;
-  timesheetStatus: "open" | "closed";
+export type { LedgerRow } from "./ledger-estado";
+
+/** O estado do ledger mais a ação de tentar de novo (releitura das seis consultas). */
+export type Ledger = LedgerAvaliacao & { readonly tentarNovamente: () => void };
+
+/** Retrato estável de uma consulta: só muda quando algum campo relevante muda. */
+function useRetrato<T>(consulta: {
+  status: "pending" | "error" | "success";
+  fetchStatus: "fetching" | "paused" | "idle";
+  data: T[] | undefined;
+  dataUpdatedAt: number;
+}): ConsultaDoLedger<T> {
+  const { status, fetchStatus, data, dataUpdatedAt } = consulta;
+  return useMemo(
+    () => ({ status, fetchStatus, data, dataUpdatedAt }),
+    [status, fetchStatus, data, dataUpdatedAt],
+  );
 }
 
-/** Lançamentos consolidados: apontamento + operação + cliente + colaborador. */
-export function useLedger() {
-  const entries = useEntries();
-  const timesheets = useTimesheets();
-  const operations = useOperations();
-  const clients = useClients();
-  const employees = useEmployees();
-  const shifts = useShifts();
+/**
+ * Lançamentos consolidados: apontamento + operação + cliente + colaborador.
+ *
+ * Devolve um ESTADO, não uma lista: `rows` só existe em `pronto` (e, como
+ * `rowsAnteriores`, em `atualizando`). Falha de qualquer consulta, mesmo com dado
+ * antigo em cache, nunca vira lista vazia nem R$ 0,00. Regras e limites em
+ * `ledger-estado.ts`.
+ *
+ * Relação ausente entre as tabelas manda reler as consultas envolvidas UMA vez por
+ * episódio (a tentativa só volta a zero depois de um `pronto`); persistindo, o
+ * estado é `inconsistente`. Sem laço de invalidação.
+ */
+export function useLedger(): Ledger {
+  const queryClient = useQueryClient();
 
-  const isLoading =
-    entries.isLoading ||
-    timesheets.isLoading ||
-    operations.isLoading ||
-    clients.isLoading ||
-    employees.isLoading ||
-    shifts.isLoading;
+  const entries = useRetrato(useEntries());
+  const timesheets = useRetrato(useTimesheets());
+  const operations = useRetrato(useOperations());
+  const clients = useRetrato(useClients());
+  const employees = useRetrato(useEmployees());
+  const shifts = useRetrato(useShifts());
 
-  const rows = useMemo<LedgerRow[]>(() => {
-    const tsMap = new Map((timesheets.data ?? []).map((t) => [t.id, t]));
-    const opMap = new Map((operations.data ?? []).map((o) => [o.id, o]));
-    const clMap = new Map((clients.data ?? []).map((c) => [c.id, c]));
-    const empMap = new Map((employees.data ?? []).map((e) => [e.id, e]));
-    const shMap = new Map((shifts.data ?? []).map((s) => [s.id, s]));
+  const [tentativa, setTentativa] = useState<0 | 1>(0);
 
-    return (entries.data ?? [])
-      .map((entry) => {
-        const ts = tsMap.get(entry.timesheet_id);
-        if (!ts) return null;
-        const op = opMap.get(ts.operation_id);
-        const client = op ? clMap.get(op.client_id) : undefined;
-        const shift = ts.shift_id ? shMap.get(ts.shift_id) : undefined;
-        return {
-          entryId: entry.id,
-          timesheetId: ts.id,
-          date: ts.work_date,
-          clientId: op?.client_id ?? "",
-          clientName: client?.name ?? "—",
-          operationId: op?.id ?? "",
-          operationName: op?.name ?? "—",
-          operationType: op?.type ?? "fixed",
-          shiftName: shift?.name ?? "—",
-          employeeId: entry.employee_id,
-          employeeName: empMap.get(entry.employee_id)?.name ?? "—",
-          status: entry.status,
-          workedMinutes: entry.worked_minutes,
-          overtimeMinutes: entry.overtime_minutes,
-          dailies: entry.status === "absent" ? 0 : 1,
-          billed: Number(entry.billed_amount ?? 0),
-          otValue:
-            entry.status === "absent"
-              ? 0
-              : Math.max(
-                  0,
-                  Number(entry.billed_amount ?? 0) - Number(entry.daily_rate_snapshot ?? 0),
-                ),
-          cost: Number(entry.cost_amount ?? 0),
-          invoiceId: entry.invoice_id,
-          timesheetStatus: ts.status,
-        } satisfies LedgerRow;
-      })
-      .filter((r): r is LedgerRow => r !== null)
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, [entries.data, timesheets.data, operations.data, clients.data, employees.data, shifts.data]);
+  const entrada = useMemo<EntradaDoLedger>(
+    () => ({ entries, timesheets, operations, clients, employees, shifts }),
+    [entries, timesheets, operations, clients, employees, shifts],
+  );
 
-  return { rows, isLoading };
+  const avaliacao = useMemo(() => avaliarLedger(entrada, tentativa), [entrada, tentativa]);
+  const plano = useMemo(
+    () => planoDeReconciliacao(avaliacao, entrada, tentativa),
+    [avaliacao, entrada, tentativa],
+  );
+
+  const relerConsultas = useCallback(
+    (nomes: readonly (typeof NOMES_DAS_CONSULTAS)[number][]) => {
+      for (const nome of nomes) {
+        void queryClient.invalidateQueries({
+          queryKey: [...CHAVES_DAS_CONSULTAS[nome]],
+          exact: true,
+        });
+      }
+    },
+    [queryClient],
+  );
+
+  // Reconciliação: no máximo uma releitura por episódio.
+  useEffect(() => {
+    if (plano.length === 0) return;
+    setTentativa(1);
+    relerConsultas(plano);
+  }, [plano, relerConsultas]);
+
+  // Leitura válida encerra o episódio; uma nova ausência poderá reconciliar de novo.
+  useEffect(() => {
+    if (avaliacao.estado === "pronto" && tentativa !== 0) setTentativa(0);
+  }, [avaliacao.estado, tentativa]);
+
+  const tentarNovamente = useCallback(() => {
+    setTentativa(0);
+    relerConsultas(NOMES_DAS_CONSULTAS);
+  }, [relerConsultas]);
+
+  return useMemo(() => ({ ...avaliacao, tentarNovamente }), [avaliacao, tentarNovamente]);
 }
 
 export function useContractRules(operationId: string | null | undefined) {

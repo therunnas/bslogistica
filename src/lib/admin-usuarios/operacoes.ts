@@ -28,7 +28,15 @@ import {
   type ClienteAdministrativo,
   ErroAdministrativo,
   type ErroDaResposta,
+  lerTudoOuFalhar,
 } from "./cliente";
+import { ordenarApresentacao } from "../paginacao";
+
+interface LinhaDeOperacao {
+  id: string;
+  name: string;
+  created_at: string;
+}
 
 interface LinhaBruta {
   operation_id: string;
@@ -257,12 +265,28 @@ export interface OperacaoResumo {
 export async function listarOperacoesDisponiveis(
   supabase: SupabaseClient<Database>,
 ): Promise<OperacaoResumo[]> {
-  const resposta = await supabase
-    .from("operations")
-    .select("id, name")
-    .order("created_at", { ascending: false });
-  if (resposta.error) {
-    throw new ErroAdministrativo(resposta.error, "listar operações");
-  }
-  return resposta.data ?? [];
+  // A leitura pagina por `id`; `created_at` entra só para reproduzir a ordem da lista
+  // (mais recentes primeiro) e NÃO sai daqui: o resultado continua `{ id, name }`.
+  const linhas = await lerTudoOuFalhar<LinhaDeOperacao>(
+    {
+      lerPagina: async ({ depoisDe, limite }) => {
+        let consulta = supabase.from("operations").select("id, name, created_at");
+        if (depoisDe !== null) consulta = consulta.gt("id", depoisDe);
+        const resposta = await consulta.order("id", { ascending: true }).limit(limite);
+        if (resposta.error) throw resposta.error;
+        return { linhas: resposta.data as LinhaDeOperacao[] };
+      },
+      contar: async () => {
+        const resposta = await supabase
+          .from("operations")
+          .select("id", { count: "exact", head: true });
+        if (resposta.error) throw resposta.error;
+        return resposta.count as number;
+      },
+    },
+    "listar operações",
+  );
+  return ordenarApresentacao(linhas, [
+    { coluna: "created_at", tipo: "instante", ascendente: false },
+  ]).map(({ id, name }) => ({ id, name }));
 }
