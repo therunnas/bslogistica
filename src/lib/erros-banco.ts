@@ -37,5 +37,41 @@ export function mensagemDoErro(erro: unknown): string {
       : MENSAGEM_CONTRATO_DE_OUTRO_CLIENTE;
   }
 
+  const traducao = traducaoDoCodigo(e.code, mensagem);
+  if (traducao) {
+    return traducao;
+  }
+
   return mensagem || "Não foi possível concluir a operação.";
+}
+
+/**
+ * Erros financeiros conhecidos das migrations 022 a 024 (vigências, turnos congelados e
+ * apontamento): o SQLSTATE decide, nunca o texto.
+ *
+ * As funções e os triggers do projeto levantam mensagens JÁ em português e pensadas para a
+ * tela ("Sem condições contratuais vigentes em …"): essas são mantidas. Só a mensagem crua do
+ * PostgreSQL, em inglês e com nome de constraint, é trocada pelo texto genérico do código.
+ * `42501` fica de fora: continua devolvendo o texto de sempre. Nenhuma mensagem aqui carrega
+ * valor financeiro.
+ */
+const MENSAGENS_FINANCEIRAS: Readonly<Record<string, string>> = {
+  P0002: "Não há registro ou vigência para os dados informados. Confira a data e o cadastro.",
+  "55000": "Esta operação não é possível no estado atual do registro.",
+  "23P01": "O período informado se sobrepõe a outro já cadastrado.",
+  "22023": "Valor ou período inválido. Revise os campos informados.",
+  "23514": "Os dados informados não atendem a uma regra de validação.",
+};
+
+const MENSAGEM_CRUA_DO_BANCO =
+  /violates|constraint|permission denied|row-level security|does not exist|invalid input|duplicate key|null value|conflicting key/i;
+
+function traducaoDoCodigo(codigo: unknown, mensagem: string): string | null {
+  if (typeof codigo !== "string" || !(codigo in MENSAGENS_FINANCEIRAS)) {
+    return null;
+  }
+  if (mensagem && !MENSAGEM_CRUA_DO_BANCO.test(mensagem)) {
+    return mensagem;
+  }
+  return MENSAGENS_FINANCEIRAS[codigo] ?? null;
 }

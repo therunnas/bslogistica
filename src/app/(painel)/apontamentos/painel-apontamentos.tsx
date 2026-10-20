@@ -44,6 +44,8 @@ import {
   shiftPlannedMinutes,
   type AttendanceStatus,
 } from "@/lib/billing";
+import { colaboradoresFaturados, linhasParaSalvar, montarCarga } from "@/lib/apontamentos-salvar";
+import { mensagemDoErro } from "@/lib/erros-banco";
 import { brl, minutesToLabel, todayISO } from "@/lib/format";
 import { useContractRules } from "@/lib/ledger";
 import { exigirLinhaAfetada } from "@/lib/mutations";
@@ -507,9 +509,17 @@ export function PainelApontamentos() {
 
   const isClosed = timesheet?.status === "closed";
 
-  const aSalvar = computed.filter(
-    ({ row }) => !row.entryId || (draft?.dirty.has(row.employeeId) ?? false),
+  // Só entra no salvamento a linha nova, ou a existente que o usuário tocou E que difere
+  // do servidor. Linha faturada nunca entra: o banco a recusaria e levaria o lote junto.
+  const faturados = useMemo(() => colaboradoresFaturados(existingEntries), [existingEntries]);
+
+  const colaboradoresASalvar = new Set(
+    linhasParaSalvar(linhas, draft?.dirty ?? new Set<string>(), existingEntries).map(
+      (linha) => linha.employeeId,
+    ),
   );
+
+  const aSalvar = computed.filter(({ row }) => colaboradoresASalvar.has(row.employeeId));
 
   const conflitos = aSalvar.filter(
     ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
@@ -564,29 +574,13 @@ export function PainelApontamentos() {
         timesheetId = data.id;
       }
 
-      const payload = aSalvar.map(({ row, calc }) => ({
-        ...(row.entryId
-          ? {
-              id: row.entryId,
-            }
-          : {}),
-        timesheet_id: timesheetId!,
-        employee_id: row.employeeId,
-        operation_id: operationId,
-        work_date: date,
-        status: row.status,
-        check_in: row.status === "absent" ? null : row.checkIn ? `${row.checkIn}:00` : null,
-        check_out: row.status === "absent" ? null : row.checkOut ? `${row.checkOut}:00` : null,
-        break_minutes: row.breakMinutes,
-        worked_minutes: calc.workedMinutes,
-        overtime_minutes: calc.overtimeMinutes,
-        daily_rate_snapshot: calc.dailyRate,
-        ot_hour_rate_snapshot: calc.otHourRate,
-        daily_cost_snapshot: calc.dailyCost,
-        billed_amount: calc.billedAmount,
-        cost_amount: calc.costAmount,
-        notes: row.notes || null,
-      }));
+      // Só as colunas editáveis (mais as chaves de contexto, que o banco sobrescreve com as da
+      // folha). Receita, custo, minutos e snapshots são derivados no banco.
+      const payload = aSalvar.map(({ row }) =>
+        montarCarga(row, { timesheetId: timesheetId!, operationId, workDate: date }, () =>
+          globalThis.crypto.randomUUID(),
+        ),
+      );
 
       const { error } = await criarClienteNavegador().from("timesheet_entries").upsert(payload);
 
@@ -645,9 +639,7 @@ export function PainelApontamentos() {
         return;
       }
 
-      toast.error(
-        error instanceof Error ? error.message : "Não foi possível salvar o apontamento.",
-      );
+      toast.error(mensagemDoErro(error));
     },
   });
 
@@ -1042,7 +1034,7 @@ export function PainelApontamentos() {
                               status: value as AttendanceStatus,
                             })
                           }
-                          disabled={isClosed}
+                          disabled={isClosed || faturados.has(row.employeeId)}
                         >
                           <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
                             <SelectValue />
@@ -1065,7 +1057,9 @@ export function PainelApontamentos() {
                           type="time"
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                           value={row.checkIn}
-                          disabled={isClosed || row.status === "absent"}
+                          disabled={
+                            isClosed || row.status === "absent" || faturados.has(row.employeeId)
+                          }
                           onChange={(event) =>
                             update(row.employeeId, {
                               checkIn: event.target.value,
@@ -1079,7 +1073,9 @@ export function PainelApontamentos() {
                           type="time"
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                           value={row.checkOut}
-                          disabled={isClosed || row.status === "absent"}
+                          disabled={
+                            isClosed || row.status === "absent" || faturados.has(row.employeeId)
+                          }
                           onChange={(event) =>
                             update(row.employeeId, {
                               checkOut: event.target.value,
@@ -1094,7 +1090,9 @@ export function PainelApontamentos() {
                           min="0"
                           className="h-9 w-20 rounded-xl border-input bg-secondary/40"
                           value={row.breakMinutes}
-                          disabled={isClosed || row.status === "absent"}
+                          disabled={
+                            isClosed || row.status === "absent" || faturados.has(row.employeeId)
+                          }
                           onChange={(event) =>
                             update(row.employeeId, {
                               breakMinutes: Number(event.target.value),

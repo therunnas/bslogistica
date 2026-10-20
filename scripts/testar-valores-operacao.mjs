@@ -415,9 +415,10 @@ verificar(
   true,
 );
 verificar(
-  "E4. a tradução do erro 23514 do turno AINDA não existe: dependência registrada para a ativação",
-  /turno já tem apontamentos|congela|jornada/i.test(ler("src/lib/erros-banco.ts")),
-  false,
+  "E4. o erro 23514 do turno já chega legível à tela (mensagem em português mantida), mas a tela ainda NÃO oferece 'novo turno a partir deste': dependência registrada para a ativação",
+  /MENSAGEM_CRUA_DO_BANCO/.test(ler("src/lib/erros-banco.ts")) &&
+    !/novo turno a partir/i.test(operacoes),
+  true,
 );
 verificar(
   "E5. o PROGRESS.md registra a dependência do congelamento e a ordem das migrations",
