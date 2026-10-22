@@ -688,32 +688,39 @@ verificar(
 // G. A interface ainda não usa o motor
 // ---------------------------------------------------------------------------
 
-console.log("G. A interface não muda nesta etapa");
+console.log("G. Interface: usa as vigências, mas não liga nem desliga o motor");
 
 const telas = [
   "src/app/(painel)/apontamentos/painel-apontamentos.tsx",
   "src/app/(painel)/clientes/painel-clientes.tsx",
   "src/app/(painel)/colaboradores/painel-colaboradores.tsx",
   "src/app/(painel)/operacoes/painel-operacoes.tsx",
-  "src/app/(painel)/operacional/painel-operacional.tsx",
+  "src/app/(painel)/_components/vigencias.tsx",
+  "src/lib/vigencias-dados.ts",
   "src/lib/mutations.ts",
 ]
   .map(ler)
   .join("\n");
 verificar(
-  "G1. nenhuma tela chama as RPCs do motor nem importa o módulo de vigências",
+  "G1. nenhuma tela liga/desliga o motor, sincroniza colunas ou regulariza legado (fora do escopo das telas U3-U7)",
   [
-    ...Object.values(RPC_VIGENCIAS.motor),
-    "lib/vigencias",
-    "financial_engine_settings",
-    "regularizar_apontamento",
+    RPC_VIGENCIAS.motor.alterar,
+    RPC_VIGENCIAS.motor.sincronizarColunas,
+    RPC_VIGENCIAS.motor.regularizarApontamento,
   ]
     .filter((n) => telas.includes(n))
     .join(","),
   "",
 );
 verificar(
-  "G2. os formulários continuam gravando taxas por UPDATE direto (o bloqueio só vale com o motor ligado)",
+  "G1b. a tela do operador não importa nada de vigências nem de valores financeiros",
+  /vigencias|financial_engine|apontamentos-financeiro/.test(
+    ler("src/app/(painel)/operacional/painel-operacional.tsx"),
+  ),
+  false,
+);
+verificar(
+  "G2. os formulários continuam gravando taxas por UPDATE direto quando o motor está desligado (useSaveRow permanece)",
   /useSaveRow\("contracts"\)/.test(telas) &&
     /useSaveRow\("employees"\)/.test(telas) &&
     /useSaveRow\("operations"\)/.test(telas),

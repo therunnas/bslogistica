@@ -20,6 +20,27 @@ export const MENSAGEM_CONTRATO_DE_OUTRO_CLIENTE =
 export const MENSAGEM_CONTRATO_EM_USO =
   "Este contrato já é usado por operações do cliente atual, então o cliente dele não pode ser trocado. Crie um novo contrato para o outro cliente.";
 
+/**
+ * Recusa de jornada de turno que já tem apontamentos (23514 do trigger da migration 024, quando
+ * habilitado). O texto do banco já é em português; a tela troca por esta explicação, que diz o que
+ * fazer: criar um turno novo a partir do existente.
+ */
+export const MENSAGEM_TURNO_PROTEGIDO =
+  "Este turno já tem apontamentos, então o horário e o intervalo dele não podem ser alterados: " +
+  "isso mudaria o cálculo de dias já registrados. Crie um turno novo a partir deste e, depois, " +
+  "inative o antigo. Nome e status continuam editáveis.";
+
+/** O erro é a recusa de jornada de turno usado (23514 com a mensagem do trigger)? */
+export function ehTurnoProtegido(erro: unknown): boolean {
+  if (typeof erro !== "object" || erro === null) return false;
+  const e = erro as { code?: unknown; message?: unknown };
+  return (
+    e.code === "23514" &&
+    typeof e.message === "string" &&
+    /turno j[aá] tem apontamentos|cadastre um turno novo/i.test(e.message)
+  );
+}
+
 interface ErroDoBanco {
   message?: unknown;
   code?: unknown;
@@ -35,6 +56,10 @@ export function mensagemDoErro(erro: unknown): string {
     return mensagem.startsWith('update or delete on table "contracts"')
       ? MENSAGEM_CONTRATO_EM_USO
       : MENSAGEM_CONTRATO_DE_OUTRO_CLIENTE;
+  }
+
+  if (ehTurnoProtegido(erro)) {
+    return MENSAGEM_TURNO_PROTEGIDO;
   }
 
   const traducao = traducaoDoCodigo(e.code, mensagem);

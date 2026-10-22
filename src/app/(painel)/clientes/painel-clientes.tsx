@@ -46,6 +46,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 import { brl, dateBR, num, todayISO } from "@/lib/format";
+import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
+import { useCriarComVigencia, useEstadoDoMotor } from "@/lib/vigencias-dados";
+import { modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { useClients, useContracts, useOperations } from "@/lib/queries";
 import type { Client, Contract } from "@/lib/types";
@@ -92,6 +95,9 @@ export function PainelClientes() {
   const removeClient = useDeleteRow("clients");
 
   const saveContract = useSaveRow("contracts");
+  const criarContratoComVigencia = useCriarComVigencia("contrato", "contracts", ["contracts"]);
+  const estadoDoMotor = useEstadoDoMotor();
+  const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");
 
   const [clientOpen, setClientOpen] = useState(false);
@@ -107,6 +113,11 @@ export function PainelClientes() {
   const contratoEmUso =
     Boolean(contractForm.id) &&
     (operations.data ?? []).some((operation) => operation.contract_id === contractForm.id);
+
+  // Taxa de contrato existente só muda por esta tela com o motor DESLIGADO; ligado, é por nova
+  // vigência; sem estado confirmado, nada financeiro é oferecido nem enviado.
+  const taxaTravada =
+    modoDeTaxa !== "direta" && (Boolean(contractForm.id) || modoDeTaxa === "bloqueada");
 
   const totalClientes = clients.data?.length ?? 0;
 
@@ -173,22 +184,51 @@ export function PainelClientes() {
     const payload: Record<string, unknown> = {
       client_id: contractForm.client_id,
       name: contractForm.name,
-      daily_rate: Number(contractForm.daily_rate) || 0,
-      shift_hours: Number(contractForm.shift_hours) || 8,
-      ot_factor: Number(contractForm.ot_factor) || 1,
-      ot_tolerance_min: Number(contractForm.ot_tolerance_min) || 0,
       valid_from: contractForm.valid_from,
       valid_to: contractForm.valid_to || null,
       status: contractForm.status,
     };
 
-    if (contractForm.id) {
-      payload["id"] = contractForm.id;
+    // Colunas financeiras: contrato existente só com o motor desligado (edição tradicional);
+    // contrato novo precisa delas como valores iniciais. Nunca com o estado desconhecido.
+    if (modoDeTaxa === "direta" || (!contractForm.id && modoDeTaxa === "por-vigencia")) {
+      payload["daily_rate"] = Number(contractForm.daily_rate) || 0;
+      payload["shift_hours"] = Number(contractForm.shift_hours) || 8;
+      payload["ot_factor"] = Number(contractForm.ot_factor) || 1;
+      payload["ot_tolerance_min"] = Number(contractForm.ot_tolerance_min) || 0;
     }
 
-    saveContract.mutate(payload, {
-      onSuccess: () => setContractOpen(false),
-    });
+    if (contractForm.id) {
+      payload["id"] = contractForm.id;
+      saveContract.mutate(payload, { onSuccess: () => setContractOpen(false) });
+      return;
+    }
+
+    if (modoDeTaxa === "por-vigencia") {
+      // Motor ligado: o preço vem da vigência. O contrato novo já nasce com a vigência inicial.
+      criarContratoComVigencia.mutate(
+        {
+          linha: payload,
+          form: {
+            inicio: contractForm.valid_from,
+            motivo: "Cadastro inicial do contrato",
+            valores: {
+              daily_rate: String(payload["daily_rate"]),
+              shift_hours: String(payload["shift_hours"]),
+              ot_factor: String(payload["ot_factor"]),
+              ot_tolerance_min: String(payload["ot_tolerance_min"]),
+            },
+            encerrarAnterior: false,
+          },
+        },
+        { onSuccess: () => setContractOpen(false) },
+      );
+      return;
+    }
+
+    if (modoDeTaxa === "direta") {
+      saveContract.mutate(payload, { onSuccess: () => setContractOpen(false) });
+    }
   }
 
   return (
@@ -227,6 +267,8 @@ export function PainelClientes() {
           icon={CalendarRange}
         />
       </div>
+
+      <AvisoDoMotor estado={estadoDoMotor} />
 
       <Tabs defaultValue="clients">
         <TabsList className="mb-5 h-auto rounded-xl border border-border bg-secondary/50 p-1">
@@ -401,7 +443,7 @@ export function PainelClientes() {
 
                 setContractOpen(true);
               }}
-              disabled={!clients.data?.length}
+              disabled={!clients.data?.length || modoDeTaxa === "bloqueada"}
             >
               <Plus className="h-4 w-4" />
               Novo contrato
@@ -764,6 +806,7 @@ export function PainelClientes() {
                 type="number"
                 step="0.01"
                 value={contractForm.daily_rate}
+                disabled={taxaTravada}
                 onChange={(event) =>
                   setContractForm({
                     ...contractForm,
@@ -781,6 +824,7 @@ export function PainelClientes() {
                 type="number"
                 step="0.5"
                 value={contractForm.shift_hours}
+                disabled={taxaTravada}
                 onChange={(event) =>
                   setContractForm({
                     ...contractForm,
@@ -798,6 +842,7 @@ export function PainelClientes() {
                 type="number"
                 step="0.05"
                 value={contractForm.ot_factor}
+                disabled={taxaTravada}
                 onChange={(event) =>
                   setContractForm({
                     ...contractForm,
@@ -814,6 +859,7 @@ export function PainelClientes() {
               <Input
                 type="number"
                 value={contractForm.ot_tolerance_min}
+                disabled={taxaTravada}
                 onChange={(event) =>
                   setContractForm({
                     ...contractForm,
@@ -857,6 +903,33 @@ export function PainelClientes() {
             </div>
           </div>
 
+          {taxaTravada ? (
+            <p className="text-xs text-muted-foreground">
+              {modoDeTaxa === "por-vigencia"
+                ? "Motor ligado: diária, jornada, fator e tolerância não são editados aqui. Registre uma nova vigência no histórico abaixo."
+                : "Estado do motor não confirmado: as condições financeiras estão somente para leitura."}
+            </p>
+          ) : null}
+
+          {contractForm.id ? (
+            <HistoricoDeVigencias
+              tipo="contrato"
+              entidadeId={contractForm.id}
+              estado={estadoDoMotor}
+              valoresIniciais={{
+                daily_rate: String(contractForm.daily_rate),
+                shift_hours: String(contractForm.shift_hours),
+                ot_factor: String(contractForm.ot_factor),
+                ot_tolerance_min: String(contractForm.ot_tolerance_min),
+              }}
+            />
+          ) : modoDeTaxa === "direta" ? (
+            <p className="text-xs text-muted-foreground">
+              Depois de salvar, abra o contrato para preparar vigências futuras (reajustes com
+              data).
+            </p>
+          ) : null}
+
           <DialogFooter className="mt-2 border-t border-border pt-5">
             <Button
               type="button"
@@ -871,7 +944,13 @@ export function PainelClientes() {
               type="button"
               className="rounded-xl"
               onClick={submitContract}
-              disabled={!contractForm.name || !contractForm.client_id}
+              disabled={
+                !contractForm.name ||
+                !contractForm.client_id ||
+                (modoDeTaxa === "bloqueada" && !contractForm.id) ||
+                saveContract.isPending ||
+                criarContratoComVigencia.isPending
+              }
             >
               Salvar contrato
             </Button>

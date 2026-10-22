@@ -114,6 +114,9 @@ jobs:
       - name: Teste motor-vigencia
         run: npm run test:motor-vigencia
 
+      - name: Teste interfaces-vigencia
+        run: npm run test:interfaces-vigencia
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

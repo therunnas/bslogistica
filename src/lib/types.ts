@@ -98,6 +98,15 @@ export interface TimesheetEntry {
   cost_amount: number;
   invoice_id: string | null;
   notes: string | null;
+  /** Condições financeiras gravadas pelo banco (migrations 022 e 024); nulas em apontamento legado. */
+  terms_origin?: string | null;
+  shift_hours_snapshot?: number | null;
+  ot_factor_snapshot?: number | null;
+  ot_tolerance_snapshot?: number | null;
+  planned_minutes_snapshot?: number | null;
+  contract_terms_id?: string | null;
+  operation_terms_id?: string | null;
+  employee_cost_terms_id?: string | null;
 }
 
 export interface Invoice {

@@ -46,6 +46,10 @@ import {
 } from "@/lib/billing";
 import { colaboradoresFaturados, linhasParaSalvar, montarCarga } from "@/lib/apontamentos-salvar";
 import { mensagemDoErro } from "@/lib/erros-banco";
+import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
+import { useEstadoDoMotor, useTermosDoApontamento } from "@/lib/vigencias-dados";
+import { resolverCondicaoDoDia } from "@/lib/vigencias-ui";
+import { AvisoDoMotor } from "../_components/vigencias";
 import { brl, minutesToLabel, todayISO } from "@/lib/format";
 import { useContractRules } from "@/lib/ledger";
 import { exigirLinhaAfetada } from "@/lib/mutations";
@@ -422,15 +426,67 @@ export function PainelApontamentos() {
     shift?.break_minutes,
   ]);
 
-  const linhas = draft?.rows ?? [];
+  const linhas = useMemo(() => draft?.rows ?? [], [draft?.rows]);
 
   const employeeMap = useMemo(
     () => new Map((employees.data ?? []).map((employee) => [employee.id, employee])),
     [employees.data],
   );
 
+  // U3: o estado do motor decide de onde vem o valor mostrado (ver apontamentos-financeiro.ts).
+  const estadoDoMotor = useEstadoDoMotor();
+  const operacaoDaTela = operationList.find((item) => item.id === operationId) ?? null;
+  const termos = useTermosDoApontamento({
+    habilitado: estadoDoMotor.tag === "ligado" && Boolean(operationId),
+    contratoId: operacaoDaTela?.contract_id ?? null,
+    operacaoId: operationId || null,
+    colaboradores: useMemo(() => linhas.map((row) => row.employeeId), [linhas]),
+  });
+
   const computed = linhas.map((row) => {
     const employee = employeeMap.get(row.employeeId);
+
+    const gravado = existingEntries.find((entry) => entry.employee_id === row.employeeId) ?? null;
+
+    let condicaoDoDia: CondicaoDoDia | null = null;
+    if (estadoDoMotor.tag === "ligado") {
+      if (termos.erro) {
+        condicaoDoDia = {
+          ok: false,
+          motivo: "Não foi possível consultar as vigências financeiras.",
+        };
+      } else if (!termos.carregando) {
+        condicaoDoDia = resolverCondicaoDoDia({
+          data: date,
+          contratoId: operacaoDaTela?.contract_id ?? null,
+          termosContrato: termos.termosContrato,
+          termosOperacao: termos.termosOperacao,
+          termosCusto: termos.termosCusto.filter((termo) => termo.employee_id === row.employeeId),
+        });
+      }
+    }
+
+    const valor = valorDaLinha({
+      estado: estadoDoMotor,
+      status: row.status,
+      gravada: Boolean(row.entryId),
+      tocada: draft?.dirty.has(row.employeeId) ?? false,
+      gravado,
+      regrasDoCadastro: rules,
+      custoDoCadastro: Number(employee?.daily_cost ?? 0),
+      condicaoDoDia,
+      plannedMinutes,
+      calcular: ({ regras, custoDiario, plannedMinutes: previstos }) =>
+        calcEntry({
+          status: row.status,
+          checkIn: row.checkIn || null,
+          checkOut: row.checkOut || null,
+          breakMinutes: row.breakMinutes,
+          plannedMinutes: previstos,
+          rules: regras,
+          employeeDailyCost: custoDiario,
+        }),
+    });
 
     const calc = calcEntry({
       status: row.status,
@@ -446,23 +502,18 @@ export function PainelApontamentos() {
       row,
       employee,
       calc,
+      valor,
     };
   });
 
-  const totals = computed.reduce(
-    (acc, { row, calc }) => ({
-      dailies: acc.dailies + (row.status === "absent" ? 0 : 1),
-      overtime: acc.overtime + calc.overtimeMinutes,
-      billed: acc.billed + calc.billedAmount,
-      cost: acc.cost + calc.costAmount,
-    }),
-    {
-      dailies: 0,
-      overtime: 0,
-      billed: 0,
-      cost: 0,
-    },
-  );
+  const somaFinanceira = somarLinhas(computed.map((item) => item.valor));
+  const totals = {
+    dailies: computed.reduce((acc, { row }) => acc + (row.status === "absent" ? 0 : 1), 0),
+    overtime: somaFinanceira.overtime,
+    billed: somaFinanceira.billed,
+    cost: somaFinanceira.cost,
+  };
+  const linhasBloqueadas = computed.filter((item) => item.valor.bloqueiaSalvar);
 
   const diariaEmOutraFolha = useMemo(() => {
     const outrasFolhas = new Map(
@@ -741,7 +792,8 @@ export function PainelApontamentos() {
                 leitura.estado !== "pronto" ||
                 saveAll.isPending ||
                 !linhas.length ||
-                !!conflitos.length
+                !!conflitos.length ||
+                linhasBloqueadas.length > 0
               }
             >
               <Save className="h-4 w-4" />
@@ -751,6 +803,21 @@ export function PainelApontamentos() {
           </div>
         }
       />
+
+      <AvisoDoMotor estado={estadoDoMotor} />
+
+      {linhasBloqueadas.length > 0 ? (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-destructive"
+        >
+          <p className="text-sm font-medium">
+            Sem condição financeira válida para {linhasBloqueadas.length} linha(s). O salvamento
+            está bloqueado.
+          </p>
+          <p className="mt-1 text-xs leading-5">{linhasBloqueadas[0]?.valor.aviso}</p>
+        </div>
+      ) : null}
 
       {avisoDeLeitura ? (
         <div
@@ -868,10 +935,22 @@ export function PainelApontamentos() {
             <div className="flex min-h-10 items-center rounded-xl border border-border bg-secondary/35 px-3">
               <p className="text-xs leading-5 text-muted-foreground">
                 <span className="font-medium text-foreground">{clientName}</span> · diária{" "}
-                {brl(rules.daily_rate)} · jornada{" "}
-                {minutesToLabel(plannedMinutes || rules.shift_hours * 60)} · HE{" "}
-                {brl((rules.daily_rate / (rules.shift_hours || 8)) * rules.ot_factor)}
-                /h
+                {estadoDoMotor.tag === "desligado" ? (
+                  <>
+                    {brl(rules.daily_rate)} · jornada{" "}
+                    {minutesToLabel(plannedMinutes || rules.shift_hours * 60)} · HE{" "}
+                    {brl((rules.daily_rate / (rules.shift_hours || 8)) * rules.ot_factor)}
+                    /h
+                  </>
+                ) : estadoDoMotor.tag === "ligado" ? (
+                  <>
+                    preço pela vigência da data trabalhada ·{" "}
+                    {computed.find((item) => item.valor.origem)?.valor.origem ??
+                      "veja a origem em cada linha"}
+                  </>
+                ) : (
+                  "regra financeira indisponível até confirmar o estado do motor"
+                )}
               </p>
             </div>
           </div>
@@ -1005,7 +1084,7 @@ export function PainelApontamentos() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  computed.map(({ row, employee, calc }) => (
+                  computed.map(({ row, employee, calc, valor }) => (
                     <TableRow
                       key={row.employeeId}
                       className="border-border transition-colors hover:bg-secondary/20"
@@ -1106,12 +1185,12 @@ export function PainelApontamentos() {
                       </TableCell>
 
                       <TableCell>
-                        {calc.overtimeMinutes > 0 ? (
+                        {valor.tipo !== "indisponivel" && valor.overtime > 0 ? (
                           <Badge
                             variant="secondary"
                             className="border border-primary/15 bg-primary/10 font-medium text-primary shadow-none"
                           >
-                            {minutesToLabel(calc.overtimeMinutes)}
+                            {minutesToLabel(valor.overtime)}
                           </Badge>
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
@@ -1119,11 +1198,16 @@ export function PainelApontamentos() {
                       </TableCell>
 
                       <TableCell className="whitespace-nowrap text-right text-sm font-medium text-foreground">
-                        {brl(calc.billedAmount)}
+                        {valor.tipo === "indisponivel" ? "—" : brl(valor.billed)}
+                        {valor.origem || valor.aviso ? (
+                          <span className="mt-0.5 block max-w-[220px] whitespace-normal text-right text-[11px] font-normal leading-4 text-muted-foreground">
+                            {valor.aviso ?? valor.origem}
+                          </span>
+                        ) : null}
                       </TableCell>
 
                       <TableCell className="whitespace-nowrap text-right text-sm text-muted-foreground">
-                        {brl(calc.costAmount)}
+                        {valor.tipo === "indisponivel" ? "—" : brl(valor.cost)}
                       </TableCell>
                     </TableRow>
                   ))

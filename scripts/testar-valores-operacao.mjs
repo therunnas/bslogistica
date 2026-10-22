@@ -396,9 +396,10 @@ console.log("E. Compatibilidade transitória das telas");
 
 const operacoes = ler("src/app/(painel)/operacoes/painel-operacoes.tsx");
 verificar(
-  "E1. a tela de Operações continua gravando operations.agreed_amount por UPDATE direto",
+  "E1. a tela de Operações continua gravando operations.agreed_amount por UPDATE direto com o motor DESLIGADO (e só então: ligado ou desconhecido, a coluna não é enviada)",
   /useSaveRow\("operations"\)/.test(operacoes) &&
-    /agreed_amount: opForm\.agreed_amount === ""/.test(operacoes),
+    /payload\["agreed_amount"\] = opForm\.agreed_amount === ""/.test(operacoes) &&
+    /const enviaValor =\s+modoDeValor === "direta"/.test(operacoes),
   true,
 );
 verificar(
@@ -417,9 +418,11 @@ verificar(
   true,
 );
 verificar(
-  "E4. o erro 23514 do turno já chega legível à tela (mensagem em português mantida), mas a tela ainda NÃO oferece 'novo turno a partir deste': dependência registrada para a ativação",
+  "E4. o erro 23514 do turno chega legível à tela e a tela (C05-B4.6, U7) explica o bloqueio e oferece 'novo turno a partir deste'",
   /MENSAGEM_CRUA_DO_BANCO/.test(ler("src/lib/erros-banco.ts")) &&
-    !/novo turno a partir/i.test(operacoes),
+    /MENSAGEM_TURNO_PROTEGIDO/.test(operacoes) &&
+    /novoTurnoAPartir/.test(operacoes) &&
+    /Criar novo turno a partir deste/.test(operacoes),
   true,
 );
 verificar(

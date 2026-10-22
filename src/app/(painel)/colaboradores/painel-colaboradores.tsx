@@ -46,6 +46,9 @@ import {
 } from "@/components/ui/table";
 
 import { brl } from "@/lib/format";
+import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
+import { useCriarComVigencia, useEstadoDoMotor } from "@/lib/vigencias-dados";
+import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { useEmployees } from "@/lib/queries";
 import type { Employee } from "@/lib/types";
@@ -72,6 +75,9 @@ export function PainelColaboradores() {
   const { data = [], isLoading } = useEmployees();
 
   const save = useSaveRow("employees");
+  const criarComVigencia = useCriarComVigencia("colaborador", "employees", ["employees"]);
+  const estadoDoMotor = useEstadoDoMotor();
+  const modoDeCusto = modoDeEdicaoDeTaxa(estadoDoMotor);
   const remove = useDeleteRow("employees");
 
   const [open, setOpen] = useState(false);
@@ -100,23 +106,50 @@ export function PainelColaboradores() {
     setOpen(true);
   }
 
+  // O custo diário de colaborador existente só muda nesta tela com o motor DESLIGADO; ligado, é
+  // por nova vigência; sem estado confirmado, nada financeiro é oferecido nem enviado.
+  const custoTravado =
+    modoDeCusto !== "direta" && (Boolean(form.id) || modoDeCusto === "bloqueada");
+
   function submit() {
     const payload: Record<string, unknown> = {
       name: form.name,
       doc: form.doc || null,
       role: form.role || null,
       phone: form.phone || null,
-      daily_cost: Number(form.daily_cost) || 0,
       status: form.status,
     };
 
-    if (form.id) {
-      payload["id"] = form.id;
+    if (modoDeCusto === "direta" || (!form.id && modoDeCusto === "por-vigencia")) {
+      payload["daily_cost"] = Number(form.daily_cost) || 0;
     }
 
-    save.mutate(payload, {
-      onSuccess: () => setOpen(false),
-    });
+    if (form.id) {
+      payload["id"] = form.id;
+      save.mutate(payload, { onSuccess: () => setOpen(false) });
+      return;
+    }
+
+    if (modoDeCusto === "por-vigencia") {
+      // Motor ligado: o custo vem da vigência; o colaborador novo já nasce com a inicial.
+      criarComVigencia.mutate(
+        {
+          linha: payload,
+          form: {
+            inicio: hojeEmSaoPaulo(),
+            motivo: "Cadastro inicial do colaborador",
+            valores: { daily_cost: String(payload["daily_cost"]) },
+            encerrarAnterior: false,
+          },
+        },
+        { onSuccess: () => setOpen(false) },
+      );
+      return;
+    }
+
+    if (modoDeCusto === "direta") {
+      save.mutate(payload, { onSuccess: () => setOpen(false) });
+    }
   }
 
   return (
@@ -127,6 +160,7 @@ export function PainelColaboradores() {
         action={
           <Button
             className="h-10 rounded-xl"
+            disabled={modoDeCusto === "bloqueada"}
             onClick={() => {
               setForm(empty);
               setOpen(true);
@@ -137,6 +171,8 @@ export function PainelColaboradores() {
           </Button>
         }
       />
+
+      <AvisoDoMotor estado={estadoDoMotor} />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Resumo
@@ -400,6 +436,7 @@ export function PainelColaboradores() {
                 step="0.01"
                 min="0"
                 value={form.daily_cost}
+                disabled={custoTravado}
                 onChange={(event) =>
                   setForm({
                     ...form,
@@ -435,6 +472,23 @@ export function PainelColaboradores() {
             </div>
           </div>
 
+          {custoTravado ? (
+            <p className="text-xs text-muted-foreground">
+              {modoDeCusto === "por-vigencia"
+                ? "Motor ligado: o custo diário não é editado aqui. Registre uma nova vigência no histórico abaixo."
+                : "Estado do motor não confirmado: o custo diário está somente para leitura."}
+            </p>
+          ) : null}
+
+          {form.id ? (
+            <HistoricoDeVigencias
+              tipo="colaborador"
+              entidadeId={form.id}
+              estado={estadoDoMotor}
+              valoresIniciais={{ daily_cost: String(form.daily_cost) }}
+            />
+          ) : null}
+
           <DialogFooter className="mt-2 border-t border-border pt-5">
             <Button
               type="button"
@@ -449,9 +503,14 @@ export function PainelColaboradores() {
               type="button"
               className="rounded-xl"
               onClick={submit}
-              disabled={!form.name || save.isPending}
+              disabled={
+                !form.name ||
+                save.isPending ||
+                criarComVigencia.isPending ||
+                (modoDeCusto === "bloqueada" && !form.id)
+              }
             >
-              {save.isPending ? "Salvando..." : "Salvar colaborador"}
+              {save.isPending || criarComVigencia.isPending ? "Salvando..." : "Salvar colaborador"}
             </Button>
           </DialogFooter>
         </DialogContent>

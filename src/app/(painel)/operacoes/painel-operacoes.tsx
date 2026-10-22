@@ -61,8 +61,20 @@ import {
   useOperations,
   useShifts,
   useTeam,
+  useEntries,
+  useTimesheets,
 } from "@/lib/queries";
 import type { Operation, Shift } from "@/lib/types";
+import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
+import { MENSAGEM_TURNO_PROTEGIDO } from "@/lib/erros-banco";
+import { useCriarComVigencia, useEstadoDoMotor } from "@/lib/vigencias-dados";
+import {
+  hojeEmSaoPaulo,
+  jornadaDoTurnoProtegida,
+  modoDeEdicaoDeTaxa,
+  novoTurnoAPartir,
+  turnoTemApontamentos,
+} from "@/lib/vigencias-ui";
 
 const emptyOperation = {
   id: "",
@@ -105,6 +117,11 @@ export function PainelOperacoes() {
   const team = useTeam();
 
   const saveOperation = useSaveRow("operations");
+  const criarOperacaoComVigencia = useCriarComVigencia("operacao", "operations", ["operations"]);
+  const estadoDoMotor = useEstadoDoMotor();
+  const modoDeValor = modoDeEdicaoDeTaxa(estadoDoMotor);
+  const timesheets = useTimesheets();
+  const entries = useEntries();
   const removeOperation = useDeleteRow("operations");
 
   const saveShift = useSaveRow("shifts");
@@ -400,6 +417,12 @@ export function PainelOperacoes() {
     setOpOpen(true);
   }
 
+  // O valor acordado de operação existente só muda aqui com o motor DESLIGADO; ligado, é por nova
+  // vigência; sem estado confirmado, nada financeiro é oferecido nem enviado. `contract_id` nunca é
+  // alterado por esta lógica: segue exatamente o que o usuário escolheu no formulário.
+  const valorTravado =
+    modoDeValor !== "direta" && (Boolean(opForm.id) || modoDeValor === "bloqueada");
+
   function submitOperation() {
     const payload: Record<string, unknown> = {
       client_id: opForm.client_id,
@@ -407,20 +430,48 @@ export function PainelOperacoes() {
       type: opForm.type,
       name: opForm.name,
       site: opForm.site || null,
-      agreed_amount: opForm.agreed_amount === "" ? null : Number(opForm.agreed_amount),
       operation_date: opForm.operation_date || null,
       status: opForm.status,
       notes: opForm.notes || null,
     };
 
-    if (opForm.id) {
-      payload["id"] = opForm.id;
+    const enviaValor = modoDeValor === "direta" || (!opForm.id && modoDeValor === "por-vigencia");
+    if (enviaValor) {
+      payload["agreed_amount"] = opForm.agreed_amount === "" ? null : Number(opForm.agreed_amount);
     }
 
-    saveOperation.mutate(payload, {
-      onSuccess: () => setOpOpen(false),
-    });
+    if (opForm.id) {
+      payload["id"] = opForm.id;
+      saveOperation.mutate(payload, { onSuccess: () => setOpOpen(false) });
+      return;
+    }
+
+    if (modoDeValor === "por-vigencia" && !opForm.contract_id && opForm.agreed_amount !== "") {
+      // Motor ligado, operação nova sem contrato: nasce com a vigência inicial do valor acordado.
+      criarOperacaoComVigencia.mutate(
+        {
+          linha: payload,
+          form: {
+            inicio: opForm.operation_date || hojeEmSaoPaulo(),
+            motivo: "Cadastro inicial da operação",
+            valores: { agreed_amount: String(opForm.agreed_amount) },
+            encerrarAnterior: false,
+          },
+        },
+        { onSuccess: () => setOpOpen(false) },
+      );
+      return;
+    }
+
+    saveOperation.mutate(payload, { onSuccess: () => setOpOpen(false) });
   }
+
+  // Turnos (U7): a jornada de turno com apontamento é protegida quando o motor está ligado ou o
+  // estado é desconhecido (o congelamento é habilitado junto com o motor).
+  const turnoUsado = shiftForm.id
+    ? turnoTemApontamentos(shiftForm.id, timesheets.data ?? [], entries.data ?? [])
+    : false;
+  const jornadaTravada = jornadaDoTurnoProtegida(estadoDoMotor, turnoUsado);
 
   function editShift(shift: Shift) {
     setShiftForm({
@@ -441,12 +492,16 @@ export function PainelOperacoes() {
     const payload: Record<string, unknown> = {
       operation_id: shiftForm.operation_id,
       name: shiftForm.name,
-      start_time: `${shiftForm.start_time}:00`,
-      end_time: `${shiftForm.end_time}:00`,
-      break_minutes: Number(shiftForm.break_minutes) || 0,
-      crosses_midnight: shiftForm.crosses_midnight,
       status: shiftForm.status,
     };
+
+    // Turno com apontamento e jornada protegida: só nome e status seguem (o histórico não muda).
+    if (!jornadaTravada) {
+      payload["start_time"] = `${shiftForm.start_time}:00`;
+      payload["end_time"] = `${shiftForm.end_time}:00`;
+      payload["break_minutes"] = Number(shiftForm.break_minutes) || 0;
+      payload["crosses_midnight"] = shiftForm.crosses_midnight;
+    }
 
     if (shiftForm.id) {
       payload["id"] = shiftForm.id;
@@ -480,6 +535,8 @@ export function PainelOperacoes() {
           </Button>
         }
       />
+
+      <AvisoDoMotor estado={estadoDoMotor} />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Resumo
@@ -890,6 +947,7 @@ export function PainelOperacoes() {
                 type="number"
                 step="0.01"
                 value={opForm.agreed_amount}
+                disabled={valorTravado}
                 onChange={(event) =>
                   setOpForm({
                     ...opForm,
@@ -899,6 +957,30 @@ export function PainelOperacoes() {
                 className={INPUT_CLASS}
               />
             </div>
+
+            {valorTravado ? (
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                {modoDeValor === "por-vigencia"
+                  ? "Motor ligado: o valor acordado não é editado aqui. Registre uma nova vigência no histórico abaixo."
+                  : "Estado do motor não confirmado: o valor acordado está somente para leitura."}
+              </p>
+            ) : null}
+
+            {opForm.id && !opForm.contract_id ? (
+              <div className="sm:col-span-2">
+                <HistoricoDeVigencias
+                  tipo="operacao"
+                  entidadeId={opForm.id}
+                  estado={estadoDoMotor}
+                  valoresIniciais={{ agreed_amount: opForm.agreed_amount }}
+                />
+              </div>
+            ) : opForm.id && opForm.contract_id ? (
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Esta operação tem contrato: diária e regras vêm das vigências do contrato (tela
+                Clientes e contratos).
+              </p>
+            ) : null}
 
             <div className="space-y-2">
               <Label>Data da operação (avulsa)</Label>
@@ -946,7 +1028,12 @@ export function PainelOperacoes() {
               type="button"
               className="rounded-xl"
               onClick={submitOperation}
-              disabled={!opForm.name || !opForm.client_id}
+              disabled={
+                !opForm.name ||
+                !opForm.client_id ||
+                saveOperation.isPending ||
+                criarOperacaoComVigencia.isPending
+              }
             >
               Salvar operação
             </Button>
@@ -989,6 +1076,7 @@ export function PainelOperacoes() {
               <Input
                 type="time"
                 value={shiftForm.start_time}
+                disabled={jornadaTravada}
                 onChange={(event) =>
                   setShiftForm({
                     ...shiftForm,
@@ -1005,6 +1093,7 @@ export function PainelOperacoes() {
               <Input
                 type="time"
                 value={shiftForm.end_time}
+                disabled={jornadaTravada}
                 onChange={(event) =>
                   setShiftForm({
                     ...shiftForm,
@@ -1021,6 +1110,7 @@ export function PainelOperacoes() {
               <Input
                 type="number"
                 value={shiftForm.break_minutes}
+                disabled={jornadaTravada}
                 onChange={(event) =>
                   setShiftForm({
                     ...shiftForm,
@@ -1035,6 +1125,7 @@ export function PainelOperacoes() {
               <Checkbox
                 id="crosses"
                 checked={shiftForm.crosses_midnight}
+                disabled={jornadaTravada}
                 onCheckedChange={(value) =>
                   setShiftForm({
                     ...shiftForm,
@@ -1048,6 +1139,26 @@ export function PainelOperacoes() {
               </Label>
             </div>
           </div>
+
+          {jornadaTravada ? (
+            <div
+              className="rounded-xl border border-border bg-secondary/30 p-4 text-sm"
+              role="note"
+            >
+              <p className="text-foreground">{MENSAGEM_TURNO_PROTEGIDO}</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 rounded-xl"
+                onClick={() => {
+                  const atual = (shifts.data ?? []).find((item) => item.id === shiftForm.id);
+                  if (atual) setShiftForm(novoTurnoAPartir(atual));
+                }}
+              >
+                Criar novo turno a partir deste
+              </Button>
+            </div>
+          ) : null}
 
           <DialogFooter className="mt-2 border-t border-border pt-5">
             <Button

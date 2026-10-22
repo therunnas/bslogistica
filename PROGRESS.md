@@ -174,6 +174,18 @@ em silêncio. Ordem das migrations:
   (R7); operação com apontamento não troca de contrato (R6).
   Falta não exige vigência (zerada, sem preço inventado); voltar a presença exige vigência na data;
   contrato antigo com jornada <= 0 entra no histórico com a jornada já normalizada (8 h).
+- **Interfaces (U3–U7, branch `feat/c05b-interfaces-vigencia`, só local):** contratos,
+  colaboradores e operações sem contrato ganham histórico de vigências e registro de reajuste
+  (com motivo, início e distinção entre alteração imediata e vigência futura) pelas RPCs das
+  migrations 023 e 024. O estado do motor tem quatro valores (carregando, desligado, ligado,
+  desconhecido): só `desligado` comprovado mantém a edição tradicional das taxas; ligado, a taxa
+  muda por nova vigência; desconhecido (falha de consulta, permissão, resposta inválida ou gatilhos
+  inconsistentes) deixa as condições financeiras somente para leitura. Apontamentos mostram o valor
+  do banco, a prévia com o preço congelado ou a vigência da data trabalhada, e a origem; sem
+  vigência a linha é bloqueada na tela. Turnos usados com jornada protegida só aceitam nome e
+  status e oferecem "novo turno a partir deste". As telas **não** ligam, desligam, sincronizam nem
+  regularizam o motor (fora do escopo). Dependência registrada: a tela do operador não mostra
+  valores nem origem de vigência.
 
 Dependências da ativação (ligar o motor da 025, não antes):
 
