@@ -295,7 +295,7 @@ verificar(
 );
 verificar(
   "E9c. os dois vivem num mapa de conta por papel, não numa condição solta",
-  /const MENU_DE_CONTA = \{\s*admin: \[ITEM_USUARIOS, ITEM_SEGURANCA\],\s*operacional: \[ITEM_SEGURANCA\],\s*"sem-papel": \[\],\s*\} as const;/.test(
+  /const MENU_DE_CONTA = \{\s*admin: \[ITEM_IMPLANTACAO, ITEM_USUARIOS, ITEM_SEGURANCA\],\s*operacional: \[ITEM_SEGURANCA\],\s*"sem-papel": \[\],\s*\} as const;/.test(
     fontes.shell,
   ),
   true,

@@ -219,6 +219,17 @@ em silêncio. Ordem das migrations:
   sem exceção de papel. Contrato sem operação ou com operação sem histórico segue excluível.
   Pronta em branch local; **não aplicada** na homologação nem em Production.
 
+- **Legado (C05-B5.7):** sem migration nova. As RPCs que já existiam bastam: `pendencias_implantacao_vigencias`
+  (em uso e sem vigência para hoje), `divergencias_implantacao_vigencias` (027), `registrar_*` (023/024,
+  data e motivo informados por quem decide), `sincronizar_colunas_legadas` e
+  `regularizar_apontamento_legado` (prévia, só não faturado, com motor ligado). A lacuna comprovada era a
+  administração não enxergar as listas: nenhuma tela as consumia. Nova tela só de leitura,
+  `/implantacao-vigencias` (menu de conta do admin, `exigirAdmin`): pendências, divergências com o
+  campo, a contagem de apontamentos legados e o link para a tela do cadastro. Não registra, não
+  sincroniza, não liga, não mostra valor em reais. Apontamento e fatura antigos seguem como
+  gravados (suíte SQL 025). Decisões que continuam do negócio: de qual data vale cada preço
+  histórico, e se um apontamento legado deve ser regularizado (reprecificado pelas vigências).
+
 Dependências da ativação (ligar o motor da 025, não antes):
 
 1. **Bloqueio da edição direta** de `contracts`, `employees` e `operations.agreed_amount`:

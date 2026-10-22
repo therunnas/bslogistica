@@ -4,6 +4,7 @@ import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { toast } from "@/lib/notificacoes";
 import { RPC_VIGENCIAS } from "@/lib/vigencias";
+import { lerDivergencias, lerPendencias } from "@/lib/vigencias-implantacao";
 import {
   interpretarEstadoDoMotor,
   montarCadastroAtomico,
@@ -229,5 +230,40 @@ export function useCriarComVigencia(tipo: TipoDeVigencia, invalidar: string[]) {
     },
     onError: (erro: unknown) =>
       toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
+  });
+}
+
+/**
+ * Implantação (C05-B5.7): as duas listas que o banco já calcula (pendências e divergências) e a
+ * contagem dos apontamentos legados. Só leitura, admin AAL2; erro nunca vira "lista vazia".
+ */
+export const CHAVE_DA_IMPLANTACAO = ["vigencias-implantacao"] as const;
+
+export function useImplantacaoDasVigencias() {
+  return useQuery({
+    queryKey: CHAVE_DA_IMPLANTACAO,
+    staleTime: 10_000,
+    retry: 1,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const db = cliente();
+      const [pend, div, legados] = await Promise.all([
+        db.rpc(RPC_VIGENCIAS.motor.pendencias),
+        db.rpc(RPC_VIGENCIAS.motor.divergencias),
+        db
+          .from("timesheet_entries")
+          .select("id", { count: "exact", head: true })
+          .is("terms_origin", null)
+          .neq("status", "absent"),
+      ]);
+      if (pend.error) throw pend.error;
+      if (div.error) throw div.error;
+      const pendencias = lerPendencias(pend.data);
+      const divergencias = lerDivergencias(div.data);
+      if (pendencias === null || divergencias === null) {
+        throw new Error("Resposta inválida da implantação das vigências.");
+      }
+      return { pendencias, divergencias, legados: legados.error ? null : (legados.count ?? 0) };
+    },
   });
 }

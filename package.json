@@ -34,7 +34,8 @@
     "test:valores-operacao": "node --experimental-strip-types scripts/testar-valores-operacao.mjs",
     "test:apontamentos-salvar": "node --experimental-strip-types scripts/testar-apontamentos-salvar.mjs",
     "test:motor-vigencia": "node --experimental-strip-types scripts/testar-motor-vigencia.mjs",
-    "test:interfaces-vigencia": "node --experimental-strip-types scripts/testar-interfaces-vigencia.mjs"
+    "test:interfaces-vigencia": "node --experimental-strip-types scripts/testar-interfaces-vigencia.mjs",
+    "test:implantacao-vigencias": "node --experimental-strip-types scripts/testar-implantacao-vigencias.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
