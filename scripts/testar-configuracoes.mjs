@@ -420,17 +420,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. conjunto de migrations contém 32 arquivos, até a 027 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5)",
+  "G10. conjunto de migrations contém 33 arquivos, até a 028 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6)",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  32,
+  33,
 );
 verificar(
-  "G10b. a migration mais recente é a 027",
+  "G10b. a migration mais recente é a 028",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_027_"),
+    .includes("_028_"),
   true,
 );
 

@@ -814,7 +814,8 @@ begin
      where id = '44444444-4444-4444-8444-4444444444b1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J29. admin altera contract_id/agreed_amount', '1 linhas', _e);
+  -- Desde a 028 o contrato de operação com apontamento não muda (a operação OP-B tem apontamento).
+  perform pg_temp.registrar('J29. admin altera contract_id/agreed_amount de operação com apontamento: recusado (028)', 'erro 55000', _e);
 
   begin
     update public.shifts set end_time = '16:00:00', break_minutes = 30
@@ -2027,8 +2028,8 @@ begin
   perform pg_temp.registrar('J119. admin move operação de folha FATURADA', 'recusou 42501', _e);
 
   -- J120. E o apontamento continua com o valor da configuração em que nasceu.
-  -- J29 trocou o contrato da OP-B para o Contrato Caro DEPOIS deste
-  -- apontamento; como contrato não é coluna motriz, o snapshot não se mexeu.
+  -- J29 tentou trocar o contrato da OP-B DEPOIS deste apontamento; desde a 028 a troca é
+  -- recusada e o snapshot segue como nasceu.
   execute 'reset role';
   select billed_amount into _b from public.timesheet_entries
    where id = '77777777-7777-4777-8777-7777777777b1';

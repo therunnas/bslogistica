@@ -1109,13 +1109,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. a 027 (ativação com divergência) é a última migration, a 026 e a 025 não são a última e a 019 está ausente",
+  "I1. a 028 (contrato da operação protegido) é a última migration, a 027, a 026 e a 025 não são a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [32, "20261022183038_027_motor_bloqueia_ativacao_com_divergencia.sql", false],
+  [33, "20261023120000_028_protege_contrato_da_operacao.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",

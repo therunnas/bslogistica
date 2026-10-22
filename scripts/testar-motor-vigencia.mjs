@@ -55,9 +55,11 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico) e a 027 (ativação com divergência), que são posteriores a ela",
+  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), a 027 (ativação com divergência) e a 028 (contrato da operação), que são posteriores a ela",
   arquivos
-    .filter((a) => a !== NOME && !a.includes("_026_") && !a.includes("_027_"))
+    .filter(
+      (a) => a !== NOME && !a.includes("_026_") && !a.includes("_027_") && !a.includes("_028_"),
+    )
     .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
 );
@@ -901,6 +903,7 @@ verificar(
 
 console.log("J. A ativação recusa divergência entre coluna e vigência");
 
+const sql025Codigo = () => ler(`supabase/migrations/${NOME}`).replace(/^\s*--.*$/gm, "");
 const sql027 = ler(
   "supabase/migrations/20261022183038_027_motor_bloqueia_ativacao_com_divergencia.sql",
 );
@@ -971,6 +974,58 @@ verificar(
   /create or replace function public\.alterar_motor_vigencia\(\s+p_ativar\s+boolean,\s+p_reason\s+text,\s+p_aceitar_pendencias\s+boolean default false\s+\) returns jsonb/.test(
     sql027Codigo,
   ),
+  true,
+);
+
+// ---------------------------------------------------------------------------
+// K. Contrato da operação protegido (028, C05-B5.6)
+// ---------------------------------------------------------------------------
+
+console.log("K. O contrato da operação não muda depois que há histórico financeiro");
+
+const sql028 = ler("supabase/migrations/20261023120000_028_protege_contrato_da_operacao.sql");
+const sql028Codigo = sql028.replace(/^\s*--.*$/gm, "");
+verificar(
+  "K1. o trigger só dispara em UPDATE OF contract_id, é BEFORE e não é desabilitado pela migration (vale com o motor ligado ou desligado)",
+  /create trigger trg_operations_protege_contrato\s+before update of contract_id on public\.operations\s+for each row/.test(
+    sql028Codigo,
+  ) &&
+    !/disable trigger trg_operations_protege_contrato/.test(sql028Codigo) &&
+    !/trg_operations_protege_contrato/.test(sql025Codigo()),
+  true,
+);
+verificar(
+  "K2. histórico = apontamento em folha da operação ou linha em operation_terms; recusa 55000 com orientação de nova operação",
+  /public\.timesheets t\s+join public\.timesheet_entries e on e\.timesheet_id = t\.id\s+where t\.operation_id = old\.id/.test(
+    sql028Codigo,
+  ) &&
+    /from public\.operation_terms ot where ot\.operation_id = old\.id/.test(sql028Codigo) &&
+    /Crie uma nova operação/.test(sql028Codigo) &&
+    /errcode = '55000'/.test(sql028Codigo),
+  true,
+);
+verificar(
+  "K3. SECURITY INVOKER (o isento por papel precisa ver current_user) e a mesma isenção das demais guardas",
+  /security invoker/.test(sql028Codigo) &&
+    !/security definer/.test(sql028Codigo) &&
+    /current_user in \('postgres', 'service_role'\)/.test(sql028Codigo),
+  true,
+);
+verificar(
+  "K4. a 028 não altera dados, nem RLS, policies, grants de tabela, gerar_fatura, a 025 ou a 019",
+  !/\b(insert into|update public\.|delete from|truncate)\b/.test(sql028Codigo) &&
+    !/create policy|alter policy|grant .* on (table )?public\./.test(sql028Codigo) &&
+    !/gerar_fatura|derivar_valores/.test(sql028Codigo) &&
+    !readdirSync(new URL("../supabase/migrations/", import.meta.url)).some((m) =>
+      m.includes("_019_"),
+    ),
+  true,
+);
+verificar(
+  "K5. a função de trigger não tem EXECUTE para nenhum papel de API",
+  sql028Codigo.includes(
+    "revoke all on function public.proteger_contrato_da_operacao() from public, anon, authenticated, service_role, bslog_rpc_operacional",
+  ) && !/grant execute/.test(sql028Codigo),
   true,
 );
 

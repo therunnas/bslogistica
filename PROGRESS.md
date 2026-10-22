@@ -206,6 +206,15 @@ em silêncio. Ordem das migrations:
   explícito (editar a coluna com o motor desligado, `sincronizar_colunas_legadas` ou registrar a
   vigência desejada). Pronta em branch local; **não aplicada** na homologação nem em Production.
 
+- **028** (contrato da operação protegido, C05-B5.6): `operations.contract_id` não pode mais
+  mudar (trocar, preencher ou remover) quando a operação tem apontamento ou valor acordado
+  cadastrado (`operation_terms`), com o motor ligado **ou** desligado; a recusa é 55000 e manda
+  criar uma nova operação. Antes só havia bloqueio ligado e só com apontamento (a 025): desligado a
+  troca era livre, e ligado com valor acordado cadastrado e sem apontamento também. Operação sem
+  histórico segue editável; contrato de outro cliente segue recusado pela 021. Trigger sempre
+  habilitado, `SECURITY INVOKER`, `postgres` e `service_role` isentos como nas demais guardas.
+  Pronta em branch local; **não aplicada** na homologação nem em Production.
+
 Dependências da ativação (ligar o motor da 025, não antes):
 
 1. **Bloqueio da edição direta** de `contracts`, `employees` e `operations.agreed_amount`:
@@ -216,10 +225,8 @@ Dependências da ativação (ligar o motor da 025, não antes):
    formulário reenvia o objeto inteiro e funciona porque o trigger está desabilitado). A
    derivação grava `planned_minutes_snapshot` e o reaproveita enquanto o turno da folha
    não mudar.
-3. **`operations.contract_id` é mutável:** trocar uma operação de sem contrato para com
-   contrato muda a fonte (valor acordado x contrato) dos apontamentos novos. A origem de
-   cada apontamento já derivado fica em `terms_origin`; decidir se a troca de fonte
-   exige data de corte.
+3. **`operations.contract_id`:** resolvido pela 028 (não muda com apontamento ou valor
+   acordado cadastrado). Sem histórico, a troca segue livre; isso é de propósito.
 4. **Legado:** valores existentes são preservados; regularizar condição antiga exige
    admin, motivo e trilha (as RPCs da 023 e da 024 já fazem isso), nunca recálculo
    automático. Apontamento sem versão na data é recusado, sem fallback para a taxa atual.

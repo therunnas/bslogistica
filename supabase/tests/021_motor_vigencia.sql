@@ -308,7 +308,7 @@ update public.employees set daily_cost = 80 where id = '5c10f000-0000-4000-8000-
 select pg_temp.registrar('A11. DESLIGADO, mudar o horário de turno usado segue livre (congelamento dormente)', '1',
   pg_temp.adm_valor($q$with u as (update public.shifts set end_time = '15:10' where id = '5c10a000-0000-4000-8000-0000000000a5' returning 1) select count(*)::text from u$q$));
 update public.shifts set end_time = '15:00' where id = '5c10a000-0000-4000-8000-0000000000a5';
-select pg_temp.registrar('A12. DESLIGADO, mudar o contrato de operação com apontamento segue livre', '1',
+select pg_temp.registrar('A12. DESLIGADO, mudar o contrato de operação com apontamento é recusado (028), como ligado', 'erro 55000',
   pg_temp.adm_valor($q$with u as (update public.operations set contract_id = '5c10d000-0000-4000-8000-0000000000d2' where id = '5c10e000-0000-4000-8000-0000000000a5' returning 1) select count(*)::text from u$q$));
 update public.operations set contract_id = '5c10d000-0000-4000-8000-0000000000d1' where id = '5c10e000-0000-4000-8000-0000000000a5';
 select pg_temp.registrar('A13. a derivação antiga e gerar_fatura não citam o motor novo nem as versões', '0',
