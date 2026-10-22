@@ -97,7 +97,7 @@ export function HistoricoDeVigencias({
   estado,
   valoresIniciais,
 }: HistoricoDeVigenciasProps) {
-  const versoes = useVersoes<VersaoComValores>(tipo, entidadeId);
+  const versoes = useVersoes(tipo, entidadeId);
   const registrar = useRegistrarVigencia(tipo);
   const encerrar = useEncerrarVigencia(tipo);
   const aposentar = useAposentarVigencia(tipo);

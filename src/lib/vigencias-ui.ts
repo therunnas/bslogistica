@@ -341,6 +341,82 @@ export function montarRegistro(
   return { rpc: RPC_DE_REGISTRO[tipo], params };
 }
 
+/** RPC que cria a entidade e a vigência inicial na MESMA transação (migration 026). */
+export const RPC_DE_CADASTRO: Readonly<Record<TipoDeVigencia, string>> = {
+  contrato: "criar_contrato_com_vigencia",
+  colaborador: "criar_colaborador_com_vigencia",
+  operacao: "criar_operacao_com_vigencia",
+};
+
+type ValorDeParametro = string | number | boolean | null;
+
+const texto = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+
+/**
+ * Cadastro novo com o motor ligado: nome da RPC atômica e parâmetros. `linha` é o payload do
+ * formulário da entidade; `f` é a vigência inicial (mesma validação do registro avulso). A
+ * entidade e a vigência persistem juntas ou nenhuma persiste. Lança se o formulário for inválido,
+ * ou se a operação já tem contrato (o valor acordado só existe sem contrato).
+ */
+export function montarCadastroAtomico(
+  tipo: TipoDeVigencia,
+  linha: Readonly<Record<string, unknown>>,
+  f: FormularioDeVigencia,
+): { rpc: string; params: Record<string, ValorDeParametro> } {
+  const { params: v } = montarRegistro(tipo, "pendente", f); // valida; o id é preenchido pelo banco
+  const comum = { p_reason: v["p_reason"] as string };
+  if (tipo === "contrato") {
+    return {
+      rpc: RPC_DE_CADASTRO.contrato,
+      params: {
+        p_client_id: texto(linha["client_id"]),
+        p_name: texto(linha["name"]),
+        p_valid_from: f.inicio,
+        p_valid_to: texto(linha["valid_to"]),
+        p_status: texto(linha["status"]),
+        p_daily_rate: v["p_daily_rate"] as number,
+        p_shift_hours: v["p_shift_hours"] as number,
+        p_ot_factor: v["p_ot_factor"] as number,
+        p_ot_tolerance_min: v["p_ot_tolerance_min"] as number,
+        ...comum,
+      },
+    };
+  }
+  if (tipo === "colaborador") {
+    return {
+      rpc: RPC_DE_CADASTRO.colaborador,
+      params: {
+        p_name: texto(linha["name"]),
+        p_doc: texto(linha["doc"]),
+        p_role: texto(linha["role"]),
+        p_phone: texto(linha["phone"]),
+        p_status: texto(linha["status"]),
+        p_daily_cost: v["p_daily_cost"] as number,
+        p_valid_from: f.inicio,
+        ...comum,
+      },
+    };
+  }
+  if (texto(linha["contract_id"]) !== null) {
+    throw new Error("Operação com contrato usa o preço do contrato, sem valor acordado.");
+  }
+  return {
+    rpc: RPC_DE_CADASTRO.operacao,
+    params: {
+      p_client_id: texto(linha["client_id"]),
+      p_type: texto(linha["type"]),
+      p_name: texto(linha["name"]),
+      p_site: texto(linha["site"]),
+      p_operation_date: texto(linha["operation_date"]),
+      p_status: texto(linha["status"]),
+      p_notes: texto(linha["notes"]),
+      p_agreed_amount: v["p_agreed_amount"] as number,
+      p_valid_from: f.inicio,
+      ...comum,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Turnos (U7)
 // ---------------------------------------------------------------------------

@@ -117,7 +117,7 @@ export function PainelOperacoes() {
   const team = useTeam();
 
   const saveOperation = useSaveRow("operations");
-  const criarOperacaoComVigencia = useCriarComVigencia("operacao", "operations", ["operations"]);
+  const criarOperacaoComVigencia = useCriarComVigencia("operacao", ["operations"]);
   const estadoDoMotor = useEstadoDoMotor();
   const modoDeValor = modoDeEdicaoDeTaxa(estadoDoMotor);
   const timesheets = useTimesheets();

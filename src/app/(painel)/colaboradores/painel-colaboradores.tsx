@@ -75,7 +75,7 @@ export function PainelColaboradores() {
   const { data = [], isLoading } = useEmployees();
 
   const save = useSaveRow("employees");
-  const criarComVigencia = useCriarComVigencia("colaborador", "employees", ["employees"]);
+  const criarComVigencia = useCriarComVigencia("colaborador", ["employees"]);
   const estadoDoMotor = useEstadoDoMotor();
   const modoDeCusto = modoDeEdicaoDeTaxa(estadoDoMotor);
   const remove = useDeleteRow("employees");

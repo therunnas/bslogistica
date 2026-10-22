@@ -88,9 +88,11 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existe a 026 (a 025 é o motor por vigência)",
-  arquivos.some((a) => a.includes("_026_")),
-  false,
+  "A5. a única 026 é a do cadastro atômico (C05-B5.1) (a 025 é o motor por vigência)",
+  arquivos
+    .filter((a) => a.includes("_026_"))
+    .every((a) => a.endsWith("_026_cadastro_atomico_com_vigencia.sql")),
+  true,
 );
 verificar(
   "A6. a 022 continua com o conteúdo aprovado (não foi editada)",

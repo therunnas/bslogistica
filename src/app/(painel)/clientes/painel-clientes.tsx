@@ -95,7 +95,7 @@ export function PainelClientes() {
   const removeClient = useDeleteRow("clients");
 
   const saveContract = useSaveRow("contracts");
-  const criarContratoComVigencia = useCriarComVigencia("contrato", "contracts", ["contracts"]);
+  const criarContratoComVigencia = useCriarComVigencia("contrato", ["contracts"]);
   const estadoDoMotor = useEstadoDoMotor();
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");

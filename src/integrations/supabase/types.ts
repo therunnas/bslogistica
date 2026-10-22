@@ -8,6 +8,33 @@ export type Database = {
   };
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          created_at: string;
+          details: Json;
+          id: string;
+          target_user_id: string | null;
+        };
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          id?: string;
+          target_user_id?: string | null;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          id?: string;
+          target_user_id?: string | null;
+        };
+        Relationships: [];
+      };
       clients: {
         Row: {
           contact_name: string | null;
@@ -46,6 +73,75 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      contract_terms: {
+        Row: {
+          active: boolean;
+          contract_id: string;
+          created_at: string;
+          created_by: string | null;
+          daily_rate: number;
+          id: string;
+          origin: string;
+          ot_factor: number;
+          ot_tolerance_min: number;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          shift_hours: number;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          contract_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          daily_rate: number;
+          id?: string;
+          origin: string;
+          ot_factor: number;
+          ot_tolerance_min: number;
+          reason: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          shift_hours: number;
+          valid_from: string;
+          valid_to?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          contract_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          daily_rate?: number;
+          id?: string;
+          origin?: string;
+          ot_factor?: number;
+          ot_tolerance_min?: number;
+          reason?: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          shift_hours?: number;
+          valid_from?: string;
+          valid_to?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contract_terms_contract_id_fkey";
+            columns: ["contract_id"];
+            isOneToOne: false;
+            referencedRelation: "contracts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contract_terms_replaced_by_fkey";
+            columns: ["replaced_by"];
+            isOneToOne: false;
+            referencedRelation: "contract_terms";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       contracts: {
         Row: {
@@ -100,6 +196,66 @@ export type Database = {
           },
         ];
       };
+      employee_cost_terms: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          daily_cost: number;
+          employee_id: string;
+          id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          daily_cost: number;
+          employee_id: string;
+          id?: string;
+          origin: string;
+          reason: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          valid_from: string;
+          valid_to?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          daily_cost?: number;
+          employee_id?: string;
+          id?: string;
+          origin?: string;
+          reason?: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          valid_from?: string;
+          valid_to?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "employee_cost_terms_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "employee_cost_terms_replaced_by_fkey";
+            columns: ["replaced_by"];
+            isOneToOne: false;
+            referencedRelation: "employee_cost_terms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       employees: {
         Row: {
           created_at: string;
@@ -133,6 +289,75 @@ export type Database = {
           role?: string | null;
           status?: Database["public"]["Enums"]["record_status"];
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      financial_engine_settings: {
+        Row: {
+          ativada_em: string | null;
+          changed_at: string;
+          changed_by: string | null;
+          id: boolean;
+          reason: string | null;
+          vigencia_ativa: boolean;
+        };
+        Insert: {
+          ativada_em?: string | null;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: boolean;
+          reason?: string | null;
+          vigencia_ativa?: boolean;
+        };
+        Update: {
+          ativada_em?: string | null;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: boolean;
+          reason?: string | null;
+          vigencia_ativa?: boolean;
+        };
+        Relationships: [];
+      };
+      financial_terms_audit: {
+        Row: {
+          action: string;
+          actor_id: string;
+          actor_session_id: string | null;
+          entity_id: string;
+          entity_kind: string;
+          id: string;
+          new: Json | null;
+          occurred_at: string;
+          previous: Json | null;
+          reason: string;
+          term_id: string;
+        };
+        Insert: {
+          action: string;
+          actor_id: string;
+          actor_session_id?: string | null;
+          entity_id: string;
+          entity_kind: string;
+          id?: string;
+          new?: Json | null;
+          occurred_at?: string;
+          previous?: Json | null;
+          reason: string;
+          term_id: string;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string;
+          actor_session_id?: string | null;
+          entity_id?: string;
+          entity_kind?: string;
+          id?: string;
+          new?: Json | null;
+          occurred_at?: string;
+          previous?: Json | null;
+          reason?: string;
+          term_id?: string;
         };
         Relationships: [];
       };
@@ -286,6 +511,66 @@ export type Database = {
           },
         ];
       };
+      operation_terms: {
+        Row: {
+          active: boolean;
+          agreed_amount: number;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          operation_id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          agreed_amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          operation_id: string;
+          origin: string;
+          reason: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          valid_from: string;
+          valid_to?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          agreed_amount?: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          operation_id?: string;
+          origin?: string;
+          reason?: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          valid_from?: string;
+          valid_to?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "operation_terms_operation_id_fkey";
+            columns: ["operation_id"];
+            isOneToOne: false;
+            referencedRelation: "operations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "operation_terms_replaced_by_fkey";
+            columns: ["replaced_by"];
+            isOneToOne: false;
+            referencedRelation: "operation_terms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       operations: {
         Row: {
           agreed_amount: number | null;
@@ -343,6 +628,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "contracts";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "operations_contrato_do_cliente_fkey";
+            columns: ["contract_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "contracts";
+            referencedColumns: ["id", "client_id"];
           },
         ];
       };
@@ -423,18 +715,26 @@ export type Database = {
           break_minutes: number;
           check_in: string | null;
           check_out: string | null;
+          contract_terms_id: string | null;
           cost_amount: number;
           created_at: string;
           daily_cost_snapshot: number;
           daily_rate_snapshot: number;
+          employee_cost_terms_id: string | null;
           employee_id: string;
           id: string;
           invoice_id: string | null;
           notes: string | null;
           operation_id: string;
+          operation_terms_id: string | null;
+          ot_factor_snapshot: number | null;
           ot_hour_rate_snapshot: number;
+          ot_tolerance_snapshot: number | null;
           overtime_minutes: number;
+          planned_minutes_snapshot: number | null;
+          shift_hours_snapshot: number | null;
           status: Database["public"]["Enums"]["attendance_status"];
+          terms_origin: string | null;
           timesheet_id: string;
           updated_at: string;
           work_date: string;
@@ -445,18 +745,26 @@ export type Database = {
           break_minutes?: number;
           check_in?: string | null;
           check_out?: string | null;
+          contract_terms_id?: string | null;
           cost_amount?: number;
           created_at?: string;
           daily_cost_snapshot?: number;
           daily_rate_snapshot?: number;
+          employee_cost_terms_id?: string | null;
           employee_id: string;
           id?: string;
           invoice_id?: string | null;
           notes?: string | null;
           operation_id: string;
+          operation_terms_id?: string | null;
+          ot_factor_snapshot?: number | null;
           ot_hour_rate_snapshot?: number;
+          ot_tolerance_snapshot?: number | null;
           overtime_minutes?: number;
+          planned_minutes_snapshot?: number | null;
+          shift_hours_snapshot?: number | null;
           status?: Database["public"]["Enums"]["attendance_status"];
+          terms_origin?: string | null;
           timesheet_id: string;
           updated_at?: string;
           work_date: string;
@@ -467,24 +775,46 @@ export type Database = {
           break_minutes?: number;
           check_in?: string | null;
           check_out?: string | null;
+          contract_terms_id?: string | null;
           cost_amount?: number;
           created_at?: string;
           daily_cost_snapshot?: number;
           daily_rate_snapshot?: number;
+          employee_cost_terms_id?: string | null;
           employee_id?: string;
           id?: string;
           invoice_id?: string | null;
           notes?: string | null;
           operation_id?: string;
+          operation_terms_id?: string | null;
+          ot_factor_snapshot?: number | null;
           ot_hour_rate_snapshot?: number;
+          ot_tolerance_snapshot?: number | null;
           overtime_minutes?: number;
+          planned_minutes_snapshot?: number | null;
+          shift_hours_snapshot?: number | null;
           status?: Database["public"]["Enums"]["attendance_status"];
+          terms_origin?: string | null;
           timesheet_id?: string;
           updated_at?: string;
           work_date?: string;
           worked_minutes?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "timesheet_entries_contract_terms_id_fkey";
+            columns: ["contract_terms_id"];
+            isOneToOne: false;
+            referencedRelation: "contract_terms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "timesheet_entries_employee_cost_terms_id_fkey";
+            columns: ["employee_cost_terms_id"];
+            isOneToOne: false;
+            referencedRelation: "employee_cost_terms";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "timesheet_entries_employee_id_fkey";
             columns: ["employee_id"];
@@ -497,6 +827,13 @@ export type Database = {
             columns: ["invoice_id"];
             isOneToOne: false;
             referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "timesheet_entries_operation_terms_id_fkey";
+            columns: ["operation_terms_id"];
+            isOneToOne: false;
+            referencedRelation: "operation_terms";
             referencedColumns: ["id"];
           },
           {
@@ -559,6 +896,35 @@ export type Database = {
           },
         ];
       };
+      user_operation_access: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          operation_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          operation_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          operation_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_operation_access_operation_id_fkey";
+            columns: ["operation_id"];
+            isOneToOne: false;
+            referencedRelation: "operations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_roles: {
         Row: {
           created_at: string;
@@ -585,13 +951,289 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      gerar_fatura: {
+      alterar_motor_vigencia: {
         Args: {
-          _client_id: string;
-          _period_start: string;
-          _period_end: string;
+          p_aceitar_pendencias?: boolean;
+          p_ativar: boolean;
+          p_reason: string;
         };
-        Returns: Database["public"]["Tables"]["invoices"]["Row"];
+        Returns: Json;
+      };
+      apontamento_faturado: {
+        Args: { p_employee_id: string; p_timesheet_id: string };
+        Returns: boolean;
+      };
+      aposentar_condicao_contrato: {
+        Args: { p_reason: string; p_term_id: string };
+        Returns: undefined;
+      };
+      aposentar_custo_colaborador: {
+        Args: { p_reason: string; p_term_id: string };
+        Returns: undefined;
+      };
+      aposentar_valor_acordado_operacao: {
+        Args: { p_reason: string; p_term_id: string };
+        Returns: undefined;
+      };
+      condicao_contrato_na_data: {
+        Args: { p_contract_id: string; p_work_date: string };
+        Returns: {
+          active: boolean;
+          contract_id: string;
+          created_at: string;
+          created_by: string | null;
+          daily_rate: number;
+          id: string;
+          origin: string;
+          ot_factor: number;
+          ot_tolerance_min: number;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          shift_hours: number;
+          valid_from: string;
+          valid_to: string | null;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "contract_terms";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      condicoes_auditar: {
+        Args: {
+          p_action: string;
+          p_entity: string;
+          p_kind: string;
+          p_new: Json;
+          p_previous: Json;
+          p_reason: string;
+          p_term: string;
+        };
+        Returns: undefined;
+      };
+      condicoes_encerrar_colaborador_interno: {
+        Args: { p_reason: string; p_term_id: string; p_valid_to: string };
+        Returns: undefined;
+      };
+      condicoes_encerrar_contrato_interno: {
+        Args: { p_reason: string; p_term_id: string; p_valid_to: string };
+        Returns: undefined;
+      };
+      condicoes_encerrar_operacao_interno: {
+        Args: { p_reason: string; p_term_id: string; p_valid_to: string };
+        Returns: undefined;
+      };
+      condicoes_exigir_admin: { Args: never; Returns: undefined };
+      condicoes_validar_motivo: { Args: { p_reason: string }; Returns: string };
+      conta_ativa: { Args: { p_user_id: string }; Returns: boolean };
+      corrigir_condicao_contrato: {
+        Args: {
+          p_daily_rate: number;
+          p_ot_factor: number;
+          p_ot_tolerance_min: number;
+          p_reason: string;
+          p_shift_hours: number;
+          p_term_id: string;
+          p_valid_from: string;
+          p_valid_to: string;
+        };
+        Returns: string;
+      };
+      corrigir_custo_colaborador: {
+        Args: {
+          p_daily_cost: number;
+          p_reason: string;
+          p_term_id: string;
+          p_valid_from: string;
+          p_valid_to: string;
+        };
+        Returns: string;
+      };
+      corrigir_valor_acordado_operacao: {
+        Args: {
+          p_agreed_amount: number;
+          p_reason: string;
+          p_term_id: string;
+          p_valid_from: string;
+          p_valid_to: string;
+        };
+        Returns: string;
+      };
+      criar_colaborador_com_vigencia: {
+        Args: {
+          p_daily_cost: number;
+          p_doc: string;
+          p_name: string;
+          p_phone: string;
+          p_reason: string;
+          p_role: string;
+          p_status: string;
+          p_valid_from: string;
+        };
+        Returns: string;
+      };
+      criar_contrato_com_vigencia: {
+        Args: {
+          p_client_id: string;
+          p_daily_rate: number;
+          p_name: string;
+          p_ot_factor: number;
+          p_ot_tolerance_min: number;
+          p_reason: string;
+          p_shift_hours: number;
+          p_status: string;
+          p_valid_from: string;
+          p_valid_to: string;
+        };
+        Returns: string;
+      };
+      criar_operacao_com_vigencia: {
+        Args: {
+          p_agreed_amount: number;
+          p_client_id: string;
+          p_name: string;
+          p_notes: string;
+          p_operation_date: string;
+          p_reason: string;
+          p_site: string;
+          p_status: string;
+          p_type: string;
+          p_valid_from: string;
+        };
+        Returns: string;
+      };
+      custo_colaborador_na_data: {
+        Args: { p_employee_id: string; p_work_date: string };
+        Returns: {
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          daily_cost: number;
+          employee_id: string;
+          id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          valid_from: string;
+          valid_to: string | null;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "employee_cost_terms";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      encerrar_condicao_contrato: {
+        Args: { p_reason: string; p_term_id: string; p_valid_to: string };
+        Returns: undefined;
+      };
+      encerrar_custo_colaborador: {
+        Args: { p_reason: string; p_term_id: string; p_valid_to: string };
+        Returns: undefined;
+      };
+      encerrar_valor_acordado_operacao: {
+        Args: { p_reason: string; p_term_id: string; p_valid_to: string };
+        Returns: undefined;
+      };
+      estado_motor_vigencia: { Args: never; Returns: Json };
+      exigir_condicao_contrato_na_data: {
+        Args: { p_contract_id: string; p_work_date: string };
+        Returns: {
+          active: boolean;
+          contract_id: string;
+          created_at: string;
+          created_by: string | null;
+          daily_rate: number;
+          id: string;
+          origin: string;
+          ot_factor: number;
+          ot_tolerance_min: number;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          shift_hours: number;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "contract_terms";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      exigir_custo_colaborador_na_data: {
+        Args: { p_employee_id: string; p_work_date: string };
+        Returns: {
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          daily_cost: number;
+          employee_id: string;
+          id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "employee_cost_terms";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      exigir_valor_acordado_operacao_na_data: {
+        Args: { p_operation_id: string; p_work_date: string };
+        Returns: {
+          active: boolean;
+          agreed_amount: number;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          operation_id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "operation_terms";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      gerar_fatura: {
+        Args: { _client_id: string; _period_end: string; _period_start: string };
+        Returns: {
+          client_id: string;
+          created_at: string;
+          id: string;
+          notes: string | null;
+          period_end: string;
+          period_start: string;
+          status: Database["public"]["Enums"]["invoice_status"];
+          total_amount: number;
+          total_cost: number;
+          total_dailies: number;
+          total_overtime: number;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "invoices";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       has_role: {
         Args: {
@@ -600,7 +1242,176 @@ export type Database = {
         };
         Returns: boolean;
       };
+      identidade_atual_utilizavel: { Args: never; Returns: boolean };
       is_staff: { Args: never; Returns: boolean };
+      listar_apontamentos_do_operador: {
+        Args: {
+          p_operation_id: string;
+          p_shift_id: string;
+          p_work_date: string;
+        };
+        Returns: {
+          break_minutes: number;
+          check_in: string;
+          check_out: string;
+          employee_id: string;
+          faturado: boolean;
+          folha_status: Database["public"]["Enums"]["timesheet_status"];
+          notes: string;
+          shift_id: string;
+          status: Database["public"]["Enums"]["attendance_status"];
+          timesheet_id: string;
+          work_date: string;
+        }[];
+      };
+      listar_equipe_do_operador: {
+        Args: { p_operation_id: string; p_shift_id: string };
+        Returns: {
+          active: boolean;
+          employee_id: string;
+          employee_name: string;
+          employee_role: string;
+        }[];
+      };
+      listar_operacoes_do_operador: {
+        Args: never;
+        Returns: {
+          cliente_nome: string;
+          id: string;
+          name: string;
+          operation_date: string;
+          site: string;
+          status: Database["public"]["Enums"]["record_status"];
+          type: Database["public"]["Enums"]["operation_type"];
+        }[];
+      };
+      listar_turnos_do_operador: {
+        Args: { p_operation_id: string };
+        Returns: {
+          break_minutes: number;
+          crosses_midnight: boolean;
+          end_time: string;
+          id: string;
+          name: string;
+          start_time: string;
+        }[];
+      };
+      mfa_bloqueia_excecao_aal1: { Args: never; Returns: boolean };
+      motor_ativo: { Args: never; Returns: boolean };
+      motor_custo_do_dia: {
+        Args: { p_employee_id: string; p_work_date: string };
+        Returns: Record<string, unknown>;
+      };
+      motor_fonte_do_dia: {
+        Args: { p_operation_id: string; p_work_date: string };
+        Returns: Record<string, unknown>;
+      };
+      motor_minutos_previstos: { Args: { p_shift_id: string }; Returns: number };
+      motor_pendencias: {
+        Args: never;
+        Returns: {
+          id: string;
+          nome: string;
+          tipo: string;
+        }[];
+      };
+      motor_sincronizar_colunas_interno: { Args: never; Returns: Json };
+      operador_autorizado: {
+        Args: { p_operation_id: string };
+        Returns: boolean;
+      };
+      operador_elegivel_aal1: { Args: never; Returns: boolean };
+      operador_elegivel_operacional: { Args: never; Returns: boolean };
+      pendencias_implantacao_vigencias: {
+        Args: never;
+        Returns: {
+          id: string;
+          nome: string;
+          tipo: string;
+        }[];
+      };
+      provision_bslog_user: {
+        Args: { _email: string; _metadata?: Json; _user_id: string };
+        Returns: undefined;
+      };
+      registrar_condicao_contrato: {
+        Args: {
+          p_contract_id: string;
+          p_daily_rate: number;
+          p_encerrar_anterior?: boolean;
+          p_ot_factor: number;
+          p_ot_tolerance_min: number;
+          p_reason: string;
+          p_shift_hours: number;
+          p_valid_from: string;
+          p_valid_to?: string;
+        };
+        Returns: string;
+      };
+      registrar_custo_colaborador: {
+        Args: {
+          p_daily_cost: number;
+          p_employee_id: string;
+          p_encerrar_anterior?: boolean;
+          p_reason: string;
+          p_valid_from: string;
+          p_valid_to?: string;
+        };
+        Returns: string;
+      };
+      registrar_valor_acordado_operacao: {
+        Args: {
+          p_agreed_amount: number;
+          p_encerrar_anterior?: boolean;
+          p_operation_id: string;
+          p_reason: string;
+          p_valid_from: string;
+          p_valid_to?: string;
+        };
+        Returns: string;
+      };
+      regularizar_apontamento_legado: {
+        Args: { p_aplicar?: boolean; p_entry_id: string; p_reason: string };
+        Returns: Json;
+      };
+      salvar_apontamento_operacional: {
+        Args: {
+          p_linhas: Json;
+          p_operation_id: string;
+          p_shift_id: string;
+          p_work_date: string;
+        };
+        Returns: string;
+      };
+      sincronizar_colunas_legadas: { Args: { p_reason: string }; Returns: Json };
+      travar_turno_da_operacao: {
+        Args: { p_operation_id: string; p_shift_id: string };
+        Returns: boolean;
+      };
+      uid_do_operador: { Args: never; Returns: string };
+      valor_acordado_operacao_na_data: {
+        Args: { p_operation_id: string; p_work_date: string };
+        Returns: {
+          active: boolean;
+          agreed_amount: number;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          operation_id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          valid_from: string;
+          valid_to: string | null;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "operation_terms";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
     };
     Enums: {
       app_role: "admin" | "operacional";

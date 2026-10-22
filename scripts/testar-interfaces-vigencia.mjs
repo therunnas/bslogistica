@@ -37,6 +37,7 @@ import { RPC_VIGENCIAS } from "../src/lib/vigencias.ts";
 import {
   CAMPOS_DA_VIGENCIA,
   PARAM_DO_ID,
+  RPC_DE_CADASTRO,
   RPC_DE_REGISTRO,
   avisoDoMotor,
   classificarInicio,
@@ -45,6 +46,7 @@ import {
   jornadaDoTurnoProtegida,
   lerNumero,
   modoDeEdicaoDeTaxa,
+  montarCadastroAtomico,
   montarRegistro,
   novoTurnoAPartir,
   podeCadastrarComTaxa,
@@ -947,7 +949,7 @@ verificar(
 );
 verificar(
   "G4. Clientes: contrato novo com o motor ligado nasce com a vigência inicial (RPC)",
-  /useCriarComVigencia\("contrato", "contracts"/.test(clientes) &&
+  /useCriarComVigencia\("contrato", \["contracts"\]/.test(clientes) &&
     /Cadastro inicial do contrato/.test(clientes),
   true,
 );
@@ -966,7 +968,7 @@ verificar(
 verificar(
   "G7. Colaboradores: histórico do custo e registro de reajuste",
   /<HistoricoDeVigencias\s+tipo="colaborador"/.test(colaboradores) &&
-    /useCriarComVigencia\("colaborador", "employees"/.test(colaboradores),
+    /useCriarComVigencia\("colaborador", \["employees"\]/.test(colaboradores),
   true,
 );
 verificar(
@@ -1084,14 +1086,18 @@ verificar(
   true,
 );
 verificar(
-  "H8. o cadastro novo com motor ligado valida a vigência ANTES de gravar a entidade",
-  dados.indexOf('montarRegistro(tipo, "pendente"') > 0 &&
-    dados.indexOf('montarRegistro(tipo, "pendente"') < dados.indexOf(".insert(v.linha)"),
+  "H8. o cadastro novo com motor ligado é UMA chamada atômica: a tela não faz INSERT da entidade",
+  dados.includes("montarCadastroAtomico(tipo, v.linha, v.form)") && !/\.insert\(/.test(dados),
   true,
 );
 verificar(
-  "H9. falha na vigência inicial é dita ao usuário (entidade criada, vigência pendente)",
-  /O cadastro foi criado, mas a vigência inicial não foi registrada/.test(dados),
+  "H9. a mensagem de 'cadastro criado, mas a vigência não foi registrada' deixou de existir: não há estado parcial",
+  !/O cadastro foi criado, mas a vigência inicial não foi registrada/.test(dados),
+  true,
+);
+verificar(
+  "H10. a camada de dados usa o cliente tipado do Database gerado, sem o tipo mínimo provisório",
+  !/ClienteMinimo/.test(dados) && /const cliente = \(\) => criarClienteNavegador\(\);/.test(dados),
   true,
 );
 
@@ -1103,13 +1109,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. nenhuma migration nova: a 025 continua a última e a 019 ausente",
+  "I1. a 026 (cadastro atômico) é a última migration, a 025 não é a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [30, "20261021100000_025_motor_financeiro_por_vigencia.sql", false],
+  [31, "20261022120000_026_cadastro_atomico_com_vigencia.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",
@@ -1138,6 +1144,232 @@ verificar(
     Object.keys(pacote.scripts)
       .filter((n) => n.startsWith("test:"))
       .every((n) => ci.includes(`npm run ${n}`)),
+  true,
+);
+
+// ---------------------------------------------------------------------------
+// J. Cadastro atômico de entidade + vigência inicial (C05-B5.1, migration 026)
+// ---------------------------------------------------------------------------
+
+console.log("J. Cadastro atômico (026)");
+
+const sql026 = ler("supabase/migrations/20261022120000_026_cadastro_atomico_com_vigencia.sql");
+const corpoSql = sql026.replace(/^\s*--.*$/gm, "");
+verificar(
+  "J1. a 026 define as três funções de cadastro, todas SECURITY INVOKER (sem SECURITY DEFINER)",
+  [
+    /create or replace function public\.criar_contrato_com_vigencia\(/.test(corpoSql),
+    /create or replace function public\.criar_colaborador_com_vigencia\(/.test(corpoSql),
+    /create or replace function public\.criar_operacao_com_vigencia\(/.test(corpoSql),
+    (corpoSql.match(/security invoker/g) ?? []).length,
+    /security definer/i.test(corpoSql),
+  ],
+  [true, true, true, 3, false],
+);
+verificar(
+  "J2. cada função registra a vigência pela RPC existente (023/024), na mesma chamada",
+  /perform public\.registrar_condicao_contrato\(/.test(corpoSql) &&
+    /perform public\.registrar_custo_colaborador\(/.test(corpoSql) &&
+    /perform public\.registrar_valor_acordado_operacao\(/.test(corpoSql),
+  true,
+);
+verificar(
+  "J3. EXECUTE só para authenticated; revoga de public, anon, service_role e do papel operacional",
+  /revoke all on function %s from public, anon, authenticated, service_role, bslog_rpc_operacional/.test(
+    corpoSql,
+  ) &&
+    /grant execute on function %s to authenticated/.test(corpoSql) &&
+    !/grant [^;]*(anon|service_role|public)/.test(corpoSql.replace(/revoke[^;]*;/g, "")),
+  true,
+);
+verificar(
+  "J4. a 026 não altera policy, tabela, trigger nem grant de tabela (só cria as três funções)",
+  !/create policy|drop policy|alter table|create trigger|drop trigger|grant [^;]* on table|drop function|create table/i.test(
+    corpoSql,
+  ),
+  true,
+);
+verificar(
+  "J5. nenhuma migration 021–025 foi tocada pela 026 (a 025 mantém o SHA aprovado — ver I2)",
+  ["_021_", "_022_", "_023_", "_024_", "_025_"].every(
+    (n) => migrations.filter((m) => m.includes(n)).length === 1,
+  ),
+  true,
+);
+const paramsDoSql = (nome) =>
+  [
+    ...corpoSql.match(new RegExp(`function public\\.${nome}\\(([^)]*)\\)`))[1].matchAll(/\bp_\w+/g),
+  ].map((m) => m[0]);
+const cadastro = (tipo, linha, form) => montarCadastroAtomico(tipo, linha, form);
+const FORM_C = {
+  inicio: "2026-01-01",
+  motivo: "Cadastro inicial do contrato",
+  valores: { daily_rate: "120", shift_hours: "8", ot_factor: "1.5", ot_tolerance_min: "10" },
+  encerrarAnterior: false,
+};
+const LINHA_C = {
+  client_id: "cli-1",
+  name: "KA",
+  valid_from: "2026-01-01",
+  valid_to: null,
+  status: "active",
+};
+const FORM_K = {
+  inicio: "2026-02-01",
+  motivo: "Cadastro inicial do colaborador",
+  valores: { daily_cost: "80" },
+  encerrarAnterior: false,
+};
+const LINHA_K = { name: "Ana", doc: null, role: "Ajudante", phone: null, status: "active" };
+const FORM_O = {
+  inicio: "2026-03-01",
+  motivo: "Cadastro inicial da operação",
+  valores: { agreed_amount: "100" },
+  encerrarAnterior: false,
+};
+const LINHA_O = {
+  client_id: "cli-1",
+  contract_id: null,
+  type: "fixed",
+  name: "Op",
+  site: null,
+  operation_date: null,
+  status: "active",
+  notes: null,
+};
+for (const [tipo, rpc, linha, form] of [
+  ["contrato", "criar_contrato_com_vigencia", LINHA_C, FORM_C],
+  ["colaborador", "criar_colaborador_com_vigencia", LINHA_K, FORM_K],
+  ["operacao", "criar_operacao_com_vigencia", LINHA_O, FORM_O],
+]) {
+  const r = cadastro(tipo, linha, form);
+  verificar(
+    `J6. ${tipo}: a RPC é ${rpc} (RPC_DE_CADASTRO)`,
+    [r.rpc, RPC_DE_CADASTRO[tipo]],
+    [rpc, rpc],
+  );
+  verificar(
+    `J7. ${tipo}: os parâmetros enviados são exatamente os da função SQL (nomes e quantidade)`,
+    Object.keys(r.params).sort(),
+    paramsDoSql(rpc).sort(),
+  );
+}
+verificar(
+  "J8. contrato: números lidos do formulário, fim do contrato vem do cadastro e a vigência nasce no início informado",
+  cadastro("contrato", { ...LINHA_C, valid_to: "2027-01-01" }, FORM_C).params,
+  {
+    p_client_id: "cli-1",
+    p_name: "KA",
+    p_valid_from: "2026-01-01",
+    p_valid_to: "2027-01-01",
+    p_status: "active",
+    p_daily_rate: 120,
+    p_shift_hours: 8,
+    p_ot_factor: 1.5,
+    p_ot_tolerance_min: 10,
+    p_reason: "Cadastro inicial do contrato",
+  },
+);
+verificar(
+  "J9. colaborador: custo numérico, início da vigência do formulário, vazios viram nulo",
+  cadastro("colaborador", { ...LINHA_K, doc: "" }, FORM_K).params,
+  {
+    p_name: "Ana",
+    p_doc: null,
+    p_role: "Ajudante",
+    p_phone: null,
+    p_status: "active",
+    p_daily_cost: 80,
+    p_valid_from: "2026-02-01",
+    p_reason: "Cadastro inicial do colaborador",
+  },
+);
+verificar(
+  "J10. operação: valor acordado numérico, sem contrato",
+  cadastro("operacao", LINHA_O, FORM_O).params["p_agreed_amount"],
+  100,
+);
+const lanca = (fn) => {
+  try {
+    fn();
+    return "não lançou";
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+};
+verificar(
+  "J11. operação COM contrato é recusada antes de qualquer chamada",
+  lanca(() => cadastro("operacao", { ...LINHA_O, contract_id: "c-1" }, FORM_O)),
+  "Operação com contrato usa o preço do contrato, sem valor acordado.",
+);
+verificar(
+  "J12. formulário inválido (sem motivo) é recusado antes de qualquer chamada, nos três tipos",
+  [
+    lanca(() => cadastro("contrato", LINHA_C, { ...FORM_C, motivo: " " })),
+    lanca(() => cadastro("colaborador", LINHA_K, { ...FORM_K, motivo: "" })),
+    lanca(() => cadastro("operacao", LINHA_O, { ...FORM_O, motivo: "" })),
+  ],
+  ["O motivo é obrigatório.", "O motivo é obrigatório.", "O motivo é obrigatório."],
+);
+verificar(
+  "J13. valor negativo ou com três casas é recusado antes de qualquer chamada",
+  [
+    lanca(() => cadastro("colaborador", LINHA_K, { ...FORM_K, valores: { daily_cost: "-1" } })) !==
+      "não lançou",
+    lanca(() =>
+      cadastro("contrato", LINHA_C, {
+        ...FORM_C,
+        valores: { ...FORM_C.valores, daily_rate: "10.123" },
+      }),
+    ) !== "não lançou",
+  ],
+  [true, true],
+);
+verificar(
+  "J14. as três telas chamam useCriarComVigencia só com o tipo e as chaves de cache (sem nome de tabela)",
+  /useCriarComVigencia\("contrato", \["contracts"\]\)/.test(clientes) &&
+    /useCriarComVigencia\("colaborador", \["employees"\]\)/.test(colaboradores) &&
+    /useCriarComVigencia\("operacao", \["operations"\]\)/.test(operacoes),
+  true,
+);
+const tipos = ler("src/integrations/supabase/types.ts");
+verificar(
+  "J15. types.ts gerado do schema local traz tabelas de vigências, auditoria, motor e as RPCs das migrations 021–026",
+  [
+    "contract_terms",
+    "employee_cost_terms",
+    "operation_terms",
+    "financial_terms_audit",
+    "financial_engine_settings",
+    "user_operation_access",
+    "admin_audit_log",
+    "criar_contrato_com_vigencia",
+    "criar_colaborador_com_vigencia",
+    "criar_operacao_com_vigencia",
+    "registrar_condicao_contrato",
+    "registrar_custo_colaborador",
+    "registrar_valor_acordado_operacao",
+    "alterar_motor_vigencia",
+    "estado_motor_vigencia",
+    "regularizar_apontamento_legado",
+    "contract_terms_id",
+    "operation_terms_id",
+    "employee_cost_terms_id",
+    "terms_origin",
+    "planned_minutes_snapshot",
+  ].filter((nome) => !new RegExp(`\\b${nome}\\b`).test(tipos)),
+  [],
+);
+verificar(
+  "J16. types.ts mantém o PostgrestVersion e o gerar_fatura (nada existente foi perdido)",
+  /PostgrestVersion: "14\.5"/.test(tipos) && /gerar_fatura: \{/.test(tipos),
+  true,
+);
+verificar(
+  "J17. nenhum valor financeiro novo passa a ser aceito do cliente em tabela: a tela não faz INSERT em tabela de versões nem de entidade na camada de dados",
+  !/\.from\("(contract_terms|employee_cost_terms|operation_terms)"\)\s*\.(insert|update|delete)/.test(
+    dados,
+  ),
   true,
 );
 

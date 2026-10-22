@@ -64,9 +64,11 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existe a 026 (a 025 é o motor por vigência; a próxima ainda não foi desenhada)",
-  arquivos.some((a) => a.includes("_026_")),
-  false,
+  "A5. a única 026 é a do cadastro atômico (C05-B5.1) (a 025 é o motor por vigência; a próxima ainda não foi desenhada)",
+  arquivos
+    .filter((a) => a.includes("_026_"))
+    .every((a) => a.endsWith("_026_cadastro_atomico_com_vigencia.sql")),
+  true,
 );
 
 const migration = ler(`supabase/migrations/${NOME}`);

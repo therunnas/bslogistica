@@ -55,8 +55,10 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations",
-  arquivos.filter((a) => a !== NOME).every((a) => a.split("_")[0] < NOME.split("_")[0]),
+  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), que é posterior a ela",
+  arquivos
+    .filter((a) => a !== NOME && !a.includes("_026_"))
+    .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
 );
 verificar(
@@ -65,9 +67,11 @@ verificar(
   false,
 );
 verificar(
-  "A5. não existe a 026",
-  arquivos.some((a) => a.includes("_026_")),
-  false,
+  "A5. a única 026 é a do cadastro atômico (C05-B5.1)",
+  arquivos
+    .filter((a) => a.includes("_026_"))
+    .every((a) => a.endsWith("_026_cadastro_atomico_com_vigencia.sql")),
+  true,
 );
 verificar(
   "A6. as migrations 021 a 024 continuam no conjunto",

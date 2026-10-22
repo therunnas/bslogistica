@@ -187,6 +187,14 @@ em silêncio. Ordem das migrations:
   regularizam o motor (fora do escopo). Dependência registrada: a tela do operador não mostra
   valores nem origem de vigência.
 
+- **026** (cadastro atômico, C05-B5.1): `criar_contrato_com_vigencia`, `criar_colaborador_com_vigencia`
+  e `criar_operacao_com_vigencia` criam a entidade e a vigência inicial na mesma transação (antes
+  eram dois passos, e a falha do segundo deixava a entidade sem condição financeira). São
+  `SECURITY INVOKER`: o INSERT segue a RLS e a vigência vai pelas RPCs 023/024, que revalidam admin
+  AAL2 e gravam a trilha. Pronta em branch local; **não aplicada** na homologação nem em
+  Production. As telas só a usam com o motor ligado (desligado, o INSERT direto continua). Os tipos
+  do Supabase (`types.ts`) foram regenerados do schema local até a 026.
+
 Dependências da ativação (ligar o motor da 025, não antes):
 
 1. **Bloqueio da edição direta** de `contracts`, `employees` e `operations.agreed_amount`:

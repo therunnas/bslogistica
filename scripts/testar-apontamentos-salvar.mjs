@@ -600,13 +600,13 @@ verificar(
   true,
 );
 verificar(
-  "F4. a correção do salvamento não depende de migration: as 021 a 024 existem e a 026 não",
+  "F4. a correção do salvamento não depende de migration: as 021 a 024 existem e a única 026 é a do cadastro atômico",
   ["_021_", "_022_", "_023_", "_024_"].every((n) =>
     readdirSync(new URL("../supabase/migrations/", import.meta.url)).some((a) => a.includes(n)),
   ) &&
-    !readdirSync(new URL("../supabase/migrations/", import.meta.url)).some((a) =>
-      a.includes("_026_"),
-    ),
+    readdirSync(new URL("../supabase/migrations/", import.meta.url))
+      .filter((a) => a.includes("_026_"))
+      .every((a) => a.endsWith("_026_cadastro_atomico_com_vigencia.sql")),
   true,
 );
 
