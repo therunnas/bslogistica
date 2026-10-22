@@ -72,6 +72,21 @@ create or replace function pg_temp.trocar(_op text, _contrato text) returns text
            case when _contrato = 'null' then 'null' else quote_literal(_contrato) end, _op))
 $$;
 
+-- DELETE de contrato como admin AAL2: linhas apagadas ou 'erro <SQLSTATE>'.
+create or replace function pg_temp.apagar_contrato(_contrato text) returns text language sql as $$
+  select pg_temp.como('5c800000-0000-4000-8000-0000000000a1', 'aal2',
+    format('with d as (delete from public.contracts where id = %L returning 1) select count(*)::text from d', _contrato))
+$$;
+
+create or replace function pg_temp.estado_contratos() returns text language sql as $$
+  select (select string_agg(coalesce(c.name, '-'), ',' order by o.name)
+            from public.operations o left join public.contracts c on c.id = o.contract_id
+           where o.name like 'O5%' or o.name like 'O6%' or o.name like 'O7%')
+      || '|' || (select count(*)::text from public.contract_terms where contract_id in
+                  ('5c80d000-0000-4000-8000-0000000000d4', '5c80d000-0000-4000-8000-0000000000d5', '5c80d000-0000-4000-8000-0000000000d7'))
+      || '|' || (select count(*)::text from public.operation_terms where operation_id = '5c80e000-0000-4000-8000-0000000000a5')
+$$;
+
 create or replace function pg_temp.erro_de(_sql text) returns text language plpgsql as $$
 begin
   execute _sql;
@@ -122,6 +137,11 @@ insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_f
   ('5c80d000-0000-4000-8000-0000000000d1', '5c80c000-0000-4000-8000-0000000000c1', 'KA', 100, 8, 1.5, 10),
   ('5c80d000-0000-4000-8000-0000000000d2', '5c80c000-0000-4000-8000-0000000000c1', 'KB', 130, 8, 1.5, 10),
   ('5c80d000-0000-4000-8000-0000000000d3', '5c80c000-0000-4000-8000-0000000000c2', 'KX outro cliente', 150, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
+  ('5c80d000-0000-4000-8000-0000000000d4', '5c80c000-0000-4000-8000-0000000000c1', 'KD contrato com vigencia de valor acordado', 110, 8, 1.5, 10),
+  ('5c80d000-0000-4000-8000-0000000000d5', '5c80c000-0000-4000-8000-0000000000c1', 'KE contrato sem historico', 120, 8, 1.5, 10),
+  ('5c80d000-0000-4000-8000-0000000000d6', '5c80c000-0000-4000-8000-0000000000c1', 'KF contrato sem operacao', 125, 8, 1.5, 10),
+  ('5c80d000-0000-4000-8000-0000000000d7', '5c80c000-0000-4000-8000-0000000000c1', 'KG contrato sem historico (motor ligado)', 126, 8, 1.5, 10);
 insert into public.employees (id, name, daily_cost) values
   ('5c80f000-0000-4000-8000-000000000001', 'EA', 60);
 -- O1 com contrato, sem histórico; O2 sem contrato com valor acordado cadastrado; O3 com contrato e
@@ -130,10 +150,17 @@ insert into public.operations (id, client_id, contract_id, name, agreed_amount) 
   ('5c80e000-0000-4000-8000-0000000000a1', '5c80c000-0000-4000-8000-0000000000c1', '5c80d000-0000-4000-8000-0000000000d1', 'O1 sem historico', null),
   ('5c80e000-0000-4000-8000-0000000000a2', '5c80c000-0000-4000-8000-0000000000c1', null, 'O2 valor acordado', 200),
   ('5c80e000-0000-4000-8000-0000000000a3', '5c80c000-0000-4000-8000-0000000000c1', '5c80d000-0000-4000-8000-0000000000d1', 'O3 apontamento', null),
-  ('5c80e000-0000-4000-8000-0000000000a4', '5c80c000-0000-4000-8000-0000000000c1', null, 'O4 sem historico', 300);
+  ('5c80e000-0000-4000-8000-0000000000a4', '5c80c000-0000-4000-8000-0000000000c1', null, 'O4 sem historico', 300),
+  ('5c80e000-0000-4000-8000-0000000000a5', '5c80c000-0000-4000-8000-0000000000c1', '5c80d000-0000-4000-8000-0000000000d4', 'O5 contrato KD e valor acordado', null),
+  ('5c80e000-0000-4000-8000-0000000000a6', '5c80c000-0000-4000-8000-0000000000c1', '5c80d000-0000-4000-8000-0000000000d5', 'O6 contrato KE sem historico', null),
+  ('5c80e000-0000-4000-8000-0000000000a7', '5c80c000-0000-4000-8000-0000000000c1', '5c80d000-0000-4000-8000-0000000000d7', 'O7 contrato KG sem historico', null);
 
 select pg_temp.adm($q$public.registrar_condicao_contrato('5c80d000-0000-4000-8000-0000000000d1', date '2020-01-01', 100, 8, 1.5, 10, 'KA')$q$);
 select pg_temp.adm($q$public.registrar_condicao_contrato('5c80d000-0000-4000-8000-0000000000d2', date '2020-01-01', 130, 8, 1.5, 10, 'KB')$q$);
+select pg_temp.adm($q$public.registrar_condicao_contrato('5c80d000-0000-4000-8000-0000000000d4', date '2020-01-01', 110, 8, 1.5, 10, 'KD')$q$);
+select pg_temp.adm($q$public.registrar_condicao_contrato('5c80d000-0000-4000-8000-0000000000d5', date '2020-01-01', 120, 8, 1.5, 10, 'KE')$q$);
+select pg_temp.adm($q$public.registrar_condicao_contrato('5c80d000-0000-4000-8000-0000000000d7', date '2020-01-01', 126, 8, 1.5, 10, 'KG')$q$);
+select pg_temp.adm($q$public.registrar_valor_acordado_operacao('5c80e000-0000-4000-8000-0000000000a5', date '2020-01-01', 400, 'O5 valor acordado com contrato')$q$);
 select pg_temp.adm($q$public.registrar_custo_colaborador('5c80f000-0000-4000-8000-000000000001', date '2020-01-01', 60, 'EA')$q$);
 select pg_temp.adm($q$public.registrar_valor_acordado_operacao('5c80e000-0000-4000-8000-0000000000a2', date '2020-01-01', 200, 'O2')$q$);
 
@@ -148,7 +175,7 @@ create temporary table _historico on commit drop as
     from public.timesheet_entries e;
 create temporary table _estado_antes on commit drop as
   select (select count(*) from public.operation_terms) as n_op_terms,
-         (select count(*) from public.contract_terms) as n_ct_terms,
+         (select count(*) from public.contract_terms where contract_id not in ('5c80d000-0000-4000-8000-0000000000d5', '5c80d000-0000-4000-8000-0000000000d7')) as n_ct_terms,
          (select count(*) from public.financial_terms_audit where action not like 'motor_vigencia%') as n_trilha;
 
 create or replace function pg_temp.historico_igual() returns text language sql as $$
@@ -159,7 +186,7 @@ create or replace function pg_temp.historico_igual() returns text language sql a
         and e.daily_cost_snapshot is not distinct from h.daily_cost_snapshot
         and e.terms_origin::text is not distinct from h.origem) = (select count(*) from _historico)
     and (select count(*) from public.operation_terms) = (select n_op_terms from _estado_antes)
-    and (select count(*) from public.contract_terms) = (select n_ct_terms from _estado_antes)
+    and (select count(*) from public.contract_terms where contract_id not in ('5c80d000-0000-4000-8000-0000000000d5', '5c80d000-0000-4000-8000-0000000000d7')) = (select n_ct_terms from _estado_antes)
     and (select count(*) from public.financial_terms_audit where action not like 'motor_vigencia%') = (select n_trilha from _estado_antes)
   then 'igual' else 'mudou' end
 $$;
@@ -236,6 +263,33 @@ select pg_temp.registrar('F5. o sistema (postgres) é isento, como nos demais bl
 update public.operations set contract_id = '5c80d000-0000-4000-8000-0000000000d1' where id = '5c80e000-0000-4000-8000-0000000000a3';
 
 -- ---------------------------------------------------------------------------
+-- J. Exclusão de contrato (motor DESLIGADO)
+-- ---------------------------------------------------------------------------
+
+create temporary table _contratos_antes on commit drop as select pg_temp.estado_contratos() as estado;
+
+select pg_temp.registrar('J1. KD: operação com valor acordado cadastrado e SEM apontamento: excluir o contrato é recusado', 'erro 55000',
+  pg_temp.apagar_contrato('5c80d000-0000-4000-8000-0000000000d4'));
+select pg_temp.registrar('J2. nada foi apagado nem desvinculado (contrato, vínculo, vigências de contrato e de valor acordado)', (select estado from _contratos_antes), pg_temp.estado_contratos());
+select pg_temp.registrar('J3. KA: operação com apontamento: excluir segue recusado (011)', 'erro 42501',
+  pg_temp.apagar_contrato('5c80d000-0000-4000-8000-0000000000d1'));
+select pg_temp.registrar('J4. o sistema (postgres) também é recusado: a exclusão não tem isenção de papel', '55000',
+  pg_temp.erro_de($q$delete from public.contracts where id = '5c80d000-0000-4000-8000-0000000000d4'$q$));
+select pg_temp.registrar('J5. a mensagem manda inativar o contrato', 'sim',
+  case when pg_temp.mensagem_de($q$delete from public.contracts where id = '5c80d000-0000-4000-8000-0000000000d4'$q$) like '%Inative o contrato%' then 'sim' else 'nao' end);
+select pg_temp.registrar('J6. admin em AAL1, operacional e anônimo não apagam contrato (0 linhas ou erro)', '0|0|0',
+  (select string_agg(case when r in ('0', 'erro 42501') then '0' else 'apagou' end, '|') from (
+     select pg_temp.como('5c800000-0000-4000-8000-0000000000a1', 'aal1', $q$with d as (delete from public.contracts where id = '5c80d000-0000-4000-8000-0000000000d5' returning 1) select count(*)::text from d$q$) as r
+     union all select pg_temp.como('5c800000-0000-4000-8000-0000000000a2', 'aal2', $q$with d as (delete from public.contracts where id = '5c80d000-0000-4000-8000-0000000000d5' returning 1) select count(*)::text from d$q$)
+     union all select pg_temp.medir_como('anon', jsonb_build_object('role', 'anon'), $q$with d as (delete from public.contracts where id = '5c80d000-0000-4000-8000-0000000000d5' returning 1) select count(*)::text from d$q$)) q));
+select pg_temp.registrar('J7. contrato SEM operação nenhuma: exclusão permitida', '1', pg_temp.apagar_contrato('5c80d000-0000-4000-8000-0000000000d6'));
+select pg_temp.registrar('J8. KE: operação ligada sem histórico: exclusão do contrato permitida', '1', pg_temp.apagar_contrato('5c80d000-0000-4000-8000-0000000000d5'));
+select pg_temp.registrar('J8b. e a operação ficou sem contrato (SET NULL preservado)', '-',
+  (select coalesce(c.name, '-') from public.operations o left join public.contracts c on c.id = o.contract_id where o.name like 'O6%'));
+select pg_temp.registrar('J9. as vigências de KE saíram junto (cascata já existente), as de KD seguem', '1',
+  (select count(*)::text from public.contract_terms where contract_id = '5c80d000-0000-4000-8000-0000000000d4'));
+
+-- ---------------------------------------------------------------------------
 -- G. Motor LIGADO
 -- ---------------------------------------------------------------------------
 
@@ -260,6 +314,18 @@ select pg_temp.registrar('G6. ligado, contrato de outro cliente: 23503 sem hist�
 select pg_temp.registrar('G7. ligado, reenviar o mesmo contract_id segue aceito', '1',
   pg_temp.trocar('5c80e000-0000-4000-8000-0000000000a3', '5c80d000-0000-4000-8000-0000000000d1'));
 select pg_temp.registrar('G8. histórico idêntico depois de tudo', 'igual', pg_temp.historico_igual());
+
+-- J (continuação). Exclusão de contrato com o motor LIGADO
+create temporary table _contratos_antes_on on commit drop as select pg_temp.estado_contratos() as estado;
+select pg_temp.registrar('J10. ligado: KD (valor acordado cadastrado, sem apontamento): excluir recusado', 'erro 55000',
+  pg_temp.apagar_contrato('5c80d000-0000-4000-8000-0000000000d4'));
+select pg_temp.registrar('J11. ligado: KA (apontamento): excluir recusado', 'erro 42501',
+  pg_temp.apagar_contrato('5c80d000-0000-4000-8000-0000000000d1'));
+select pg_temp.registrar('J12. ligado: nada mudou', (select estado from _contratos_antes_on), pg_temp.estado_contratos());
+select pg_temp.registrar('J13. ligado: KG (operação sem histórico): exclusão do contrato permitida', '1', pg_temp.apagar_contrato('5c80d000-0000-4000-8000-0000000000d7'));
+select pg_temp.registrar('J13b. ligado: e a operação ficou sem contrato', '-',
+  (select coalesce(c.name, '-') from public.operations o left join public.contracts c on c.id = o.contract_id where o.name like 'O7%'));
+
 
 -- ---------------------------------------------------------------------------
 -- H. Remoção de contrato e permissões

@@ -213,6 +213,10 @@ em silêncio. Ordem das migrations:
   troca era livre, e ligado com valor acordado cadastrado e sem apontamento também. Operação sem
   histórico segue editável; contrato de outro cliente segue recusado pela 021. Trigger sempre
   habilitado, `SECURITY INVOKER`, `postgres` e `service_role` isentos como nas demais guardas.
+  Segunda porta fechada (C05-B5.6A): excluir o contrato desvinculava a operação pelo `SET NULL` da
+  chave estrangeira, que roda como dono e escapava do trigger; um `BEFORE DELETE` em `contracts`
+  recusa (55000) a exclusão quando a operação ligada tem apontamento ou valor acordado cadastrado,
+  sem exceção de papel. Contrato sem operação ou com operação sem histórico segue excluível.
   Pronta em branch local; **não aplicada** na homologação nem em Production.
 
 Dependências da ativação (ligar o motor da 025, não antes):

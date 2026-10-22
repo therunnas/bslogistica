@@ -1028,6 +1028,20 @@ verificar(
   ) && !/grant execute/.test(sql028Codigo),
   true,
 );
+verificar(
+  "K6. excluir contrato: trigger BEFORE DELETE sempre habilitado recusa 55000 quando a operação ligada tem apontamento ou operation_terms, sem exceção de papel e sem EXECUTE para API",
+  /create trigger trg_contracts_protege_exclusao_com_historico\s+before delete on public\.contracts\s+for each row/.test(
+    sql028Codigo,
+  ) &&
+    /for update;/.test(sql028Codigo) &&
+    /o\.contract_id = old\.id\s+and \(exists/.test(sql028Codigo) &&
+    /Inative o contrato/.test(sql028Codigo) &&
+    !/disable trigger trg_contracts_protege_exclusao_com_historico/.test(sql028Codigo) &&
+    sql028Codigo.includes(
+      "revoke all on function public.proteger_contrato_contra_exclusao() from public, anon, authenticated, service_role, bslog_rpc_operacional",
+    ),
+  true,
+);
 
 console.log("");
 if (falhas.length > 0) {
