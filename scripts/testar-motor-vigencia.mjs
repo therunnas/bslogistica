@@ -55,9 +55,9 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), que é posterior a ela",
+  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico) e a 027 (ativação com divergência), que são posteriores a ela",
   arquivos
-    .filter((a) => a !== NOME && !a.includes("_026_"))
+    .filter((a) => a !== NOME && !a.includes("_026_") && !a.includes("_027_"))
     .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
 );
@@ -606,6 +606,7 @@ const sqlTodas = [
   "20261020180000_023_registro_vigencias_financeiras.sql",
   "20261020210000_024_valores_acordados_operacao.sql",
   NOME,
+  "20261022183038_027_motor_bloqueia_ativacao_com_divergencia.sql",
 ]
   .map((f) => ler(`supabase/migrations/${f}`).replace(/^\s*--.*$/gm, ""))
   .join("\n");
@@ -617,7 +618,7 @@ function parametrosDoSql(nome) {
 }
 const nomesTs = Object.values(RPC_VIGENCIAS).flatMap((g) => Object.values(g));
 verificar(
-  "F1. as 20 RPCs do módulo existem no SQL (023, 024 e 025)",
+  "F1. as 21 RPCs do módulo existem no SQL (023, 024, 025 e 027)",
   nomesTs.every((n) => parametrosDoSql(n) !== null),
   true,
 );
@@ -891,6 +892,85 @@ verificar(
 verificar(
   "H10. o CI continua sem secrets e com permissões de leitura",
   /permissions:\s*\n\s*contents: read/.test(ci) && !/secrets\./.test(ci),
+  true,
+);
+
+// ---------------------------------------------------------------------------
+// J. Ativação recusa divergência (027, C05-B5.5)
+// ---------------------------------------------------------------------------
+
+console.log("J. A ativação recusa divergência entre coluna e vigência");
+
+const sql027 = ler(
+  "supabase/migrations/20261022183038_027_motor_bloqueia_ativacao_com_divergencia.sql",
+);
+const sql027Codigo = sql027.replace(/^\s*--.*$/gm, "");
+const ativar027 = sql027Codigo.slice(
+  sql027Codigo.indexOf("if p_ativar then"),
+  sql027Codigo.indexOf("_sync := public.motor_sincronizar_colunas_interno()"),
+);
+verificar(
+  "J1. a divergência é medida DEPOIS de habilitar os bloqueios (as tabelas já estão travadas) e antes de gravar a chave",
+  ativar027.indexOf("enable  trigger trg_operations_bloqueia_taxa_direta") > -1 &&
+    ativar027.indexOf("enable  trigger trg_operations_bloqueia_taxa_direta") <
+      ativar027.indexOf("motor_divergencias()") &&
+    ativar027.indexOf("motor_divergencias()") <
+      ativar027.indexOf("update public.financial_engine_settings"),
+  true,
+);
+verificar(
+  "J2. a recusa é 55000 e p_aceitar_pendencias não aparece na condição da divergência",
+  /if _div > 0 then\s+raise exception[\s\S]*?errcode = '55000'/.test(ativar027) &&
+    !/_div > 0 and/.test(ativar027),
+  true,
+);
+verificar(
+  "J3. a mensagem de recusa usa só contagens, nunca nome de cadastro",
+  /raise exception 'Há % cadastro\(s\) \(contratos: %, colaboradores: %, operações sem contrato: %\)[^']*',\s+_div, _div_c, _div_e, _div_o/.test(
+    ativar027,
+  ),
+  true,
+);
+verificar(
+  "J4. a 027 não cria vigência, não atualiza coluna e não chama a sincronização na ativação",
+  !/insert into public\.(contract_terms|employee_cost_terms|operation_terms)/.test(sql027Codigo) &&
+    !/update public\.(contracts|employees|operations)\b/.test(sql027Codigo) &&
+    !/motor_sincronizar_colunas_interno/.test(ativar027),
+  true,
+);
+verificar(
+  "J5. operação com contrato fica fora da comparação, e a jornada <= 0 e o fator 0 são normalizados como no motor antigo",
+  /where o\.contract_id is null\s+and daterange/.test(sql027Codigo) &&
+    sql027Codigo.includes("case when c.shift_hours > 0 then c.shift_hours else 8 end") &&
+    sql027Codigo.includes("case when coalesce(c.ot_factor, 0) = 0 then 1 else c.ot_factor end"),
+  true,
+);
+verificar(
+  "J6. a lista interna não tem nenhum papel de API; a lista administrativa e a ativação só para authenticated",
+  /if _f\.nome in \('divergencias_implantacao_vigencias', 'alterar_motor_vigencia'\) then\s+execute format\('grant execute on function %s to authenticated'/.test(
+    sql027Codigo,
+  ) &&
+    sql027Codigo.includes(
+      "revoke all on function %s from public, anon, authenticated, service_role, bslog_rpc_operacional",
+    ),
+  true,
+);
+verificar(
+  "J7. a lista administrativa exige admin AAL2 (condicoes_exigir_admin) e a 027 não toca gerar_fatura nem a 019",
+  /function public\.divergencias_implantacao_vigencias\(\)[\s\S]*?perform public\.condicoes_exigir_admin\(\)/.test(
+    sql027Codigo,
+  ) &&
+    !/gerar_fatura|derivar_valores_financeiros/.test(sql027Codigo) &&
+    !readdirSync(new URL("../supabase/migrations/", import.meta.url)).some((m) =>
+      m.includes("_019_"),
+    ),
+  true,
+);
+verificar(
+  "J8. as migrations 021 a 026 seguem como estavam (a 027 não as reescreve; o nome da RPC é o mesmo da 025)",
+  /create or replace function public\.alterar_motor_vigencia\(\s+p_ativar\s+boolean,\s+p_reason\s+text,\s+p_aceitar_pendencias\s+boolean default false\s+\) returns jsonb/.test(
+    sql027Codigo,
+  ),
   true,
 );
 

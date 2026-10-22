@@ -195,6 +195,17 @@ em silêncio. Ordem das migrations:
   Production. As telas só a usam com o motor ligado (desligado, o INSERT direto continua). Os tipos
   do Supabase (`types.ts`) foram regenerados do schema local até a 026.
 
+- **027** (ativação com divergência, C05-B5.5): com o motor desligado, a edição direta de taxa
+  muda só a coluna, não a vigência cadastrada; a 025 ligava mesmo assim e o preço passava, em
+  silêncio, da coluna para a vigência (não havia sobrescrita das colunas, só troca da fonte).
+  `alterar_motor_vigencia(true, ...)` agora recusa (55000) enquanto existir cadastro cuja coluna
+  difere da vigência ativa de hoje; a conferência roda dentro da transação, depois de habilitar os
+  bloqueios (as tabelas já estão travadas), e a exceção desfaz tudo. Ausência de vigência segue
+  como pendência; vigência futura e operação com contrato não entram; `p_aceitar_pendencias` não
+  libera divergência. Lista para o admin: `divergencias_implantacao_vigencias()`. Corrigir é ato
+  explícito (editar a coluna com o motor desligado, `sincronizar_colunas_legadas` ou registrar a
+  vigência desejada). Pronta em branch local; **não aplicada** na homologação nem em Production.
+
 Dependências da ativação (ligar o motor da 025, não antes):
 
 1. **Bloqueio da edição direta** de `contracts`, `employees` e `operations.agreed_amount`:

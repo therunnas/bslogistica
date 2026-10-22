@@ -37,6 +37,7 @@ export const RPC_VIGENCIAS = {
   motor: {
     estado: "estado_motor_vigencia",
     pendencias: "pendencias_implantacao_vigencias",
+    divergencias: "divergencias_implantacao_vigencias",
     alterar: "alterar_motor_vigencia",
     sincronizarColunas: "sincronizar_colunas_legadas",
     regularizarApontamento: "regularizar_apontamento_legado",

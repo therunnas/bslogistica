@@ -1127,6 +1127,15 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      divergencias_implantacao_vigencias: {
+        Args: never;
+        Returns: {
+          campos: string[];
+          id: string;
+          nome: string;
+          tipo: string;
+        }[];
+      };
       encerrar_condicao_contrato: {
         Args: { p_reason: string; p_term_id: string; p_valid_to: string };
         Returns: undefined;

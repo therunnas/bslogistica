@@ -340,7 +340,22 @@ select pg_temp.registrar('B9. anônimo não liga (42501)', 'erro 42501',
   pg_temp.medir_como('anon', jsonb_build_object('role', 'anon'), $q$select count(*)::text from (select public.alterar_motor_vigencia(true, 'x')) x$q$));
 select pg_temp.registrar('B10. a chave continua desligada depois das recusas', 'false', (select vigencia_ativa::text from public.financial_engine_settings));
 
+-- Desde a 027 ligar é recusado enquanto a coluna diverge da vigência de hoje. Esta suíte quer
+-- ligar com as colunas ANTIGAS defasadas (M0 depende disso), então guarda as colunas, alinha-as pela
+-- RPC explícita, liga e devolve as colunas guardadas como `postgres` (isento do bloqueio, como L6).
+-- A recusa em si é provada na suíte 023.
+create temporary table _colunas_antes on commit drop as
+  select 'c'::text as k, id, daily_rate::numeric as v1, shift_hours::numeric as v2, ot_factor::numeric as v3, ot_tolerance_min::numeric as v4 from public.contracts
+  union all select 'e', id, daily_cost, null, null, null from public.employees
+  union all select 'o', id, agreed_amount, null, null, null from public.operations;
+select pg_temp.registrar('B10b. a divergência entre coluna e vigência de hoje recusa ligar (027): 55000', 'erro 55000', pg_temp.motor(true));
+select pg_temp.registrar('B10c. alinhar as colunas pela RPC explícita (admin AAL2)', '1',
+  pg_temp.adm($q$public.sincronizar_colunas_legadas('Alinhado para ligar no teste')$q$));
+
 select pg_temp.registrar('B11. LIGAR com motivo, admin AAL2', '1', pg_temp.motor(true));
+update public.contracts c set daily_rate = a.v1, shift_hours = a.v2, ot_factor = a.v3, ot_tolerance_min = a.v4 from _colunas_antes a where a.k = 'c' and a.id = c.id;
+update public.employees e set daily_cost = a.v1 from _colunas_antes a where a.k = 'e' and a.id = e.id;
+update public.operations o set agreed_amount = a.v1 from _colunas_antes a where a.k = 'o' and a.id = o.id;
 select pg_temp.registrar('B12. ligado: motor novo, bloqueios e congelamento HABILITADOS; motor antigo DESABILITADO', 'D|O|O|O|O|O', pg_temp.gatilhos());
 select pg_temp.registrar('B13. a chave registra ligada, a data de hoje (America/Sao_Paulo), o autor e o motivo', 'true|true|5c100000-0000-4000-8000-0000000000a1|Ligado no teste',
   (select vigencia_ativa::text || '|' || (ativada_em = (now() at time zone 'America/Sao_Paulo')::date)::text || '|' || changed_by::text || '|' || reason from public.financial_engine_settings));
@@ -743,7 +758,7 @@ select pg_temp.registrar('M11. sincronizar_colunas_legadas à mão (admin): idem
   (select ((x ->> 'contratos')::int >= 1)::text || '|' || (y ->> 'contratos') || '|' || (y ->> 'colaboradores') || '|' || (y ->> 'operacoes')
      from (select pg_temp.adm_valor($q$select public.sincronizar_colunas_legadas('Sincronização manual')::text$q$)::jsonb x,
                   pg_temp.adm_valor($q$select public.sincronizar_colunas_legadas('Sincronização manual 2')::text$q$)::jsonb y) q));
-select pg_temp.registrar('M11b. e deixou 2 eventos na trilha', '2', (select count(*)::text from public.financial_terms_audit where action = 'colunas_legadas_sincronizadas'));
+select pg_temp.registrar('M11b. e deixou 3 eventos na trilha (2 aqui + o alinhamento B10c antes de ligar)', '3', (select count(*)::text from public.financial_terms_audit where action = 'colunas_legadas_sincronizadas'));
 
 select pg_temp.registrar('M11c. desligar normalizou as colunas antigas com jornada <= 0 (K3: 0 -> 8; K4: -3 -> 8): a mesma jornada que o motor antigo já usava', '8.00|8.00',
   (select shift_hours::text from public.contracts where id = '5c10d000-0000-4000-8000-0000000000d3') || '|' || (select shift_hours::text from public.contracts where id = '5c10d000-0000-4000-8000-0000000000d4'));
