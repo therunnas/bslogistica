@@ -254,6 +254,8 @@ export interface FormularioDeVigencia {
   /** Valores digitados, por `chave` (texto, aceita vírgula). */
   valores: Readonly<Record<string, string>>;
   encerrarAnterior: boolean;
+  /** Fim da vigência (exclusive), opcional: vazio = em aberto. */
+  fim?: string;
 }
 
 /** "1.234,56" não é aceito de propósito: só dígitos, ponto ou vírgula decimal. */
@@ -280,6 +282,14 @@ export function validarNovaVigencia(tipo: TipoDeVigencia, f: FormularioDeVigenci
   }
   if (f.motivo.trim() === "") {
     erros.push("O motivo é obrigatório.");
+  }
+  const fim = (f.fim ?? "").trim();
+  if (fim !== "") {
+    if (!DATA_ISO.test(fim) || Number.isNaN(Date.parse(`${fim}T00:00:00Z`))) {
+      erros.push("Fim da vigência inválido.");
+    } else if (DATA_ISO.test(f.inicio) && fim <= f.inicio) {
+      erros.push("O fim da vigência deve ser posterior ao início.");
+    }
   }
   for (const campo of CAMPOS_DA_VIGENCIA[tipo]) {
     const texto = f.valores[campo.chave] ?? "";
@@ -322,7 +332,7 @@ export function montarRegistro(
     [PARAM_DO_ID[tipo]]: entidadeId,
     p_valid_from: f.inicio,
     p_reason: f.motivo.trim(),
-    p_valid_to: null,
+    p_valid_to: (f.fim ?? "").trim() === "" ? null : (f.fim as string).trim(),
     p_encerrar_anterior: f.encerrarAnterior,
   };
   for (const campo of CAMPOS_DA_VIGENCIA[tipo]) {

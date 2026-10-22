@@ -433,6 +433,35 @@ for (const tipo of ["contrato", "colaborador", "operacao"]) {
 // D. Condição aplicável à data trabalhada
 // ---------------------------------------------------------------------------
 
+// Regressão do QA de navegador (C05-B4.8): o formulário precisa permitir o FIM da vigência, para
+// registrar um período passado quando já existe uma versão futura (senão o banco recusa a sobreposição).
+verificar(
+  "C17. fim da vigência: vazio = em aberto (p_valid_to nulo)",
+  montarRegistro("contrato", "c-1", FORM_CONTRATO).params.p_valid_to,
+  null,
+);
+verificar(
+  "C18. fim informado vai em p_valid_to",
+  montarRegistro("contrato", "c-1", { ...FORM_CONTRATO, fim: "2026-12-31" }).params.p_valid_to,
+  "2026-12-31",
+);
+verificar(
+  "C19. fim anterior ou igual ao início é recusado; data inválida também",
+  [
+    validarNovaVigencia("contrato", { ...FORM_CONTRATO, fim: "2026-11-01" }).length,
+    validarNovaVigencia("contrato", { ...FORM_CONTRATO, fim: "2026-10-01" }).length,
+    validarNovaVigencia("contrato", { ...FORM_CONTRATO, fim: "xx" }).length,
+    validarNovaVigencia("contrato", { ...FORM_CONTRATO, fim: "2026-12-01" }).length,
+  ],
+  [1, 1, 1, 0],
+);
+verificar(
+  "C20. a tela oferece o campo de fim e o envia",
+  /vigencia-fim-nova/.test(ler("src/app/(painel)/_components/vigencias.tsx")) &&
+    /fim: fimNova/.test(ler("src/app/(painel)/_components/vigencias.tsx")),
+  true,
+);
+
 console.log("D. Condição aplicável à data trabalhada (U3)");
 
 const tc = (id, de, ate, taxa) => ({

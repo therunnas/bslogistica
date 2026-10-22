@@ -107,6 +107,7 @@ export function HistoricoDeVigencias({
   const [novaOpen, setNovaOpen] = useState(false);
   const [inicio, setInicio] = useState(hoje);
   const [motivo, setMotivo] = useState("");
+  const [fimNova, setFimNova] = useState("");
   const [valores, setValores] = useState<Record<string, string>>({ ...valoresIniciais });
   const [encerrarAnterior, setEncerrarAnterior] = useState(true);
 
@@ -117,7 +118,13 @@ export function HistoricoDeVigencias({
   const [aposentando, setAposentando] = useState<VersaoComValores | null>(null);
   const [motivoApos, setMotivoApos] = useState("");
 
-  const erros = validarNovaVigencia(tipo, { inicio, motivo, valores, encerrarAnterior });
+  const erros = validarNovaVigencia(tipo, {
+    inicio,
+    motivo,
+    valores,
+    encerrarAnterior,
+    fim: fimNova,
+  });
   const classe = classificarInicio(inicio, hoje);
 
   const linhas = useMemo(() => versoes.data ?? [], [versoes.data]);
@@ -125,6 +132,7 @@ export function HistoricoDeVigencias({
   function abrirNova() {
     setInicio(hoje);
     setMotivo("");
+    setFimNova("");
     setValores({ ...valoresIniciais });
     setEncerrarAnterior(true);
     setNovaOpen(true);
@@ -259,6 +267,17 @@ export function HistoricoDeVigencias({
               </Badge>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="vigencia-fim-nova">Fim da vigência (opcional, exclusive)</Label>
+              <Input
+                id="vigencia-fim-nova"
+                type="date"
+                value={fimNova}
+                onChange={(e) => setFimNova(e.target.value)}
+                className={INPUT_CLASS}
+              />
+            </div>
+
             {CAMPOS_DA_VIGENCIA[tipo].map((campo) => (
               <div key={campo.chave} className="space-y-2">
                 <Label htmlFor={`vigencia-${campo.chave}`}>{campo.rotulo}</Label>
@@ -314,7 +333,7 @@ export function HistoricoDeVigencias({
               disabled={erros.length > 0 || registrar.isPending || !liberado}
               onClick={() =>
                 registrar.mutate(
-                  { entidadeId, form: { inicio, motivo, valores, encerrarAnterior } },
+                  { entidadeId, form: { inicio, motivo, valores, encerrarAnterior, fim: fimNova } },
                   { onSuccess: () => setNovaOpen(false) },
                 )
               }
