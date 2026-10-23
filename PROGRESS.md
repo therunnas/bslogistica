@@ -151,30 +151,41 @@ Outros itens, de menor gravidade:
   não distingue bloqueio de ausência de dado; testes em Production provam menos
   do que parecem. Os testes SQL locais é que medem as proteções.
 
-### C05-B — vigências financeiras (staging/homologação; fora de Production)
+### C05-B — vigências financeiras (banco em Production; interfaces ainda não publicadas)
+
+**Situação em 23/10/2026** (fatos de Production em
+[docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md), seção "Vigências financeiras"):
+
+| Frente                              | Implementado | Validado                             | Publicado                   | Pendente                                     |
+| ----------------------------------- | ------------ | ------------------------------------ | --------------------------- | -------------------------------------------- |
+| Banco (migrations `021` a `028`)    | sim          | ensaio local e conferência por lote  | **sim, em Production** (33) | —                                            |
+| Motor atual (`010`)                 | sim          | preservado, funções e gatilho iguais | em uso (ligado)             | —                                            |
+| Motor por vigência (`025`)          | sim          | estrutura conferida, nunca ativado   | instalado, **desligado**    | ativação: decisão de negócio, etapa própria  |
+| Interfaces (PR B)                   | sim, branch  | 26 suítes Node; sem Preview          | **não**                     | PR B, Preview, merge e deploy (autorizações) |
+| Vigências dos 7 cadastros pendentes | —            | —                                    | nenhuma cadastrada          | decisão de negócio: datas e valores          |
 
 Regra de negócio: cada apontamento preserva as condições vigentes na data trabalhada;
 reajuste futuro não reescreve diária anterior; faturado é imutável; nada é recalculado
 em silêncio. Ordem das migrations:
 
-- **021** e **022** (expansão do esquema): aplicadas na homologação.
+- **021** e **022** (expansão do esquema): **aplicadas em Production** (L1, 23/10/2026).
 - **023**: registro de vigências de contrato e de custo por RPC admin AAL2, trilha
-  `financial_terms_audit` e imutabilidade das versões. Pronta em branch local.
+  `financial_terms_audit` e imutabilidade das versões. **Aplicada em Production** (L2, 23/10/2026).
 - **024**: vigência do valor acordado por operação (`operation_terms`, `operation_terms_id`
   no apontamento, RPCs espelho das da 023) e o **congelamento de jornada de turno usado,
-  criado DESABILITADO**. Pronta em branch local; nenhum efeito sobre o cálculo.
+  criado DESABILITADO**. **Aplicada em Production** (L2); nenhum efeito sobre o cálculo.
 - **025**: motor financeiro por vigência, **desligado por padrão** e reversível
   (`financial_engine_settings`, `alterar_motor_vigencia`). Ligar troca 6 triggers de uma vez
   (motor antigo desabilitado; motor novo, 3 bloqueios de edição direta e congelamento de
   turno habilitados); desligar volta ao motor antigo, ressincroniza as colunas das taxas pela
-  versão vigente hoje e deixa a trilha. Pronta em branch local; não aplicada em nenhum
-  ambiente hospedado. Regras do motor ligado: preço pela versão da data trabalhada, sem
+  versão vigente hoje e deixa a trilha. **Aplicada em Production** (L3, 23/10/2026), com o motor
+  **desligado**. Regras do motor ligado: preço pela versão da data trabalhada, sem
   fallback para a taxa atual; edição usa os preços congelados; apontamento legado só muda
   por `regularizar_apontamento_legado`; operação com legado recusa data anterior à ativação
   (R7); operação com apontamento não troca de contrato (R6).
   Falta não exige vigência (zerada, sem preço inventado); voltar a presença exige vigência na data;
   contrato antigo com jornada <= 0 entra no histórico com a jornada já normalizada (8 h).
-- **Interfaces (U3–U7, branch `feat/c05b-interfaces-vigencia`, só local):** contratos,
+- **Interfaces (U3–U7, branch `feat/c05b-interfaces-vigencia`; implementadas, NÃO publicadas):** contratos,
   colaboradores e operações sem contrato ganham histórico de vigências e registro de reajuste
   (com motivo, início e distinção entre alteração imediata e vigência futura) pelas RPCs das
   migrations 023 e 024. O estado do motor tem quatro valores (carregando, desligado, ligado,
@@ -191,8 +202,7 @@ em silêncio. Ordem das migrations:
   e `criar_operacao_com_vigencia` criam a entidade e a vigência inicial na mesma transação (antes
   eram dois passos, e a falha do segundo deixava a entidade sem condição financeira). São
   `SECURITY INVOKER`: o INSERT segue a RLS e a vigência vai pelas RPCs 023/024, que revalidam admin
-  AAL2 e gravam a trilha. Pronta em branch local; **não aplicada** na homologação nem em
-  Production. As telas só a usam com o motor ligado (desligado, o INSERT direto continua). Os tipos
+  AAL2 e gravam a trilha. **Aplicada em Production** (L4, 23/10/2026). As telas só a usam com o motor ligado (desligado, o INSERT direto continua). Os tipos
   do Supabase (`types.ts`) foram regenerados do schema local até a 026.
 
 - **027** (ativação com divergência, C05-B5.5): com o motor desligado, a edição direta de taxa
@@ -204,7 +214,8 @@ em silêncio. Ordem das migrations:
   como pendência; vigência futura e operação com contrato não entram; `p_aceitar_pendencias` não
   libera divergência. Lista para o admin: `divergencias_implantacao_vigencias()`. Corrigir é ato
   explícito (editar a coluna com o motor desligado, `sincronizar_colunas_legadas` ou registrar a
-  vigência desejada). Pronta em branch local; **não aplicada** na homologação nem em Production.
+  vigência desejada). **Aplicada em Production** (L4). A trava de pendências continua contornável
+  com `p_aceitar_pendencias = true`: a `027` fecha só a divergência.
 
 - **028** (contrato da operação protegido, C05-B5.6): `operations.contract_id` não pode mais
   mudar (trocar, preencher ou remover) quando a operação tem apontamento ou valor acordado
@@ -217,18 +228,34 @@ em silêncio. Ordem das migrations:
   chave estrangeira, que roda como dono e escapava do trigger; um `BEFORE DELETE` em `contracts`
   recusa (55000) a exclusão quando a operação ligada tem apontamento ou valor acordado cadastrado,
   sem exceção de papel. Contrato sem operação ou com operação sem histórico segue excluível.
-  Pronta em branch local; **não aplicada** na homologação nem em Production.
+  **Aplicada em Production** (L4). Vale desde já, com o motor desligado: o contrato das operações
+  que têm apontamento não troca.
 
 - **Legado (C05-B5.7):** sem migration nova. As RPCs que já existiam bastam: `pendencias_implantacao_vigencias`
   (em uso e sem vigência para hoje), `divergencias_implantacao_vigencias` (027), `registrar_*` (023/024,
   data e motivo informados por quem decide), `sincronizar_colunas_legadas` e
   `regularizar_apontamento_legado` (prévia, só não faturado, com motor ligado). A lacuna comprovada era a
   administração não enxergar as listas: nenhuma tela as consumia. Nova tela só de leitura,
-  `/implantacao-vigencias` (menu de conta do admin, `exigirAdmin`): pendências, divergências com o
+  `/implantacao-vigencias` (menu de conta do admin, `exigirAdmin`; só na branch, não publicada): pendências, divergências com o
   campo, a contagem de apontamentos legados e o link para a tela do cadastro. Não registra, não
   sincroniza, não liga, não mostra valor em reais. Apontamento e fatura antigos seguem como
   gravados (suíte SQL 025). Decisões que continuam do negócio: de qual data vale cada preço
   histórico, e se um apontamento legado deve ser regularizado (reprecificado pelas vigências).
+
+Próximos passos da C05-B, em ordem e cada um com autorização própria:
+
+1. Publicar a branch e abrir o PR B (ainda não existe).
+2. Validar em Preview, que exige projeto Supabase de teste próprio no escopo Preview (não
+   verificado) e uma conta admin em AAL2 nesse projeto.
+3. Merge e deploy das interfaces. Depois, conferência só de leitura em Production.
+4. Decidir as 7 pendências de vigência (4 colaboradores, 2 contratos, 1 operação sem contrato):
+   data de início e valor de cada uma.
+5. Só então, e em etapa separada, avaliar a ativação do motor, com as dependências abaixo.
+6. Limpeza final do projeto (dados fictícios, ramos antigos): etapa futura, não iniciada.
+
+Riscos abertos: um admin em AAL2 pode ligar o motor pela API com `p_aceitar_pendencias = true`
+(há 1 admin); logs de Production não verificados depois dos lotes; o backup mais recente é anterior
+à `025`; o dump não preserva event triggers. O PR #63 e a migration `019` seguem separados.
 
 Dependências da ativação (ligar o motor da 025, não antes):
 
