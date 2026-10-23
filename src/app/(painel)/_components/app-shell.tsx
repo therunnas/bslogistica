@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarCheck,
   FileText,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -71,8 +72,14 @@ const ITEM_SEGURANCA = {
   icon: ShieldCheck,
 } as const;
 
+const ITEM_IMPLANTACAO = {
+  href: "/implantacao-vigencias",
+  label: "Implantação das vigências",
+  icon: History,
+} as const;
+
 const MENU_DE_CONTA = {
-  admin: [ITEM_USUARIOS, ITEM_SEGURANCA],
+  admin: [ITEM_IMPLANTACAO, ITEM_USUARIOS, ITEM_SEGURANCA],
   operacional: [ITEM_SEGURANCA],
   "sem-papel": [],
 } as const;

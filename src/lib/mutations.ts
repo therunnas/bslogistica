@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/lib/notificacoes";
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { mensagemDoErro } from "@/lib/erros-banco";
 
 type Row = Record<string, unknown>;
 
@@ -51,7 +52,7 @@ export function useSaveRow(table: string, invalidate: string[] = [table]) {
       invalidate.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
       toast.success("Registro salvo.");
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(mensagemDoErro(error)),
   });
 }
 

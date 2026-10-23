@@ -96,6 +96,33 @@ jobs:
       - name: Teste paridade-financeira
         run: npm run test:paridade-financeira
 
+      - name: Teste integridade-contratos
+        run: npm run test:integridade-contratos
+
+      - name: Teste condicoes-expansao
+        run: npm run test:condicoes-expansao
+
+      - name: Teste registro-vigencias
+        run: npm run test:registro-vigencias
+
+      - name: Teste valores-operacao
+        run: npm run test:valores-operacao
+
+      - name: Teste apontamentos-salvar
+        run: npm run test:apontamentos-salvar
+
+      - name: Teste motor-vigencia
+        run: npm run test:motor-vigencia
+
+      - name: Teste interfaces-vigencia
+        run: npm run test:interfaces-vigencia
+
+      - name: Teste implantacao-vigencias
+        run: npm run test:implantacao-vigencias
+
+      - name: Teste vigencias-paginacao
+        run: npm run test:vigencias-paginacao
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

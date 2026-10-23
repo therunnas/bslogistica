@@ -402,8 +402,14 @@ begin
   -- `user_operation_access`, da 013. A 017 acrescenta `admin_audit_log`, com
   -- RLS ativa desde a criação — passa a 14. Constante atualizada de propósito,
   -- não relaxada: continua contando TODAS as tabelas com RLS ativa, e uma
-  -- tabela nova sem RLS faria este caso FALHAR do mesmo jeito que antes.
-  perform pg_temp.registrar('F3. as 14 tabelas de public seguem com RLS ativa', '14',
+  -- tabela nova sem RLS faria este caso FALHAR do mesmo jeito que antes. A 022
+  -- acrescenta `contract_terms` e `employee_cost_terms`, ambas com RLS ativa desde a
+  -- criação — passa a 16, pelo mesmo critério. A 023 acrescenta `financial_terms_audit`
+  -- (trilha das vigências financeiras), também com RLS desde a criação — passa a 17. A 024
+  -- acrescenta `operation_terms` (versões do valor acordado), com RLS desde a criação — 18.
+  -- A 025 acrescenta `financial_engine_settings` (a chave do motor por vigência), também com
+  -- RLS desde a criação — 19.
+  perform pg_temp.registrar('F3. as 19 tabelas de public seguem com RLS ativa', '19',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -507,30 +513,46 @@ do $bloco_i$
 begin
   -- A lista inteira, e não a contagem: assim um trigger acrescentado, removido
   -- ou renomeado pela 014 apareceria. Os dois conjuntos são os do schema com as
-  -- 19 migrations, lidos do catálogo antes da 014.
-  perform pg_temp.registrar('I1. os 10 triggers de timesheet_entries, intactos',
-    'trg_timesheet_entries_ancora_folha, trg_timesheet_entries_bloqueia_delete_faturado, '
+  -- 19 migrations, lidos do catálogo antes da 014. A 022 acrescenta um (o guard das
+  -- colunas de condições financeiras): são 11, e os 10 originais seguem intactos. A 024
+  -- acrescenta o da coluna `operation_terms_id` (valor acordado versionado): são 12. A 025
+  -- acrescenta o motor por vigência, criado DESABILITADO (a lista conta o trigger, esteja
+  -- habilitado ou não): são 13.
+  perform pg_temp.registrar('I1. os 13 triggers de timesheet_entries, intactos (um deles dormente)',
+    'trg_timesheet_entries_ancora_folha, trg_timesheet_entries_bloqueia_condicoes, '
+    'trg_timesheet_entries_bloqueia_condicoes_operacao, '
+    'trg_timesheet_entries_bloqueia_delete_faturado, '
     'trg_timesheet_entries_bloqueia_desvinculo, trg_timesheet_entries_bloqueia_edicao_faturada, '
     'trg_timesheet_entries_bloqueia_truncate, trg_timesheet_entries_bloqueia_vinculo_direto, '
     'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_calculo_financeiro, '
+    'trg_timesheet_entries_calculo_vigencia, '
     'trg_timesheet_entries_chave, trg_timesheet_entries_updated',
     (select string_agg(t.tgname, ', ' order by t.tgname)
        from pg_trigger t join pg_class c on c.oid = t.tgrelid
       where not t.tgisinternal and c.relname = 'timesheet_entries'
         and c.relnamespace = 'public'::regnamespace));
 
-  perform pg_temp.registrar('I2. os 4 triggers de shifts, intactos',
+  -- Os 4 originais de shifts seguem intactos. A 024 acrescenta o congelamento de jornada de
+  -- turno usado, criado DESABILITADO (a lista conta o trigger, esteja habilitado ou não).
+  perform pg_temp.registrar('I2. os 5 triggers de shifts, intactos (um deles dormente)',
     'trg_shifts_bloqueia_delete_usado, trg_shifts_bloqueia_fontes, '
-    'trg_shifts_bloqueia_mover_referenciado, trg_shifts_updated',
+    'trg_shifts_bloqueia_mover_referenciado, trg_shifts_congela_jornada_usada, trg_shifts_updated',
     (select string_agg(t.tgname, ', ' order by t.tgname)
        from pg_trigger t join pg_class c on c.oid = t.tgrelid
       where not t.tgisinternal and c.relname = 'shifts'
         and c.relnamespace = 'public'::regnamespace));
 
-  -- Exatamente uma constraint CHECK por tabela: a da 014, e nada mais.
-  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries', '1',
+  -- Exatamente uma constraint CHECK por tabela: a da 014, e nada mais. As cinco da
+  -- 022 (valores das colunas novas de condições financeiras) ficam de fora pelo nome,
+  -- para que qualquer OUTRA constraint continue fazendo este caso falhar.
+  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022', '1',
     (select count(*)::text from pg_constraint
-      where conrelid = 'public.timesheet_entries'::regclass and contype = 'c'));
+      where conrelid = 'public.timesheet_entries'::regclass and contype = 'c'
+        and conname not in ('timesheet_entries_terms_origin_valida',
+                            'timesheet_entries_shift_hours_snapshot_positiva',
+                            'timesheet_entries_ot_factor_snapshot_nao_negativo',
+                            'timesheet_entries_ot_tolerance_snapshot_nao_negativa',
+                            'timesheet_entries_planned_minutes_snapshot_nao_negativo')));
 
   perform pg_temp.registrar('I4. um unico CHECK em shifts', '1',
     (select count(*)::text from pg_constraint

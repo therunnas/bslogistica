@@ -200,7 +200,7 @@ console.log("\nD. Navegação: quem vê o quê no menu de conta\n");
 
 verificar(
   "D1. admin continua vendo 'Usuários'",
-  /admin: \[ITEM_USUARIOS, ITEM_SEGURANCA\]/.test(fontes.shell),
+  /admin: \[ITEM_IMPLANTACAO, ITEM_USUARIOS, ITEM_SEGURANCA\]/.test(fontes.shell),
   true,
 );
 verificar(
@@ -420,17 +420,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. conjunto de migrations contém 25 arquivos, até a 020",
+  "G10. conjunto de migrations contém 33 arquivos, até a 028 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6)",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  25,
+  33,
 );
 verificar(
-  "G10b. a migration mais recente é a 020",
+  "G10b. a migration mais recente é a 028",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_020_"),
+    .includes("_028_"),
   true,
 );
 

@@ -291,6 +291,14 @@ export function mensagemDeErro(erro: unknown): string {
       return "Dados do apontamento inválidos. Revise os campos informados.";
     case "23505":
       return "Já existe um registro conflitante para este apontamento. Atualize os dados e tente novamente.";
+    // Condições financeiras da data (migrations 022 a 024). Texto fixo, sem valor: o operador
+    // não vê taxa, custo nem margem, e a correção é do administrador.
+    case "P0002":
+      return "Não há condições financeiras cadastradas para esta data. Avise o administrador.";
+    case "55000":
+      return "Este apontamento não pode ser alterado no estado atual. Atualize os dados e tente novamente.";
+    case "23P01":
+      return "Há um conflito no cadastro de períodos. Avise o administrador.";
     default:
       return erro instanceof Error && erro.message
         ? erro.message

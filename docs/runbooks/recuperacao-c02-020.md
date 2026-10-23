@@ -128,3 +128,49 @@ sem concorrência): catálogo recuperado **idêntico** ao das 24 migrations da `
 injetada com rollback completo, divergência barrada pelas pré-condições, segunda
 execução falha seguro, e 13/13 suítes originais (704 asserções) passando. **Não
 prova** privilégios do Supabase hospedado nem a recuperação funcional da aplicação.
+
+## Restaurar um dump lógico de Production: o event trigger `ensure_rls`
+
+Este runbook trata da reversão da `020`. A **restauração de um dump lógico** de
+Production (`pg_dump -Fc` dos schemas `public`, `auth`, `storage` e
+`supabase_migrations`) tem uma lacuna que se aplica a qualquer recuperação:
+
+- Production tem **7 event triggers habilitados**. Um é do projeto, `ensure_rls`
+  (`ddl_command_end`, tags `CREATE TABLE`, `CREATE TABLE AS`, `SELECT INTO`), que chama
+  `public.rls_auto_enable()` e liga RLS em toda tabela nova de `public`. Os outros 6
+  (`issue_graphql_placeholder`, `issue_pg_cron_access`, `issue_pg_graphql_access`,
+  `issue_pg_net_access`, `pgrst_ddl_watch`, `pgrst_drop_watch`) pertencem a
+  `supabase_admin`, vêm do provisionamento da plataforma e **não** se recriam à mão.
+- Event trigger é objeto do banco, não de um schema: o dump filtrado por schema **não o
+  preserva**. A função `public.rls_auto_enable()` é restaurada; o trigger, não.
+- Depois do `pg_restore`, recriar e verificar:
+
+```sql
+CREATE EVENT TRIGGER ensure_rls ON ddl_command_end
+  WHEN TAG IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
+  EXECUTE FUNCTION public.rls_auto_enable();
+
+select evtname, evtevent, evtenabled, evtfoid::regprocedure::text, evttags::text
+  from pg_event_trigger where evtname = 'ensure_rls';
+-- ensure_rls | ddl_command_end | O | rls_auto_enable() | {"CREATE TABLE","CREATE TABLE AS","SELECT INTO"}
+
+select count(*) from pg_class
+ where relnamespace = 'public'::regnamespace and relkind in ('r', 'p') and not relrowsecurity;  -- 0
+```
+
+- **Privilégio:** criar event trigger exige superusuário no PostgreSQL padrão. Num
+  Postgres local, `supabase_admin` é superusuário, então a criação é possível por essa
+  regra. Em Supabase hospedado o `postgres` **não** é superusuário e o trigger pertence
+  a ele: **o privilégio necessário em Production não está comprovado.** Antes de depender
+  disso, conferir se o painel (opção de habilitar RLS automaticamente) ou o suporte da
+  plataforma o recria.
+- Sem o trigger, as tabelas existentes continuam protegidas (a RLS vem no dump); só tabela
+  **nova** criada fora de migration nasceria sem RLS. As migrations do projeto ligam RLS
+  explicitamente.
+- A suíte `supabase/tests/002_autorizacao.sql` depende desse trigger: ela cria uma tabela
+  em `public` e exige RLS ligada. Em banco restaurado sem o trigger ela falha, e essa
+  falha é **esperada**, não um defeito das migrations. Rodar a 002 só em banco local
+  descartável, nunca em Production.
+- Este é um backup **do PostgreSQL**. Não cobre a configuração de Auth (MFA, SMTP, Site
+  URL), os segredos da Vercel, o Storage (0 objetos), os dados dos schemas `vault` e
+  `realtime`, nem funções de borda.

@@ -34,6 +34,8 @@
 --   PASSAM ANTES E DEPOIS:   J50, J51, J53, J55, J58, J58b — a prova de que
 --                            reenvio legítimo, decisão administrativa, fluxo
 --                            diário e `gerar_fatura` não foram atingidos
+--                            (J51 foi realinhado à 021: o admin move o cliente
+--                            junto com o contrato; ver J51a..J51e)
 --
 -- TERCEIRA RODADA. Os casos J59..J82 vieram da revisão seguinte, que mostrou
 -- que proteger o vínculo e o DELETE deixava a LINHA faturada editável — e
@@ -812,7 +814,8 @@ begin
      where id = '44444444-4444-4444-8444-4444444444b1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J29. admin altera contract_id/agreed_amount', '1 linhas', _e);
+  -- Desde a 028 o contrato de operação com apontamento não muda (a operação OP-B tem apontamento).
+  perform pg_temp.registrar('J29. admin altera contract_id/agreed_amount de operação com apontamento: recusado (028)', 'erro 55000', _e);
 
   begin
     update public.shifts set end_time = '16:00:00', break_minutes = 30
@@ -1005,14 +1008,59 @@ begin
 
   -- J51. Admin continua podendo: é decisão administrativa, não proibição.
   -- OP-C é descartável e não tem histórico faturado.
+  --
+  -- Desde a 021 (C05-A) a decisão precisa ser COERENTE: a chave composta
+  -- `operations_contrato_do_cliente_fkey` impede que a operação aponte para o contrato
+  -- de OUTRO cliente. Mover só o `client_id` deixaria OP-C com o contrato do cliente
+  -- antigo e é recusado com 23503 (J51a); o admin move o cliente JUNTO com o contrato
+  -- (aqui, saindo do contrato: `contract_id` nulo, J51), ou escolhe um contrato do novo
+  -- cliente (J51c). O que a 021 recusa continua recusado para o admin (J51a, J51d).
   perform set_config('request.jwt.claims', json_build_object(
     'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);
+
+  -- J51a. Só o client_id, mantendo o contrato do cliente antigo: relação incoerente.
   begin
     update public.operations set client_id = '33333333-3333-4333-8333-33333333333b'
      where id = '44444444-4444-4444-8444-4444444444c1';
     get diagnostics _n = row_count; _e := _n || ' linhas';
   exception when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J51. admin muda client_id', '1 linhas', _e);
+  perform pg_temp.registrar('J51a. admin NAO muda so o client_id mantendo o contrato do cliente antigo', 'erro 23503', _e);
+
+  perform pg_temp.registrar('J51a2. e a operacao segue no cliente e no contrato de antes', '33333333-3333-4333-8333-333333333333|33333333-3333-4333-8333-333333333334',
+    (select client_id || '|' || contract_id from public.operations where id = '44444444-4444-4444-8444-4444444444c1'));
+
+  -- J51. Mover o cliente junto com o contrato (sem contrato) é a decisão legítima.
+  begin
+    update public.operations set client_id = '33333333-3333-4333-8333-33333333333b', contract_id = null
+     where id = '44444444-4444-4444-8444-4444444444c1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J51. admin muda client_id junto com o contrato (sem contrato)', '1 linhas', _e);
+
+  -- J51c / J51d. Escolher contrato: o do novo cliente passa, o do cliente antigo não.
+  begin
+    insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min)
+    values ('33333333-3333-4333-8333-33333333333c', '33333333-3333-4333-8333-33333333333b', 'Contrato B destino', 200, 8, 1.5, 10);
+    _e := 'contrato criado';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J51b. admin cria contrato do cliente destino', 'contrato criado', _e);
+
+  begin
+    update public.operations set contract_id = '33333333-3333-4333-8333-333333333334'
+     where id = '44444444-4444-4444-8444-4444444444c1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J51d. admin NAO aponta a operacao do cliente B para contrato do cliente A', 'erro 23503', _e);
+
+  begin
+    update public.operations set contract_id = '33333333-3333-4333-8333-33333333333c'
+     where id = '44444444-4444-4444-8444-4444444444c1';
+    get diagnostics _n = row_count; _e := _n || ' linhas';
+  exception when others then _e := 'erro ' || sqlstate; end;
+  perform pg_temp.registrar('J51c. admin aponta a operacao para contrato do proprio cliente', '1 linhas', _e);
+
+  perform pg_temp.registrar('J51e. estado final coerente (cliente B e contrato de B)', '33333333-3333-4333-8333-33333333333b|33333333-3333-4333-8333-33333333333c',
+    (select client_id || '|' || contract_id from public.operations where id = '44444444-4444-4444-8444-4444444444c1'));
 end;
 $cliente_da_operacao$;
 
@@ -1980,8 +2028,8 @@ begin
   perform pg_temp.registrar('J119. admin move operação de folha FATURADA', 'recusou 42501', _e);
 
   -- J120. E o apontamento continua com o valor da configuração em que nasceu.
-  -- J29 trocou o contrato da OP-B para o Contrato Caro DEPOIS deste
-  -- apontamento; como contrato não é coluna motriz, o snapshot não se mexeu.
+  -- J29 tentou trocar o contrato da OP-B DEPOIS deste apontamento; desde a 028 a troca é
+  -- recusada e o snapshot segue como nasceu.
   execute 'reset role';
   select billed_amount into _b from public.timesheet_entries
    where id = '77777777-7777-4777-8777-7777777777b1';

@@ -12,7 +12,7 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 | Aplicação             | publicada em `admin.bslogisticas.com.br`                                                                                                      |
 | Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                                                                             |
 | Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                                                                                      |
-| Migrations            | todas as de `supabase/migrations/` aplicadas (25 de 25); a última é a `020` (C02)                                                             |
+| Migrations            | 33 registradas; a última é a `028` (C05-B, aplicada em 23/10/2026). Ver "Vigências financeiras", abaixo                                       |
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                                                                           |
 | Usuário `operacional` | perfil homologado com uma conta existente que era admin e foi rebaixada; contas definitivas ainda não criadas ([PROGRESS.md](../PROGRESS.md)) |
 
@@ -25,6 +25,74 @@ ambientes" em [docs/SEGURANCA.md](SEGURANCA.md).
 
 O site institucional (`bslogisticas.com.br`) é outro projeto, em outro
 repositório, e não faz parte deste.
+
+## Vigências financeiras (C05-B)
+
+Estado em 23/10/2026 (C05-B7.2). Quatro níveis que não se confundem: **implementado**
+(existe no código), **validado** (foi testado), **publicado** (está disponível aos
+usuários) e **pendente**.
+
+**Banco — migrations `021` a `028`**
+
+- Implementado e **publicado em Production**: tabelas de vigência de contrato, de custo do
+  colaborador e do valor acordado da operação, trilha `financial_terms_audit`, as RPCs de
+  registro, os cadastros atômicos, a chave do motor e os bloqueios da `027` e da `028`.
+- Validado: ensaio local de cada migration e de sua reversão, mais conferência de catálogo
+  em Production depois de cada lote (L1 a L4): histórico, estruturas, permissões, RLS,
+  dados e valores financeiros idênticos. Os logs de Production (Postgres, API, Auth e
+  Vercel) **não** foram verificados depois dos lotes.
+- Efeito já ativo, mesmo com o motor desligado (`028`): o contrato de uma operação que tem
+  apontamento ou valor acordado cadastrado não troca, e esse contrato não é excluído.
+
+**Motor financeiro**
+
+- Motor atual (`010`): **ligado**, sem alteração (gatilho `trg_timesheet_entries_calculo_financeiro`
+  habilitado; `derivar_valores_financeiros` e `gerar_fatura` com o mesmo corpo de antes).
+- Motor por vigência (`025`): instalado e **desligado**. `financial_engine_settings` tem uma
+  linha com `vigencia_ativa = false`, nunca alterada; os gatilhos novos (cálculo por vigência,
+  três bloqueios de edição direta de taxa e congelamento de jornada de turno) estão
+  desabilitados.
+- Nenhuma vigência foi cadastrada: as três tabelas de versões e a trilha têm 0 linhas.
+- **Ativar o motor é decisão de negócio e etapa própria**: não é feita por nenhuma tela. A RPC
+  `alterar_motor_vigencia` é executável por `admin` em AAL2 pela API. A `027` recusa ligar
+  com divergência entre coluna e vigência, mas `p_aceitar_pendencias = true` ainda liga com
+  cadastros sem vigência, e o motor novo recusaria apontamento remunerável deles.
+
+**Pendências de vigência (decisão de negócio)**
+
+Há 7 cadastros em uso sem vigência para hoje: 4 colaboradores, 2 contratos e 1 operação sem
+contrato. Falta decidir a data de início e o valor de cada vigência; nada foi presumido nem
+cadastrado.
+
+**Interfaces — PR B**
+
+- **Implementado**, só na branch `feat/c05b-interfaces-vigencia`: histórico e reajuste de
+  vigências em contratos, colaboradores e operações sem contrato; cadastro atômico (usado só com o
+  motor ligado); apontamentos com valor do banco, prévia e origem; turnos usados com jornada
+  protegida; tela somente de leitura `/implantacao-vigencias`. As telas não ligam nem desligam o
+  motor.
+- **Validado**: as 26 suítes Node (`test:*`). Não houve verificação visual em ambiente hospedado.
+- **Publicado**: **não**. As interfaces não estão na `main`, nem em Preview, nem em Production.
+- **Pendente**: criar o PR B, validar em Preview (exige projeto Supabase de teste próprio no
+  escopo Preview; **não verificado**), merge e deploy, cada um com autorização.
+
+**Separados deste trabalho**: o PR #63 (fechamento quinzenal, rascunho) e a migration `019`
+(nunca aplicada).
+
+**Backups de Production** (dump lógico do PostgreSQL, cifrado com `age`, uma cópia local e uma
+cópia externa cifrada)
+
+- O mais recente é de 23/10/2026, **depois da `024` e antes da `025`**; uma restauração dele
+  exigiria reaplicar a `025` a `028`. Não existe backup posterior à `025`.
+- Limites: o dump por schema **não preserva event triggers** (o `ensure_rls` é recriado à mão
+  e o privilégio para isso em Supabase hospedado não está comprovado; ver
+  [recuperação](runbooks/recuperacao-c02-020.md)); não cobre a configuração de Auth, os segredos
+  da Vercel, o Storage nem `vault` e `realtime`; a restauração do pacote mais recente não foi
+  ensaiada (o ensaio vale para o procedimento); a cópia da chave privada no gerenciador de
+  senhas não foi verificada. Production não tem backup gerenciado nem PITR.
+
+**Limpeza final do projeto** (dados fictícios, ramos antigos, rascunhos): etapa futura, não
+iniciada.
 
 ## Stack
 
@@ -83,9 +151,9 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 
 | Verificação                     | Estado                                                                                                               |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Suítes Node (`test:*`)          | 11 scripts, todos exigidos pela CI                                                                                   |
-| Testes SQL (`supabase/tests`)   | 14 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
-| CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 11 suítes e build, sem secret e sem tocar o Supabase de Production |
+| Suítes Node (`test:*`)          | 26 scripts, todos exigidos pela CI; 8 deles são da C05-B                                                             |
+| Testes SQL (`supabase/tests`)   | 24 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
+| CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 26 suítes e build, sem secret e sem tocar o Supabase de Production |
 | `npm audit`                     | 0 vulnerabilidades                                                                                                   |
 
 ## Riscos e pendências confirmados
