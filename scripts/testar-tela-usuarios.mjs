@@ -385,9 +385,20 @@ verificar(
   /criarClienteNavegador\([^)]*\)[\s\S]{0,80}\.from\("operations"\)/.test(telaInteira),
   false,
 );
+// A4D: a leitura passou a paginar por `id`. `created_at` entra na consulta só para
+// manter a ordem da lista (mais recentes primeiro) e é descartado: o resultado
+// continua `{ id, name }`. Nenhuma coluna financeira ou de vínculo é lida.
 verificar(
-  "F17. listarOperacoesDisponiveis projeta só id e name, nada financeiro",
-  /\.from\("operations"\)\s*\.select\("id, name"\)/.test(fontes.operacoesLib),
+  "F17. listarOperacoesDisponiveis lê só id, name e created_at (ordem), nada financeiro",
+  /\.from\("operations"\)\s*\.select\("id, name, created_at"\)/.test(fontes.operacoesLib) &&
+    !/\.from\("operations"\)\s*\.select\("[^"]*(agreed_amount|contract_id|client_id)/.test(
+      fontes.operacoesLib,
+    ),
+  true,
+);
+verificar(
+  "F17b. e devolve só { id, name } (created_at não vaza para a tela)",
+  /\.map\(\(\{ id, name \}\) => \(\{ id, name \}\)\)/.test(fontes.operacoesLib),
   true,
 );
 verificar(

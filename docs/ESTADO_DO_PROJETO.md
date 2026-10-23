@@ -16,9 +16,12 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                                                                           |
 | Usuário `operacional` | perfil homologado com uma conta existente que era admin e foi rebaixada; contas definitivas ainda não criadas ([PROGRESS.md](../PROGRESS.md)) |
 
-O **Preview** da Vercel falha de propósito: não tem as variáveis
-`NEXT_PUBLIC_SUPABASE_*`, e conectá-lo ao banco de produção para deixar o check
-verde é proibido.
+O **Preview** da Vercel não pode usar o banco de produção: o escopo Preview não
+deve ter as variáveis de Production, e o código recusa (no build e em cada
+requisição) um Preview apontado para o projeto Supabase de Production. Sem
+destino de teste próprio, o build de Preview falha de propósito, e conectá-lo ao
+banco de produção para deixar o check verde é proibido. Ver "Isolamento entre
+ambientes" em [docs/SEGURANCA.md](SEGURANCA.md).
 
 O site institucional (`bslogisticas.com.br`) é outro projeto, em outro
 repositório, e não faz parte deste.

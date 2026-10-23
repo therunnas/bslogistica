@@ -4,11 +4,21 @@
 
 import * as Sentry from "@sentry/nextjs";
 
-Sentry.init({
-  dsn: "https://61af9cd029eab6da3f484461be2f9d7d@o4512036932419584.ingest.us.sentry.io/4512036953260032",
+import { sentryHabilitado } from "./src/lib/ambiente";
 
-  // 10% das transações em produção, tudo em desenvolvimento.
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1,
+const habilitado = sentryHabilitado(process.env["VERCEL_ENV"]);
+
+Sentry.init({
+  // Só Production envia eventos. Local, CI, E2E e Preview ficam sem DSN: nada
+  // sai da máquina nem do deploy. `NODE_ENV` não serve de critério — o Preview
+  // da Vercel também roda com NODE_ENV=production.
+  dsn: habilitado
+    ? "https://61af9cd029eab6da3f484461be2f9d7d@o4512036932419584.ingest.us.sentry.io/4512036953260032"
+    : undefined,
+  enabled: habilitado,
+
+  // 10% das transações em Production, nenhuma fora dela.
+  tracesSampleRate: habilitado ? 0.1 : 0,
 
   // Política conservadora de coleta. Painel administrativo com dados de
   // clientes, colaboradores, contratos e valores faturados: o Sentry recebe o

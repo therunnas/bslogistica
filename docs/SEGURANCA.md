@@ -304,6 +304,72 @@ por `src/lib/admin-usuarios/`, **exclusivamente no servidor**, depois de
 valor no bundle do navegador. O Sentry roda com `userInfo`, `httpBodies`, cookies,
 headers e query params desligados, e não há source maps servidos ao navegador.
 
+## Isolamento entre ambientes
+
+`NODE_ENV` **não** identifica o ambiente: um Preview da Vercel também roda com
+`NODE_ENV=production`. O critério é `VERCEL_ENV`, e **só `VERCEL_ENV=production`
+conta como Production** (`src/lib/ambiente.ts`).
+
+**A ausência de `VERCEL_ENV` não prova ambiente seguro.** Os sinais de execução
+que a Vercel define (`VERCEL`, `VERCEL_URL`, `VERCEL_REGION`,
+`VERCEL_DEPLOYMENT_ID`, `VERCEL_PROJECT_ID`) distinguem "estou na Vercel" de
+"estou na minha máquina". Com qualquer sinal presente, `VERCEL_ENV` precisa ser
+exatamente `production`, `preview` ou `development`: ausente, vazio, com outra
+caixa ou desconhecido **faz o build e a requisição falharem**, e o ambiente não é
+assumido nem como Production nem como local. Sem nenhum sinal (máquina local, CI
+do GitHub, E2E), nada é verificado.
+
+| Ambiente                         | Supabase de Production                    | Destino exigido                                            |
+| -------------------------------- | ----------------------------------------- | ---------------------------------------------------------- |
+| Production                       | permitido (comportamento preservado)      | as variáveis de Production, como sempre                    |
+| Preview, Development             | **barrado** (build e cada requisição)     | URL https e chave publicável próprias, de um projeto teste |
+| Na Vercel, `VERCEL_ENV` inválido | **falha** (não vira Production nem local) | —                                                          |
+| Local, CI, E2E (sem sinais)      | não se aplica (o `.env` de quem executa)  | —                                                          |
+
+**Não existe exceção por variável.** Nenhuma variável de ambiente autoriza um
+Preview a usar o projeto Supabase de Production; uma `BS_PREVIEW_SHARED_SUPABASE`
+que ainda exista na Vercel não tem efeito algum, e a suíte `test:isolamento` o
+prova. Quem precisa de um Preview funcional configura um projeto Supabase de teste
+no escopo Preview.
+
+Camadas:
+
+1. **Build** (`next.config.ts`): valida o ambiente e o destino antes de qualquer
+   página ser pré-renderizada, e publica o ambiente já validado ao navegador como
+   `NEXT_PUBLIC_AMBIENTE`.
+2. **Runtime do servidor** (`lerAmbienteSupabase`, usada pelo `proxy.ts`, pelas
+   Server Actions e pelo cliente do servidor): repete a regra a cada uso. O
+   `proxy.ts` valida antes de montar a CSP.
+3. **Chave privilegiada** (`admin.ts`): fora de Production, uma
+   `SUPABASE_SERVICE_ROLE_KEY` que declare ser do projeto de Production é barrada.
+4. **Navegador**: só confere o ambiente que o build publicou; quem decide é o build.
+
+Limites honestos:
+
+- o gate barra o **projeto de Production**; não prova que o destino seja de teste.
+  Um Preview só é isolado de fato com um projeto Supabase próprio;
+- a chave publicável só é atribuída a um projeto quando é o formato legado (JWT com
+  `ref`). Chaves `sb_publishable_…` e `sb_secret_…` não carregam o projeto: para elas
+  decide a URL, e o isolamento da chave privilegiada depende de o escopo Preview
+  **não** ter a variável;
+- o Next embute as variáveis `NEXT_PUBLIC_*` no build: o destino de um deploy é o
+  do momento do build;
+- o desenvolvimento local continua livre para usar o `.env` de quem o roda;
+- se a URL de Production um dia passar a um domínio próprio, a comparação por
+  referência deixa de reconhecê-la — atualizar `REFERENCIA_SUPABASE_PRODUCTION`;
+- se a Vercel deixar de expor as variáveis de sistema, os sinais somem e o gate não
+  se aplica. A opção de expô-las deve ficar ligada.
+
+**Sentry:** só Production envia eventos. Fora dela o SDK sobe sem DSN (servidor,
+edge e navegador), com traces zerados, e não há túnel `/monitoring`, source maps,
+release nem telemetria do plugin — **sem depender** de `SENTRY_AUTH_TOKEN` estar
+ausente. A coleta restrita de dados é a mesma.
+
+**Configuração que continua sendo da Vercel** (não verificável a partir do
+repositório): variáveis do escopo Preview, Deployment Protection, vínculo do
+repositório ao projeto e a limpeza dos deploys anteriores à contenção, cujo bundle
+guarda o destino do momento do build.
+
 ## Cabeçalhos HTTP e CSP
 
 Em `next.config.ts`, para todas as rotas: `X-Content-Type-Options: nosniff`,
@@ -322,9 +388,9 @@ em `next.config.ts`):
 
 ```
 default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'unsafe-inline';
-img-src 'self' data:; font-src 'self'; connect-src 'self' <host Supabase>;
+img-src 'self' data:; font-src 'self'; connect-src 'self' <origem do Supabase>;
 frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none';
-upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
+upgrade-insecure-requests; report-uri <endpoint do Sentry — só em Production>
 ```
 
 - O nonce cobre os scripts inline que o Next injeta no streaming do RSC, sem
@@ -333,8 +399,13 @@ upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
   `/esqueci-senha` deixam de ser estáticas.
 - O script de tema é um arquivo (`public/theme-script.js`), o que elimina o único
   `dangerouslySetInnerHTML` alcançável.
-- O Sentry usa o túnel `/monitoring` (same-origin) e recebe os relatórios de
-  violação.
+- A origem do Supabase em `connect-src` vem de `NEXT_PUBLIC_SUPABASE_URL`,
+  validada por `origemDoSupabase()` (https, ou http só em loopback; sem
+  credenciais) — não há host fixo no código nem host vindo da requisição. A
+  montagem está em `src/lib/csp.ts`. Em Production a origem é a mesma de antes; um
+  Preview não aceita a de Production (ver "Isolamento entre ambientes").
+- O Sentry usa o túnel `/monitoring` (same-origin) **só em Production**; fora dela
+  a rota não existe, e o `report-uri` também só existe em Production.
 - As fontes são auto-hospedadas por `next/font`, por isso `font-src 'self'`.
 - **`style-src` mantém `'unsafe-inline'`** — Radix/shadcn usam estilo inline para
   posicionamento. Apertar isso é etapa própria (ver riscos residuais).
@@ -362,11 +433,12 @@ upgrade-insecure-requests; report-uri <endpoint de segurança do Sentry>
 
 - Vercel, projeto do sistema, com domínio customizado em Production. O site
   institucional é **outro projeto e outro repositório**.
-- **Preview** não tem as variáveis `NEXT_PUBLIC_SUPABASE_*`, de propósito: o build
-  de Preview falha. Não conectar Preview ao banco de produção para deixar o check
-  verde.
-- Sem as variáveis, o build falha na pré-renderização nomeando o que falta, em
-  vez de publicar uma aplicação quebrada.
+- **Preview** não usa o banco de Production: o escopo Preview não tem as
+  variáveis de Production, e o código barra o contrário (ver "Isolamento entre
+  ambientes"). Sem destino de teste próprio, o build de Preview falha, de
+  propósito. Não conectar Preview ao banco de produção para deixar o check verde.
+- Sem as variáveis, o build falha nomeando o que falta, em vez de publicar uma
+  aplicação quebrada.
 - **Nunca `supabase config push`.** O `config.toml` não descreve a configuração de
   Auth real; um push aplicaria padrões do CLI e desligaria MFA, confirmação de
   e-mail e a Site URL de produção.
@@ -394,7 +466,7 @@ fechamento.
 | **Backup integral restaurável não comprovado**                                   | média       | Existe backup técnico anterior à `020`, mas não restauração integral comprovada no plano Free. Fecha com plano de backup/PITR ou restauração testada.                                                                                                                                                                                                                                                                                                    |
 | **Banimento direto do último admin pela Auth Admin API**                         | baixa       | O trigger do último admin protege `user_roles`; banir a conta direto em `auth.users` não passa por ele. Fecha com decisão de desenho própria.                                                                                                                                                                                                                                                                                                            |
 | **Revisão de segurança específica (Codex) da C02 não executada**                 | informativa | Homologação e testes locais foram feitos; falta a revisão independente.                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Isolamento Preview/Production não completamente comprovado**                   | média       | Preview sem variáveis do banco é decisão deliberada; a prova do isolamento ponta a ponta é frente própria da auditoria.                                                                                                                                                                                                                                                                                                                                  |
+| **Isolamento Preview/Production: prova com Preview real pendente**               | média       | O código barra Preview apontado para Production, no build e em cada requisição, sem exceção por variável (testado localmente). Falta comprovar com um Preview real depois do merge e tratar os deploys anteriores à contenção.                                                                                                                                                                                                                           |
 | **Observabilidade histórica limitada**                                           | informativa | A verificação de logs após a `020` cobriu só as janelas disponíveis nos planos atuais.                                                                                                                                                                                                                                                                                                                                                                   |
 | **Auditoria best-effort**                                                        | informativa | Ver "Administração de usuários e auditoria".                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **Alocação de equipe sem autor nem histórico**                                   | informativa | `operation_team` não registra quem alocou. Só `admin` escreve nela, mas não há trilha por linha.                                                                                                                                                                                                                                                                                                                                                         |

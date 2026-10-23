@@ -1,6 +1,8 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+import { sinaisDe, verificarDestinoSupabase } from "./src/lib/ambiente";
+
 /**
  * Baseline de cabeçalhos de segurança.
  *
@@ -30,7 +32,34 @@ const cabecalhosDeSeguranca = [
   },
 ];
 
+// Proteção no BUILD, antes de qualquer página ser pré-renderizada. Estando na
+// Vercel, o ambiente tem de ser válido (production, preview ou development) — se
+// os sinais da plataforma existirem e VERCEL_ENV não, o build falha. Fora de
+// Production, o deploy precisa de URL e chave publicável próprias e não pode
+// apontar para o projeto Supabase de Production nem carregar a chave privilegiada
+// dele — por exemplo, por herdar as variáveis de Production. O build falha com
+// mensagem explícita, sem citar URL nem chave. A mesma regra vale de novo em cada
+// requisição do servidor, em lerAmbienteSupabase(). Fora da Vercel (local, CI,
+// E2E) nenhum sinal existe e nada é verificado. Nenhuma variável desvia essa regra.
+const ambienteDeExecucao = verificarDestinoSupabase(sinaisDe(process.env), {
+  url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  chave: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  chaveDeServico: process.env.SUPABASE_SERVICE_ROLE_KEY,
+});
+
+/**
+ * Só a Vercel em Production é "produção" para o Sentry. `NODE_ENV` não decide:
+ * um deploy de Preview também roda com NODE_ENV=production. Local, CI do GitHub
+ * e E2E não têm sinal da Vercel, e portanto não enviam nada ao Sentry.
+ */
+const producao = ambienteDeExecucao === "production";
+
 const nextConfig: NextConfig = {
+  // Publica o ambiente de implantação ao navegador (VERCEL_ENV não existe lá),
+  // já validado acima. Nome próprio de propósito: não depende de a Vercel expor
+  // NEXT_PUBLIC_VERCEL_ENV, e vazio fora da Vercel significa "não é Production".
+  env: { NEXT_PUBLIC_AMBIENTE: ambienteDeExecucao === "fora-da-vercel" ? "" : ambienteDeExecucao },
+
   // Exige que todo href aponte para uma rota existente no App Router: link
   // quebrado vira erro de compilação em vez de 404 em produção.
   typedRoutes: true,
@@ -61,14 +90,23 @@ export default withSentryConfig(nextConfig, {
   // This can increase your server load as well as your hosting bill.
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
-  tunnelRoute: "/monitoring",
+  // Só em Production. Fora dela a rota não existe (404): um túnel aberto em
+  // Preview deixaria qualquer um relayar envelopes ao Sentry real.
+  tunnelRoute: producao ? "/monitoring" : false,
+
+  // Fora de Production: nada vai ao Sentry no build — nem telemetria do plugin,
+  // nem source maps, nem criação de release —, mesmo que SENTRY_AUTH_TOKEN
+  // esteja presente no escopo da variável. Não depende da ausência do token.
+  telemetry: producao,
+  sourcemaps: { disable: !producao },
+  release: { create: producao },
 
   webpack: {
     // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
     // See the following for more information:
     // https://docs.sentry.io/product/crons/
     // https://vercel.com/docs/cron-jobs
-    automaticVercelMonitors: true,
+    automaticVercelMonitors: producao,
 
     // Tree-shaking options for reducing bundle size
     treeshake: {
