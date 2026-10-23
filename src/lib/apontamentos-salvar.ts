@@ -106,6 +106,26 @@ export function linhaFoiAlterada(linha: LinhaDoApontamento, gravado: Apontamento
 }
 
 /**
+ * Uma linha JÁ GRAVADA tem alteração real? É o critério único do salvamento e da prévia de
+ * preço: tocar na linha não basta (editar e devolver o valor original deixa a linha em
+ * `tocadas`, mas sem diferença), e o que conta é o que seria gravado.
+ *
+ * Se o servidor não tem mais a linha (leitura velha), vale como alterada: não há como provar
+ * que é idêntica. Linha sem `entryId` não é "gravada": a pergunta não se aplica (`false`).
+ */
+export function linhaGravadaFoiAlterada(
+  linha: LinhaDoApontamento,
+  tocadas: ReadonlySet<string>,
+  gravado: ApontamentoGravado | undefined,
+): boolean {
+  if (!linha.entryId || !tocadas.has(linha.employeeId)) {
+    return false;
+  }
+
+  return gravado ? linhaFoiAlterada(linha, gravado) : true;
+}
+
+/**
  * As linhas que o salvamento envia, na ordem em que vieram.
  *
  * - sem `entryId`: nova, entra sempre;
@@ -131,11 +151,7 @@ export function linhasParaSalvar(
       return true;
     }
 
-    if (!tocadas.has(linha.employeeId)) {
-      return false;
-    }
-
-    return gravado ? linhaFoiAlterada(linha, gravado) : true;
+    return linhaGravadaFoiAlterada(linha, tocadas, gravado);
   });
 }
 

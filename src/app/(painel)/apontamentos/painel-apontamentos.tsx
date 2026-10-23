@@ -44,7 +44,12 @@ import {
   shiftPlannedMinutes,
   type AttendanceStatus,
 } from "@/lib/billing";
-import { colaboradoresFaturados, linhasParaSalvar, montarCarga } from "@/lib/apontamentos-salvar";
+import {
+  colaboradoresFaturados,
+  linhaGravadaFoiAlterada,
+  linhasParaSalvar,
+  montarCarga,
+} from "@/lib/apontamentos-salvar";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
 import { useEstadoDoMotor, useTermosDoApontamento } from "@/lib/vigencias-dados";
@@ -470,7 +475,9 @@ export function PainelApontamentos() {
       estado: estadoDoMotor,
       status: row.status,
       gravada: Boolean(row.entryId),
-      tocada: draft?.dirty.has(row.employeeId) ?? false,
+      // Alteração real, não interação: editar e devolver o valor original não é mudança, e o
+      // critério é o mesmo do salvamento (`linhasParaSalvar`).
+      tocada: linhaGravadaFoiAlterada(row, draft?.dirty ?? new Set<string>(), gravado ?? undefined),
       gravado,
       regrasDoCadastro: rules,
       custoDoCadastro: Number(employee?.daily_cost ?? 0),

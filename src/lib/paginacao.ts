@@ -478,3 +478,43 @@ export async function lerTabelaPaginada<T extends object>(
   });
   return ordenarApresentacao(resultado.linhas, leitura.ordem);
 }
+
+/** Resposta de uma consulta tipada do `supabase-js`: linhas (ou `null`), erro e contagem. */
+export interface RespostaDeConsulta<T> {
+  readonly data: T[] | null;
+  readonly error: { readonly message: string } | null;
+  readonly count?: number | null;
+}
+
+/**
+ * Lê um conjunto FILTRADO inteiro, com a mesma garantia de `lerTabelaPaginada`: cursor por `id`,
+ * contagem exata antes e depois e nenhum resultado parcial (qualquer falha lança `ErroPaginacao`).
+ *
+ * Quem chama monta a consulta: `lerPagina` deve aplicar os MESMOS filtros em toda página, somar
+ * `gt("id", depoisDe)` quando houver cursor e terminar em `order("id", { ascending: true })` e
+ * `limit(limite)`; `contar` deve aplicar os mesmos filtros com `select("*", { count: "exact",
+ * head: true })`. A ordem de apresentação é de quem usa. Sem ela, a resposta vem em `id` crescente.
+ */
+export async function lerConsultaPaginada<T extends object>(
+  lerPagina: (pedido: PedidoDePagina) => PromiseLike<RespostaDeConsulta<T>>,
+  contar: () => PromiseLike<{
+    readonly error: { readonly message: string } | null;
+    readonly count?: number | null;
+  }>,
+): Promise<T[]> {
+  const resultado = await lerTudoPaginado<T>({
+    lerPagina: async (pedido) => {
+      const resposta = await lerPagina(pedido);
+      if (resposta.error) throw resposta.error;
+      // `data` nulo sem erro é "página ausente": o paginador recusa.
+      return { linhas: resposta.data as readonly T[] };
+    },
+    contar: async () => {
+      const resposta = await contar();
+      if (resposta.error) throw resposta.error;
+      // `count` ausente (null/undefined) não é número: o paginador recusa.
+      return resposta.count as number;
+    },
+  });
+  return resultado.linhas;
+}

@@ -29,10 +29,12 @@ import {
   COLUNAS_ENVIADAS,
   colaboradoresFaturados,
   linhaFoiAlterada,
+  linhaGravadaFoiAlterada,
   linhasParaSalvar,
   montarCarga,
   soHoraEMinuto,
 } from "../src/lib/apontamentos-salvar.ts";
+import { valorDaLinha } from "../src/lib/apontamentos-financeiro.ts";
 import { mensagemDoErro } from "../src/lib/erros-banco.ts";
 import { mensagemDeErro } from "../src/app/(painel)/operacional/_dominio.ts";
 
@@ -657,6 +659,153 @@ verificar(
     "_na_data",
   ].filter((c) => sql.replace(/^\s*--.*$/gm, "").includes(c)),
   [],
+);
+
+// ---------------------------------------------------------------------------
+// G. Alteração real, não interação (achado P2 do PR #68)
+// ---------------------------------------------------------------------------
+
+console.log("G. Alteração real, não interação");
+
+const nenhuma = new Set();
+const tocou = (...ids) => new Set(ids);
+
+verificar(
+  "G1. linha gravada sem edição: não foi alterada",
+  linhaGravadaFoiAlterada(linha(), nenhuma, gravado()),
+  false,
+);
+verificar(
+  "G2. linha gravada, editada e DEVOLVIDA ao original: tocada, mas não alterada",
+  linhaGravadaFoiAlterada(linha({ checkOut: "15:00" }), tocou("c1"), gravado()),
+  false,
+);
+verificar(
+  "G3. a normalização do horário vale (08:00 = 08:00:00; nota nula = nota vazia)",
+  linhaGravadaFoiAlterada(
+    linha({ checkIn: "06:00", checkOut: "15:00", notes: "" }),
+    tocou("c1"),
+    gravado({ check_in: "06:00:00", check_out: "15:00:00", notes: null }),
+  ),
+  false,
+);
+verificar(
+  "G4. alteração real de horário, intervalo, nota e status: alterada",
+  [
+    linhaGravadaFoiAlterada(linha({ checkOut: "16:00" }), tocou("c1"), gravado()),
+    linhaGravadaFoiAlterada(linha({ breakMinutes: 30 }), tocou("c1"), gravado()),
+    linhaGravadaFoiAlterada(linha({ notes: "atraso" }), tocou("c1"), gravado()),
+    linhaGravadaFoiAlterada(linha({ status: "absent" }), tocou("c1"), gravado()),
+  ],
+  [true, true, true, true],
+);
+verificar(
+  "G5. editar sem tocar (estado inconsistente) não vale como alteração; linha nova não é 'gravada'",
+  [
+    linhaGravadaFoiAlterada(linha({ checkOut: "16:00" }), nenhuma, gravado()),
+    linhaGravadaFoiAlterada(linha({ entryId: undefined }), tocou("c1"), undefined),
+  ],
+  [false, false],
+);
+verificar(
+  "G6. o servidor não tem mais a linha (leitura velha): vale como alterada, como no salvamento",
+  linhaGravadaFoiAlterada(linha(), tocou("c1"), undefined),
+  true,
+);
+
+const tresLinhas = [
+  linha({ employeeId: "c1", entryId: "e1" }), // tocada e devolvida ao original
+  linha({ employeeId: "c2", entryId: "e2", checkOut: "17:00" }), // alteração real
+  linha({ employeeId: "c3", entryId: "e3" }), // não tocada
+];
+const tresGravados = [
+  gravado({ id: "e1", employee_id: "c1" }),
+  gravado({ id: "e2", employee_id: "c2" }),
+  gravado({ id: "e3", employee_id: "c3" }),
+];
+const tocadas3 = tocou("c1", "c2");
+verificar(
+  "G7. várias linhas, algumas devolvidas ao original: só a alteração real é alterada",
+  tresLinhas.map((l, i) => linhaGravadaFoiAlterada(l, tocadas3, tresGravados[i])),
+  [false, true, false],
+);
+verificar(
+  "G8. o salvamento envia exatamente as linhas que o critério chama de alteradas",
+  [
+    linhasParaSalvar(tresLinhas, tocadas3, tresGravados).map((l) => l.employeeId),
+    tresLinhas
+      .filter((l, i) => linhaGravadaFoiAlterada(l, tocadas3, tresGravados[i]))
+      .map((l) => l.employeeId),
+  ].map((ids) => ids.join(",")),
+  ["c2", "c2"],
+);
+
+// O valor mostrado e o bloqueio do salvamento usam o mesmo critério (legado com o motor ligado).
+const LIGADO = { tag: "ligado", ativadaEm: null };
+const DESLIGADO = { tag: "desligado" };
+const CALC = () => ({ billedAmount: 1, costAmount: 1, overtimeMinutes: 0 });
+const LEGADO = {
+  status: "present",
+  billed_amount: 137.5,
+  cost_amount: 87.5,
+  overtime_minutes: 0,
+  daily_rate_snapshot: 100,
+  daily_cost_snapshot: 70,
+  shift_hours_snapshot: null,
+  ot_factor_snapshot: 1,
+  ot_tolerance_snapshot: 10,
+  planned_minutes_snapshot: null,
+  terms_origin: null,
+};
+const valor = (estado, tocada) =>
+  valorDaLinha({
+    estado,
+    status: "present",
+    gravada: true,
+    tocada,
+    gravado: LEGADO,
+    regrasDoCadastro: { daily_rate: 999, shift_hours: 8, ot_factor: 3, ot_tolerance_min: 10 },
+    custoDoCadastro: 555,
+    condicaoDoDia: null,
+    plannedMinutes: 480,
+    calcular: CALC,
+  });
+const devolvida = linhaGravadaFoiAlterada(linha(), tocou("c1"), gravado());
+const editada = linhaGravadaFoiAlterada(linha({ checkOut: "16:00" }), tocou("c1"), gravado());
+const v1 = valor(LIGADO, devolvida);
+verificar(
+  "G9. motor LIGADO, legado editado e devolvido ao original: mostra o banco e NÃO bloqueia o salvamento",
+  [v1.tipo, v1.billed, v1.bloqueiaSalvar],
+  ["banco", 137.5, false],
+);
+const v2 = valor(LIGADO, editada);
+verificar(
+  "G10. motor LIGADO, legado com alteração real: continua indisponível e bloqueado",
+  [v2.tipo, v2.bloqueiaSalvar],
+  ["indisponivel", true],
+);
+const v3 = valor(DESLIGADO, devolvida);
+const v4 = valor(DESLIGADO, editada);
+verificar(
+  "G11. motor DESLIGADO: a prévia de sempre, igual com ou sem alteração, sem bloqueio",
+  [v3.tipo, v3.bloqueiaSalvar, v4.tipo, v4.bloqueiaSalvar, v3.billed === v4.billed],
+  ["previa", false, "previa", false, true],
+);
+
+const telaApontamentos = ler("src/app/(painel)/apontamentos/painel-apontamentos.tsx");
+verificar(
+  "G12. a tela passa à prévia de preço a alteração real (mesma função do salvamento), não o conjunto 'tocadas'",
+  /tocada: linhaGravadaFoiAlterada\(row, draft\?\.dirty \?\? new Set<string>\(\), gravado \?\? undefined\)/.test(
+    telaApontamentos,
+  ) && !/tocada: draft\?\.dirty\.has/.test(telaApontamentos),
+  true,
+);
+verificar(
+  "G13. linhasParaSalvar usa o mesmo critério (uma definição só de 'alterada')",
+  /return linhaGravadaFoiAlterada\(linha, tocadas, gravado\);/.test(
+    ler("src/lib/apontamentos-salvar.ts"),
+  ),
+  true,
 );
 
 console.log("");

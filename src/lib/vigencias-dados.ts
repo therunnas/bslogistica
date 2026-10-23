@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { mensagemDoErro } from "@/lib/erros-banco";
+import { lerConsultaPaginada } from "@/lib/paginacao";
 import { toast } from "@/lib/notificacoes";
 import { RPC_VIGENCIAS } from "@/lib/vigencias";
 import { lerDivergencias, lerPendencias } from "@/lib/vigencias-implantacao";
@@ -25,6 +26,77 @@ import {
  */
 
 const cliente = () => criarClienteNavegador();
+
+type Cliente = ReturnType<typeof criarClienteNavegador>;
+
+/**
+ * Leituras das versões, SEMPRE completas (C05-B7.4). O PostgREST corta toda resposta em 1000
+ * linhas, em silêncio, e versão encerrada continua `active`: um conjunto cortado faria a tela
+ * tratar versão existente como "sem condição financeira" e bloquear o salvamento da folha. Cada
+ * leitura é paginada por `id` e conferida por contagem (`lerConsultaPaginada`); qualquer falha
+ * lança, e resultado parcial nunca é devolvido. O filtro é aplicado igual em toda página e na
+ * contagem.
+ */
+export function lerVersoesDoContrato(db: Cliente, contratoId: string, somenteAtivas: boolean) {
+  return lerConsultaPaginada(
+    ({ depoisDe, limite }) => {
+      let q = db.from("contract_terms").select("*").eq("contract_id", contratoId);
+      if (somenteAtivas) q = q.eq("active", true);
+      if (depoisDe !== null) q = q.gt("id", depoisDe);
+      return q.order("id", { ascending: true }).limit(limite);
+    },
+    () => {
+      let q = db
+        .from("contract_terms")
+        .select("*", { count: "exact", head: true })
+        .eq("contract_id", contratoId);
+      if (somenteAtivas) q = q.eq("active", true);
+      return q;
+    },
+  );
+}
+
+export function lerVersoesDaOperacao(db: Cliente, operacaoId: string, somenteAtivas: boolean) {
+  return lerConsultaPaginada(
+    ({ depoisDe, limite }) => {
+      let q = db.from("operation_terms").select("*").eq("operation_id", operacaoId);
+      if (somenteAtivas) q = q.eq("active", true);
+      if (depoisDe !== null) q = q.gt("id", depoisDe);
+      return q.order("id", { ascending: true }).limit(limite);
+    },
+    () => {
+      let q = db
+        .from("operation_terms")
+        .select("*", { count: "exact", head: true })
+        .eq("operation_id", operacaoId);
+      if (somenteAtivas) q = q.eq("active", true);
+      return q;
+    },
+  );
+}
+
+export function lerCustosDosColaboradores(
+  db: Cliente,
+  colaboradores: readonly string[],
+  somenteAtivas: boolean,
+) {
+  return lerConsultaPaginada(
+    ({ depoisDe, limite }) => {
+      let q = db.from("employee_cost_terms").select("*").in("employee_id", colaboradores);
+      if (somenteAtivas) q = q.eq("active", true);
+      if (depoisDe !== null) q = q.gt("id", depoisDe);
+      return q.order("id", { ascending: true }).limit(limite);
+    },
+    () => {
+      let q = db
+        .from("employee_cost_terms")
+        .select("*", { count: "exact", head: true })
+        .in("employee_id", colaboradores);
+      if (somenteAtivas) q = q.eq("active", true);
+      return q;
+    },
+  );
+}
 
 /** Versão de qualquer fonte de preço: os campos comuns tipados, os valores lidos por chave. */
 export type VersaoDeVigencia = VersaoBase & Record<string, unknown>;
@@ -59,14 +131,13 @@ export function useVersoes(tipo: TipoDeVigencia, entidadeId: string | null) {
     queryFn: async (): Promise<VersaoDeVigencia[]> => {
       const id = entidadeId as string;
       const db = cliente();
-      const { data, error } =
+      const data =
         tipo === "contrato"
-          ? await db.from("contract_terms").select("*").eq("contract_id", id)
+          ? await lerVersoesDoContrato(db, id, false)
           : tipo === "colaborador"
-            ? await db.from("employee_cost_terms").select("*").eq("employee_id", id)
-            : await db.from("operation_terms").select("*").eq("operation_id", id);
-      if (error) throw error;
-      return (data ?? [])
+            ? await lerCustosDosColaboradores(db, [id], false)
+            : await lerVersoesDaOperacao(db, id, false);
+      return data
         .slice()
         .sort((a, b) =>
           a.valid_from === b.valid_from
@@ -88,42 +159,18 @@ export function useTermosDoApontamento(p: {
   const contrato = useQuery({
     queryKey: ["vigencias", "contrato", p.contratoId],
     enabled: ativo && Boolean(p.contratoId),
-    queryFn: async () => {
-      const { data, error } = await cliente()
-        .from("contract_terms")
-        .select("*")
-        .eq("contract_id", p.contratoId as string)
-        .eq("active", true);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => lerVersoesDoContrato(cliente(), p.contratoId as string, true),
   });
   const operacao = useQuery({
     queryKey: ["vigencias", "operacao", p.operacaoId],
     enabled: ativo && Boolean(p.operacaoId),
-    queryFn: async () => {
-      const { data, error } = await cliente()
-        .from("operation_terms")
-        .select("*")
-        .eq("operation_id", p.operacaoId as string)
-        .eq("active", true);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => lerVersoesDaOperacao(cliente(), p.operacaoId as string, true),
   });
   const chaveColaboradores = [...p.colaboradores].sort().join(",");
   const custos = useQuery({
     queryKey: ["vigencias", "custos", chaveColaboradores],
     enabled: ativo && p.colaboradores.length > 0,
-    queryFn: async () => {
-      const { data, error } = await cliente()
-        .from("employee_cost_terms")
-        .select("*")
-        .in("employee_id", p.colaboradores)
-        .eq("active", true);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => lerCustosDosColaboradores(cliente(), p.colaboradores, true),
   });
   return {
     carregando:
