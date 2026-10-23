@@ -779,6 +779,28 @@ verificar(
   [l8.tipo, l8.billed, l8.cost, l8.overtime, l8.bloqueiaSalvar],
   ["previa", 0, 0, 0, false],
 );
+const l8b = entrada({
+  status: "absent",
+  gravada: true,
+  tocada: true,
+  gravado: { ...GRAVADO, terms_origin: null },
+});
+verificar(
+  "E13b. LIGADO, legado presença -> falta: indisponível e bloqueado (o banco recusa com 55000)",
+  [l8b.tipo, l8b.billed, l8b.bloqueiaSalvar, /regulariza/i.test(l8b.aviso ?? "")],
+  ["indisponivel", 0, true, true],
+);
+const l8c = entrada({
+  status: "absent",
+  gravada: true,
+  tocada: true,
+  gravado: { ...GRAVADO, status: "absent", terms_origin: null },
+});
+verificar(
+  "E13c. LIGADO, falta já gravada permanece falta: zero e NÃO bloqueia",
+  [l8c.tipo, l8c.billed, l8c.bloqueiaSalvar],
+  ["previa", 0, false],
+);
 for (const estado of [DESCONHECIDO, CARREGANDO]) {
   const g = entrada({ estado, gravada: true, tocada: false, gravado: GRAVADO });
   const n = entrada({ estado });

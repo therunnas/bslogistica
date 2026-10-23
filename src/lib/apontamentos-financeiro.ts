@@ -198,6 +198,17 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
   // Motor ligado.
   if (semMudanca && e.gravado) return doBanco(e.gravado);
 
+  // Legado (presença/reposição sem origem de preço) não vira falta: o banco recusa com 55000
+  // qualquer edição motriz, inclusive esta, e perderia as outras linhas do salvamento.
+  if (e.status === "absent" && e.gravada && e.gravado && e.gravado.status !== "absent") {
+    if (!e.gravado.terms_origin) {
+      return INDISPONIVEL(
+        "Apontamento anterior ao histórico de vigências: horário, intervalo e status só mudam depois da regularização por um administrador.",
+        true,
+      );
+    }
+  }
+
   if (e.status === "absent") {
     return ZERO({ origem: origemGravada(e.gravado), aviso: "Falta: sem cobrança." });
   }
