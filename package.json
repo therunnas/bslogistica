@@ -35,6 +35,7 @@
     "test:apontamentos-salvar": "node --experimental-strip-types scripts/testar-apontamentos-salvar.mjs",
     "test:motor-vigencia": "node --experimental-strip-types scripts/testar-motor-vigencia.mjs",
     "test:interfaces-vigencia": "node --experimental-strip-types scripts/testar-interfaces-vigencia.mjs",
+    "test:ativacao-motor": "node --experimental-strip-types scripts/testar-ativacao-motor.mjs",
     "test:implantacao-vigencias": "node --experimental-strip-types scripts/testar-implantacao-vigencias.mjs",
     "test:vigencias-paginacao": "node --experimental-strip-types scripts/testar-vigencias-paginacao.mjs"
   },

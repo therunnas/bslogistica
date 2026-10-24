@@ -197,8 +197,12 @@ verificar(
   true,
 );
 verificar(
-  "C8. a tela não liga, desliga nem sincroniza o motor e diz isso",
-  /só consulta: nada é registrado, sincronizado nem ligado aqui/.test(painel),
+  "C8. a consulta não registra nem sincroniza; a única ação é ligar o motor, com confirmação (C05-B8.6)",
+  /não registra nem sincroniza nada; a única ação desta tela é ligar o motor, com confirmação/.test(
+    painel,
+  ) &&
+    /<AtivarMotor/.test(painel) &&
+    !/sincronizar|desligar/i.test(painel.replace(/não registra nem sincroniza/g, "")),
   true,
 );
 

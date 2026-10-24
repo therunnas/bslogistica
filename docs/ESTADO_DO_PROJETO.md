@@ -69,8 +69,11 @@ cadastrado.
 - **Implementado**, só na branch `feat/c05b-interfaces-vigencia`: histórico e reajuste de
   vigências em contratos, colaboradores e operações sem contrato; cadastro atômico (usado só com o
   motor ligado); apontamentos com valor do banco, prévia e origem; turnos usados com jornada
-  protegida; tela somente de leitura `/implantacao-vigencias`. As telas não ligam nem desligam o
-  motor.
+  protegida; tela `/implantacao-vigencias` (consulta). As telas de cadastro não ligam nem
+  desligam o motor. A C05-B8.6 acrescenta à `/implantacao-vigencias` o controle de **ligar** o
+  motor (Server Action com `exigirAdminAal2()`, RPC `alterar_motor_vigencia` com o JWT da sessão,
+  motivo, frase de confirmação, `p_aceitar_pendencias = false`; sem botão de desligar). Está em PR,
+  **não** foi usado em nenhum ambiente: o motor segue desligado em Production e na homologação.
 - **Validado**: as 26 suítes Node (`test:*`). Não houve verificação visual em ambiente hospedado.
 - **Publicado**: **não**. As interfaces não estão na `main`, nem em Preview, nem em Production.
 - **Pendente**: criar o PR B, validar em Preview (exige projeto Supabase de teste próprio no

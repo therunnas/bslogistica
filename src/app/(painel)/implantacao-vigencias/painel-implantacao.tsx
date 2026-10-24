@@ -25,6 +25,7 @@ import {
   type LinhaDePendencia,
 } from "@/lib/vigencias-implantacao";
 import { PageHeader } from "../_components/app-shell";
+import { AtivarMotor } from "./ativar-motor";
 
 function Tabela({
   titulo,
@@ -81,7 +82,7 @@ export function PainelImplantacaoVigencias() {
     <div>
       <PageHeader
         title="Implantação das vigências"
-        description="Cadastros que impedem ligar o motor por vigência. Esta tela só consulta: nada é registrado, sincronizado nem ligado aqui."
+        description="Cadastros que impedem ligar o motor por vigência. A consulta não registra nem sincroniza nada; a única ação desta tela é ligar o motor, com confirmação."
       />
 
       {consulta.isPending ? (
@@ -103,8 +104,8 @@ export function PainelImplantacaoVigencias() {
                 <AlertTitle>Nenhuma pendência nem divergência</AlertTitle>
                 <AlertDescription>
                   O banco não encontrou cadastro em uso sem vigência para hoje nem coluna diferente
-                  da vigência. Ligar o motor continua sendo ato separado, de administrador com
-                  segundo fator e motivo.
+                  da vigência. Ligar o motor é ato separado, de administrador com segundo fator,
+                  motivo e confirmação.
                 </AlertDescription>
               </Alert>
             ) : (
@@ -119,6 +120,12 @@ export function PainelImplantacaoVigencias() {
               </Alert>
             );
           })()}
+
+          <AtivarMotor
+            semBloqueios={
+              resumirImplantacao(consulta.data.pendencias, consulta.data.divergencias).semBloqueios
+            }
+          />
 
           <Tabela
             titulo="Sem vigência para hoje"
