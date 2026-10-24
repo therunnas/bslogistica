@@ -1395,6 +1395,67 @@ verificar(
   true,
 );
 
+// ---------------------------------------------------------------------------
+// K. Início do custo do colaborador novo (C05-B8.9)
+// ---------------------------------------------------------------------------
+
+console.log("K. Início do custo do colaborador novo");
+
+verificar(
+  "K1. colaborador novo com o motor ligado: a vigência inicial usa a data escolhida, não 'hoje' fixo",
+  /inicio: inicioDoCusto,\s*motivo: "Cadastro inicial do colaborador"/.test(colaboradores) &&
+    !/inicio: hojeEmSaoPaulo\(\),\s*motivo: "Cadastro inicial do colaborador"/.test(colaboradores),
+  true,
+);
+verificar(
+  "K2. o campo de data só aparece no cadastro NOVO com o motor ligado (existente muda por nova vigência)",
+  /\{!form\.id && modoDeCusto === "por-vigencia" \? \(\s*<div className="space-y-2">\s*<Label htmlFor="employee-cost-from">/.test(
+    colaboradores,
+  ),
+  true,
+);
+verificar(
+  "K3. a data volta para hoje a cada novo cadastro e sem data o salvamento fica bloqueado",
+  /setForm\(empty\);\s*setInicioDoCusto\(hojeEmSaoPaulo\(\)\);/.test(colaboradores) &&
+    /!form\.id && modoDeCusto === "por-vigencia" && !inicioDoCusto/.test(colaboradores),
+  true,
+);
+const cadastroRetroativo = montarCadastroAtomico(
+  "colaborador",
+  { name: "X", status: "active", daily_cost: 80 },
+  {
+    inicio: "2026-10-01",
+    motivo: "Cadastro inicial do colaborador",
+    valores: { daily_cost: "80" },
+    encerrarAnterior: false,
+  },
+);
+verificar(
+  "K4. a data escolhida chega à RPC atômica como p_valid_from (a mesma que valida e audita)",
+  [cadastroRetroativo.rpc, cadastroRetroativo.params.p_valid_from],
+  ["criar_colaborador_com_vigencia", "2026-10-01"],
+);
+let semData = "";
+try {
+  montarCadastroAtomico(
+    "colaborador",
+    { name: "X", status: "active" },
+    {
+      inicio: "",
+      motivo: "Cadastro inicial do colaborador",
+      valores: { daily_cost: "80" },
+      encerrarAnterior: false,
+    },
+  );
+} catch (e) {
+  semData = e instanceof Error ? "recusado" : "";
+}
+verificar(
+  "K5. sem data de início o cadastro atômico é recusado antes de chegar ao banco",
+  semData,
+  "recusado",
+);
+
 console.log("");
 if (falhas.length > 0) {
   console.log(`${passou} passaram, ${falhas.length} falharam.`);

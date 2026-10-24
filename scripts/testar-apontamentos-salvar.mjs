@@ -37,6 +37,8 @@ import {
 import { valorDaLinha } from "../src/lib/apontamentos-financeiro.ts";
 import { mensagemDoErro } from "../src/lib/erros-banco.ts";
 import { mensagemDeErro } from "../src/app/(painel)/operacional/_dominio.ts";
+import { entradaIgualSaida } from "../src/lib/horarios.ts";
+import { workedMinutes } from "../src/lib/billing.ts";
 
 let passou = 0;
 const falhas = [];
@@ -806,6 +808,70 @@ verificar(
     ler("src/lib/apontamentos-salvar.ts"),
   ),
   true,
+);
+
+// ---------------------------------------------------------------------------
+// H. Entrada igual à saída (C05-B8.9)
+// ---------------------------------------------------------------------------
+
+console.log("H. Entrada igual à saída");
+
+verificar(
+  "H1. presença com entrada = saída é recusada (08:00 / 08:00:00 normalizados)",
+  [
+    entradaIgualSaida("present", "08:00", "08:00"),
+    entradaIgualSaida("present", "08:00:00", "08:00"),
+    entradaIgualSaida("replacement", "22:00", "22:00:00"),
+  ],
+  [true, true, true],
+);
+verificar(
+  "H2. turno que vira a meia-noite e jornada normal continuam aceitos",
+  [
+    entradaIgualSaida("present", "22:00", "06:00"),
+    entradaIgualSaida("present", "08:00", "17:00"),
+    entradaIgualSaida("present", "23:59", "00:00"),
+  ],
+  [false, false, false],
+);
+verificar(
+  "H3. falta e horário ausente não são decididos aqui (sem regra de negócio)",
+  [
+    entradaIgualSaida("absent", "08:00", "08:00"),
+    entradaIgualSaida("present", "", ""),
+    entradaIgualSaida("present", null, null),
+    entradaIgualSaida("present", "08:00", null),
+  ],
+  [false, false, false, false],
+);
+verificar(
+  "H4. o cálculo NÃO mudou: billing.ts ainda mede 24 h na igualdade e 8 h no turno noturno",
+  [workedMinutes("08:00", "08:00", 60), workedMinutes("22:00", "07:00", 60)],
+  [1380, 480],
+);
+const telaOperacional = ler("src/app/(painel)/operacional/painel-operacional.tsx");
+verificar(
+  "H5. Apontamentos: a recusa bloqueia o botão, aparece em alerta e é repetida no envio",
+  /entradaIgualSaida\(row\.status, row\.checkIn, row\.checkOut\)/.test(telaApontamentos) &&
+    /!!horariosIguais\.length \|\|/.test(telaApontamentos) &&
+    /if \(horariosIguais\.length\) \{\s*throw new Error\(MENSAGEM_ENTRADA_IGUAL_SAIDA\);/.test(
+      telaApontamentos,
+    ),
+  true,
+);
+verificar(
+  "H6. Operacional: a recusa bloqueia o botão e é repetida no envio, sem mexer no contrato da RPC",
+  /entradaIgualSaida\(linha\.status, linha\.check_in, linha\.check_out\)/.test(telaOperacional) &&
+    /\}\) \|\| horariosIguais\.length > 0/.test(telaOperacional) &&
+    /if \(horariosIguais\.length > 0\) \{\s*toast\.error\(MENSAGEM_ENTRADA_IGUAL_SAIDA\);/.test(
+      telaOperacional,
+    ),
+  true,
+);
+verificar(
+  "H7. o validador não importa nada (a suíte o executa de verdade)",
+  /^\s*import /m.test(semComentarios(ler("src/lib/horarios.ts"))),
+  false,
 );
 
 console.log("");

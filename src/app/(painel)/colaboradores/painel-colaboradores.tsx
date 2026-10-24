@@ -82,6 +82,9 @@ export function PainelColaboradores() {
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<typeof empty>(empty);
+  // Início da vigência do custo do colaborador NOVO (motor ligado). Colaborador novo não tem
+  // apontamento, então nenhuma data aqui reescreve histórico; o existente muda por nova vigência.
+  const [inicioDoCusto, setInicioDoCusto] = useState(hojeEmSaoPaulo());
 
   const colaboradoresAtivos = data.filter((employee) => employee.status === "active").length;
 
@@ -136,7 +139,7 @@ export function PainelColaboradores() {
         {
           linha: payload,
           form: {
-            inicio: hojeEmSaoPaulo(),
+            inicio: inicioDoCusto,
             motivo: "Cadastro inicial do colaborador",
             valores: { daily_cost: String(payload["daily_cost"]) },
             encerrarAnterior: false,
@@ -163,6 +166,7 @@ export function PainelColaboradores() {
             disabled={modoDeCusto === "bloqueada"}
             onClick={() => {
               setForm(empty);
+              setInicioDoCusto(hojeEmSaoPaulo());
               setOpen(true);
             }}
           >
@@ -447,6 +451,25 @@ export function PainelColaboradores() {
               />
             </div>
 
+            {!form.id && modoDeCusto === "por-vigencia" ? (
+              <div className="space-y-2">
+                <Label htmlFor="employee-cost-from">Custo vigente desde</Label>
+
+                <Input
+                  id="employee-cost-from"
+                  type="date"
+                  value={inicioDoCusto}
+                  onChange={(event) => setInicioDoCusto(event.target.value)}
+                  className={INPUT_CLASS}
+                />
+
+                <p className="text-xs text-muted-foreground">
+                  Primeiro dia trabalhado com este custo. Dias anteriores a esta data não podem ser
+                  apontados para o colaborador.
+                </p>
+              </div>
+            ) : null}
+
             <div className="space-y-2">
               <Label>Status</Label>
 
@@ -507,7 +530,8 @@ export function PainelColaboradores() {
                 !form.name ||
                 save.isPending ||
                 criarComVigencia.isPending ||
-                (modoDeCusto === "bloqueada" && !form.id)
+                (modoDeCusto === "bloqueada" && !form.id) ||
+                (!form.id && modoDeCusto === "por-vigencia" && !inicioDoCusto)
               }
             >
               {save.isPending || criarComVigencia.isPending ? "Salvando..." : "Salvar colaborador"}

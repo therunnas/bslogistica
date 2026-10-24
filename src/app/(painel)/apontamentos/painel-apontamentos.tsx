@@ -59,6 +59,7 @@ import { brl, minutesToLabel, todayISO } from "@/lib/format";
 import { useContractRules } from "@/lib/ledger";
 import { exigirLinhaAfetada } from "@/lib/mutations";
 import { toast } from "@/lib/notificacoes";
+import { MENSAGEM_ENTRADA_IGUAL_SAIDA, entradaIgualSaida } from "@/lib/horarios";
 import {
   useClients,
   useEmployees,
@@ -579,6 +580,11 @@ export function PainelApontamentos() {
 
   const aSalvar = computed.filter(({ row }) => colaboradoresASalvar.has(row.employeeId));
 
+  // Entrada igual à saída viraria jornada de 24 h no cálculo: recusada antes de enviar.
+  const horariosIguais = aSalvar.filter(({ row }) =>
+    entradaIgualSaida(row.status, row.checkIn, row.checkOut),
+  );
+
   const conflitos = aSalvar.filter(
     ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
   );
@@ -594,6 +600,10 @@ export function PainelApontamentos() {
         return {
           gravadas: 0,
         };
+      }
+
+      if (horariosIguais.length) {
+        throw new Error(MENSAGEM_ENTRADA_IGUAL_SAIDA);
       }
 
       if (conflitos.length) {
@@ -800,6 +810,7 @@ export function PainelApontamentos() {
                 saveAll.isPending ||
                 !linhas.length ||
                 !!conflitos.length ||
+                !!horariosIguais.length ||
                 linhasBloqueadas.length > 0
               }
             >
@@ -823,6 +834,18 @@ export function PainelApontamentos() {
             está bloqueado.
           </p>
           <p className="mt-1 text-xs leading-5">{linhasBloqueadas[0]?.valor.aviso}</p>
+        </div>
+      ) : null}
+
+      {horariosIguais.length > 0 ? (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-destructive"
+        >
+          <p className="text-sm font-medium">
+            {horariosIguais.length} linha(s) com entrada igual à saída. O salvamento está bloqueado.
+          </p>
+          <p className="mt-1 text-xs leading-5">{MENSAGEM_ENTRADA_IGUAL_SAIDA}</p>
         </div>
       ) : null}
 

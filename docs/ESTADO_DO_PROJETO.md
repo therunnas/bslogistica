@@ -72,12 +72,25 @@ cadastrado.
   protegida; tela `/implantacao-vigencias` (consulta). As telas de cadastro não ligam nem
   desligam o motor. A C05-B8.6 acrescenta à `/implantacao-vigencias` o controle de **ligar** o
   motor (Server Action com `exigirAdminAal2()`, RPC `alterar_motor_vigencia` com o JWT da sessão,
-  motivo, frase de confirmação, `p_aceitar_pendencias = false`; sem botão de desligar). Está em PR,
-  **não** foi usado em nenhum ambiente: o motor segue desligado em Production e na homologação.
-- **Validado**: as 26 suítes Node (`test:*`). Não houve verificação visual em ambiente hospedado.
-- **Publicado**: **não**. As interfaces não estão na `main`, nem em Preview, nem em Production.
-- **Pendente**: criar o PR B, validar em Preview (exige projeto Supabase de teste próprio no
-  escopo Preview; **não verificado**), merge e deploy, cada um com autorização.
+  motivo, frase de confirmação, `p_aceitar_pendencias = false`; sem botão de desligar). Está em PR.
+  Usado **só na homologação** (C05-B8.8, 24/10/2026, pelo Preview do PR, admin AAL2): motor
+  ligado lá, com dados `HML-TESTE`; em Production o motor segue **desligado**. É controle técnico
+  de implantação: a única forma segura de ligar o motor, por isso permanece até existir
+  procedimento substituto validado.
+- **C05-B8.9** (no mesmo PR): as telas de apontamento (admin e operacional) recusam salvar linha
+  com entrada igual à saída, que o cálculo mediria como 24 h; o cálculo não mudou e o banco ainda
+  aceita a igualdade por outra via (corrigir no banco exige migration própria). O cadastro de
+  colaborador novo com o motor ligado pede a data de início do custo (antes era sempre hoje, o que
+  recusava apontar dias anteriores).
+- **Regras comerciais pendentes** (decisão da BS, nada implementado por suposição): fator e custo
+  da hora extra, preço por trabalhador, acúmulo e arredondamento no fechamento, semântica da
+  tolerância, adicionais de sábado/domingo/feriado, parâmetros da operação sem contrato (8 h, fator
+  1, 10 min fixos) e cobrança de presença ou substituição sem horário.
+- **Validado**: as 28 suítes Node (`test:*`); homologação ponta a ponta na C05-B8.8.
+- **Publicado**: as interfaces (PR #68) estão na `main` e em Production. O controle de ativação e
+  as correções da C05-B8.9 (PR #69) estão só no Preview, ligado à homologação.
+- **Pendente**: decisão da BS sobre as regras comerciais acima; merge do PR #69 e procedimento
+  para ligar o motor em Production, cada um com autorização.
 
 **Separados deste trabalho**: o PR #63 (fechamento quinzenal, rascunho) e a migration `019`
 (nunca aplicada).
