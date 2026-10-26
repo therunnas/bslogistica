@@ -47,7 +47,7 @@ import {
 
 import { brl } from "@/lib/format";
 import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
-import { useCriarComVigencia, useEstadoDoMotor } from "@/lib/vigencias-dados";
+import { useCriarComVigencia, useEstadoDoMotor, useRegrasDaBs } from "@/lib/vigencias-dados";
 import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { useEmployees } from "@/lib/queries";
@@ -78,6 +78,7 @@ export function PainelColaboradores() {
   const criarComVigencia = useCriarComVigencia("colaborador", ["employees"]);
   const estadoDoMotor = useEstadoDoMotor();
   const modoDeCusto = modoDeEdicaoDeTaxa(estadoDoMotor);
+  const regrasBs = useRegrasDaBs();
   const remove = useDeleteRow("employees");
 
   const [open, setOpen] = useState(false);
@@ -85,6 +86,8 @@ export function PainelColaboradores() {
   // Início da vigência do custo do colaborador NOVO (motor ligado). Colaborador novo não tem
   // apontamento, então nenhuma data aqui reescreve histórico; o existente muda por nova vigência.
   const [inicioDoCusto, setInicioDoCusto] = useState(hojeEmSaoPaulo());
+  // Valor-hora acordado da hora extra paga (migration 029), opcional: vazio = sem valor acordado.
+  const [horaExtraDoCusto, setHoraExtraDoCusto] = useState("");
 
   const colaboradoresAtivos = data.filter((employee) => employee.status === "active").length;
 
@@ -141,8 +144,12 @@ export function PainelColaboradores() {
           form: {
             inicio: inicioDoCusto,
             motivo: "Cadastro inicial do colaborador",
-            valores: { daily_cost: String(payload["daily_cost"]) },
+            valores: {
+              daily_cost: String(payload["daily_cost"]),
+              ot_hourly_cost: horaExtraDoCusto,
+            },
             encerrarAnterior: false,
+            regrasBs,
           },
         },
         { onSuccess: () => setOpen(false) },
@@ -167,6 +174,7 @@ export function PainelColaboradores() {
             onClick={() => {
               setForm(empty);
               setInicioDoCusto(hojeEmSaoPaulo());
+              setHoraExtraDoCusto("");
               setOpen(true);
             }}
           >
@@ -466,6 +474,27 @@ export function PainelColaboradores() {
                 <p className="text-xs text-muted-foreground">
                   Primeiro dia trabalhado com este custo. Dias anteriores a esta data não podem ser
                   apontados para o colaborador.
+                </p>
+              </div>
+            ) : null}
+
+            {!form.id && modoDeCusto === "por-vigencia" && regrasBs ? (
+              <div className="space-y-2">
+                <Label htmlFor="employee-ot-hourly-cost">
+                  Valor-hora da hora extra paga (R$, opcional)
+                </Label>
+
+                <Input
+                  id="employee-ot-hourly-cost"
+                  inputMode="decimal"
+                  value={horaExtraDoCusto}
+                  onChange={(event) => setHoraExtraDoCusto(event.target.value)}
+                  className={INPUT_CLASS}
+                />
+
+                <p className="text-xs text-muted-foreground">
+                  Valor combinado com este colaborador. Vazio: a hora extra paga é o custo da diária
+                  dividido pela jornada, sem acréscimo.
                 </p>
               </div>
             ) : null}

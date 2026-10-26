@@ -408,8 +408,9 @@ begin
   -- (trilha das vigências financeiras), também com RLS desde a criação — passa a 17. A 024
   -- acrescenta `operation_terms` (versões do valor acordado), com RLS desde a criação — 18.
   -- A 025 acrescenta `financial_engine_settings` (a chave do motor por vigência), também com
-  -- RLS desde a criação — 19.
-  perform pg_temp.registrar('F3. as 19 tabelas de public seguem com RLS ativa', '19',
+  -- RLS desde a criação — 19. A 029 acrescenta `billing_additionals` (adicionais de serviço),
+  -- com RLS desde a criação — 20.
+  perform pg_temp.registrar('F3. as 20 tabelas de public seguem com RLS ativa', '20',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -517,12 +518,13 @@ begin
   -- colunas de condições financeiras): são 11, e os 10 originais seguem intactos. A 024
   -- acrescenta o da coluna `operation_terms_id` (valor acordado versionado): são 12. A 025
   -- acrescenta o motor por vigência, criado DESABILITADO (a lista conta o trigger, esteja
-  -- habilitado ou não): são 13.
-  perform pg_temp.registrar('I1. os 13 triggers de timesheet_entries, intactos (um deles dormente)',
+  -- habilitado ou não): são 13. A 029 acrescenta a recusa de entrada igual à saída: são 14.
+  perform pg_temp.registrar('I1. os 14 triggers de timesheet_entries, intactos (um deles dormente)',
     'trg_timesheet_entries_ancora_folha, trg_timesheet_entries_bloqueia_condicoes, '
     'trg_timesheet_entries_bloqueia_condicoes_operacao, '
     'trg_timesheet_entries_bloqueia_delete_faturado, '
     'trg_timesheet_entries_bloqueia_desvinculo, trg_timesheet_entries_bloqueia_edicao_faturada, '
+    'trg_timesheet_entries_bloqueia_horario_igual, '
     'trg_timesheet_entries_bloqueia_truncate, trg_timesheet_entries_bloqueia_vinculo_direto, '
     'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_calculo_financeiro, '
     'trg_timesheet_entries_calculo_vigencia, '
@@ -544,15 +546,17 @@ begin
 
   -- Exatamente uma constraint CHECK por tabela: a da 014, e nada mais. As cinco da
   -- 022 (valores das colunas novas de condições financeiras) ficam de fora pelo nome,
-  -- para que qualquer OUTRA constraint continue fazendo este caso falhar.
-  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022', '1',
+  -- para que qualquer OUTRA constraint continue fazendo este caso falhar. A da 029 (valor-hora
+  -- da hora extra paga, positivo) também fica de fora pelo nome.
+  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022 e a da 029', '1',
     (select count(*)::text from pg_constraint
       where conrelid = 'public.timesheet_entries'::regclass and contype = 'c'
         and conname not in ('timesheet_entries_terms_origin_valida',
                             'timesheet_entries_shift_hours_snapshot_positiva',
                             'timesheet_entries_ot_factor_snapshot_nao_negativo',
                             'timesheet_entries_ot_tolerance_snapshot_nao_negativa',
-                            'timesheet_entries_planned_minutes_snapshot_nao_negativo')));
+                            'timesheet_entries_planned_minutes_snapshot_nao_negativo',
+                            'timesheet_entries_ot_hourly_cost_snapshot_positivo')));
 
   perform pg_temp.registrar('I4. um unico CHECK em shifts', '1',
     (select count(*)::text from pg_constraint

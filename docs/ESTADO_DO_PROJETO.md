@@ -12,7 +12,7 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 | Aplicação             | publicada em `admin.bslogisticas.com.br`                                                                                                      |
 | Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                                                                             |
 | Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                                                                                      |
-| Migrations            | 33 registradas; a última é a `028` (C05-B, aplicada em 23/10/2026). Ver "Vigências financeiras", abaixo                                       |
+| Migrations            | 33 registradas; a última é a `028` (C05-B, aplicada em 23/10/2026). A `029` existe só no repositório. Ver "Vigências financeiras", abaixo     |
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                                                                           |
 | Usuário `operacional` | perfil homologado com uma conta existente que era admin e foi rebaixada; contas definitivas ainda não criadas ([PROGRESS.md](../PROGRESS.md)) |
 
@@ -82,15 +82,35 @@ cadastrado.
   aceita a igualdade por outra via (corrigir no banco exige migration própria). O cadastro de
   colaborador novo com o motor ligado pede a data de início do custo (antes era sempre hoje, o que
   recusava apontar dias anteriores).
-- **Regras comerciais pendentes** (decisão da BS, nada implementado por suposição): fator e custo
-  da hora extra, preço por trabalhador, acúmulo e arredondamento no fechamento, semântica da
-  tolerância, adicionais de sábado/domingo/feriado, parâmetros da operação sem contrato (8 h, fator
-  1, 10 min fixos) e cobrança de presença ou substituição sem horário.
-- **Validado**: as 28 suítes Node (`test:*`); homologação ponta a ponta na C05-B8.8.
+- **C05-B8.10** (no mesmo PR; migration `029` **só local**, não aplicada em banco remoto): regras
+  confirmadas pela BS. Valem no motor por vigência; o motor antigo (`010`) não muda.
+  - **Hora extra paga** pelo valor-hora acordado com cada colaborador (`employee_cost_terms.ot_hourly_cost`,
+    opcional, congelado no apontamento). Cobrança e custo independentes: o fator do contrato só
+    entra na cobrança. Sem valor acordado, segue diária de custo ÷ jornada (o comportamento anterior).
+  - **Saída antecipada**: custo proporcional às horas trabalhadas, com os dois horários; a cobrança
+    continua a diária inteira.
+  - **Adicionais de serviço** (`billing_additionals`): motivo, valor, referência, período, cliente e
+    operação opcional; só por RPC (admin AAL2, trilha), cancelamento com motivo, sem exclusão;
+    `gerar_fatura` inclui os que cabem inteiros no período, um item cada.
+  - **Entrada igual à saída** recusada pelo banco (23514), por qualquer via.
+  - As telas só oferecem isso quando `estado_motor_vigencia()` anuncia `regras_bs`: o código pode
+    ser publicado antes da `029` sem mudar nada. O Dashboard mostra a receita dos apontamentos; os
+    adicionais aparecem no Faturamento e na fatura.
+  - Validado localmente: aplicar a `029` sobre dados existentes não altera nenhum valor gravado, e a
+    reversão devolve catálogo e dados idênticos aos da `028`.
+- **Regras comerciais pendentes** (decisão da BS, nada implementado por suposição): arredondamento de
+  meia hora (15 e 45 min) e se é diário ou depois de acumular a quinzena; feriado (100% com diária
+  por 4 h e extra acima disso); sábado e domingo; cobrança ao cliente por saída antecipada; preço
+  avulso por serviço completo ou por trabalhador; parâmetros da operação sem contrato (8 h, fator 1,
+  10 min fixos); presença ou substituição sem horário; como os adicionais entram no Dashboard e nos
+  Relatórios. Fechamento quinzenal com aprovação do gerente do cliente: PR #63, separado.
+- **Validado**: as 29 suítes Node (`test:*`) e as 26 SQL locais; homologação ponta a ponta na
+  C05-B8.8 (antes da `029`).
 - **Publicado**: as interfaces (PR #68) estão na `main` e em Production. O controle de ativação e
-  as correções da C05-B8.9 (PR #69) estão só no Preview, ligado à homologação.
-- **Pendente**: decisão da BS sobre as regras comerciais acima; merge do PR #69 e procedimento
-  para ligar o motor em Production, cada um com autorização.
+  as correções da C05-B8.9 (PR #69) estão só no Preview, ligado à homologação. A C05-B8.10 está
+  só na branch local, sem push.
+- **Pendente**: decisão da BS sobre as regras comerciais acima; aplicar a `029` na homologação e
+  validar; merge do PR #69 e procedimento para ligar o motor em Production, cada um com autorização.
 
 **Separados deste trabalho**: o PR #63 (fechamento quinzenal, rascunho) e a migration `019`
 (nunca aplicada).
@@ -167,9 +187,9 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 
 | Verificação                     | Estado                                                                                                               |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Suítes Node (`test:*`)          | 26 scripts, todos exigidos pela CI; 8 deles são da C05-B                                                             |
-| Testes SQL (`supabase/tests`)   | 24 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
-| CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 26 suítes e build, sem secret e sem tocar o Supabase de Production |
+| Suítes Node (`test:*`)          | 29 scripts, todos exigidos pela CI; 11 deles são da C05-B                                                            |
+| Testes SQL (`supabase/tests`)   | 26 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
+| CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 29 suítes e build, sem secret e sem tocar o Supabase de Production |
 | `npm audit`                     | 0 vulnerabilidades                                                                                                   |
 
 ## Riscos e pendências confirmados

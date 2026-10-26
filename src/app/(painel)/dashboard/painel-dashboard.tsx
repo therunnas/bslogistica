@@ -41,6 +41,7 @@ import { brl, dateBR, minutesToHours, monthRange, num, pct } from "@/lib/format"
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
+import { useRegrasDaBs } from "@/lib/vigencias-dados";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -52,6 +53,9 @@ export function PainelDashboard() {
   const [end, setEnd] = useState(initial.end);
 
   const ledger = useLedger();
+  // Com a migration 029 existem adicionais de serviço, que vão para a fatura mas não são
+  // apontamento: a receita deste painel é a dos apontamentos (ver Faturamento).
+  const regrasBs = useRegrasDaBs();
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
 
@@ -209,7 +213,11 @@ export function PainelDashboard() {
             <Kpi
               label="Receita"
               value={brl(kpis.revenue)}
-              description="Receita gerada no período"
+              description={
+                regrasBs
+                  ? "Receita dos apontamentos no período; adicionais de serviço no Faturamento"
+                  : "Receita gerada no período"
+              }
               icon={BadgeDollarSign}
             />
 

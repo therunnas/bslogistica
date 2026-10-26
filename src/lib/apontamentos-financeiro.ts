@@ -13,6 +13,11 @@
  *                                        fica bloqueado (o banco recusaria de qualquer modo);
  *   - motor carregando ou desconhecido-> só o que já está gravado; nunca uma prévia.
  *
+ * Com o motor ligado e as regras da migration 029 anunciadas pelo banco (`regrasBs`), a prévia
+ * usa o valor-hora acordado da hora extra paga (congelado no apontamento ou o da vigência da
+ * data) e o custo proporcional da saída antecipada, como o banco. Sem o anúncio, a prévia é a de
+ * antes, que é o que o banco sem a 029 calcula.
+ *
  * Sem importações em tempo de execução (a suíte Node executa este arquivo): a fórmula de
  * `calcEntry()` entra por parâmetro, para que a paridade com o SQL continue num lugar só.
  */
@@ -36,6 +41,10 @@ export type CalcularLinha = (p: {
   regras: RegrasDeCalculo;
   custoDiario: number;
   plannedMinutes: number;
+  /** Valor-hora acordado da hora extra paga; nulo = diária de custo ÷ jornada. */
+  custoHoraExtra: number | null;
+  /** Custo proporcional na saída antecipada (motor por vigência com a 029). */
+  custoProporcional: boolean;
 }) => ResultadoDoCalculo;
 
 /** O que o servidor tem para a linha (colunas da 022/024 incluídas; todas anuláveis). */
@@ -51,11 +60,20 @@ export interface GravadoFinanceiro {
   ot_tolerance_snapshot?: number | null;
   planned_minutes_snapshot?: number | null;
   terms_origin?: string | null;
+  /** Valor-hora congelado da hora extra paga (migration 029); nulo = sem valor acordado. */
+  ot_hourly_cost_snapshot?: number | null;
 }
 
 /** Condição aplicável à data trabalhada, já resolvida pela tela (ou o motivo de não haver). */
 export type CondicaoDoDia =
-  | { ok: true; regras: RegrasDeCalculo; custoDiario: number; origem: string }
+  | {
+      ok: true;
+      regras: RegrasDeCalculo;
+      custoDiario: number;
+      origem: string;
+      /** Valor-hora acordado da versão de custo da data (029); nulo ou ausente = sem valor. */
+      custoHoraExtra?: number | null;
+    }
   | { ok: false; motivo: string };
 
 export type TipoDeValor = "banco" | "previa" | "indisponivel";
@@ -87,6 +105,8 @@ export interface EntradaDaLinha {
   condicaoDoDia: CondicaoDoDia | null;
   plannedMinutes: number;
   calcular: CalcularLinha;
+  /** O banco anunciou as regras da migration 029 (`estado_motor_vigencia().regras_bs`). */
+  regrasBs?: boolean;
 }
 
 export const ROTULO_DA_ORIGEM_GRAVADA: Readonly<Record<string, string>> = {
@@ -136,9 +156,15 @@ const INDISPONIVEL = (aviso: string, bloqueiaSalvar: boolean): ValorDaLinha => (
   bloqueiaSalvar,
 });
 
-function congelado(
-  g: GravadoFinanceiro,
-): { regras: RegrasDeCalculo; custo: number; planned: number } | null {
+const numeroOuNulo = (v: unknown): number | null =>
+  v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+
+function congelado(g: GravadoFinanceiro): {
+  regras: RegrasDeCalculo;
+  custo: number;
+  planned: number;
+  custoHoraExtra: number | null;
+} | null {
   const origemOk = g.terms_origin === "versao" || g.terms_origin === "valor_acordado";
   const campos = [
     g.daily_rate_snapshot,
@@ -158,6 +184,7 @@ function congelado(
     },
     custo: Number(g.daily_cost_snapshot),
     planned: Number(g.planned_minutes_snapshot),
+    custoHoraExtra: numeroOuNulo(g.ot_hourly_cost_snapshot),
   };
 }
 
@@ -170,6 +197,9 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
       regras: e.regrasDoCadastro,
       custoDiario: e.custoDoCadastro,
       plannedMinutes: e.plannedMinutes,
+      // Motor antigo (010): sem valor-hora e sem proporcional, com ou sem a 029.
+      custoHoraExtra: null,
+      custoProporcional: false,
     });
     return {
       tipo: "previa",
@@ -197,6 +227,7 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
 
   // Motor ligado.
   if (semMudanca && e.gravado) return doBanco(e.gravado);
+  const regrasBs = e.regrasBs === true;
 
   // Legado (presença/reposição sem origem de preço) não vira falta: o banco recusa com 55000
   // qualquer edição motriz, inclusive esta, e perderia as outras linhas do salvamento.
@@ -223,7 +254,13 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
         true,
       );
     }
-    const r = e.calcular({ regras: c.regras, custoDiario: c.custo, plannedMinutes: c.planned });
+    const r = e.calcular({
+      regras: c.regras,
+      custoDiario: c.custo,
+      plannedMinutes: c.planned,
+      custoHoraExtra: regrasBs ? c.custoHoraExtra : null,
+      custoProporcional: regrasBs,
+    });
     return {
       tipo: "previa",
       billed: r.billedAmount,
@@ -243,6 +280,8 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
     regras: cond.regras,
     custoDiario: cond.custoDiario,
     plannedMinutes: e.plannedMinutes,
+    custoHoraExtra: regrasBs ? (cond.custoHoraExtra ?? null) : null,
+    custoProporcional: regrasBs,
   });
   return {
     tipo: "previa",

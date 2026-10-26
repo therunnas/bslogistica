@@ -306,9 +306,14 @@ verificar(
   [],
 );
 verificar(
-  "C9. custo e valor acordado: um campo cada",
-  [CAMPOS_DA_VIGENCIA.colaborador.length, CAMPOS_DA_VIGENCIA.operacao.length],
-  [1, 1],
+  "C9. custo: o custo diário e o valor-hora OPCIONAL da 029 (só com regras_bs); valor acordado: um campo",
+  [
+    CAMPOS_DA_VIGENCIA.colaborador.length,
+    CAMPOS_DA_VIGENCIA.colaborador.filter((c) => c.opcional === true && c.requerRegrasBs === true)
+      .length,
+    CAMPOS_DA_VIGENCIA.operacao.length,
+  ],
+  [2, 1, 1],
 );
 verificar(
   "C10. lerNumero aceita vírgula e recusa milhar e negativo",
@@ -1131,13 +1136,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. a 028 (contrato da operação protegido) é a última migration, a 027, a 026 e a 025 não são a última e a 019 está ausente",
+  "I1. a 029 (regras financeiras da BS) é a última migration, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [33, "20261023120000_028_protege_contrato_da_operacao.sql", false],
+  [34, "20261026120000_029_regras_financeiras_bs.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",

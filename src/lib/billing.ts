@@ -55,6 +55,17 @@ export interface EntryCalcInput {
   plannedMinutes: number;
   rules: ContractRules;
   employeeDailyCost: number;
+  /**
+   * Valor-hora acordado da hora extra PAGA ao colaborador (migration 029). Ausente ou nulo: a
+   * hora extra paga é diária de custo ÷ jornada, sem fator, como sempre foi.
+   */
+  employeeOtHourCost?: number | null;
+  /**
+   * Saída antecipada paga proporcionalmente às horas trabalhadas (migration 029, motor por
+   * vigência). Só vale com entrada e saída preenchidas; a cobrança não muda. Ausente: diária de
+   * custo inteira, como no motor antigo.
+   */
+  proportionalCost?: boolean;
 }
 
 export interface EntryCalcResult {
@@ -71,12 +82,19 @@ export interface EntryCalcResult {
  * Diária: 1 por colaborador presente (faltas não geram cobrança).
  * Hora extra: (diária / horas do turno) x fator x horas excedentes,
  * descontando a tolerância em minutos definida no contrato.
+ * Custo: diária de custo (proporcional às horas trabalhadas na saída antecipada, quando
+ * `proportionalCost`) + horas excedentes x valor-hora acordado (ou diária de custo / jornada).
+ * A ordem das operações é a de `derivar_valores_por_vigencia()` (029), para a paridade.
  */
 export function calcEntry(input: EntryCalcInput): EntryCalcResult {
   const { rules } = input;
   const shiftHours = rules.shift_hours > 0 ? rules.shift_hours : 8;
   const otHourRate = (rules.daily_rate / shiftHours) * (rules.ot_factor || 1);
-  const otCostHourRate = input.employeeDailyCost / shiftHours;
+  const otHourCost = input.employeeOtHourCost;
+  const otCostHourRate =
+    otHourCost !== null && otHourCost !== undefined && otHourCost > 0
+      ? otHourCost
+      : input.employeeDailyCost / shiftHours;
 
   if (input.status === "absent") {
     return {
@@ -95,6 +113,11 @@ export function calcEntry(input: EntryCalcInput): EntryCalcResult {
   const excess = worked - planned;
   const overtime = excess > (rules.ot_tolerance_min ?? 0) ? excess : 0;
   const otHours = overtime / 60;
+  const temHorarios = Boolean(input.checkIn) && Boolean(input.checkOut);
+  const baseCost =
+    input.proportionalCost === true && temHorarios && worked < planned
+      ? (input.employeeDailyCost * worked) / planned
+      : input.employeeDailyCost;
 
   return {
     workedMinutes: worked,
@@ -103,7 +126,7 @@ export function calcEntry(input: EntryCalcInput): EntryCalcResult {
     otHourRate,
     dailyCost: input.employeeDailyCost,
     billedAmount: round2(rules.daily_rate + otHours * otHourRate),
-    costAmount: round2(input.employeeDailyCost + otHours * otCostHourRate),
+    costAmount: round2(baseCost + otHours * otCostHourRate),
   };
 }
 

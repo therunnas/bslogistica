@@ -52,7 +52,7 @@ import {
 } from "@/lib/apontamentos-salvar";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
-import { useEstadoDoMotor, useTermosDoApontamento } from "@/lib/vigencias-dados";
+import { useEstadoDoMotor, useRegrasDaBs, useTermosDoApontamento } from "@/lib/vigencias-dados";
 import { resolverCondicaoDoDia } from "@/lib/vigencias-ui";
 import { AvisoDoMotor } from "../_components/vigencias";
 import { brl, minutesToLabel, todayISO } from "@/lib/format";
@@ -441,6 +441,7 @@ export function PainelApontamentos() {
 
   // U3: o estado do motor decide de onde vem o valor mostrado (ver apontamentos-financeiro.ts).
   const estadoDoMotor = useEstadoDoMotor();
+  const regrasBs = useRegrasDaBs();
   const operacaoDaTela = operationList.find((item) => item.id === operationId) ?? null;
   const termos = useTermosDoApontamento({
     habilitado: estadoDoMotor.tag === "ligado" && Boolean(operationId),
@@ -484,7 +485,14 @@ export function PainelApontamentos() {
       custoDoCadastro: Number(employee?.daily_cost ?? 0),
       condicaoDoDia,
       plannedMinutes,
-      calcular: ({ regras, custoDiario, plannedMinutes: previstos }) =>
+      regrasBs,
+      calcular: ({
+        regras,
+        custoDiario,
+        plannedMinutes: previstos,
+        custoHoraExtra,
+        custoProporcional,
+      }) =>
         calcEntry({
           status: row.status,
           checkIn: row.checkIn || null,
@@ -493,6 +501,8 @@ export function PainelApontamentos() {
           plannedMinutes: previstos,
           rules: regras,
           employeeDailyCost: custoDiario,
+          employeeOtHourCost: custoHoraExtra,
+          proportionalCost: custoProporcional,
         }),
     });
 

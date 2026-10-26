@@ -55,10 +55,15 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), a 027 (ativação com divergência) e a 028 (contrato da operação), que são posteriores a ela",
+  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), a 027 (ativação com divergência), a 028 (contrato da operação) e a 029 (regras da BS), que são posteriores a ela",
   arquivos
     .filter(
-      (a) => a !== NOME && !a.includes("_026_") && !a.includes("_027_") && !a.includes("_028_"),
+      (a) =>
+        a !== NOME &&
+        !a.includes("_026_") &&
+        !a.includes("_027_") &&
+        !a.includes("_028_") &&
+        !a.includes("_029_"),
     )
     .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
@@ -609,13 +614,22 @@ const sqlTodas = [
   "20261020210000_024_valores_acordados_operacao.sql",
   NOME,
   "20261022183038_027_motor_bloqueia_ativacao_com_divergencia.sql",
+  // A 029 (C05-B8.10) recria as RPCs de custo com o valor-hora da hora extra paga.
+  "20261026120000_029_regras_financeiras_bs.sql",
 ]
   .map((f) => ler(`supabase/migrations/${f}`).replace(/^\s*--.*$/gm, ""))
   .join("\n");
+/** Parâmetros da definição VIGENTE: a última da cadeia de migrations (`create [or replace]`). */
 function parametrosDoSql(nome) {
-  const m = sqlTodas.match(
-    new RegExp(`create or replace function public\\.${nome}\\(([\\s\\S]*?)\\)\\s*returns`),
-  );
+  const todas = [
+    ...sqlTodas.matchAll(
+      new RegExp(
+        `create (?:or replace )?function public\\.${nome}\\(([\\s\\S]*?)\\)\\s*returns`,
+        "g",
+      ),
+    ),
+  ];
+  const m = todas.at(-1);
   return m ? [...m[1].matchAll(/\b(p_[a-z_]+)\b/g)].map((x) => x[1]) : null;
 }
 const nomesTs = Object.values(RPC_VIGENCIAS).flatMap((g) => Object.values(g));

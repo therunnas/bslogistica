@@ -76,6 +76,8 @@ export interface ParametrosRegistrarCustoColaborador {
   p_reason: string;
   p_valid_to?: string | null;
   p_encerrar_anterior?: boolean;
+  /** Valor-hora acordado da hora extra paga (migration 029); omitido = sem valor acordado. */
+  p_ot_hourly_cost?: number;
 }
 
 export interface ParametrosRegistrarValorAcordadoOperacao {
@@ -120,6 +122,8 @@ export interface EstadoDoMotor {
   motivo: string | null;
   /** As chaves de trigger estão como a linha de configuração diz? Falso = intervenção manual. */
   consistente: boolean;
+  /** Migration 029 aplicada (valor-hora acordado, custo proporcional, adicionais). */
+  regras_bs?: boolean;
 }
 
 export interface PendenciaDeImplantacao {
