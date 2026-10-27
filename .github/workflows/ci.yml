@@ -123,6 +123,12 @@ jobs:
       - name: Teste vigencias-paginacao
         run: npm run test:vigencias-paginacao
 
+      - name: Teste ativacao-motor
+        run: npm run test:ativacao-motor
+
+      - name: Teste regras-bs
+        run: npm run test:regras-bs
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

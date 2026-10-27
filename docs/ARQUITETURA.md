@@ -234,10 +234,23 @@ risco em [PROGRESS.md](../PROGRESS.md).
 
 ## Regras de cálculo
 
-Em `src/lib/billing.ts`. Uma diária por colaborador presente; falta não gera
-cobrança. A hora extra é `(diária ÷ horas do turno) × fator`, aplicada ao
-excedente que ultrapassar a tolerância definida no contrato. O turno trata
-virada de meia-noite.
+Em `src/lib/billing.ts` (prévia) e no trigger do motor ativo (autoridade). Uma
+diária por colaborador presente; falta não gera cobrança. A hora extra cobrada é
+`(diária ÷ horas do turno) × fator`, aplicada ao excedente que ultrapassar a
+tolerância definida no contrato. O turno trata virada de meia-noite; entrada
+igual à saída é recusada pelo banco (seria uma jornada de 24 h).
+
+Com o motor por vigência e a migration `029`, o **custo** segue regras próprias,
+independentes da cobrança: a hora extra paga usa o valor-hora acordado na versão
+de custo do colaborador (sem ele, diária de custo ÷ jornada, sem fator), e a
+saída antecipada paga proporcionalmente aos minutos trabalhados (só com os dois
+horários; a cobrança continua a diária inteira). Arredondamento de meia hora,
+feriado e fim de semana não estão implementados: dependem de decisão da BS.
+
+**Adicionais de serviço** (`billing_additionals`, migration `029`) são valores
+extras do período, com motivo e referência, separados da diária: não criam
+diária nem custo. `gerar_fatura` soma os que cabem inteiros no período da fatura
+e cria um item para cada.
 
 ## Diária por colaborador
 

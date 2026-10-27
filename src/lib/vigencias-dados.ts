@@ -8,6 +8,7 @@ import { RPC_VIGENCIAS } from "@/lib/vigencias";
 import { lerDivergencias, lerPendencias } from "@/lib/vigencias-implantacao";
 import {
   interpretarEstadoDoMotor,
+  interpretarRegrasDaBs,
   montarCadastroAtomico,
   montarRegistro,
   type EstadoDoMotorUI,
@@ -108,8 +109,8 @@ export const CHAVE_DO_MOTOR = ["motor-estado"] as const;
  * viram `desconhecido` — nunca `desligado`. Relê ao voltar para a janela, para que a tela não
  * fique presa a um estado antigo depois de o motor ser ligado ou desligado.
  */
-export function useEstadoDoMotor(): EstadoDoMotorUI {
-  const consulta = useQuery({
+function useConsultaDoMotor() {
+  return useQuery({
     queryKey: CHAVE_DO_MOTOR,
     queryFn: async () => {
       const { data, error } = await cliente().rpc(RPC_VIGENCIAS.motor.estado);
@@ -119,9 +120,24 @@ export function useEstadoDoMotor(): EstadoDoMotorUI {
     retry: 1,
     refetchOnWindowFocus: true,
   });
+}
+
+export function useEstadoDoMotor(): EstadoDoMotorUI {
+  const consulta = useConsultaDoMotor();
   if (consulta.isError) return interpretarEstadoDoMotor(null, consulta.error ?? { code: "?" });
   if (!consulta.data) return { tag: "carregando" };
   return interpretarEstadoDoMotor(consulta.data.data, consulta.data.error);
+}
+
+/**
+ * O banco já tem a migration 029 (valor-hora acordado, custo proporcional, adicionais)? Lê a
+ * mesma consulta do estado do motor (mesma chave, sem chamada extra). Carregando, erro ou banco
+ * anterior: `false`, e a tela não oferece nada que dependa da 029.
+ */
+export function useRegrasDaBs(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarRegrasDaBs(consulta.data.data, consulta.data.error);
 }
 
 export function useVersoes(tipo: TipoDeVigencia, entidadeId: string | null) {

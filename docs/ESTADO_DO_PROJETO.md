@@ -12,7 +12,7 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 | Aplicação             | publicada em `admin.bslogisticas.com.br`                                                                                                      |
 | Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                                                                             |
 | Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                                                                                      |
-| Migrations            | 33 registradas; a última é a `028` (C05-B, aplicada em 23/10/2026). Ver "Vigências financeiras", abaixo                                       |
+| Migrations            | 33 registradas; a última é a `028` (C05-B, aplicada em 23/10/2026). A `029` existe só no repositório. Ver "Vigências financeiras", abaixo     |
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                                                                           |
 | Usuário `operacional` | perfil homologado com uma conta existente que era admin e foi rebaixada; contas definitivas ainda não criadas ([PROGRESS.md](../PROGRESS.md)) |
 
@@ -69,12 +69,56 @@ cadastrado.
 - **Implementado**, só na branch `feat/c05b-interfaces-vigencia`: histórico e reajuste de
   vigências em contratos, colaboradores e operações sem contrato; cadastro atômico (usado só com o
   motor ligado); apontamentos com valor do banco, prévia e origem; turnos usados com jornada
-  protegida; tela somente de leitura `/implantacao-vigencias`. As telas não ligam nem desligam o
-  motor.
-- **Validado**: as 26 suítes Node (`test:*`). Não houve verificação visual em ambiente hospedado.
-- **Publicado**: **não**. As interfaces não estão na `main`, nem em Preview, nem em Production.
-- **Pendente**: criar o PR B, validar em Preview (exige projeto Supabase de teste próprio no
-  escopo Preview; **não verificado**), merge e deploy, cada um com autorização.
+  protegida; tela `/implantacao-vigencias` (consulta). As telas de cadastro não ligam nem
+  desligam o motor. A C05-B8.6 acrescenta à `/implantacao-vigencias` o controle de **ligar** o
+  motor (Server Action com `exigirAdminAal2()`, RPC `alterar_motor_vigencia` com o JWT da sessão,
+  motivo, frase de confirmação, `p_aceitar_pendencias = false`; sem botão de desligar). Está em PR.
+  Usado **só na homologação** (C05-B8.8, 24/10/2026, pelo Preview do PR, admin AAL2): motor
+  ligado lá, com dados `HML-TESTE`; em Production o motor segue **desligado**. É controle técnico
+  de implantação: a única forma segura de ligar o motor, por isso permanece até existir
+  procedimento substituto validado.
+  **Trava de servidor (C05-B8.12):** o controle não é permanente. A Server Action só aceita o
+  pedido se a variável `BS_ATIVACAO_MOTOR_HABILITADA` (server-only, nunca `NEXT_PUBLIC_*`) valer
+  exatamente `true`; ausente ou com qualquer outro valor, o padrão em todos os ambientes, ela recusa
+  (código `desabilitada`) depois da autorização e antes de tocar o banco, e a tela nem mostra botão
+  nem diálogo. Não substitui nada: admin em AAL2, motivo, frase e a RPC do banco seguem exigidos, e
+  não existe botão de desligar. Procedimento para Production, com autorização própria: definir a
+  variável no projeto da Vercel, publicar, ligar o motor pela tela, remover a variável e publicar de
+  novo.
+- **C05-B8.9** (no mesmo PR): as telas de apontamento (admin e operacional) recusam salvar linha
+  com entrada igual à saída, que o cálculo mediria como 24 h; o cálculo não mudou e o banco ainda
+  aceita a igualdade por outra via (corrigir no banco exige migration própria). O cadastro de
+  colaborador novo com o motor ligado pede a data de início do custo (antes era sempre hoje, o que
+  recusava apontar dias anteriores).
+- **C05-B8.10** (no mesmo PR; migration `029` **só local**, não aplicada em banco remoto): regras
+  confirmadas pela BS. Valem no motor por vigência; o motor antigo (`010`) não muda.
+  - **Hora extra paga** pelo valor-hora acordado com cada colaborador (`employee_cost_terms.ot_hourly_cost`,
+    opcional, congelado no apontamento). Cobrança e custo independentes: o fator do contrato só
+    entra na cobrança. Sem valor acordado, segue diária de custo ÷ jornada (o comportamento anterior).
+  - **Saída antecipada**: custo proporcional às horas trabalhadas, com os dois horários; a cobrança
+    continua a diária inteira.
+  - **Adicionais de serviço** (`billing_additionals`): motivo, valor, referência, período, cliente e
+    operação opcional; só por RPC (admin AAL2, trilha), cancelamento com motivo, sem exclusão;
+    `gerar_fatura` inclui os que cabem inteiros no período, um item cada.
+  - **Entrada igual à saída** recusada pelo banco (23514), por qualquer via.
+  - As telas só oferecem isso quando `estado_motor_vigencia()` anuncia `regras_bs`: o código pode
+    ser publicado antes da `029` sem mudar nada. O Dashboard mostra a receita dos apontamentos; os
+    adicionais aparecem no Faturamento e na fatura.
+  - Validado localmente: aplicar a `029` sobre dados existentes não altera nenhum valor gravado, e a
+    reversão devolve catálogo e dados idênticos aos da `028`.
+- **Regras comerciais pendentes** (decisão da BS, nada implementado por suposição): arredondamento de
+  meia hora (15 e 45 min) e se é diário ou depois de acumular a quinzena; feriado (100% com diária
+  por 4 h e extra acima disso); sábado e domingo; cobrança ao cliente por saída antecipada; preço
+  avulso por serviço completo ou por trabalhador; parâmetros da operação sem contrato (8 h, fator 1,
+  10 min fixos); presença ou substituição sem horário; como os adicionais entram no Dashboard e nos
+  Relatórios. Fechamento quinzenal com aprovação do gerente do cliente: PR #63, separado.
+- **Validado**: as 29 suítes Node (`test:*`) e as 26 SQL locais; homologação ponta a ponta na
+  C05-B8.8 (antes da `029`).
+- **Publicado**: as interfaces (PR #68) estão na `main` e em Production. O controle de ativação e
+  as correções da C05-B8.9 (PR #69) estão só no Preview, ligado à homologação. A C05-B8.10 está
+  só na branch local, sem push.
+- **Pendente**: decisão da BS sobre as regras comerciais acima; aplicar a `029` na homologação e
+  validar; merge do PR #69 e procedimento para ligar o motor em Production, cada um com autorização.
 
 **Separados deste trabalho**: o PR #63 (fechamento quinzenal, rascunho) e a migration `019`
 (nunca aplicada).
@@ -151,9 +195,9 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 
 | Verificação                     | Estado                                                                                                               |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Suítes Node (`test:*`)          | 26 scripts, todos exigidos pela CI; 8 deles são da C05-B                                                             |
-| Testes SQL (`supabase/tests`)   | 24 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
-| CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 26 suítes e build, sem secret e sem tocar o Supabase de Production |
+| Suítes Node (`test:*`)          | 29 scripts, todos exigidos pela CI; 11 deles são da C05-B                                                            |
+| Testes SQL (`supabase/tests`)   | 26 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
+| CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 29 suítes e build, sem secret e sem tocar o Supabase de Production |
 | `npm audit`                     | 0 vulnerabilidades                                                                                                   |
 
 ## Riscos e pendências confirmados

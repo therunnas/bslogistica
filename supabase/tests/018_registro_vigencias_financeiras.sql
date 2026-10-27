@@ -645,9 +645,9 @@ select pg_temp.registrar('V3. as 16 funções SECURITY DEFINER são do postgres,
       and p.proname in ('registrar_condicao_contrato', 'corrigir_condicao_contrato', 'encerrar_condicao_contrato', 'aposentar_condicao_contrato', 'condicao_contrato_na_data', 'exigir_condicao_contrato_na_data',
                         'registrar_custo_colaborador', 'corrigir_custo_colaborador', 'encerrar_custo_colaborador', 'aposentar_custo_colaborador', 'custo_colaborador_na_data', 'exigir_custo_colaborador_na_data',
                         'condicoes_exigir_admin', 'condicoes_auditar', 'condicoes_encerrar_contrato_interno', 'condicoes_encerrar_colaborador_interno')));
-select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (o da 024, se aplicada, fica de fora da conta)', '11',
+select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (os da 024 e da 029, se aplicadas, ficam de fora da conta)', '11',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'
-      and tgname <> 'trg_timesheet_entries_bloqueia_condicoes_operacao'));
+      and tgname not in ('trg_timesheet_entries_bloqueia_condicoes_operacao', 'trg_timesheet_entries_bloqueia_horario_igual')));
 select pg_temp.registrar('V5. a derivação financeira e gerar_fatura não citam as versões (continuam como estavam)', '0',
   (select count(*)::text from pg_proc where pronamespace = 'public'::regnamespace and proname in ('derivar_valores_financeiros', 'gerar_fatura')
      and (prosrc ilike '%contract_terms%' or prosrc ilike '%employee_cost_terms%' or prosrc ilike '%financial_terms_audit%')));

@@ -231,6 +231,12 @@ em silêncio. Ordem das migrations:
   **Aplicada em Production** (L4). Vale desde já, com o motor desligado: o contrato das operações
   que têm apontamento não troca.
 
+- **029** (regras confirmadas pela BS, C05-B8.10): **só no repositório**, não aplicada em nenhum
+  banco remoto. Hora extra paga pelo valor-hora acordado por colaborador, custo proporcional na
+  saída antecipada (cobrança inalterada), adicionais de serviço separados da diária e incluídos
+  em `gerar_fatura`, e recusa de entrada igual à saída no banco. Detalhes, validação e regras
+  ainda pendentes de decisão da BS em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md).
+
 - **Legado (C05-B5.7):** sem migration nova. As RPCs que já existiam bastam: `pendencias_implantacao_vigencias`
   (em uso e sem vigência para hoje), `divergencias_implantacao_vigencias` (027), `registrar_*` (023/024,
   data e motivo informados por quem decide), `sincronizar_colunas_legadas` e

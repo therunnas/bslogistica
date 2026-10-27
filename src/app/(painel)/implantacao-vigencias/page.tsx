@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { VARIAVEL_DE_ATIVACAO, ativacaoHabilitada } from "@/lib/ativacao-motor";
+
 import { exigirAdmin } from "../_exigir-admin";
 import { PainelImplantacaoVigencias } from "./painel-implantacao";
 
@@ -13,5 +15,11 @@ export default async function ImplantacaoVigencias() {
   const bloqueio = await exigirAdmin();
   if (bloqueio) return bloqueio;
 
-  return <PainelImplantacaoVigencias />;
+  // A trava é lida aqui, no servidor; o navegador só recebe o resultado. Quem recusa é a Server
+  // Action, que repete a leitura: esta prop só decide o que a tela mostra.
+  return (
+    <PainelImplantacaoVigencias
+      ativacaoHabilitada={ativacaoHabilitada(process.env[VARIAVEL_DE_ATIVACAO])}
+    />
+  );
 }

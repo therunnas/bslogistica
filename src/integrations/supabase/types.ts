@@ -35,6 +35,79 @@ export type Database = {
         };
         Relationships: [];
       };
+      billing_additionals: {
+        Row: {
+          amount: number;
+          cancel_reason: string | null;
+          canceled_at: string | null;
+          canceled_by: string | null;
+          client_id: string;
+          created_at: string;
+          created_by: string | null;
+          description: string;
+          id: string;
+          invoice_id: string | null;
+          operation_id: string | null;
+          period_end: string;
+          period_start: string;
+          reference: string | null;
+        };
+        Insert: {
+          amount: number;
+          cancel_reason?: string | null;
+          canceled_at?: string | null;
+          canceled_by?: string | null;
+          client_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          description: string;
+          id?: string;
+          invoice_id?: string | null;
+          operation_id?: string | null;
+          period_end: string;
+          period_start: string;
+          reference?: string | null;
+        };
+        Update: {
+          amount?: number;
+          cancel_reason?: string | null;
+          canceled_at?: string | null;
+          canceled_by?: string | null;
+          client_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string;
+          id?: string;
+          invoice_id?: string | null;
+          operation_id?: string | null;
+          period_end?: string;
+          period_start?: string;
+          reference?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_additionals_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_additionals_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_additionals_operation_id_fkey";
+            columns: ["operation_id"];
+            isOneToOne: false;
+            referencedRelation: "operations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       clients: {
         Row: {
           contact_name: string | null;
@@ -205,6 +278,7 @@ export type Database = {
           employee_id: string;
           id: string;
           origin: string;
+          ot_hourly_cost: number | null;
           reason: string;
           replaced_by: string | null;
           retired_at: string | null;
@@ -219,6 +293,7 @@ export type Database = {
           employee_id: string;
           id?: string;
           origin: string;
+          ot_hourly_cost?: number | null;
           reason: string;
           replaced_by?: string | null;
           retired_at?: string | null;
@@ -233,6 +308,7 @@ export type Database = {
           employee_id?: string;
           id?: string;
           origin?: string;
+          ot_hourly_cost?: number | null;
           reason?: string;
           replaced_by?: string | null;
           retired_at?: string | null;
@@ -729,6 +805,7 @@ export type Database = {
           operation_terms_id: string | null;
           ot_factor_snapshot: number | null;
           ot_hour_rate_snapshot: number;
+          ot_hourly_cost_snapshot: number | null;
           ot_tolerance_snapshot: number | null;
           overtime_minutes: number;
           planned_minutes_snapshot: number | null;
@@ -759,6 +836,7 @@ export type Database = {
           operation_terms_id?: string | null;
           ot_factor_snapshot?: number | null;
           ot_hour_rate_snapshot?: number;
+          ot_hourly_cost_snapshot?: number | null;
           ot_tolerance_snapshot?: number | null;
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
@@ -789,6 +867,7 @@ export type Database = {
           operation_terms_id?: string | null;
           ot_factor_snapshot?: number | null;
           ot_hour_rate_snapshot?: number;
+          ot_hourly_cost_snapshot?: number | null;
           ot_tolerance_snapshot?: number | null;
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
@@ -975,6 +1054,10 @@ export type Database = {
         Args: { p_reason: string; p_term_id: string };
         Returns: undefined;
       };
+      cancelar_adicional: {
+        Args: { p_additional_id: string; p_reason: string };
+        Returns: undefined;
+      };
       condicao_contrato_na_data: {
         Args: { p_contract_id: string; p_work_date: string };
         Returns: {
@@ -1026,6 +1109,7 @@ export type Database = {
         Returns: undefined;
       };
       condicoes_exigir_admin: { Args: never; Returns: undefined };
+      condicoes_validar_hora_extra: { Args: { p_valor: number }; Returns: number };
       condicoes_validar_motivo: { Args: { p_reason: string }; Returns: string };
       conta_ativa: { Args: { p_user_id: string }; Returns: boolean };
       corrigir_condicao_contrato: {
@@ -1044,6 +1128,7 @@ export type Database = {
       corrigir_custo_colaborador: {
         Args: {
           p_daily_cost: number;
+          p_ot_hourly_cost?: number;
           p_reason: string;
           p_term_id: string;
           p_valid_from: string;
@@ -1066,6 +1151,7 @@ export type Database = {
           p_daily_cost: number;
           p_doc: string;
           p_name: string;
+          p_ot_hourly_cost?: number;
           p_phone: string;
           p_reason: string;
           p_role: string;
@@ -1114,6 +1200,7 @@ export type Database = {
           employee_id: string;
           id: string;
           origin: string;
+          ot_hourly_cost: number | null;
           reason: string;
           replaced_by: string | null;
           retired_at: string | null;
@@ -1185,6 +1272,7 @@ export type Database = {
           employee_id: string;
           id: string;
           origin: string;
+          ot_hourly_cost: number | null;
           reason: string;
           replaced_by: string | null;
           retired_at: string | null;
@@ -1343,6 +1431,18 @@ export type Database = {
         Args: { _email: string; _metadata?: Json; _user_id: string };
         Returns: undefined;
       };
+      registrar_adicional: {
+        Args: {
+          p_amount: number;
+          p_client_id: string;
+          p_description: string;
+          p_operation_id?: string;
+          p_period_end: string;
+          p_period_start: string;
+          p_reference?: string;
+        };
+        Returns: string;
+      };
       registrar_condicao_contrato: {
         Args: {
           p_contract_id: string;
@@ -1362,6 +1462,7 @@ export type Database = {
           p_daily_cost: number;
           p_employee_id: string;
           p_encerrar_anterior?: boolean;
+          p_ot_hourly_cost?: number;
           p_reason: string;
           p_valid_from: string;
           p_valid_to?: string;

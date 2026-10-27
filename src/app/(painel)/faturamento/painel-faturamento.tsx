@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "../_components/app-shell";
+import { AdicionaisDoPeriodo } from "./adicionais";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,8 @@ import {
 } from "@/components/ui/table";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { adicionalElegivel, somarAdicionais } from "@/lib/adicionais";
+import { CHAVE_DOS_ADICIONAIS, useAdicionais } from "@/lib/adicionais-dados";
 import { marginPct, round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
 import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
@@ -44,7 +47,8 @@ import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
 import { toast } from "@/lib/notificacoes";
-import { useClients, useInvoices } from "@/lib/queries";
+import { useClients, useInvoices, useOperations } from "@/lib/queries";
+import { useRegrasDaBs } from "@/lib/vigencias-dados";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -59,6 +63,9 @@ export function PainelFaturamento() {
   const clients = useClients();
   const invoices = useInvoices();
   const ledger = useLedger();
+  const operations = useOperations();
+  // Adicionais de serviço só existem com a migration 029 (o banco anuncia `regras_bs`).
+  const regrasBs = useRegrasDaBs();
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
 
@@ -138,6 +145,18 @@ export function PainelFaturamento() {
     };
   }, [period]);
 
+  const adicionais = useAdicionais(selectedClient, regrasBs);
+  /** O mesmo critério de `gerar_fatura`: período do adicional inteiro dentro do da fatura. */
+  const adicionaisElegiveis = useMemo(
+    () => (adicionais.data ?? []).filter((a) => adicionalElegivel(a, selectedClient, start, end)),
+    [adicionais.data, selectedClient, start, end],
+  );
+  const totalAdicionais = somarAdicionais(adicionaisElegiveis);
+  // Com a 029, gerar exige saber o que entra: leitura dos adicionais pendente ou falha bloqueia.
+  const adicionaisProntos = !regrasBs || adicionais.isSuccess;
+  const totalAFaturar = round2(totals.billed + totalAdicionais);
+  const semNadaParaGerar = (!period.length && !adicionaisElegiveis.length) || !adicionaisProntos;
+
   const dailiesValue = round2(totals.billed - totals.otValue);
 
   const overtimeValue = totals.otValue;
@@ -156,6 +175,10 @@ export function PainelFaturamento() {
       // andamento esconderia do usuário o que será faturado.
       if (!exibicao.podeAgir) {
         throw new Error("Aguarde a conclusão da leitura dos dados antes de gerar a fatura.");
+      }
+
+      if (!adicionaisProntos) {
+        throw new Error("Aguarde a leitura dos adicionais de serviço antes de gerar a fatura.");
       }
 
       const { data, error } = await criarClienteNavegador().rpc("gerar_fatura", {
@@ -178,6 +201,9 @@ export function PainelFaturamento() {
         }),
         queryClient.invalidateQueries({
           queryKey: ["timesheet_entries"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: CHAVE_DOS_ADICIONAIS,
         }),
       ]);
 
@@ -269,7 +295,7 @@ export function PainelFaturamento() {
               type="button"
               className="h-10 rounded-xl"
               onClick={() => generate.mutate()}
-              disabled={!period.length || !exibicao.podeAgir || generate.isPending}
+              disabled={semNadaParaGerar || !exibicao.podeAgir || generate.isPending}
             >
               <FileText className="h-4 w-4" />
 
@@ -349,16 +375,20 @@ export function PainelFaturamento() {
 
             <Resumo
               label="Total a faturar"
-              value={brl(totals.billed)}
-              description="Lançamentos elegíveis"
+              value={brl(totalAFaturar)}
+              description={
+                regrasBs
+                  ? `Lançamentos ${brl(totals.billed)} + adicionais ${brl(totalAdicionais)}`
+                  : "Lançamentos elegíveis"
+              }
               icon={ReceiptText}
             />
 
             <Resumo
               label="Margem"
-              value={brl(totals.billed - totals.cost)}
+              value={brl(totalAFaturar - totals.cost)}
               description={`${num(
-                marginPct(totals.billed, totals.cost),
+                marginPct(totalAFaturar, totals.cost),
                 1,
               )}% · custo ${brl(totals.cost)}`}
               icon={TrendingUp}
@@ -474,6 +504,20 @@ export function PainelFaturamento() {
               </div>
             </CardContent>
           </Card>
+
+          {regrasBs ? (
+            <AdicionaisDoPeriodo
+              clienteId={selectedClient}
+              inicio={start}
+              fim={end}
+              operacoes={(operations.data ?? []).filter(
+                (operation) => operation.client_id === selectedClient,
+              )}
+              adicionais={adicionais.data ?? []}
+              carregando={adicionais.isPending}
+              erro={adicionais.isError}
+            />
+          ) : null}
         </>
       )}
 

@@ -62,6 +62,18 @@ export function interpretarEstadoDoMotor(data: unknown, erro: unknown): EstadoDo
     : { tag: "desligado" };
 }
 
+/**
+ * As regras da migration 029 (valor-hora acordado da hora extra paga, custo proporcional na saída
+ * antecipada e adicionais de serviço) só existem depois de ela ser aplicada. O banco anuncia com
+ * `regras_bs = true` na resposta de `estado_motor_vigencia`; sem o anúncio (banco anterior, erro
+ * ou resposta inválida) a tela se comporta como antes e não oferece nada que dependa da 029.
+ */
+export function interpretarRegrasDaBs(data: unknown, erro: unknown): boolean {
+  if (erro !== null && erro !== undefined) return false;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  return (data as { regras_bs?: unknown }).regras_bs === true;
+}
+
 export type ModoDeEdicaoDeTaxa = "direta" | "por-vigencia" | "bloqueada";
 
 /**
@@ -204,6 +216,10 @@ export interface CampoDeVigencia {
   param: string;
   rotulo: string;
   tipo: "dinheiro" | "horas" | "fator" | "minutos";
+  /** Vazio é aceito e o parâmetro não é enviado (o banco grava NULL). */
+  opcional?: boolean;
+  /** Só existe com a migration 029 aplicada (`regras_bs`). */
+  requerRegrasBs?: boolean;
 }
 
 export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoDeVigencia[]>> = {
@@ -225,6 +241,14 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
   ],
   colaborador: [
     { chave: "daily_cost", param: "p_daily_cost", rotulo: "Custo diário (R$)", tipo: "dinheiro" },
+    {
+      chave: "ot_hourly_cost",
+      param: "p_ot_hourly_cost",
+      rotulo: "Valor-hora da hora extra paga (R$, opcional)",
+      tipo: "dinheiro",
+      opcional: true,
+      requerRegrasBs: true,
+    },
   ],
   operacao: [
     {
@@ -256,6 +280,16 @@ export interface FormularioDeVigencia {
   encerrarAnterior: boolean;
   /** Fim da vigência (exclusive), opcional: vazio = em aberto. */
   fim?: string;
+  /** O banco anunciou a migration 029: os campos `requerRegrasBs` valem. */
+  regrasBs?: boolean;
+}
+
+/** Campos que a tela mostra, valida e envia: os da 029 só com o anúncio do banco. */
+export function camposDaVigencia(
+  tipo: TipoDeVigencia,
+  regrasBs: boolean,
+): readonly CampoDeVigencia[] {
+  return CAMPOS_DA_VIGENCIA[tipo].filter((campo) => regrasBs || campo.requerRegrasBs !== true);
 }
 
 /** "1.234,56" não é aceito de propósito: só dígitos, ponto ou vírgula decimal. */
@@ -291,8 +325,9 @@ export function validarNovaVigencia(tipo: TipoDeVigencia, f: FormularioDeVigenci
       erros.push("O fim da vigência deve ser posterior ao início.");
     }
   }
-  for (const campo of CAMPOS_DA_VIGENCIA[tipo]) {
+  for (const campo of camposDaVigencia(tipo, f.regrasBs === true)) {
     const texto = f.valores[campo.chave] ?? "";
+    if (campo.opcional === true && texto.trim() === "") continue;
     const n = lerNumero(texto);
     if (n === null) {
       erros.push(`${campo.rotulo}: informe um número válido (sem negativo).`);
@@ -305,6 +340,9 @@ export function validarNovaVigencia(tipo: TipoDeVigencia, f: FormularioDeVigenci
     }
     if (campo.tipo === "horas" && n <= 0) {
       erros.push(`${campo.rotulo}: a jornada deve ser maior que zero.`);
+    }
+    if (campo.opcional === true && n <= 0) {
+      erros.push(`${campo.rotulo}: informe um valor maior que zero ou deixe vazio.`);
     }
   }
   return erros;
@@ -335,8 +373,10 @@ export function montarRegistro(
     p_valid_to: (f.fim ?? "").trim() === "" ? null : (f.fim as string).trim(),
     p_encerrar_anterior: f.encerrarAnterior,
   };
-  for (const campo of CAMPOS_DA_VIGENCIA[tipo]) {
-    params[campo.param] = lerNumero(f.valores[campo.chave] ?? "") as number;
+  for (const campo of camposDaVigencia(tipo, f.regrasBs === true)) {
+    const texto = f.valores[campo.chave] ?? "";
+    if (campo.opcional === true && texto.trim() === "") continue;
+    params[campo.param] = lerNumero(texto) as number;
   }
   return { rpc: RPC_DE_REGISTRO[tipo], params };
 }
@@ -394,6 +434,8 @@ export function montarCadastroAtomico(
         p_daily_cost: v["p_daily_cost"] as number,
         p_valid_from: f.inicio,
         ...comum,
+        // Só com a 029 e preenchido: sem ele, a chamada é a mesma de antes da migration.
+        ...("p_ot_hourly_cost" in v ? { p_ot_hourly_cost: v["p_ot_hourly_cost"] as number } : {}),
       },
     };
   }
@@ -481,6 +523,8 @@ export interface TermoDeOperacao extends VersaoBase {
 
 export interface TermoDeCusto extends VersaoBase {
   daily_cost: number | string;
+  /** Migration 029; ausente antes dela, nulo = sem valor-hora acordado. */
+  ot_hourly_cost?: number | string | null;
 }
 
 const dataBR = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
@@ -552,5 +596,13 @@ export function resolverCondicaoDoDia(p: {
       motivo: `Sem custo vigente em ${quando} para o colaborador. Registre a vigência de custo antes de apontar nesta data.`,
     };
   }
-  return { ok: true, regras, custoDiario: Number(custo.daily_cost), origem };
+  const horaExtra = custo.ot_hourly_cost;
+  return {
+    ok: true,
+    regras,
+    custoDiario: Number(custo.daily_cost),
+    origem,
+    custoHoraExtra:
+      horaExtra === null || horaExtra === undefined || horaExtra === "" ? null : Number(horaExtra),
+  };
 }

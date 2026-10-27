@@ -32,13 +32,14 @@ import {
   useAposentarVigencia,
   useEncerrarVigencia,
   useRegistrarVigencia,
+  useRegrasDaBs,
   useVersoes,
 } from "@/lib/vigencias-dados";
 import {
-  CAMPOS_DA_VIGENCIA,
   ROTULO_DA_ORIGEM,
   ROTULO_DA_SITUACAO,
   avisoDoMotor,
+  camposDaVigencia,
   classificarInicio,
   hojeEmSaoPaulo,
   podeRegistrarVigencia,
@@ -73,7 +74,14 @@ function valoresDaVersao(tipo: TipoDeVigencia, v: VersaoComValores): string {
   if (tipo === "contrato") {
     return `${brl(Number(v["daily_rate"]))} · ${num(Number(v["shift_hours"]), 1)} h · HE ${num(Number(v["ot_factor"]), 2)}x · tol. ${Number(v["ot_tolerance_min"])} min`;
   }
-  if (tipo === "colaborador") return brl(Number(v["daily_cost"]));
+  if (tipo === "colaborador") {
+    // `ot_hourly_cost` só existe depois da migration 029.
+    if (!("ot_hourly_cost" in v)) return brl(Number(v["daily_cost"]));
+    const hora = v["ot_hourly_cost"];
+    return `${brl(Number(v["daily_cost"]))} · HE paga ${
+      hora === null || hora === undefined ? "sem valor-hora acordado" : `${brl(Number(hora))}/h`
+    }`;
+  }
   return brl(Number(v["agreed_amount"]));
 }
 
@@ -101,6 +109,8 @@ export function HistoricoDeVigencias({
   const registrar = useRegistrarVigencia(tipo);
   const encerrar = useEncerrarVigencia(tipo);
   const aposentar = useAposentarVigencia(tipo);
+  const regrasBs = useRegrasDaBs();
+  const campos = camposDaVigencia(tipo, regrasBs);
   const hoje = hojeEmSaoPaulo();
   const liberado = podeRegistrarVigencia(estado);
 
@@ -124,16 +134,27 @@ export function HistoricoDeVigencias({
     valores,
     encerrarAnterior,
     fim: fimNova,
+    regrasBs,
   });
   const classe = classificarInicio(inicio, hoje);
 
   const linhas = useMemo(() => versoes.data ?? [], [versoes.data]);
 
   function abrirNova() {
+    // Campo sem valor sugerido pelo cadastro (o valor-hora da 029) parte do da versão vigente,
+    // para que um reajuste do custo não apague em silêncio o valor-hora acordado.
+    const vigente = linhas.find((v) => v.active && situacaoDaVersao(v, hoje) === "vigente");
+    const sugeridos: Record<string, string> = { ...valoresIniciais };
+    for (const campo of campos) {
+      const atual = vigente?.[campo.chave];
+      if (!(campo.chave in sugeridos) && atual !== null && atual !== undefined) {
+        sugeridos[campo.chave] = String(atual);
+      }
+    }
     setInicio(hoje);
     setMotivo("");
     setFimNova("");
-    setValores({ ...valoresIniciais });
+    setValores(sugeridos);
     setEncerrarAnterior(true);
     setNovaOpen(true);
   }
@@ -278,7 +299,7 @@ export function HistoricoDeVigencias({
               />
             </div>
 
-            {CAMPOS_DA_VIGENCIA[tipo].map((campo) => (
+            {campos.map((campo) => (
               <div key={campo.chave} className="space-y-2">
                 <Label htmlFor={`vigencia-${campo.chave}`}>{campo.rotulo}</Label>
                 <Input
@@ -333,7 +354,10 @@ export function HistoricoDeVigencias({
               disabled={erros.length > 0 || registrar.isPending || !liberado}
               onClick={() =>
                 registrar.mutate(
-                  { entidadeId, form: { inicio, motivo, valores, encerrarAnterior, fim: fimNova } },
+                  {
+                    entidadeId,
+                    form: { inicio, motivo, valores, encerrarAnterior, fim: fimNova, regrasBs },
+                  },
                   { onSuccess: () => setNovaOpen(false) },
                 )
               }

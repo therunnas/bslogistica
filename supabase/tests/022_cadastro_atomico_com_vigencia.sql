@@ -241,7 +241,7 @@ select pg_temp.registrar('F1. SECURITY INVOKER (não elevam privilégio), dono p
 select pg_temp.registrar('F2. EXECUTE só para authenticated (e o dono)', 'true|false|false|false|false',
   (select has_function_privilege('authenticated', 'public.criar_contrato_com_vigencia(uuid,text,date,date,text,numeric,numeric,numeric,integer,text)', 'execute')::text
      || '|' || has_function_privilege('anon', 'public.criar_contrato_com_vigencia(uuid,text,date,date,text,numeric,numeric,numeric,integer,text)', 'execute')::text
-     || '|' || has_function_privilege('service_role', 'public.criar_colaborador_com_vigencia(text,text,text,text,text,numeric,date,text)', 'execute')::text
+     || '|' || has_function_privilege('service_role', 'public.criar_colaborador_com_vigencia(text,text,text,text,text,numeric,date,text,numeric)', 'execute')::text
      || '|' || has_function_privilege('bslog_rpc_operacional', 'public.criar_operacao_com_vigencia(uuid,text,text,text,date,text,text,numeric,date,text)', 'execute')::text
      || '|' || has_function_privilege('anon', 'public.criar_operacao_com_vigencia(uuid,text,text,text,date,text,text,numeric,date,text)', 'execute')::text));
 

@@ -37,6 +37,7 @@ import {
 
 import { todayISO } from "@/lib/format";
 import { toast } from "@/lib/notificacoes";
+import { MENSAGEM_ENTRADA_IGUAL_SAIDA, entradaIgualSaida } from "@/lib/horarios";
 import { useSalvarApontamentoOperacional } from "@/lib/operacional/mutations";
 import {
   useApontamentosDoOperador,
@@ -248,11 +249,22 @@ export function PainelOperacional() {
 
   const pendentes = pronto ? linhasAlteradas(linhas, apontamentos.data) : [];
 
+  // Entrada igual à saída viraria jornada de 24 h no cálculo: recusada antes de enviar.
+  const horariosIguais = pendentes.filter((linha) =>
+    entradaIgualSaida(linha.status, linha.check_in, linha.check_out),
+  );
+
   function enviar() {
     if (!operationId || !shiftId || !pronto) return;
 
     if (pendentes.length === 0) {
       toast.info("Nenhuma alteração para salvar.");
+
+      return;
+    }
+
+    if (horariosIguais.length > 0) {
+      toast.error(MENSAGEM_ENTRADA_IGUAL_SAIDA);
 
       return;
     }
@@ -664,6 +676,12 @@ export function PainelOperacional() {
                   ? "Nenhuma informação precisa ser salva."
                   : "Revise as alterações antes de salvar o apontamento."}
               </p>
+
+              {horariosIguais.length > 0 ? (
+                <p role="alert" className="mt-1 text-xs text-destructive">
+                  {MENSAGEM_ENTRADA_IGUAL_SAIDA}
+                </p>
+              ) : null}
             </div>
 
             <Button
@@ -676,7 +694,7 @@ export function PainelOperacional() {
                   fechada,
                   pendentes: pendentes.length,
                   salvando: salvar.isPending,
-                })
+                }) || horariosIguais.length > 0
               }
             >
               <Save className="h-4 w-4" />

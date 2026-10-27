@@ -107,6 +107,8 @@ export interface TimesheetEntry {
   contract_terms_id?: string | null;
   operation_terms_id?: string | null;
   employee_cost_terms_id?: string | null;
+  /** Valor-hora congelado da hora extra paga (migration 029); ausente antes dela. */
+  ot_hourly_cost_snapshot?: number | null;
 }
 
 export interface Invoice {
