@@ -22,6 +22,25 @@ export const RPC_ATIVACAO = {
   alterar: "alterar_motor_vigencia",
 } as const;
 
+/**
+ * Trava de servidor da ativação (C05-B8.12). O controle de ligar o motor NÃO é permanente: só
+ * existe enquanto esta variável, lida no servidor (nunca `NEXT_PUBLIC_*`), valer exatamente
+ * "true". Ausente, vazia, com outra caixa ou com qualquer outro valor, a ativação está
+ * DESABILITADA — é o padrão em todos os ambientes, Production inclusive. A janela de ativação é
+ * aberta de propósito, pela variável do projeto na Vercel, e fechada de novo depois.
+ *
+ * A variável não substitui nada: o admin com segundo fator, o motivo, a frase e a RPC do banco
+ * continuam exigidos. Ela só decide se o servidor aceita o pedido.
+ */
+export const VARIAVEL_DE_ATIVACAO = "BS_ATIVACAO_MOTOR_HABILITADA";
+
+export function ativacaoHabilitada(valor: string | null | undefined): boolean {
+  return valor === "true";
+}
+
+export const MENSAGEM_ATIVACAO_DESABILITADA =
+  "A ativação do motor está desabilitada neste ambiente. Ela só é aberta, por configuração do servidor, na janela de ativação autorizada.";
+
 /** A frase que o admin digita para confirmar. Exata: protege contra clique acidental. */
 export const FRASE_DE_CONFIRMACAO = "LIGAR MOTOR";
 export const MOTIVO_MINIMO = 10;
@@ -29,6 +48,7 @@ export const MOTIVO_MAXIMO = 1000;
 
 export type CodigoDeRecusa =
   | "nao-autorizado"
+  | "desabilitada"
   | "entrada-invalida"
   | "ja-ligado"
   | "estado-desconhecido"

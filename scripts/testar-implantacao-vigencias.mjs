@@ -156,7 +156,7 @@ const shell = ler("src/app/(painel)/_components/app-shell.tsx");
 
 verificar(
   "C1. a página chama exigirAdmin ANTES de renderizar o painel",
-  /const bloqueio = await exigirAdmin\(\);\s+if \(bloqueio\) return bloqueio;\s+return <PainelImplantacaoVigencias \/>/.test(
+  /const bloqueio = await exigirAdmin\(\);\s+if \(bloqueio\) return bloqueio;[\s\S]*?return \(\s*<PainelImplantacaoVigencias/.test(
     page,
   ),
   true,

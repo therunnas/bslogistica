@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   FRASE_DE_CONFIRMACAO,
   MOTIVO_MAXIMO,
+  MENSAGEM_ATIVACAO_DESABILITADA,
   validarEntradaDeAtivacao,
   type ResultadoDaAtivacao,
 } from "@/lib/ativacao-motor";
@@ -32,7 +33,13 @@ import { ligarMotorAction } from "./_acoes";
  * Server Action. Quem decide é o servidor (admin em AAL2) e o banco; esta tela só pede e mostra o
  * resultado real. Não existe botão de desligar, e nunca se aceita pendência.
  */
-export function AtivarMotor({ semBloqueios }: { semBloqueios: boolean }) {
+export function AtivarMotor({
+  semBloqueios,
+  habilitada,
+}: {
+  semBloqueios: boolean;
+  habilitada: boolean;
+}) {
   const estado = useEstadoDoMotor();
   const queryClient = useQueryClient();
   const [aberto, setAberto] = useState(false);
@@ -113,6 +120,16 @@ export function AtivarMotor({ semBloqueios }: { semBloqueios: boolean }) {
       <Alert variant="destructive" className="mb-6">
         <AlertTitle>Estado do motor desconhecido</AlertTitle>
         <AlertDescription>{estado.motivo} Não é seguro ligar nesta situação.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Janela de ativação fechada (padrão): nem botão nem diálogo. A Server Action também recusa.
+  if (!habilitada) {
+    return (
+      <Alert className="mb-6">
+        <AlertTitle>Ativação do motor desabilitada neste ambiente</AlertTitle>
+        <AlertDescription>{MENSAGEM_ATIVACAO_DESABILITADA}</AlertDescription>
       </Alert>
     );
   }

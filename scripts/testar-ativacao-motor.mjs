@@ -19,9 +19,12 @@ import { readFileSync } from "node:fs";
 
 import {
   FRASE_DE_CONFIRMACAO,
+  MENSAGEM_ATIVACAO_DESABILITADA,
   MOTIVO_MAXIMO,
   MOTIVO_MINIMO,
   RPC_ATIVACAO,
+  VARIAVEL_DE_ATIVACAO,
+  ativacaoHabilitada,
   ligarMotorDeVigencia,
   validarEntradaDeAtivacao,
 } from "../src/lib/ativacao-motor.ts";
@@ -453,6 +456,91 @@ verificar(
 verificar(
   "E13. o módulo da ativação não importa Next.js nem o Supabase (puro, testável sem rede)",
   !/from "next|from "@supabase|from "@\/integrations/.test(lib),
+  true,
+);
+
+// ---------------------------------------------------------------------------
+// F. Trava de servidor da ativação (C05-B8.12)
+// ---------------------------------------------------------------------------
+
+console.log("F. Trava de servidor: a janela de ativação é fechada por padrão");
+
+verificar(
+  "F1. só o texto exato 'true' abre a janela; ausente, vazio, outra caixa, espaço e qualquer outro valor, não",
+  [
+    ativacaoHabilitada("true"),
+    ativacaoHabilitada(undefined),
+    ativacaoHabilitada(null),
+    ativacaoHabilitada(""),
+    ativacaoHabilitada("TRUE"),
+    ativacaoHabilitada("True"),
+    ativacaoHabilitada(" true"),
+    ativacaoHabilitada("true "),
+    ativacaoHabilitada("1"),
+    ativacaoHabilitada("yes"),
+    ativacaoHabilitada("false"),
+  ],
+  [true, false, false, false, false, false, false, false, false, false, false],
+);
+verificar(
+  "F2. a variável é só de servidor: nome sem NEXT_PUBLIC e fora de qualquer arquivo de código do cliente",
+  [
+    VARIAVEL_DE_ATIVACAO,
+    VARIAVEL_DE_ATIVACAO.startsWith("NEXT_PUBLIC_"),
+    /NEXT_PUBLIC_BS_ATIVACAO/.test(ler("src/lib/ativacao-motor.ts") + ler(".env.example")),
+    componente.includes(VARIAVEL_DE_ATIVACAO) || /process\.env/.test(componente + painel),
+  ],
+  ["BS_ATIVACAO_MOTOR_HABILITADA", false, false, false],
+);
+verificar(
+  "F3. a Server Action recusa com a janela fechada: depois da autorização, antes de criar o cliente do banco e de qualquer RPC",
+  /ativacaoHabilitada\(process\.env\[VARIAVEL_DE_ATIVACAO\]\)/.test(acao) &&
+    /codigo: "desabilitada"/.test(acao) &&
+    acao.indexOf("exigirAdminAal2()") < acao.indexOf("ativacaoHabilitada(") &&
+    acao.indexOf("ativacaoHabilitada(") < acao.indexOf("criarClienteServidor()") &&
+    acao.indexOf("ativacaoHabilitada(") < acao.indexOf("ligarMotorDeVigencia("),
+  true,
+);
+verificar(
+  "F4. a recusa tem código próprio e mensagem fixa (sem eco de entrada do cliente)",
+  [
+    /\| "desabilitada"/.test(lib),
+    MENSAGEM_ATIVACAO_DESABILITADA.length > 40,
+    /mensagem: MENSAGEM_ATIVACAO_DESABILITADA/.test(acao),
+  ],
+  [true, true, true],
+);
+verificar(
+  "F5. a página lê a trava no servidor e a passa ao painel; o painel a repassa ao controle",
+  /ativacaoHabilitada=\{ativacaoHabilitada\(process\.env\[VARIAVEL_DE_ATIVACAO\]\)\}/.test(
+    pagina,
+  ) && /habilitada=\{ativacaoHabilitada\}/.test(painel),
+  true,
+);
+verificar(
+  "F6. com a janela fechada o controle não tem botão nem diálogo: o retorno antecede o botão e o diálogo",
+  /if \(!habilitada\) \{\s*return \(/.test(componente) &&
+    componente.indexOf("if (!habilitada)") < componente.indexOf("Ligar o motor…") &&
+    componente.indexOf("if (!habilitada)") < componente.indexOf("<Dialog"),
+  true,
+);
+verificar(
+  "F7. a trava não cria bypass: continua exigindo admin em AAL2, motivo, frase e a RPC oficial, sem service_role e sem aceitar pendência",
+  /exigirAdminAal2\(\)/.test(acao) &&
+    /p_aceitar_pendencias: false/.test(lib) &&
+    !/service_role|SERVICE_ROLE|criarClienteAdmin/i.test(acao + lib + componente + pagina),
+  true,
+);
+verificar(
+  "F8. a variável está documentada no .env.example como desabilitada por padrão, sem valor ligado",
+  /BS_ATIVACAO_MOTOR_HABILITADA/.test(ler(".env.example")) &&
+    !/^BS_ATIVACAO_MOTOR_HABILITADA=true/m.test(ler(".env.example")),
+  true,
+);
+verificar(
+  "F9. continua sem botão de desligar e sem nova página: a rota é a mesma da B8.6",
+  !/Desligar|desligar o motor/i.test(componente.replace(/Desligar depois exige/, "")) &&
+    ler("src/app/(painel)/_components/app-shell.tsx").split("/implantacao-vigencias").length === 2,
   true,
 );
 

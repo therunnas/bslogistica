@@ -77,6 +77,14 @@ cadastrado.
   ligado lá, com dados `HML-TESTE`; em Production o motor segue **desligado**. É controle técnico
   de implantação: a única forma segura de ligar o motor, por isso permanece até existir
   procedimento substituto validado.
+  **Trava de servidor (C05-B8.12):** o controle não é permanente. A Server Action só aceita o
+  pedido se a variável `BS_ATIVACAO_MOTOR_HABILITADA` (server-only, nunca `NEXT_PUBLIC_*`) valer
+  exatamente `true`; ausente ou com qualquer outro valor, o padrão em todos os ambientes, ela recusa
+  (código `desabilitada`) depois da autorização e antes de tocar o banco, e a tela nem mostra botão
+  nem diálogo. Não substitui nada: admin em AAL2, motivo, frase e a RPC do banco seguem exigidos, e
+  não existe botão de desligar. Procedimento para Production, com autorização própria: definir a
+  variável no projeto da Vercel, publicar, ligar o motor pela tela, remover a variável e publicar de
+  novo.
 - **C05-B8.9** (no mesmo PR): as telas de apontamento (admin e operacional) recusam salvar linha
   com entrada igual à saída, que o cálculo mediria como 24 h; o cálculo não mudou e o banco ainda
   aceita a igualdade por outra via (corrigir no banco exige migration própria). O cadastro de

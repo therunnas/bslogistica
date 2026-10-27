@@ -2,7 +2,13 @@
 
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import { ErroDeAutorizacaoAdministrativa, exigirAdminAal2 } from "@/lib/admin-usuarios/autorizacao";
-import { ligarMotorDeVigencia, type ResultadoDaAtivacao } from "@/lib/ativacao-motor";
+import {
+  MENSAGEM_ATIVACAO_DESABILITADA,
+  VARIAVEL_DE_ATIVACAO,
+  ativacaoHabilitada,
+  ligarMotorDeVigencia,
+  type ResultadoDaAtivacao,
+} from "@/lib/ativacao-motor";
 
 /**
  * Liga o motor por vigência (C05-B8.6). A única escrita da tela de implantação.
@@ -12,6 +18,10 @@ import { ligarMotorDeVigencia, type ResultadoDaAtivacao } from "@/lib/ativacao-m
  * RPC roda com o cliente da SESSÃO (cookies do próprio admin): o JWT dele é o que o banco avalia,
  * e `alterar_motor_vigencia` repete admin + AAL2 por dentro e grava a trilha. Não há `service_role`
  * aqui, nem identidade vinda do cliente.
+ *
+ * Depois da autorização e ANTES de criar o cliente do banco, a trava de servidor decide se a janela
+ * de ativação está aberta (C05-B8.12). Fechada é o padrão: ocultar o botão não bastaria, porque a
+ * Server Action é uma rota que qualquer admin autenticado pode chamar.
  */
 export async function ligarMotorAction(entrada: {
   motivo: unknown;
@@ -28,6 +38,10 @@ export async function ligarMotorAction(entrada: {
       };
     }
     throw erro;
+  }
+
+  if (!ativacaoHabilitada(process.env[VARIAVEL_DE_ATIVACAO])) {
+    return { ok: false, codigo: "desabilitada", mensagem: MENSAGEM_ATIVACAO_DESABILITADA };
   }
 
   const supabase = await criarClienteServidor();
