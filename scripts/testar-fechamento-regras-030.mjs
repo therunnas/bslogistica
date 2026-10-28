@@ -921,8 +921,12 @@ verificar(
     .join("|"),
   "-3,75|0,00|0,00",
 );
-verificar("H3. total do ajuste −3,75", csvColab.at(-1)[6], "-3,75");
-verificar("H4. horas extras COBRADAS no CSV: 160 min = 2,67 h", csvColab.at(-1)[4], "2,67");
+verificar(
+  "H3. total do ajuste −3,75 (linha de total, antes do consolidado)",
+  csvColab.at(-5)[6],
+  "-3,75",
+);
+verificar("H4. horas extras COBRADAS no CSV: 160 min = 2,67 h", csvColab.at(-5)[4], "2,67");
 const csvDiario = lerCsv(csvDoFechamento(antes, "diario"));
 verificar(
   "H5. CSV diário: tipo do dia em texto (Feriado, Sábado, Dia comum)",
@@ -1216,12 +1220,12 @@ verificar(
   "10000,10000,0,0",
 );
 verificar(
-  "J12. CSV só com cabeçalho nos dois formatos, sem erro",
+  "J12. CSV só com adicionais: por colaborador = cabeçalho + total + 4 linhas do consolidado; diário só cabeçalho",
   [
     lerCsv(csvDoFechamento(soAdicional, "colaborador")).length,
     lerCsv(csvDoFechamento(soAdicional, "diario")).length,
   ].join(","),
-  "2,1",
+  "6,1",
 );
 {
   const painel = semComentarios(fonteDoRepo("src/app/(painel)/fechamento/painel-fechamento.tsx"));
@@ -1236,6 +1240,96 @@ verificar(
     true,
   );
 }
+
+/* ================================================================== */
+console.log("\nK. Alertas em todo estado e consolidado do CSV (B8.21)\n");
+
+const { temDivergencia } = await import("../src/lib/fechamento/apresentacao.ts");
+const vazioDivergente = await carregar([], {
+  resumo: {
+    receita_apontamentos: 50,
+    adicionais: 0,
+    ajuste_faturado: 0,
+    ajuste_previsto: 0,
+    receita_total: 50,
+    a_faturar: 50,
+    faturado: 0,
+    ajuste_aplicavel: true,
+  },
+  ajustes: [],
+  saldo: [],
+  adicionais: [],
+});
+verificar(
+  "K1. período vazio com valor no banco: o estado segue vazio (nenhuma diária inventada)",
+  `${estadoDoResultado(vazioDivergente)}|${vazioDivergente.consolidado.diarias}|${vazioDivergente.colaboradores.length}`,
+  "vazio|0|0",
+);
+verificar(
+  "K2. mas o ALERTA CRÍTICO de divergência existe e a divergência é detectada",
+  `${alerta(vazioDivergente, "divergencia-conciliacao")?.severidade}|${temDivergencia(vazioDivergente)}`,
+  "critico|true",
+);
+verificar(
+  "K3. o alerta não altera nenhum total",
+  `${vazioDivergente.financeiro.receitaCentavos}|${vazioDivergente.financeiro.apontamentosCentavos}`,
+  "0|0",
+);
+verificar(
+  "K4. vazio sem divergência: sem alerta e sem conciliação extra",
+  `${nenhum.alertas.length}|${temDivergencia(nenhum)}`,
+  "0|false",
+);
+verificar(
+  "K5. só faltas e só adicionais continuam com seus alertas visíveis",
+  `${codigos(soFaltas).join(",")}|${soAdicional.alertas.length}`,
+  "falta|0",
+);
+{
+  const painel = semComentarios(fonteDoRepo("src/app/(painel)/fechamento/painel-fechamento.tsx"));
+  const iAlertas = painel.indexOf("<AlertasDoFechamento");
+  verificar(
+    "K6. a tela renderiza os alertas UMA vez, antes de qualquer ramo de estado",
+    (painel.match(/<AlertasDoFechamento/g) ?? []).length === 1 &&
+      iAlertas < painel.indexOf('estado === "vazio"'),
+    true,
+  );
+  verificar(
+    "K7. no estado vazio a conciliação só aparece com divergência",
+    /temDivergencia\(dados\) \? <ConciliacaoDoFechamento/.test(painel),
+    true,
+  );
+}
+const csvSoAdicional = lerCsv(csvDoFechamento(soAdicional, "colaborador"));
+verificar(
+  "K8. CSV só com adicionais: adicional 100,00 e receita 100,00 nas linhas do consolidado, sem colaborador",
+  `${csvSoAdicional.at(-4)[10]}|${csvSoAdicional.at(-1)[10]}|${csvSoAdicional.length}`,
+  "100,00|100,00|6",
+);
+const csvAntes = lerCsv(csvDoFechamento(antes, "colaborador"));
+verificar(
+  "K9. apontamentos + adicional (cenário 029): receita no consolidado 846,25 = total cobrado 750,00 + adicional 100,00 + ajuste −3,75",
+  `${csvAntes.at(-5)[10]}|${csvAntes.at(-4)[10]}|${csvAntes.at(-5)[6]}|${csvAntes.at(-1)[10]}`,
+  "750,00|100,00|-3,75|846,25",
+);
+verificar(
+  "K10. já faturado/a faturar do consolidado: 0,00 e 846,25; custo 559,16; resultado 287,09",
+  `${csvAntes.at(-1)[8]}|${csvAntes.at(-1)[9]}|${csvAntes.at(-1)[7]}|${csvAntes.at(-1)[11]}`,
+  "0,00|846,25|559,16|287,09",
+);
+verificar(
+  "K11. conciliado com o resumo exportado (XLSX/Resumo): mesma receita",
+  `${csvAntes.at(-1)[10] === "846,25"}|${indicadores["Receita total"]}`,
+  "true|84625",
+);
+verificar(
+  "K12. a soma das linhas por colaborador não inclui o adicional (sem duplicar)",
+  csvAntes
+    .slice(1, -5)
+    .reduce((a, l) => a + Number(l[10].replace(",", ".")) * 100, 0)
+    .toFixed(0),
+  "75000",
+);
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);
 

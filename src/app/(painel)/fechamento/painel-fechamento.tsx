@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   anosParaEscolher,
   estadoDoResultado,
+  temDivergencia,
   mesAtualNoBrasil,
   NOMES_DOS_MESES,
   periodoDoPreset,
@@ -429,16 +430,28 @@ function Resultado({ dados, onAtualizar }: { dados: FechamentoData; onAtualizar:
         </div>
       </div>
 
+      {/* Os alertas aparecem em TODO estado: um período sem lançamentos não é um período sem
+          problemas (ex.: o banco informa valores que o Fechamento não encontrou). */}
+      <AlertasDoFechamento alertas={dados.alertas} />
+
       {estado === "vazio" ? (
-        <Mensagem
-          icone={<FileSearch className="h-5 w-5 text-muted-foreground" aria-hidden="true" />}
-          titulo="Nenhum lançamento financeiro encontrado para este cliente e período."
-          descricao="Não há presenças, substitutos nem faltas apontados neste recorte."
-        />
+        <>
+          <div className={temDivergencia(dados) ? "mb-6" : undefined}>
+            <Mensagem
+              icone={<FileSearch className="h-5 w-5 text-muted-foreground" aria-hidden="true" />}
+              titulo="Nenhum lançamento financeiro encontrado para este cliente e período."
+              descricao={
+                temDivergencia(dados)
+                  ? "O Fechamento não encontrou lançamentos, mas o resumo do banco informa valores neste período. Veja a conciliação abaixo."
+                  : "Não há presenças, substitutos nem faltas apontados neste recorte."
+              }
+            />
+          </div>
+
+          {temDivergencia(dados) ? <ConciliacaoDoFechamento dados={dados} /> : null}
+        </>
       ) : (
         <>
-          <AlertasDoFechamento alertas={dados.alertas} />
-
           {estado === "somente-faltas" ? (
             <div className="mb-6">
               <Mensagem

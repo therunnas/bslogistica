@@ -170,6 +170,11 @@ function temValorSemDiarias(dados: FechamentoData): boolean {
   );
 }
 
+/** Alguma parcela do Fechamento não confere com o resumo financeiro do banco. */
+export function temDivergencia(dados: FechamentoData): boolean {
+  return dados.conciliacao.some((item) => !item.confere);
+}
+
 /** O que o resultado carregado significa para a tela, sem recalcular nada. */
 export function estadoDoResultado(dados: FechamentoData): EstadoDoResultado {
   if (dados.consolidado.diarias > 0) return "com-lancamentos";

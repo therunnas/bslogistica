@@ -49,6 +49,11 @@ export interface TabelaExportada {
   linhas: ValorExportado[][];
   /** Linha de totais consolidados, ou `null` quando a tabela não tem. */
   totais: ValorExportado[] | null;
+  /**
+   * Linhas do CONSOLIDADO DO CLIENTE depois do total por colaborador (só o CSV as usa): o que
+   * compõe a receita e não pertence a nenhum colaborador. Vêm prontas de `financeiro`.
+   */
+  consolidado?: ValorExportado[][];
 }
 
 export type FormatoDeCsv = "colaborador" | "diario";
@@ -59,6 +64,15 @@ export const ROTULO_DO_FORMATO_DE_CSV: Record<FormatoDeCsv, string> = {
 };
 
 export const ROTULO_DO_TOTAL = "Total";
+
+/** Rótulos das linhas do consolidado do cliente (CSV por colaborador). */
+export const ROTULO_DOS_ADICIONAIS =
+  "Adicionais de serviço (consolidado do cliente, sem distribuir)";
+export const ROTULO_DO_AJUSTE_FATURADO =
+  "Ajuste de arredondamento já faturado (consolidado do cliente)";
+export const ROTULO_DO_AJUSTE_PREVISTO =
+  "Ajuste de arredondamento previsto (consolidado do cliente; já na coluna de ajuste do Total)";
+export const ROTULO_DA_RECEITA = "Receita total (consolidado do cliente)";
 
 const POR_COLABORADOR: ColunaExportada[] = [
   { titulo: "Colaborador", tipo: "texto", largura: 32 },
@@ -135,7 +149,35 @@ export function tabelaPorColaborador(dados: FechamentoData): TabelaExportada {
         dados.financeiro.ajustePrevistoCentavos,
       ),
     ],
+    consolidado: linhasDoConsolidado(dados),
   };
+}
+
+/**
+ * Consolidado do cliente: adicionais e ajuste faturado (que nenhum colaborador "tem") e a receita
+ * total, com o custo, o já faturado, o a faturar, o resultado e a margem do banco. Nada é somado
+ * nem distribuído aqui: cada célula é um campo de `financeiro`.
+ */
+function linhasDoConsolidado(dados: FechamentoData): ValorExportado[][] {
+  const f = dados.financeiro;
+  // Uma linha com o rótulo e células vazias; cada par [coluna, valor] preenche uma coluna.
+  const linha = (rotulo: string, celulas: [number, ValorExportado][]): ValorExportado[] =>
+    POR_COLABORADOR.map((_, coluna) =>
+      coluna === 0 ? rotulo : (celulas.find(([indice]) => indice === coluna)?.[1] ?? null),
+    );
+  return [
+    linha(ROTULO_DOS_ADICIONAIS, [[10, f.adicionaisCentavos]]),
+    linha(ROTULO_DO_AJUSTE_FATURADO, [[10, f.ajusteFaturadoCentavos]]),
+    linha(ROTULO_DO_AJUSTE_PREVISTO, [[10, f.ajustePrevistoCentavos]]),
+    linha(ROTULO_DA_RECEITA, [
+      [7, f.custoCentavos],
+      [8, f.jaFaturadoCentavos],
+      [9, f.aFaturarCentavos],
+      [10, f.receitaCentavos],
+      [11, f.resultadoCentavos],
+      [12, f.margemPermil],
+    ]),
+  ];
 }
 
 export function tabelaDetalhamentoDiario(dados: FechamentoData): TabelaExportada {
@@ -311,7 +353,11 @@ function tituloDoCsv(coluna: ColunaExportada): string {
 }
 
 export function montarCsvDaTabela(tabela: TabelaExportada): string {
-  const linhas = tabela.totais ? [...tabela.linhas, tabela.totais] : tabela.linhas;
+  const linhas = [
+    ...tabela.linhas,
+    ...(tabela.totais ? [tabela.totais] : []),
+    ...(tabela.consolidado ?? []),
+  ];
   return montarCsv(
     tabela.colunas.map(tituloDoCsv),
     linhas.map((linha) =>

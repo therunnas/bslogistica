@@ -34,6 +34,7 @@ import {
 import {
   centavosDoTexto,
   dadosDoOuro,
+  dadosVazios,
   dadosHostis,
   lerCsv,
   ouro,
@@ -62,6 +63,8 @@ const dados = dadosDoOuro();
 const csvColab = csvDoFechamento(dados, "colaborador");
 const csvDiario = csvDoFechamento(dados, "diario");
 const colab = lerCsv(csvColab);
+/** Adicionais, ajuste faturado, ajuste previsto e receita total: o consolidado do cliente, depois do total. */
+const LINHAS_DO_CONSOLIDADO = 4;
 const diario = lerCsv(csvDiario);
 
 // --- C. por colaborador -----------------------------------------------------
@@ -85,13 +88,13 @@ igual("C1. cabeçalho, na ordem pedida", colab[0], [
 ]);
 
 verificar(
-  "C2. uma linha por colaborador, mais cabeçalho e total",
+  "C2. uma linha por colaborador, mais cabeçalho, total e as 4 linhas do consolidado do cliente",
   colab.length,
-  Object.keys(ouro.esperado.colaboradores).length + 2,
+  Object.keys(ouro.esperado.colaboradores).length + 2 + LINHAS_DO_CONSOLIDADO,
 );
 
 // Total consolidado, conferido contra a fixture ouro (centavos → texto escrito à mão).
-igual("C3. linha de totais consolidados", colab[colab.length - 1], [
+igual("C3. linha de totais consolidados", colab[colab.length - 1 - LINHAS_DO_CONSOLIDADO], [
   "Total",
   "",
   "10",
@@ -276,6 +279,136 @@ verificar(
   true,
 );
 
+// --- K. consolidado do cliente (B8.21) --------------------------------------
+
+console.log("\nK. Consolidado do cliente no CSV por colaborador");
+
+{
+  const consolidado = colab.slice(-LINHAS_DO_CONSOLIDADO);
+  igual(
+    "K1. rótulos das quatro linhas, depois do total",
+    consolidado.map((l) => l[0]),
+    [
+      "Adicionais de serviço (consolidado do cliente, sem distribuir)",
+      "Ajuste de arredondamento já faturado (consolidado do cliente)",
+      "Ajuste de arredondamento previsto (consolidado do cliente; já na coluna de ajuste do Total)",
+      "Receita total (consolidado do cliente)",
+    ],
+  );
+  verificar(
+    "K2. a fixture ouro não tem adicional nem ajuste: 0,00 e 0,00",
+    `${consolidado[0][10]}|${consolidado[1][10]}`,
+    "0,00|0,00",
+  );
+  igual(
+    "K3. receita total com custo, já faturado, a faturar, resultado e margem do consolidado",
+    consolidado[3].slice(6),
+    ["", "792,19", "471,09", "606,55", "1077,64", "285,45", "26,5"],
+  );
+  verificar(
+    "K4. nenhum colaborador recebe adicional: as linhas do consolidado não têm função nem diárias",
+    consolidado.every((l) => l[1] === "" && l[2] === ""),
+    true,
+  );
+  verificar(
+    "K5. a linha por colaborador não mudou (Ana)",
+    colab.find((l) => l[0] === "Ana Souza")[10],
+    "506,25",
+  );
+}
+{
+  const f = dadosDoOuro();
+  const comAdicional = {
+    ...f,
+    adicionais: [
+      {
+        id: "a",
+        descricao: "x",
+        referencia: null,
+        operacaoId: null,
+        inicio: "2026-03-01",
+        fim: "2026-03-15",
+        valorCentavos: 10000,
+        faturaId: null,
+      },
+    ],
+    financeiro: {
+      ...f.financeiro,
+      adicionaisCentavos: 10000,
+      ajusteFaturadoCentavos: -375,
+      ajustePrevistoCentavos: -125,
+      ajusteCentavos: -500,
+      receitaCentavos: 107764 + 10000 - 500,
+      resultadoCentavos: 107764 + 10000 - 500 - 79219,
+      margemPermil: 276,
+      aFaturarCentavos: 70000,
+      jaFaturadoCentavos: 47109,
+    },
+  };
+  const linhas = lerCsv(csvDoFechamento(comAdicional, "colaborador"));
+  const c = linhas.slice(-LINHAS_DO_CONSOLIDADO);
+  verificar(
+    "K6. apontamentos + adicionais: adicionais 100,00 em linha própria",
+    c[0][10],
+    "100,00",
+  );
+  verificar(
+    "K7. ajuste faturado NEGATIVO sai como número puro (−3,75), sem apóstrofo",
+    c[1][10],
+    "-3,75",
+  );
+  verificar(
+    "K7b. ajuste previsto em linha própria (−1,25): Total + adicionais + ajuste faturado + ajuste previsto = receita",
+    `${c[2][10]}|${centavosDoTexto(linhas.at(-1 - LINHAS_DO_CONSOLIDADO)[10]) + centavosDoTexto(c[0][10]) + centavosDoTexto(c[1][10]) + centavosDoTexto(c[2][10]) === centavosDoTexto(c[3][10])}`,
+    "-1,25|true",
+  );
+  verificar(
+    "K8. receita total = apontamentos + adicionais + ajustes, vinda do financeiro (1.172,64), sem duplicar",
+    c[3][10],
+    "1172,64",
+  );
+  verificar(
+    "K9. a soma por colaborador continua só de apontamentos (1.077,64): o adicional não é distribuído",
+    linhas.slice(1, -1 - LINHAS_DO_CONSOLIDADO).reduce((a, l) => a + centavosDoTexto(l[10]), 0),
+    107764,
+  );
+  verificar(
+    "K10. já faturado e a faturar do consolidado vêm do financeiro (a faturar inclui adicional e ajuste)",
+    `${c[3][8]}|${c[3][9]}`,
+    "471,09|700,00",
+  );
+  verificar(
+    "K11. toda linha, inclusive as do consolidado, tem 13 colunas",
+    linhas.every((l) => l.length === 13),
+    true,
+  );
+  const hostil = csvDoFechamento(
+    { ...comAdicional, financeiro: { ...comAdicional.financeiro, ajusteFaturadoCentavos: -375 } },
+    "colaborador",
+  );
+  verificar(
+    "K12. as células do consolidado (rótulos fixos e números) não começam com operador de fórmula",
+    lerCsv(hostil)
+      .slice(-LINHAS_DO_CONSOLIDADO)
+      .every((l) => l.every((x) => !/^[=+@\t\r]/.test(x) && !/^-[^0-9]/.test(x))),
+    true,
+  );
+}
+{
+  const f = dadosVazios();
+  const so = lerCsv(csvDoFechamento(f, "colaborador"));
+  verificar(
+    "K13. sem movimentação: cabeçalho, total e as 4 linhas do consolidado, tudo zerado",
+    `${so.length}|${so.at(-1)[10]}|${so.at(-1)[12]}`,
+    "6|0,00|—",
+  );
+  verificar(
+    "K14. o CSV diário não ganhou linha nenhuma (só cabeçalho no vazio)",
+    lerCsv(csvDoFechamento(f, "diario")).length,
+    1,
+  );
+}
+
 // --- P. paridade ------------------------------------------------------------
 
 console.log("\nP. Paridade com o FechamentoData");
@@ -304,35 +437,43 @@ verificar(
   dados.consolidado.extraCentavos,
 );
 
-const linhasColab = colab.slice(1, -1);
+const linhasColab = colab.slice(1, -1 - LINHAS_DO_CONSOLIDADO);
 verificar(
   "P5. soma do 'Total cobrado' por colaborador = total do CSV",
   somaDe([[], ...linhasColab], 10),
-  centavosDoTexto(colab[colab.length - 1][10]),
+  centavosDoTexto(colab[colab.length - 1 - LINHAS_DO_CONSOLIDADO][10]),
 );
 verificar(
   "P6. soma do 'Custo previsto' por colaborador = total do CSV",
   somaDe([[], ...linhasColab], 7),
-  centavosDoTexto(colab[colab.length - 1][7]),
+  centavosDoTexto(colab[colab.length - 1 - LINHAS_DO_CONSOLIDADO][7]),
 );
 verificar(
   "P7. já faturado + a faturar = faturado total, em toda linha",
   colab
-    .slice(1)
+    .slice(1, -LINHAS_DO_CONSOLIDADO)
     .every((l) => centavosDoTexto(l[8]) + centavosDoTexto(l[9]) === centavosDoTexto(l[10])),
   true,
 );
 verificar(
   "P8. resultado = faturado − custo, em toda linha",
   colab
-    .slice(1)
+    .slice(1, -LINHAS_DO_CONSOLIDADO)
     .every((l) => centavosDoTexto(l[10]) - centavosDoTexto(l[7]) === centavosDoTexto(l[11])),
   true,
 );
 verificar(
+  "P8b. na linha de receita total: já faturado + a faturar = receita total",
+  centavosDoTexto(colab.at(-1)[8]) + centavosDoTexto(colab.at(-1)[9]) ===
+    centavosDoTexto(colab.at(-1)[10]),
+  true,
+);
+verificar(
   "P9. o total confere com a fixture ouro (faturado e custo)",
-  centavosDoTexto(colab[colab.length - 1][10]) === ouro.esperado.consolidado.faturadoCentavos &&
-    centavosDoTexto(colab[colab.length - 1][7]) === ouro.esperado.consolidado.custoCentavos,
+  centavosDoTexto(colab[colab.length - 1 - LINHAS_DO_CONSOLIDADO][10]) ===
+    ouro.esperado.consolidado.faturadoCentavos &&
+    centavosDoTexto(colab[colab.length - 1 - LINHAS_DO_CONSOLIDADO][7]) ===
+      ouro.esperado.consolidado.custoCentavos,
   true,
 );
 verificar(
@@ -342,7 +483,7 @@ verificar(
 );
 verificar(
   "P12. total do 'Ajuste de arredondamento' = ajuste previsto do Fechamento",
-  centavosDoTexto(colab[colab.length - 1][6]),
+  centavosDoTexto(colab[colab.length - 1 - LINHAS_DO_CONSOLIDADO][6]),
   dados.financeiro.ajustePrevistoCentavos,
 );
 verificar(
