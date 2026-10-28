@@ -26,9 +26,12 @@ import { arredondarMinutosExtras, calcEntry } from "../src/lib/billing.ts";
 import { valorDaLinha } from "../src/lib/apontamentos-financeiro.ts";
 import {
   camposDaVigencia,
+  camposDoCadastroInicialDeContrato,
+  errosDosParametros030,
   interpretarRegrasDefinitivas,
   montarCadastroAtomico,
   montarRegistro,
+  PARAMETROS_030_INICIAIS,
   parametrosDeHoras,
   resolverCondicaoDoDia,
   tipoDoDia,
@@ -58,6 +61,8 @@ function verificar(caso, obtido, esperado) {
 }
 
 const ler = (p) => readFileSync(p, "utf8");
+const igual = verificar;
+const semComentarios = (f) => f.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 // ---------------------------------------------------------------------------
 // A. Arredondamento
@@ -880,6 +885,159 @@ verificar(
   ],
   [false, true, false],
 );
+
+console.log("\nI. Cadastro inicial do contrato com os parâmetros da 030 (B8.21)\n");
+
+const linhaContrato = {
+  client_id: "cli-1",
+  name: "Contrato novo",
+  valid_to: null,
+  status: "active",
+};
+const baseValores = {
+  daily_rate: "120",
+  shift_hours: "8",
+  ot_factor: "1,5",
+  ot_tolerance_min: "10",
+};
+const formInicial = (extra = {}, regrasDefinitivas = true) => ({
+  inicio: "2026-01-01",
+  motivo: "Cadastro inicial do contrato",
+  valores: { ...baseValores, ...extra },
+  encerrarAnterior: false,
+  regrasDefinitivas,
+});
+const cadastro030 = (extra, flag) =>
+  montarCadastroAtomico("contrato", linhaContrato, formInicial(extra, flag)).params;
+
+verificar(
+  "I1. sem o anúncio da 030 o cadastro inicial não tem campo novo",
+  camposDoCadastroInicialDeContrato(false).length,
+  0,
+);
+verificar(
+  "I2. com a 030: modo, sábado e feriado, os mesmos campos da nova vigência",
+  camposDoCadastroInicialDeContrato(true)
+    .map((c) => c.chave)
+    .join(","),
+  "ot_rounding_mode,saturday_shift_hours,holiday_pay_factor",
+);
+igual(
+  "I3. contrato novo com os três parâmetros: a RPC atômica recebe os três",
+  (({ p_ot_rounding_mode, p_saturday_shift_hours, p_holiday_pay_factor }) => ({
+    p_ot_rounding_mode,
+    p_saturday_shift_hours,
+    p_holiday_pay_factor,
+  }))(
+    cadastro030({
+      ot_rounding_mode: "acumulado",
+      saturday_shift_hours: "4",
+      holiday_pay_factor: "2",
+    }),
+  ),
+  { p_ot_rounding_mode: "acumulado", p_saturday_shift_hours: 4, p_holiday_pay_factor: 2 },
+);
+igual(
+  "I4. contrato novo com os padrões válidos: só o modo diário; sábado e feriado vazios não são enviados",
+  (({ p_ot_rounding_mode, p_saturday_shift_hours, p_holiday_pay_factor }) => ({
+    p_ot_rounding_mode,
+    p_saturday_shift_hours,
+    p_holiday_pay_factor,
+  }))(cadastro030({ ...PARAMETROS_030_INICIAIS })),
+  { p_ot_rounding_mode: "diario" },
+);
+verificar(
+  "I5. antes da 030 a chamada é a de antes: nenhum parâmetro novo",
+  Object.keys(
+    cadastro030({ ot_rounding_mode: "acumulado", saturday_shift_hours: "4" }, false),
+  ).filter((k) => /rounding|saturday|holiday/.test(k)).length,
+  0,
+);
+verificar(
+  "I6. validação: sábado acima da jornada",
+  errosDosParametros030({ ...PARAMETROS_030_INICIAIS, shift_hours: "8", saturday_shift_hours: "9" })
+    .length,
+  1,
+);
+verificar(
+  "I7. validação: sábado dentro da jornada, fator 2: sem erro",
+  errosDosParametros030({
+    ...PARAMETROS_030_INICIAIS,
+    shift_hours: "8",
+    saturday_shift_hours: "4",
+    holiday_pay_factor: "2",
+  }).length,
+  0,
+);
+verificar(
+  "I8. validação: fator de feriado abaixo de 1",
+  errosDosParametros030({ ...PARAMETROS_030_INICIAIS, holiday_pay_factor: "0,5" }).length,
+  1,
+);
+verificar(
+  "I9. validação: modo fora das opções",
+  errosDosParametros030({ ...PARAMETROS_030_INICIAIS, ot_rounding_mode: "mensal" }).length,
+  1,
+);
+verificar(
+  "I10. validação: três casas decimais no sábado",
+  errosDosParametros030({ ...PARAMETROS_030_INICIAIS, saturday_shift_hours: "4,125" }).length,
+  1,
+);
+verificar(
+  "I11. o erro dos parâmetros não esconde nem inventa erro de outros campos",
+  errosDosParametros030({ ...PARAMETROS_030_INICIAIS }).length,
+  0,
+);
+verificar(
+  "I12. o envio inválido continua barrado pela montagem (segunda barreira)",
+  (() => {
+    try {
+      cadastro030({ saturday_shift_hours: "9" });
+      return "enviou";
+    } catch {
+      return "barrou";
+    }
+  })(),
+  "barrou",
+);
+{
+  const tela = semComentarios(
+    ler(new URL("../src/app/(painel)/clientes/painel-clientes.tsx", import.meta.url)),
+  );
+  verificar(
+    "I13. campos só aparecem com a 030, motor por vigência e contrato NOVO",
+    /camposDoCadastroInicialDeContrato\(\s*regrasDefinitivas && modoDeTaxa === "por-vigencia" && !contractForm\.id,?\s*\)/.test(
+      tela,
+    ),
+    true,
+  );
+  verificar(
+    "I14. o envio usa a RPC atômica e informa regrasDefinitivas só quando os campos existem",
+    /regrasDefinitivas: camposDa030\.length > 0/.test(tela),
+    true,
+  );
+  verificar(
+    "I15. parâmetros da 030 nunca vão no payload da edição tradicional (saveContract)",
+    /payload\[["'](ot_rounding_mode|saturday_shift_hours|holiday_pay_factor)/.test(tela),
+    false,
+  );
+  verificar(
+    "I16. o botão salvar fica desabilitado com erro dos parâmetros",
+    /errosDa030\.length > 0 \|\|/.test(tela),
+    true,
+  );
+  verificar(
+    "I17. contrato existente continua por nova vigência (campos fora do formulário de edição)",
+    /!contractForm\.id\s*\)/.test(tela),
+    true,
+  );
+  verificar(
+    "I18. nenhuma gravação direta em contract_terms nem service_role na tela",
+    /contract_terms|service_role/.test(tela),
+    false,
+  );
+}
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);
 if (falhas.length > 0) {

@@ -405,6 +405,28 @@ select pg_temp.registrar('V6. chamada antiga (sem os parâmetros novos) continua
   (select ot_rounding_mode || '|' || coalesce(saturday_shift_hours::text, '-') || '|' || coalesce(holiday_pay_factor::text, '-')
      from public.contract_terms where contract_id::text = (select id from _k)));
 
+-- Cadastro inicial do contrato pela RPC atômica (B8.21): a tela envia os três parâmetros da 030.
+create temporary table _kn (id text);
+insert into _kn select pg_temp.adm($q$select public.criar_contrato_com_vigencia('5c30c000-0000-4000-8000-0000000000c1', 'K novo 030', date '2026-01-01', null, 'active', 100, 8, 1.5, 10, 'Cadastro inicial do contrato', 'acumulado', 4, 2)::text$q$);
+select pg_temp.registrar('V7. cadastro inicial com os parâmetros da 030 persiste na vigência inicial (acumulado|4.00|2.00), uma versão só', 'acumulado|4.00|2.00|1',
+  (select ot_rounding_mode || '|' || coalesce(saturday_shift_hours::text, '-') || '|' || coalesce(holiday_pay_factor::text, '-') || '|'
+          || (select count(*)::text from public.contract_terms where contract_id::text = (select id from _kn))
+     from public.contract_terms where contract_id::text = (select id from _kn)));
+insert into _kn select pg_temp.adm($q$select public.criar_contrato_com_vigencia('5c30c000-0000-4000-8000-0000000000c1', 'K padrão 030', date '2026-01-01', null, 'active', 100, 8, 1.5, 10, 'Cadastro inicial do contrato', 'diario')::text$q$);
+select pg_temp.registrar('V8. cadastro inicial só com o modo (sem sábado nem feriado): diario|-|-', 'diario|-|-',
+  (select ot_rounding_mode || '|' || coalesce(saturday_shift_hours::text, '-') || '|' || coalesce(holiday_pay_factor::text, '-')
+     from public.contract_terms where contract_id = (select c.id from public.contracts c where c.name = 'K padrão 030')));
+select pg_temp.registrar('V9. cadastro inicial inválido é recusado e NADA persiste (sábado acima da jornada 22023; modo inválido 22023; fator < 1 22023)', 'erro 22023|erro 22023|erro 22023|0',
+  pg_temp.adm($q$select public.criar_contrato_com_vigencia('5c30c000-0000-4000-8000-0000000000c1', 'K inválido', date '2026-01-01', null, 'active', 100, 8, 1.5, 10, 'x', 'diario', 9)::text$q$)
+  || '|' || pg_temp.adm($q$select public.criar_contrato_com_vigencia('5c30c000-0000-4000-8000-0000000000c1', 'K inválido', date '2026-01-01', null, 'active', 100, 8, 1.5, 10, 'x', 'mensal')::text$q$)
+  || '|' || pg_temp.adm($q$select public.criar_contrato_com_vigencia('5c30c000-0000-4000-8000-0000000000c1', 'K inválido', date '2026-01-01', null, 'active', 100, 8, 1.5, 10, 'x', 'diario', null, 0.5)::text$q$)
+  || '|' || (select count(*)::text from public.contracts where name = 'K inválido'));
+select pg_temp.registrar('V10. operacional e admin AAL1 não cadastram contrato (42501); o contrato não ganha colunas da 030', 'erro 42501|erro 42501|0',
+  pg_temp.ope($q$select public.criar_contrato_com_vigencia('5c30c000-0000-4000-8000-0000000000c1', 'K proibido', date '2026-01-01', null, 'active', 100, 8, 1.5, 10, 'x', 'acumulado', 4, 2)::text$q$)
+  || '|' || pg_temp.adm1($q$select public.criar_contrato_com_vigencia('5c30c000-0000-4000-8000-0000000000c1', 'K proibido', date '2026-01-01', null, 'active', 100, 8, 1.5, 10, 'x', 'acumulado', 4, 2)::text$q$)
+  || '|' || (select count(*)::text from information_schema.columns where table_schema = 'public' and table_name = 'contracts'
+              and column_name in ('ot_rounding_mode', 'saturday_shift_hours', 'holiday_pay_factor')));
+
 -- ---------------------------------------------------------------------------
 -- P. Preservação do histórico
 -- ---------------------------------------------------------------------------

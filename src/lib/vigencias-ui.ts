@@ -358,6 +358,42 @@ export function camposDaVigencia(
   );
 }
 
+/**
+ * Parâmetros da migration 030 que o CADASTRO INICIAL do contrato também define (os mesmos campos
+ * da nova vigência): vazios sem o anúncio do banco (`regras_definitivas`). Só valem quando o
+ * cadastro passa pela RPC atômica (motor por vigência); a edição tradicional não os tem.
+ */
+export function camposDoCadastroInicialDeContrato(
+  regrasDefinitivas: boolean,
+): readonly CampoDeVigencia[] {
+  return camposDaVigencia("contrato", false, regrasDefinitivas).filter(
+    (campo) => campo.requerRegrasDefinitivas === true,
+  );
+}
+
+/** Valores iniciais dos campos acima: arredondamento diário (padrão do banco), sem sábado nem feriado. */
+export const PARAMETROS_030_INICIAIS: Readonly<Record<string, string>> = {
+  ot_rounding_mode: "diario",
+  saturday_shift_hours: "",
+  holiday_pay_factor: "",
+};
+
+/**
+ * Erros dos parâmetros da 030 no cadastro inicial, com a MESMA validação da nova vigência (a
+ * jornada de sábado não passa da jornada do contrato; o fator de feriado é 1 ou mais). Só os
+ * erros desses campos: o resto do formulário segue com a validação que já tinha.
+ */
+export function errosDosParametros030(valores: Readonly<Record<string, string>>): string[] {
+  const rotulos = camposDoCadastroInicialDeContrato(true).map((c) => c.rotulo);
+  return validarNovaVigencia("contrato", {
+    inicio: "2000-01-01",
+    motivo: "Cadastro inicial do contrato",
+    valores,
+    encerrarAnterior: false,
+    regrasDefinitivas: true,
+  }).filter((mensagem) => rotulos.some((r) => mensagem.startsWith(`${r}:`)));
+}
+
 /** "1.234,56" não é aceito de propósito: só dígitos, ponto ou vírgula decimal. */
 export function lerNumero(texto: string): number | null {
   const t = texto.trim().replace(",", ".");
