@@ -36,6 +36,9 @@ import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format"
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
+import { somarAdicionais } from "@/lib/adicionais";
+import { useAdicionaisDoPeriodo } from "@/lib/adicionais-dados";
+import { useRegrasDaBs } from "@/lib/vigencias-dados";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -47,6 +50,9 @@ export function PainelRelatorios() {
   const [end, setEnd] = useState(initial.end);
 
   const ledger = useLedger();
+  // Adicionais de serviço (029) entram no total da receita e da margem pelo critério da fatura; as
+  // tabelas por colaborador, operação e lançamento seguem por apontamento.
+  const regrasBs = useRegrasDaBs();
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
 
@@ -128,8 +134,12 @@ export function PainelRelatorios() {
     return [...map.values()].sort((a, b) => b.billed - a.billed);
   }, [period]);
 
+  const adicionais = useAdicionaisDoPeriodo(start, end, regrasBs);
+  const totalAdicionais = somarAdicionais(adicionais.data ?? []);
+
   const totals = useMemo(() => {
-    const billed = sumBy(period, (row) => row.billed);
+    const apontamentos = sumBy(period, (row) => row.billed);
+    const billed = apontamentos + totalAdicionais;
 
     const cost = sumBy(period, (row) => row.cost);
 
@@ -137,11 +147,12 @@ export function PainelRelatorios() {
       dailies: sumBy(period, (row) => row.dailies),
       absences: period.filter((row) => row.status === "absent").length,
       overtime: sumBy(period, (row) => row.overtimeMinutes),
+      apontamentos,
       billed,
       cost,
       margin: billed - cost,
     };
-  }, [period]);
+  }, [period, totalAdicionais]);
 
   function exportCsv() {
     if (!exibicao.podeAgir) return;
@@ -261,7 +272,11 @@ export function PainelRelatorios() {
             <Resumo
               label="Receita"
               value={brl(totals.billed)}
-              description="Receita gerada"
+              description={
+                regrasBs
+                  ? `Apontamentos ${brl(totals.apontamentos)} + adicionais ${brl(totalAdicionais)}`
+                  : "Receita gerada"
+              }
               icon={BadgeDollarSign}
             />
 

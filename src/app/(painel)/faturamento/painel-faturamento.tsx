@@ -15,6 +15,7 @@ import {
 
 import { PageHeader } from "../_components/app-shell";
 import { AdicionaisDoPeriodo } from "./adicionais";
+import { ArredondamentoAcumulado } from "./arredondamento";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { adicionalElegivel, somarAdicionais } from "@/lib/adicionais";
 import { CHAVE_DOS_ADICIONAIS, useAdicionais } from "@/lib/adicionais-dados";
+import { CHAVE_DOS_AJUSTES, useAjustesDeArredondamento } from "@/lib/regras-definitivas-dados";
 import { marginPct, round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
 import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
@@ -48,7 +50,7 @@ import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
 import { toast } from "@/lib/notificacoes";
 import { useClients, useInvoices, useOperations } from "@/lib/queries";
-import { useRegrasDaBs } from "@/lib/vigencias-dados";
+import { useRegrasDaBs, useRegrasDefinitivas } from "@/lib/vigencias-dados";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -66,6 +68,8 @@ export function PainelFaturamento() {
   const operations = useOperations();
   // Adicionais de serviço só existem com a migration 029 (o banco anuncia `regras_bs`).
   const regrasBs = useRegrasDaBs();
+  // Arredondamento acumulado (030): mesma função que gerar_fatura usa.
+  const regrasDefinitivas = useRegrasDefinitivas();
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
 
@@ -154,8 +158,13 @@ export function PainelFaturamento() {
   const totalAdicionais = somarAdicionais(adicionaisElegiveis);
   // Com a 029, gerar exige saber o que entra: leitura dos adicionais pendente ou falha bloqueia.
   const adicionaisProntos = !regrasBs || adicionais.isSuccess;
-  const totalAFaturar = round2(totals.billed + totalAdicionais);
-  const semNadaParaGerar = (!period.length && !adicionaisElegiveis.length) || !adicionaisProntos;
+  const ajustes = useAjustesDeArredondamento(selectedClient, start, end, regrasDefinitivas);
+  const totalAjustes =
+    Math.round((ajustes.data ?? []).reduce((acc, a) => acc + Math.round(a.ajuste * 100), 0)) / 100;
+  const ajustesProntos = !regrasDefinitivas || ajustes.isSuccess;
+  const totalAFaturar = round2(totals.billed + totalAdicionais + totalAjustes);
+  const semNadaParaGerar =
+    (!period.length && !adicionaisElegiveis.length) || !adicionaisProntos || !ajustesProntos;
 
   const dailiesValue = round2(totals.billed - totals.otValue);
 
@@ -175,6 +184,10 @@ export function PainelFaturamento() {
       // andamento esconderia do usuário o que será faturado.
       if (!exibicao.podeAgir) {
         throw new Error("Aguarde a conclusão da leitura dos dados antes de gerar a fatura.");
+      }
+
+      if (!ajustesProntos) {
+        throw new Error("Aguarde o cálculo do arredondamento acumulado antes de gerar a fatura.");
       }
 
       if (!adicionaisProntos) {
@@ -204,6 +217,9 @@ export function PainelFaturamento() {
         }),
         queryClient.invalidateQueries({
           queryKey: CHAVE_DOS_ADICIONAIS,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: CHAVE_DOS_AJUSTES,
         }),
       ]);
 
@@ -378,7 +394,9 @@ export function PainelFaturamento() {
               value={brl(totalAFaturar)}
               description={
                 regrasBs
-                  ? `Lançamentos ${brl(totals.billed)} + adicionais ${brl(totalAdicionais)}`
+                  ? `Lançamentos ${brl(totals.billed)} + adicionais ${brl(totalAdicionais)}${
+                      regrasDefinitivas ? ` + arredondamento ${brl(totalAjustes)}` : ""
+                    }`
                   : "Lançamentos elegíveis"
               }
               icon={ReceiptText}
@@ -504,6 +522,14 @@ export function PainelFaturamento() {
               </div>
             </CardContent>
           </Card>
+
+          {regrasDefinitivas ? (
+            <ArredondamentoAcumulado
+              ajustes={ajustes.data ?? []}
+              carregando={ajustes.isPending}
+              erro={ajustes.isError}
+            />
+          ) : null}
 
           {regrasBs ? (
             <AdicionaisDoPeriodo

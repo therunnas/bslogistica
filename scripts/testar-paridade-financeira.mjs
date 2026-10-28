@@ -633,8 +633,11 @@ verificar(
   false,
 );
 verificar(
-  "M3. calcEntry continua usando round2 para receita e custo",
-  /billedAmount: round2\(/.test(billing) && /costAmount: round2\(/.test(billing),
+  "M3. calcEntry continua usando round2 para receita e custo (030: em todos os ramos)",
+  /let billedAmount = round2\(/.test(billing) &&
+    /billedAmount = round2\(baseCob \+/.test(billing) &&
+    /\? round2\(\(worked \/ 60\)/.test(billing) &&
+    /: round2\(baseCost \+ otHours \* otCostHourRate\)/.test(billing),
   true,
 );
 verificar(

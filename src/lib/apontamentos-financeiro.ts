@@ -22,7 +22,25 @@
  * `calcEntry()` entra por parâmetro, para que a paridade com o SQL continue num lugar só.
  */
 
+import type { ModoDeArredondamento, TipoDoDia } from "./billing";
 import type { EstadoDoMotorUI } from "./vigencias-ui";
+
+/** Parâmetros de horas da versão do contrato (migration 030). */
+export interface ParametrosDeHoras {
+  modo: ModoDeArredondamento;
+  sabadoHoras: number | null;
+  fatorFeriado: number | null;
+}
+
+/** Valor acordado (operação sem contrato) e versões anteriores à 030: neutros. */
+export const PARAMETROS_NEUTROS: ParametrosDeHoras = {
+  modo: "diario",
+  sabadoHoras: null,
+  fatorFeriado: null,
+};
+
+/** O que a prévia aplica com as regras definitivas; nulo = cobrança de antes. */
+export type HorasDaLinha = (ParametrosDeHoras & { tipoDoDia: TipoDoDia }) | null;
 
 export interface RegrasDeCalculo {
   daily_rate: number;
@@ -45,6 +63,8 @@ export type CalcularLinha = (p: {
   custoHoraExtra: number | null;
   /** Custo proporcional na saída antecipada (motor por vigência com a 029). */
   custoProporcional: boolean;
+  /** Regras definitivas (030): parâmetros da versão e tipo do dia; nulo = cobrança de antes. */
+  horas: HorasDaLinha;
 }) => ResultadoDoCalculo;
 
 /** O que o servidor tem para a linha (colunas da 022/024 incluídas; todas anuláveis). */
@@ -62,6 +82,10 @@ export interface GravadoFinanceiro {
   terms_origin?: string | null;
   /** Valor-hora congelado da hora extra paga (migration 029); nulo = sem valor acordado. */
   ot_hourly_cost_snapshot?: number | null;
+  /** Versão do contrato que precificou a linha (para os parâmetros de horas, 030). */
+  contract_terms_id?: string | null;
+  /** Tipo do dia congelado na precificação (030). */
+  day_kind_snapshot?: string | null;
 }
 
 /** Condição aplicável à data trabalhada, já resolvida pela tela (ou o motivo de não haver). */
@@ -73,6 +97,8 @@ export type CondicaoDoDia =
       origem: string;
       /** Valor-hora acordado da versão de custo da data (029); nulo ou ausente = sem valor. */
       custoHoraExtra?: number | null;
+      /** Parâmetros de horas da versão da data (030); ausente = neutros. */
+      horas?: ParametrosDeHoras;
     }
   | { ok: false; motivo: string };
 
@@ -107,6 +133,20 @@ export interface EntradaDaLinha {
   calcular: CalcularLinha;
   /** O banco anunciou as regras da migration 029 (`estado_motor_vigencia().regras_bs`). */
   regrasBs?: boolean;
+  /** O banco anunciou as regras definitivas (030, `regras_definitivas`). */
+  regrasDefinitivas?: boolean;
+  /** Tipo do dia da folha pelo calendário atual (linhas novas; e gravadas antes da 030). */
+  tipoDoDia?: TipoDoDia;
+  /** Parâmetros de horas de uma versão do contrato carregada; nulo = não carregada. */
+  parametrosDaVersao?: (contractTermsId: string) => ParametrosDeHoras | null;
+}
+
+const TIPOS_DO_DIA: readonly string[] = ["util", "sabado", "feriado"];
+
+function tipoGravado(valor: string | null | undefined, padrao: TipoDoDia): TipoDoDia {
+  return valor !== null && valor !== undefined && TIPOS_DO_DIA.includes(valor)
+    ? (valor as TipoDoDia)
+    : padrao;
 }
 
 export const ROTULO_DA_ORIGEM_GRAVADA: Readonly<Record<string, string>> = {
@@ -197,9 +237,10 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
       regras: e.regrasDoCadastro,
       custoDiario: e.custoDoCadastro,
       plannedMinutes: e.plannedMinutes,
-      // Motor antigo (010): sem valor-hora e sem proporcional, com ou sem a 029.
+      // Motor antigo (010): sem valor-hora, sem proporcional e sem as regras da 030.
       custoHoraExtra: null,
       custoProporcional: false,
+      horas: null,
     });
     return {
       tipo: "previa",
@@ -228,6 +269,8 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
   // Motor ligado.
   if (semMudanca && e.gravado) return doBanco(e.gravado);
   const regrasBs = e.regrasBs === true;
+  const regrasDefinitivas = regrasBs && e.regrasDefinitivas === true;
+  const tipoDoDia: TipoDoDia = e.tipoDoDia ?? "util";
 
   // Legado (presença/reposição sem origem de preço) não vira falta: o banco recusa com 55000
   // qualquer edição motriz, inclusive esta, e perderia as outras linhas do salvamento.
@@ -254,12 +297,30 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
         true,
       );
     }
+    let horas: HorasDaLinha = null;
+    if (regrasDefinitivas) {
+      const id = g.contract_terms_id;
+      const parametros =
+        g.terms_origin === "valor_acordado"
+          ? PARAMETROS_NEUTROS
+          : id && e.parametrosDaVersao
+            ? e.parametrosDaVersao(id)
+            : null;
+      if (!parametros) {
+        return INDISPONIVEL(
+          "Prévia indisponível: a versão do contrato deste apontamento não está carregada. O banco calcula ao salvar.",
+          false,
+        );
+      }
+      horas = { ...parametros, tipoDoDia: tipoGravado(g.day_kind_snapshot, tipoDoDia) };
+    }
     const r = e.calcular({
       regras: c.regras,
       custoDiario: c.custo,
       plannedMinutes: c.planned,
       custoHoraExtra: regrasBs ? c.custoHoraExtra : null,
       custoProporcional: regrasBs,
+      horas,
     });
     return {
       tipo: "previa",
@@ -282,6 +343,7 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
     plannedMinutes: e.plannedMinutes,
     custoHoraExtra: regrasBs ? (cond.custoHoraExtra ?? null) : null,
     custoProporcional: regrasBs,
+    horas: regrasDefinitivas ? { ...(cond.horas ?? PARAMETROS_NEUTROS), tipoDoDia } : null,
   });
   return {
     tipo: "previa",

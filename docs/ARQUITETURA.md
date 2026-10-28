@@ -244,8 +244,24 @@ Com o motor por vigência e a migration `029`, o **custo** segue regras própria
 independentes da cobrança: a hora extra paga usa o valor-hora acordado na versão
 de custo do colaborador (sem ele, diária de custo ÷ jornada, sem fator), e a
 saída antecipada paga proporcionalmente aos minutos trabalhados (só com os dois
-horários; a cobrança continua a diária inteira). Arredondamento de meia hora,
-feriado e fim de semana não estão implementados: dependem de decisão da BS.
+horários).
+
+A migration `030` acrescenta as regras definitivas da BS, configuradas por
+vigência do contrato:
+
+- **Cobrança:** a saída antecipada também é proporcional. A hora extra cobrada é
+  arredondada nos minutos residuais de cada hora (até 15 descarta; 16 a 45 vira 30;
+  46 a 59 vira a hora seguinte). No modo `diario` isso acontece no próprio
+  apontamento, depois da tolerância. No modo `acumulado`, o apontamento guarda os
+  minutos brutos e o fechamento arredonda a soma do período uma vez, com item
+  próprio na fatura. No sábado, a jornada de referência pode ser menor (ex.: 4 h),
+  mas a hora continua diária ÷ jornada contratual.
+- **Custo:** no feriado, horas × custo-hora × fator. Fora disso, minutos exatos.
+- **Colunas:** `billed_overtime_minutes` guarda os minutos cobrados do dia, e
+  `overtime_minutes`, o excedente à jornada (base do custo).
+
+Regras que a BS não confirmou continuam como antes: pagamento no sábado, cobrança
+no feriado, domingo e compensação entre dias.
 
 **Adicionais de serviço** (`billing_additionals`, migration `029`) são valores
 extras do período, com motivo e referência, separados da diária: não criam

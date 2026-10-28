@@ -55,7 +55,7 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), a 027 (ativação com divergência), a 028 (contrato da operação) e a 029 (regras da BS), que são posteriores a ela",
+  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), a 027 (ativação com divergência), a 028 (contrato da operação), a 029 (regras da BS) e a 030 (regras definitivas), que são posteriores a ela",
   arquivos
     .filter(
       (a) =>
@@ -63,7 +63,8 @@ verificar(
         !a.includes("_026_") &&
         !a.includes("_027_") &&
         !a.includes("_028_") &&
-        !a.includes("_029_"),
+        !a.includes("_029_") &&
+        !a.includes("_030_"),
     )
     .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,
@@ -616,6 +617,8 @@ const sqlTodas = [
   "20261022183038_027_motor_bloqueia_ativacao_com_divergencia.sql",
   // A 029 (C05-B8.10) recria as RPCs de custo com o valor-hora da hora extra paga.
   "20261026120000_029_regras_financeiras_bs.sql",
+  // A 030 (C05-B8.15) recria as de condição do contrato com os parâmetros de horas.
+  "20261028120000_030_regras_definitivas_bs.sql",
 ]
   .map((f) => ler(`supabase/migrations/${f}`).replace(/^\s*--.*$/gm, ""))
   .join("\n");

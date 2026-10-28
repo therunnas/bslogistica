@@ -44,6 +44,14 @@ export const RPC_VIGENCIAS = {
   },
 } as const;
 
+/** RPCs da migration 030 (fechamento e calendário). Admin AAL2; o operacional não executa. */
+export const RPC_REGRAS_DEFINITIVAS = {
+  ajustesDeArredondamento: "ajustes_de_arredondamento_acumulado",
+  saldoDeHoras: "saldo_de_horas_do_periodo",
+  registrarFeriado: "registrar_feriado",
+  aposentarFeriado: "aposentar_feriado",
+} as const;
+
 /** Datas em `YYYY-MM-DD`. A vigência é o intervalo semiaberto [início, fim). */
 export interface ParametrosRegistrarCondicaoContrato {
   p_contract_id: string;
@@ -56,6 +64,12 @@ export interface ParametrosRegistrarCondicaoContrato {
   p_valid_to?: string | null;
   /** Fecha a versão aberta anterior na data de início da nova. */
   p_encerrar_anterior?: boolean;
+  /** Migration 030: 'diario' (padrão) ou 'acumulado'. */
+  p_ot_rounding_mode?: "diario" | "acumulado";
+  /** Migration 030: jornada de referência da cobrança no sábado; omitido = dia comum. */
+  p_saturday_shift_hours?: number;
+  /** Migration 030: fator do pagamento em feriado (2 = +100%); omitido = sem regra. */
+  p_holiday_pay_factor?: number;
 }
 
 export interface ParametrosCorrigirCondicaoContrato {
@@ -67,6 +81,9 @@ export interface ParametrosCorrigirCondicaoContrato {
   p_ot_factor: number;
   p_ot_tolerance_min: number;
   p_reason: string;
+  p_ot_rounding_mode?: "diario" | "acumulado";
+  p_saturday_shift_hours?: number;
+  p_holiday_pay_factor?: number;
 }
 
 export interface ParametrosRegistrarCustoColaborador {
@@ -124,6 +141,8 @@ export interface EstadoDoMotor {
   consistente: boolean;
   /** Migration 029 aplicada (valor-hora acordado, custo proporcional, adicionais). */
   regras_bs?: boolean;
+  /** Migration 030 aplicada (arredondamento, saída antecipada cobrada, sábado, feriado). */
+  regras_definitivas?: boolean;
 }
 
 export interface PendenciaDeImplantacao {

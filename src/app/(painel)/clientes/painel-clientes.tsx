@@ -47,7 +47,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { brl, dateBR, num, todayISO } from "@/lib/format";
 import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
-import { useCriarComVigencia, useEstadoDoMotor } from "@/lib/vigencias-dados";
+import { FeriadosDoCalendario } from "./feriados";
+import { useCriarComVigencia, useEstadoDoMotor, useRegrasDefinitivas } from "@/lib/vigencias-dados";
 import { modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { useClients, useContracts, useOperations } from "@/lib/queries";
@@ -97,6 +98,8 @@ export function PainelClientes() {
   const saveContract = useSaveRow("contracts");
   const criarContratoComVigencia = useCriarComVigencia("contrato", ["contracts"]);
   const estadoDoMotor = useEstadoDoMotor();
+  // Calendário de feriados só existe com a migration 030 (o banco anuncia `regras_definitivas`).
+  const regrasDefinitivas = useRegrasDefinitivas();
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");
 
@@ -581,6 +584,8 @@ export function PainelClientes() {
               </div>
             </CardContent>
           </Card>
+
+          {regrasDefinitivas ? <FeriadosDoCalendario /> : null}
         </TabsContent>
       </Tabs>
 

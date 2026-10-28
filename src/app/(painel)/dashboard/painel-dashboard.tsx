@@ -42,6 +42,8 @@ import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
 import { useRegrasDaBs } from "@/lib/vigencias-dados";
+import { somarAdicionais } from "@/lib/adicionais";
+import { useAdicionaisDoPeriodo } from "@/lib/adicionais-dados";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -53,8 +55,9 @@ export function PainelDashboard() {
   const [end, setEnd] = useState(initial.end);
 
   const ledger = useLedger();
-  // Com a migration 029 existem adicionais de serviço, que vão para a fatura mas não são
-  // apontamento: a receita deste painel é a dos apontamentos (ver Faturamento).
+  // Com a migration 029 existem adicionais de serviço: entram no total da receita e da margem
+  // pelo mesmo critério da fatura. Os gráficos seguem por apontamento (data, cliente, tipo), e o
+  // arredondamento acumulado só existe no fechamento (Faturamento).
   const regrasBs = useRegrasDaBs();
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
@@ -64,8 +67,12 @@ export function PainelDashboard() {
     [rows, start, end],
   );
 
+  const adicionais = useAdicionaisDoPeriodo(start, end, regrasBs);
+  const totalAdicionais = somarAdicionais(adicionais.data ?? []);
+
   const kpis = useMemo(() => {
-    const revenue = sumBy(period, (row) => row.billed);
+    const apontamentos = sumBy(period, (row) => row.billed);
+    const revenue = apontamentos + totalAdicionais;
 
     const cost = sumBy(period, (row) => row.cost);
 
@@ -73,12 +80,13 @@ export function PainelDashboard() {
       dailies: sumBy(period, (row) => row.dailies),
       absences: period.filter((row) => row.status === "absent").length,
       otHours: minutesToHours(sumBy(period, (row) => row.overtimeMinutes)),
+      apontamentos,
       revenue,
       cost,
       margin: revenue - cost,
       marginPct: marginPct(revenue, cost),
     };
-  }, [period]);
+  }, [period, totalAdicionais]);
 
   const activeEmployees = useMemo(
     () =>
@@ -215,7 +223,7 @@ export function PainelDashboard() {
               value={brl(kpis.revenue)}
               description={
                 regrasBs
-                  ? "Receita dos apontamentos no período; adicionais de serviço no Faturamento"
+                  ? `Apontamentos ${brl(kpis.apontamentos)} + adicionais ${brl(totalAdicionais)}`
                   : "Receita gerada no período"
               }
               icon={BadgeDollarSign}

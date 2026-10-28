@@ -443,7 +443,11 @@ verificar(
     camposDaVigencia("colaborador", true).map((c) => c.chave),
     camposDaVigencia("contrato", true).length,
   ],
-  [["daily_cost"], ["daily_cost", "ot_hourly_cost"], CAMPOS_DA_VIGENCIA.contrato.length],
+  [
+    ["daily_cost"],
+    ["daily_cost", "ot_hourly_cost"],
+    CAMPOS_DA_VIGENCIA.contrato.filter((c) => c.requerRegrasDefinitivas !== true).length,
+  ],
 );
 const FORM = {
   inicio: "2026-11-01",
@@ -680,9 +684,9 @@ const corpo = (nome) => {
   return m ? m[1] : "";
 };
 verificar(
-  "G1. a 029 é a última migration e a 019 continua ausente",
-  [migrations.at(-1), migrations.some((m) => m.includes("_019_"))],
-  [NOME_029, false],
+  "G1. a 029 existe (a 030 vem depois) e a 019 continua ausente",
+  [migrations.includes(NOME_029), migrations.some((m) => m.includes("_019_"))],
+  [true, false],
 );
 verificar(
   "G2. a 029 não toca o motor antigo nem afrouxa privilégio (sem grant a anon/service_role, sem disable trigger)",
@@ -746,7 +750,7 @@ verificar(
   [
     /\{regrasBs \? \(\s*<AdicionaisDoPeriodo/.test(faturamento),
     /modoDeCusto === "por-vigencia" && regrasBs \? \(/.test(colaboradores),
-    /regrasBs,\s*calcular:/.test(apontamentos),
+    /regrasBs,[\s\S]{0,600}calcular:/.test(apontamentos),
     /employeeOtHourCost: custoHoraExtra,\s*proportionalCost: custoProporcional,/.test(apontamentos),
   ],
   [true, true, true, true],

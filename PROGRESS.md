@@ -237,6 +237,12 @@ em silêncio. Ordem das migrations:
   em `gerar_fatura`, e recusa de entrada igual à saída no banco. Detalhes, validação e regras
   ainda pendentes de decisão da BS em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md).
 
+- **030** (regras definitivas da BS, C05-B8.15): **só no repositório**. Arredondamento da hora extra
+  cobrada (diário ou acumulado no período, por contrato), saída antecipada cobrada
+  proporcionalmente, jornada de referência de sábado, pagamento em feriado com fator e calendário de
+  feriados, e saldo de horas informativo. Detalhes e pendências no
+  [ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md).
+
 - **Legado (C05-B5.7):** sem migration nova. As RPCs que já existiam bastam: `pendencias_implantacao_vigencias`
   (em uso e sem vigência para hoje), `divergencias_implantacao_vigencias` (027), `registrar_*` (023/024,
   data e motivo informados por quem decide), `sincronizar_colunas_legadas` e

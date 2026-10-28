@@ -409,8 +409,9 @@ begin
   -- acrescenta `operation_terms` (versões do valor acordado), com RLS desde a criação — 18.
   -- A 025 acrescenta `financial_engine_settings` (a chave do motor por vigência), também com
   -- RLS desde a criação — 19. A 029 acrescenta `billing_additionals` (adicionais de serviço),
-  -- com RLS desde a criação — 20.
-  perform pg_temp.registrar('F3. as 20 tabelas de public seguem com RLS ativa', '20',
+  -- com RLS desde a criação — 20. A 030 acrescenta `financial_holidays` (calendário de feriados),
+  -- com RLS desde a criação — 21.
+  perform pg_temp.registrar('F3. as 21 tabelas de public seguem com RLS ativa', '21',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -547,8 +548,9 @@ begin
   -- Exatamente uma constraint CHECK por tabela: a da 014, e nada mais. As cinco da
   -- 022 (valores das colunas novas de condições financeiras) ficam de fora pelo nome,
   -- para que qualquer OUTRA constraint continue fazendo este caso falhar. A da 029 (valor-hora
-  -- da hora extra paga, positivo) também fica de fora pelo nome.
-  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022 e a da 029', '1',
+  -- da hora extra paga, positivo) também fica de fora pelo nome, e as duas da 030 (minutos cobrados
+  -- e tipo do dia).
+  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022, a da 029 e as 2 da 030', '1',
     (select count(*)::text from pg_constraint
       where conrelid = 'public.timesheet_entries'::regclass and contype = 'c'
         and conname not in ('timesheet_entries_terms_origin_valida',
@@ -556,7 +558,9 @@ begin
                             'timesheet_entries_ot_factor_snapshot_nao_negativo',
                             'timesheet_entries_ot_tolerance_snapshot_nao_negativa',
                             'timesheet_entries_planned_minutes_snapshot_nao_negativo',
-                            'timesheet_entries_ot_hourly_cost_snapshot_positivo')));
+                            'timesheet_entries_ot_hourly_cost_snapshot_positivo',
+                            'timesheet_entries_minutos_cobrados_nao_negativos',
+                            'timesheet_entries_tipo_do_dia_valido')));
 
   perform pg_temp.registrar('I4. um unico CHECK em shifts', '1',
     (select count(*)::text from pg_constraint

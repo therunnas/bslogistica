@@ -9,6 +9,7 @@ import { lerDivergencias, lerPendencias } from "@/lib/vigencias-implantacao";
 import {
   interpretarEstadoDoMotor,
   interpretarRegrasDaBs,
+  interpretarRegrasDefinitivas,
   montarCadastroAtomico,
   montarRegistro,
   type EstadoDoMotorUI,
@@ -138,6 +139,13 @@ export function useRegrasDaBs(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarRegrasDaBs(consulta.data.data, consulta.data.error);
+}
+
+/** O banco já tem a migration 030 (regras definitivas)? Mesma consulta do estado do motor. */
+export function useRegrasDefinitivas(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarRegrasDefinitivas(consulta.data.data, consulta.data.error);
 }
 
 export function useVersoes(tipo: TipoDeVigencia, entidadeId: string | null) {
