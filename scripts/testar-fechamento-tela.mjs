@@ -579,12 +579,25 @@ igual("C32. rótulos de severidade", ROTULO_DA_SEVERIDADE, {
     estadoDoResultado(DADOS),
     "com-lancamentos",
   );
-  const vazio = { ...DADOS, consolidado: { ...DADOS.consolidado, diarias: 0 }, faltas: 0 };
+  const semValor = {
+    ...DADOS,
+    consolidado: { ...DADOS.consolidado, diarias: 0 },
+    financeiro: { ...DADOS.financeiro, receitaCentavos: 0 },
+    adicionais: [],
+    ajustesAcumulados: [],
+    ajustesFaturados: [],
+  };
+  const vazio = { ...semValor, faltas: 0 };
   verificar("C36. sem diárias e sem faltas: vazio", estadoDoResultado(vazio), "vazio");
   verificar(
     "C37. sem diárias e com faltas: somente faltas",
     estadoDoResultado({ ...vazio, faltas: 2 }),
     "somente-faltas",
+  );
+  verificar(
+    "C38. sem diárias, com adicional: somente financeiro (não é vazio)",
+    estadoDoResultado({ ...vazio, adicionais: [{ id: "ad", valorCentavos: 10000 }] }),
+    "somente-financeiro",
   );
 }
 

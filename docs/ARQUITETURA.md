@@ -278,8 +278,9 @@ detalhamento diário), `;` como separador, decimal com vírgula, reutilizando `s
 
 Limitações conhecidas: o valor é **previsto** (custo previsto não é pagamento realizado); a
 exportação é de um cliente e um período por vez (no máximo 31 dias); a leitura é paginada e, em
-volume alto, lenta (12.400 lançamentos levaram ~20 s localmente); período só de adicionais, sem
-nenhum lançamento, aparece como vazio.
+volume alto, lenta (12.400 lançamentos levaram ~20 s localmente). Período só com adicionais (ou
+ajustes), sem diárias, mostra a receita, a conciliação e os adicionais, sem diária nem colaborador
+inventados; só vira "vazio" sem nenhum valor financeiro.
 
 ## Regras de cálculo
 

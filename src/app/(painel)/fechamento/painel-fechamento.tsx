@@ -423,7 +423,7 @@ function Resultado({ dados, onAtualizar }: { dados: FechamentoData; onAtualizar:
 
           <ExportarFechamento
             dados={dados}
-            disponivel={estado === "com-lancamentos"}
+            disponivel={estado === "com-lancamentos" || estado === "somente-financeiro"}
             onDesatualizado={onAtualizar}
           />
         </div>
@@ -448,12 +448,26 @@ function Resultado({ dados, onAtualizar }: { dados: FechamentoData; onAtualizar:
               />
             </div>
           ) : (
-            <ResumoDoFechamento dados={dados} />
+            <>
+              {estado === "somente-financeiro" ? (
+                <div className="mb-6">
+                  <Mensagem
+                    icone={
+                      <FileSearch className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                    }
+                    titulo="Período sem diárias, com valores financeiros."
+                    descricao="Não há presenças nem substitutos apontados, mas há adicionais ou ajustes no período. Eles entram na receita e na conciliação abaixo; não há diárias nem colaboradores a detalhar."
+                  />
+                </div>
+              ) : null}
+
+              <ResumoDoFechamento dados={dados} />
+            </>
           )}
 
           <ConciliacaoDoFechamento dados={dados} />
 
-          <TabelaPorColaborador dados={dados} />
+          {dados.colaboradores.length === 0 ? null : <TabelaPorColaborador dados={dados} />}
 
           {estado === "com-lancamentos" ? <DetalheDiario dados={dados} /> : null}
         </>

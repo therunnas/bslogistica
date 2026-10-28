@@ -1072,6 +1072,171 @@ for (const trecho of [
   );
 }
 
+/* ================================================================== */
+console.log("\nJ. Período só com adicionais (B8.21)\n");
+
+const { estadoDoResultado } = await import("../src/lib/fechamento/apresentacao.ts");
+const soAdicional = await carregar([], {
+  resumo: {
+    receita_apontamentos: 0,
+    adicionais: 100,
+    ajuste_faturado: 0,
+    ajuste_previsto: 0,
+    receita_total: 100,
+    a_faturar: 100,
+    faturado: 0,
+    ajuste_aplicavel: true,
+  },
+  ajustes: [],
+  saldo: [],
+});
+verificar(
+  "J1. só adicional: o período NÃO é vazio",
+  estadoDoResultado(soAdicional),
+  "somente-financeiro",
+);
+igual(
+  "J2. receita, a faturar e já faturado vêm do banco; custo 0 e nenhuma diária inventada",
+  [
+    soAdicional.financeiro.receitaCentavos,
+    soAdicional.financeiro.adicionaisCentavos,
+    soAdicional.financeiro.aFaturarCentavos,
+    soAdicional.financeiro.jaFaturadoCentavos,
+    soAdicional.financeiro.custoCentavos,
+    soAdicional.consolidado.diarias,
+    soAdicional.colaboradores.length,
+    soAdicional.detalhes.length,
+  ],
+  [10000, 10000, 10000, 0, 0, 0, 0, 0],
+);
+verificar(
+  "J3. a conciliação confere em todas as parcelas, sem duplicar o adicional",
+  soAdicional.conciliacao.every((c) => c.confere),
+  true,
+);
+verificar("J4. o adicional está detalhado", soAdicional.adicionais.length, 1);
+const soAdicionalFaturado = await carregar([], {
+  resumo: {
+    receita_apontamentos: 0,
+    adicionais: 100,
+    ajuste_faturado: 0,
+    ajuste_previsto: 0,
+    receita_total: 100,
+    a_faturar: 0,
+    faturado: 100,
+    ajuste_aplicavel: true,
+  },
+  ajustes: [],
+  saldo: [],
+  adicionais: [ADICIONAL("inv-1")],
+});
+verificar(
+  "J5. adicional já faturado: já faturado 100, a faturar 0, conciliado",
+  `${soAdicionalFaturado.financeiro.jaFaturadoCentavos}|${soAdicionalFaturado.financeiro.aFaturarCentavos}|${soAdicionalFaturado.conciliacao.every((c) => c.confere)}`,
+  "10000|0|true",
+);
+const nenhum = await carregar([], {
+  resumo: {
+    receita_apontamentos: 0,
+    adicionais: 0,
+    ajuste_faturado: 0,
+    ajuste_previsto: 0,
+    receita_total: 0,
+    a_faturar: 0,
+    faturado: 0,
+    ajuste_aplicavel: true,
+  },
+  ajustes: [],
+  saldo: [],
+  adicionais: [],
+});
+verificar(
+  "J6. sem qualquer movimentação (ou só adicional cancelado, que não vem na lista): vazio",
+  estadoDoResultado(nenhum),
+  "vazio",
+);
+const soFaltas = await carregar([L03()], {
+  resumo: {
+    receita_apontamentos: 0,
+    adicionais: 0,
+    ajuste_faturado: 0,
+    ajuste_previsto: 0,
+    receita_total: 0,
+    a_faturar: 0,
+    faturado: 0,
+    ajuste_aplicavel: true,
+  },
+  ajustes: [],
+  saldo: [],
+  adicionais: [],
+});
+verificar(
+  "J7. somente faltas continua somente-faltas",
+  estadoDoResultado(soFaltas),
+  "somente-faltas",
+);
+const faltaMaisAdicional = await carregar([L03()], {
+  resumo: {
+    receita_apontamentos: 0,
+    adicionais: 100,
+    ajuste_faturado: 0,
+    ajuste_previsto: 0,
+    receita_total: 100,
+    a_faturar: 100,
+    faturado: 0,
+    ajuste_aplicavel: true,
+  },
+  ajustes: [],
+  saldo: [],
+});
+verificar(
+  "J8. falta + adicional: somente-financeiro, e a falta segue contada por colaborador",
+  `${estadoDoResultado(faltaMaisAdicional)}|${faltaMaisAdicional.faltas}|${faltaMaisAdicional.colaboradores.length}`,
+  "somente-financeiro|1|1",
+);
+verificar(
+  "J9. adicionais + apontamentos: com-lancamentos, sem duplicar (receita 846,25)",
+  `${estadoDoResultado(antes)}|${antes.financeiro.receitaCentavos}`,
+  "com-lancamentos|84625",
+);
+verificar(
+  "J10. exportação disponível no período só de adicionais: o XLSX é gerado e o resumo traz o adicional",
+  (await gerarXlsxDoFechamento(soAdicional)).subarray(0, 2).toString("latin1"),
+  "PK",
+);
+const indSo = Object.fromEntries(indicadoresDoResumo(soAdicional).map((i) => [i.rotulo, i.valor]));
+verificar(
+  "J11. resumo exportado: adicionais 10000, receita 10000, custo 0, diárias 0",
+  [
+    indSo["Adicionais de serviço"],
+    indSo["Receita total"],
+    indSo["Custo previsto / Valor devido"],
+    indSo["Quantidade de diárias"],
+  ].join(","),
+  "10000,10000,0,0",
+);
+verificar(
+  "J12. CSV só com cabeçalho nos dois formatos, sem erro",
+  [
+    lerCsv(csvDoFechamento(soAdicional, "colaborador")).length,
+    lerCsv(csvDoFechamento(soAdicional, "diario")).length,
+  ].join(","),
+  "2,1",
+);
+{
+  const painel = semComentarios(fonteDoRepo("src/app/(painel)/fechamento/painel-fechamento.tsx"));
+  verificar(
+    "J13. a tela libera a exportação no estado somente-financeiro",
+    /estado === "com-lancamentos" \|\| estado === "somente-financeiro"/.test(painel),
+    true,
+  );
+  verificar(
+    "J14. e mostra a conciliação em todo estado que não é vazio",
+    painel.indexOf("<ConciliacaoDoFechamento") > painel.indexOf('estado === "vazio"'),
+    true,
+  );
+}
+
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);
 
 if (falhas.length > 0) {

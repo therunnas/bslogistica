@@ -157,10 +157,25 @@ export function ehSomenteFalta(colaborador: LinhaColaborador): boolean {
   return colaborador.faltas > 0 && colaborador.consolidado.diarias === 0;
 }
 
-export type EstadoDoResultado = "vazio" | "somente-faltas" | "com-lancamentos";
+export type EstadoDoResultado =
+  "vazio" | "somente-faltas" | "somente-financeiro" | "com-lancamentos";
+
+/** Há adicional, ajuste de arredondamento ou receita no período, mesmo sem nenhuma diária. */
+function temValorSemDiarias(dados: FechamentoData): boolean {
+  return (
+    dados.adicionais.length > 0 ||
+    dados.ajustesAcumulados.length > 0 ||
+    dados.ajustesFaturados.length > 0 ||
+    dados.financeiro.receitaCentavos !== 0
+  );
+}
 
 /** O que o resultado carregado significa para a tela, sem recalcular nada. */
 export function estadoDoResultado(dados: FechamentoData): EstadoDoResultado {
   if (dados.consolidado.diarias > 0) return "com-lancamentos";
+  // Sem diária, mas com valor financeiro vindo do banco (adicional não cancelado ou ajuste de
+  // arredondamento): o período tem movimentação e a tela mostra a receita, a conciliação e o
+  // detalhe. Nenhuma diária nem colaborador é inventado.
+  if (temValorSemDiarias(dados)) return "somente-financeiro";
   return dados.faltas > 0 ? "somente-faltas" : "vazio";
 }

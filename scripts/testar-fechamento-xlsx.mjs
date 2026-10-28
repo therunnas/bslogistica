@@ -1174,8 +1174,8 @@ verificar(
   2,
 );
 verificar(
-  "U6. só a leitura 'com-lancamentos' libera a exportação",
-  /disponivel=\{estado === "com-lancamentos"\}/.test(painel),
+  "U6. só 'com-lancamentos' e 'somente-financeiro' liberam a exportação",
+  /disponivel=\{estado === "com-lancamentos" \|\| estado === "somente-financeiro"\}/.test(painel),
   true,
 );
 verificar(
