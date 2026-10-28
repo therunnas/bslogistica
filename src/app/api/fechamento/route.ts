@@ -4,7 +4,13 @@ import { lerAcesso } from "@/app/(painel)/_autorizacao";
 import { ehAdmin } from "@/app/(painel)/_papel";
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import { carregarFechamento, dependenciasComSupabase } from "@/lib/fechamento/carregar";
-import { decidirAcesso, descreverErro, extrairFiltros } from "@/lib/fechamento/http";
+import { verificarDisponibilidade } from "@/lib/fechamento/disponibilidade";
+import {
+  decidirAcesso,
+  negarSeIndisponivel,
+  descreverErro,
+  extrairFiltros,
+} from "@/lib/fechamento/http";
 import type { RespostaDeErro } from "@/lib/fechamento/http";
 
 /**
@@ -44,8 +50,13 @@ export async function GET(request: Request) {
   if (negado) return responderErro(negado);
 
   try {
-    const filtros = extrairFiltros(new URL(request.url).searchParams);
     const supabase = await criarClienteServidor();
+    // Antes de qualquer leitura: sem a 030 e o motor novo ligados, as funções do Fechamento
+    // podem nem existir. Nega com 503 controlado; "não sei" também nega.
+    const indisponivel = negarSeIndisponivel(await verificarDisponibilidade(supabase));
+    if (indisponivel) return responderErro(indisponivel);
+
+    const filtros = extrairFiltros(new URL(request.url).searchParams);
     const fechamento = await carregarFechamento(filtros, dependenciasComSupabase(supabase));
 
     return NextResponse.json(fechamento, { headers: SEM_CACHE });

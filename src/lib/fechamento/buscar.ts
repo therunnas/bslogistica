@@ -175,6 +175,8 @@ export function mensagemDoErro(erro: unknown): string {
       return erro.message !== "" ? erro.message : "Confira o cliente e o período informados.";
     case "cliente-nao-encontrado":
       return "Cliente não encontrado.";
+    case "fechamento-indisponivel":
+      return erro.message !== "" ? erro.message : "O Fechamento está indisponível neste ambiente.";
     case "dados-mudaram":
       return "Os dados mudaram durante a leitura. Tente novamente.";
     case "leitura-incompleta":
@@ -192,6 +194,7 @@ const NAO_REPETIVEIS = new Set([
   "filtro-invalido",
   "cliente-nao-encontrado",
   "dado-inconsistente",
+  "fechamento-indisponivel",
 ]);
 
 /** "Tentar novamente" só faz sentido quando repetir pode dar certo. */

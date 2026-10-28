@@ -225,8 +225,8 @@ verificar(
   true,
 );
 verificar(
-  "E3. a navegação vem de um mapa por papel",
-  /const navegacao = NAVEGACAO\[papel\];/.test(fontes.shell),
+  "E3. a navegação vem de um mapa por papel (só o Fechamento é filtrado, pelo gate)",
+  /const navegacao = NAVEGACAO\[papel\]\.filter\(/.test(fontes.shell),
   true,
 );
 verificar(

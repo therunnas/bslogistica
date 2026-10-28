@@ -150,6 +150,9 @@ jobs:
       - name: Teste fechamento-xlsx
         run: npm run test:fechamento-xlsx
 
+      - name: Teste fechamento-gate
+        run: npm run test:fechamento-gate
+
       - name: Teste fechamento-conciliacao
         run: npm run test:fechamento-conciliacao
 

@@ -1,3 +1,4 @@
+import { decidirDisponibilidade } from "./fechamento/disponibilidade";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
@@ -110,8 +111,9 @@ export const CHAVE_DO_MOTOR = ["motor-estado"] as const;
  * viram `desconhecido` — nunca `desligado`. Relê ao voltar para a janela, para que a tela não
  * fique presa a um estado antigo depois de o motor ser ligado ou desligado.
  */
-function useConsultaDoMotor() {
+function useConsultaDoMotor(habilitado = true) {
   return useQuery({
+    enabled: habilitado,
     queryKey: CHAVE_DO_MOTOR,
     queryFn: async () => {
       const { data, error } = await cliente().rpc(RPC_VIGENCIAS.motor.estado);
@@ -139,6 +141,18 @@ export function useRegrasDaBs(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarRegrasDaBs(consulta.data.data, consulta.data.error);
+}
+
+/**
+ * O Fechamento está disponível (030 anunciada, motor novo ligado, estado confirmado)? Mesma
+ * decisão do servidor, pela mesma consulta do motor. Só consulta se `habilitado` (admin).
+ * Carregando, erro ou estado desconhecido: `false` — o menu esconde o link; quem barra de verdade
+ * é o servidor (página e APIs).
+ */
+export function useFechamentoDisponivel(habilitado: boolean): boolean {
+  const consulta = useConsultaDoMotor(habilitado);
+  if (!habilitado || consulta.isError || !consulta.data) return false;
+  return decidirDisponibilidade(consulta.data.data, consulta.data.error).disponivel;
 }
 
 /** O banco já tem a migration 030 (regras definitivas)? Mesma consulta do estado do motor. */

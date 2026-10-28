@@ -4,6 +4,7 @@ import { lerAcesso } from "@/app/(painel)/_autorizacao";
 import { ehAdmin } from "@/app/(painel)/_papel";
 import { criarClienteServidor } from "@/integrations/supabase/server";
 import { carregarFechamento, dependenciasComSupabase } from "@/lib/fechamento/carregar";
+import { verificarDisponibilidade } from "@/lib/fechamento/disponibilidade";
 import { ErroDeFiltroDoFechamento } from "@/lib/fechamento/erros";
 import { nomeDoArquivo } from "@/lib/fechamento/exportacao";
 import {
@@ -15,6 +16,7 @@ import {
   descreverErro,
   extrairCorpoDoXlsx,
   lerCorpoComLimite,
+  negarSeIndisponivel,
 } from "@/lib/fechamento/http";
 import type { RespostaDeErro } from "@/lib/fechamento/http";
 import { TIPO_DO_XLSX, gerarXlsxDoFechamento } from "@/lib/fechamento/xlsx";
@@ -76,8 +78,12 @@ export async function POST(request: Request) {
   if (negado) return responderErro(negado);
 
   try {
-    const { assinatura, ...filtros } = extrairCorpoDoXlsx(await lerCorpo(request));
     const supabase = await criarClienteServidor();
+    // Antes de ler corpo ou banco: a mesma proteção da tela e do GET.
+    const indisponivel = negarSeIndisponivel(await verificarDisponibilidade(supabase));
+    if (indisponivel) return responderErro(indisponivel);
+
+    const { assinatura, ...filtros } = extrairCorpoDoXlsx(await lerCorpo(request));
     const fechamento = await carregarFechamento(filtros, dependenciasComSupabase(supabase));
 
     const divergente = conferirAssinatura(assinatura, fechamento.meta.assinatura);

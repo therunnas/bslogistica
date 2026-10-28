@@ -31,6 +31,7 @@ import {
   ErroDeDadoFinanceiro,
   ErroDeFiltroDoFechamento,
 } from "./erros";
+import { MENSAGEM_DE_INDISPONIBILIDADE, type Disponibilidade } from "./disponibilidade";
 import { ErroDeLeituraDoFechamento } from "./leitura";
 
 export interface CorpoDeErro {
@@ -44,6 +45,19 @@ export interface RespostaDeErro {
 
 function erro(status: number, codigo: string, mensagem: string): RespostaDeErro {
   return { status, corpo: { erro: { codigo, mensagem } } };
+}
+
+/**
+ * 503 controlado quando o banco não sustenta o Fechamento (030 ausente, motor desligado, estado
+ * desconhecido ou verificação com falha). `null` = disponível. Vem ANTES de qualquer leitura.
+ */
+export function negarSeIndisponivel(disponibilidade: Disponibilidade): RespostaDeErro | null {
+  if (disponibilidade.disponivel) return null;
+  return erro(
+    503,
+    "fechamento-indisponivel",
+    MENSAGEM_DE_INDISPONIBILIDADE[disponibilidade.motivo],
+  );
 }
 
 /** Parâmetros que a V1 aceita. Qualquer outro é recusado. */

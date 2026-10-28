@@ -264,6 +264,13 @@ Vocabulário: _apontamentos_ (cobrado dos lançamentos), _adicionais_, _ajuste d
 (_já faturado_ e _previsto_), _receita_ (a soma), _a faturar_ e _já faturado_. O saldo de horas
 (compensação entre dias) é **informativo** e não altera nenhum valor.
 
+**Disponibilidade (gate).** O Fechamento depende das migrations 029/030. Página, `GET /api/fechamento`
+e `POST /api/fechamento/xlsx` consultam `estado_motor_vigencia` (sessão do admin, AAL2) **antes** de
+qualquer leitura e só liberam com `regras_definitivas = true`, motor novo ligado e estado
+consistente; erro, resposta desconhecida, 030 ausente ou motor desligado respondem 503
+`fechamento-indisponivel` com frase fixa (a página mostra a mesma mensagem). O link do menu some
+pelo mesmo critério, mas a barreira é o servidor.
+
 **Conciliação.** Cada parcela do Fechamento é comparada com `resumo_financeiro_periodo`, a fonte de
 Dashboard e Relatórios. Diferença vira alerta crítico e nunca é "corrigida". Única diferença
 esperada: o Fechamento arredonda o período pedido de uma vez (como a fatura), enquanto o resumo
