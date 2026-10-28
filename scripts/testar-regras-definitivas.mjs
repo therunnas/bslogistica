@@ -34,6 +34,12 @@ import {
   tipoDoDia,
   validarNovaVigencia,
 } from "../src/lib/vigencias-ui.ts";
+import {
+  ajusteTotal,
+  descricaoDaReceita,
+  lerResumoFinanceiro,
+  parcelasFecham,
+} from "../src/lib/resumo-financeiro.ts";
 import { datasAtivas, montarRegistroDeFeriado, validarFeriado } from "../src/lib/feriados.ts";
 
 let passou = 0;
@@ -715,6 +721,164 @@ verificar(
     .concat(ler("src/app/(painel)/operacional/painel-operacional.tsx"))
     .some((t) => /billed_overtime|day_kind|feriado|arredond/i.test(t)),
   false,
+);
+
+// ---------------------------------------------------------------------------
+// H. Conciliação da receita e fracionamento (C05-B8.17)
+// ---------------------------------------------------------------------------
+
+console.log("H. Conciliação");
+
+const LINHA = {
+  receita_apontamentos: "1034.25",
+  adicionais: "0.00",
+  ajuste_faturado: "4.50",
+  ajuste_previsto: "0.00",
+  receita_total: "1038.75",
+  a_faturar: "0.00",
+  faturado: "1038.75",
+  ajuste_aplicavel: true,
+};
+const brl = (v) => `R$ ${v.toFixed(2)}`;
+verificar(
+  "H1. lê a linha da RPC (numeric chega como texto) e as parcelas fecham em centavos",
+  (() => {
+    const r = lerResumoFinanceiro(LINHA);
+    return [r?.receita, r?.ajusteFaturado, r ? parcelasFecham(r) : null, r ? ajusteTotal(r) : null];
+  })(),
+  [1038.75, 4.5, true, 4.5],
+);
+verificar(
+  "H2. resposta fora do formato é recusada (nulo), nunca um total inventado",
+  [
+    lerResumoFinanceiro(null),
+    lerResumoFinanceiro([]),
+    lerResumoFinanceiro({ ...LINHA, receita_total: "abc" }),
+    lerResumoFinanceiro({ ...LINHA, ajuste_aplicavel: "true" }),
+    lerResumoFinanceiro({ ...LINHA, adicionais: undefined }),
+  ],
+  [null, null, null, null, null],
+);
+verificar(
+  "H3. parcelas que não fecham com o total são detectadas",
+  parcelasFecham(lerResumoFinanceiro({ ...LINHA, receita_total: "1039.00" })),
+  false,
+);
+verificar(
+  "H4. ajustes negativo, positivo e zero entram uma vez na descrição, com o mesmo texto nas duas telas",
+  [
+    descricaoDaReceita(lerResumoFinanceiro({ ...LINHA, ajuste_faturado: "-3.75" }), brl),
+    descricaoDaReceita(lerResumoFinanceiro({ ...LINHA, ajuste_faturado: "5.25" }), brl),
+    descricaoDaReceita(lerResumoFinanceiro({ ...LINHA, ajuste_faturado: "0.00" }), brl),
+    descricaoDaReceita(
+      lerResumoFinanceiro({ ...LINHA, ajuste_faturado: "2.00", ajuste_previsto: "1.50" }),
+      brl,
+    ),
+  ],
+  [
+    "Apontamentos R$ 1034.25 + adicionais R$ 0.00 + arredondamento R$ -3.75",
+    "Apontamentos R$ 1034.25 + adicionais R$ 0.00 + arredondamento R$ 5.25",
+    "Apontamentos R$ 1034.25 + adicionais R$ 0.00",
+    "Apontamentos R$ 1034.25 + adicionais R$ 0.00 + arredondamento R$ 3.50",
+  ],
+);
+verificar(
+  "H5. com filtro de operação o ajuste não se aplica e a tela diz isso",
+  descricaoDaReceita(
+    lerResumoFinanceiro({ ...LINHA, ajuste_faturado: "0.00", ajuste_aplicavel: false }),
+    brl,
+  ),
+  "Apontamentos R$ 1034.25 + adicionais R$ 0.00 (arredondamento acumulado não se aplica por operação)",
+);
+const dashboard = ler("src/app/(painel)/dashboard/painel-dashboard.tsx");
+const relatorios = ler("src/app/(painel)/relatorios/painel-relatorios.tsx");
+verificar(
+  "H6. Dashboard e Relatórios leem a receita do MESMO resumo do banco e usam o mesmo texto das parcelas",
+  [dashboard, relatorios].map(
+    (t) =>
+      /useResumoFinanceiro\(start, end, regrasDefinitivas\)/.test(t) &&
+      /resumo\.data\?\.receita \?\?/.test(t) &&
+      /descricaoDaReceita\(resumo\.data, brl\)/.test(t),
+  ),
+  [true, true],
+);
+verificar(
+  "H7. nenhuma fórmula de arredondamento em tela ou nos módulos do resumo (o ajuste só vem do banco)",
+  [
+    dashboard,
+    relatorios,
+    ler("src/lib/resumo-financeiro.ts"),
+    ler("src/lib/regras-definitivas-dados.ts"),
+  ].map((t) => /arredondarMinutosExtras|arredondar_minutos|valor_arredondado\s*-/.test(t)),
+  [false, false, false, false],
+);
+verificar(
+  "H8. antes da 030 a receita é a de antes: o resumo só é lido com o anúncio e os adicionais locais só sem ele",
+  [dashboard, relatorios].map((t) =>
+    /useAdicionaisDoPeriodo\(start, end, regrasBs && !regrasDefinitivas\)/.test(t),
+  ),
+  [true, true],
+);
+const sql030 = ler("supabase/migrations/20261028120000_030_regras_definitivas_bs.sql").replace(
+  /^\s*--.*$/gm,
+  "",
+);
+const corpoSql = (nome) => {
+  const m = sql030.match(
+    new RegExp(`function public\\.${nome}\\([\\s\\S]*?\\$\\$([\\s\\S]*?)\\$\\$;`),
+  );
+  return m ? m[1] : "";
+};
+verificar(
+  "H9. gerar_fatura valida o fechamento ANTES de qualquer escrita e marca o tipo de cada item",
+  (() => {
+    const c = corpoSql("gerar_fatura");
+    const itens = (c.match(/insert into public\.invoice_items/g) ?? []).length;
+    const comTipo = (c.match(/'(diarias|horas_extras|arredondamento|adicional)'/g) ?? []).length;
+    return [
+      c.indexOf("validar_fechamento_acumulado(") > 0 &&
+        c.indexOf("validar_fechamento_acumulado(") < c.indexOf("insert into public.invoices"),
+      itens,
+      comTipo >= 4,
+    ];
+  })(),
+  [true, 4, true],
+);
+verificar(
+  "H10. o fracionamento é recusado com 55000: período de fechamento inteiro e sem repetir colaborador já faturado",
+  (() => {
+    const c = corpoSql("validar_fechamento_acumulado");
+    return [
+      (c.match(/errcode = '55000'/g) ?? []).length,
+      /extract\(day from p_inicio\) = 16 and p_fim = _ultimo/.test(c),
+      /te\.invoice_id is not null/.test(c),
+      /insert|update|delete/i.test(c),
+    ];
+  })(),
+  [2, true, true, false],
+);
+verificar(
+  "H11. o resumo é só leitura, exige admin AAL2 e lê o ajuste faturado pelo TIPO do item (nunca pela descrição)",
+  (() => {
+    const c = corpoSql("resumo_financeiro_periodo");
+    return [
+      /condicoes_exigir_admin\(\)/.test(c),
+      /it\.kind = 'arredondamento'/.test(c),
+      /description/.test(c),
+      /insert|update|delete/i.test(c),
+      /ajustes_de_arredondamento_acumulado\(c\.cli, q\.qi, q\.qf\)/.test(c),
+    ];
+  })(),
+  [true, true, false, false, true],
+);
+verificar(
+  "H12. nada de acesso novo: sem grant a anon e a validação interna sem EXECUTE de API",
+  [
+    /grant execute on function public\.validar_fechamento_acumulado/i.test(sql030),
+    /'resumo_financeiro_periodo'/.test(sql030),
+    /grant [^;]* to (anon|public)\b/i.test(sql030),
+  ],
+  [false, true, false],
 );
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);

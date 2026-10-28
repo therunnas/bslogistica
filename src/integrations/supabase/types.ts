@@ -492,6 +492,7 @@ export type Database = {
           description: string;
           id: string;
           invoice_id: string;
+          kind: string | null;
           operation_id: string | null;
           quantity: number;
           unit_price: number;
@@ -502,6 +503,7 @@ export type Database = {
           description: string;
           id?: string;
           invoice_id: string;
+          kind?: string | null;
           operation_id?: string | null;
           quantity?: number;
           unit_price?: number;
@@ -512,6 +514,7 @@ export type Database = {
           description?: string;
           id?: string;
           invoice_id?: string;
+          kind?: string | null;
           operation_id?: string | null;
           quantity?: number;
           unit_price?: number;
@@ -1577,6 +1580,19 @@ export type Database = {
         Args: { p_aplicar?: boolean; p_entry_id: string; p_reason: string };
         Returns: Json;
       };
+      resumo_financeiro_periodo: {
+        Args: { p_client_id?: string; p_fim: string; p_inicio: string; p_operation_id?: string };
+        Returns: {
+          a_faturar: number;
+          adicionais: number;
+          ajuste_aplicavel: boolean;
+          ajuste_faturado: number;
+          ajuste_previsto: number;
+          faturado: number;
+          receita_apontamentos: number;
+          receita_total: number;
+        }[];
+      };
       saldo_de_horas_do_periodo: {
         Args: { p_client_id: string; p_fim: string; p_inicio: string };
         Returns: {
@@ -1603,6 +1619,10 @@ export type Database = {
         Returns: boolean;
       };
       uid_do_operador: { Args: never; Returns: string };
+      validar_fechamento_acumulado: {
+        Args: { p_apontamentos: string[]; p_client_id: string; p_fim: string; p_inicio: string };
+        Returns: undefined;
+      };
       valor_acordado_operacao_na_data: {
         Args: { p_operation_id: string; p_work_date: string };
         Returns: {

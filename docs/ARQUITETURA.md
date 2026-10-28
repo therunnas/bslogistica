@@ -260,6 +260,12 @@ vigência do contrato:
 - **Colunas:** `billed_overtime_minutes` guarda os minutos cobrados do dia, e
   `overtime_minutes`, o excedente à jornada (base do custo).
 
+O arredondamento acumulado é calculado **uma vez por período de fechamento**:
+`gerar_fatura` só o aceita sobre um período inteiro (1–15, 16–fim ou o mês) e
+recusa faturar à parte o que sobrou de um colaborador já faturado nesse período.
+A receita de Dashboard e Relatórios vem de `resumo_financeiro_periodo`, a mesma
+função de ajuste que a fatura usa, com o ajuste separado das demais parcelas.
+
 Regras que a BS não confirmou continuam como antes: pagamento no sábado, cobrança
 no feriado, domingo e compensação entre dias.
 

@@ -37,6 +37,14 @@
 --      colaborador, excedentes e faltantes brutos do período. É INFORMATIVO: como a compensação se
 --      aplica à cobrança e ao custo não foi confirmado, nenhum valor muda por causa dela.
 --
+--   6. CONCILIAÇÃO E FRACIONAMENTO (B8.17). `resumo_financeiro_periodo` é a fonte única da receita
+--      de Dashboard e Relatórios: apontamentos, adicionais, ajuste de arredondamento (faturado, pelos
+--      itens tipo 'arredondamento', e previsto, pela mesma função da fatura) e total, a faturar e
+--      faturado. Para o arredondamento acumulado não ser fracionado entre faturas,
+--      `gerar_fatura` recusa (55000) quando há minutos acumulados e o período não é um fechamento
+--      inteiro (1–15, 16–fim ou o mês) ou quando o mesmo colaborador já teve minutos acumulados
+--      faturados no período.
+--
 -- Parâmetros novos nascem neutros: modo 'diario', sem regra de sábado, sem fator de feriado.
 -- Apontamentos já gravados não mudam; só o que for precificado ou editado depois.
 --
@@ -47,6 +55,9 @@
 --   registrar/corrigir_condicao_contrato e criar_contrato_com_vigencia e recriar as da 023/026;
 --   drop function public.ajustes_de_arredondamento_acumulado(uuid, date, date, uuid[]);
 --   drop function public.saldo_de_horas_do_periodo(uuid, date, date);
+--   drop function public.resumo_financeiro_periodo(date, date, uuid, uuid);
+--   drop function public.validar_fechamento_acumulado(uuid, date, date, uuid[]);
+--   alter table public.invoice_items drop column kind;
 --   drop function public.registrar_feriado(date, text, text);
 --   drop function public.aposentar_feriado(uuid, text);
 --   drop function public.motor_tipo_do_dia(date);
@@ -113,6 +124,16 @@ alter table public.timesheet_entries
     check (billed_overtime_minutes is null or billed_overtime_minutes >= 0),
   add constraint timesheet_entries_tipo_do_dia_valido
     check (day_kind_snapshot is null or day_kind_snapshot in ('util', 'sabado', 'feriado'));
+
+-- Tipo do item da fatura (B8.17): a conciliação de Dashboard e Relatórios lê o ajuste de
+-- arredondamento pelo tipo, nunca pelo texto da descrição. Faturas anteriores ficam com NULL.
+alter table public.invoice_items
+  add column kind text,
+  add constraint invoice_items_tipo_valido
+    check (kind is null or kind in ('diarias', 'horas_extras', 'arredondamento', 'adicional'));
+
+comment on column public.invoice_items.kind is
+  'Tipo do item: diarias, horas_extras, arredondamento (acumulado) ou adicional. NULL = fatura anterior a 030.';
 
 comment on column public.timesheet_entries.billed_overtime_minutes is
   'Minutos de hora extra COBRADOS no dia (arredondados no modo diario; brutos no modo acumulado). Derivado pelo sistema. NULL = apontamento anterior a 030.';
@@ -1047,6 +1068,195 @@ end;
 $$;
 
 
+-- Proteção contra o fracionamento do arredondamento acumulado (B8.17). Cada fatura arredonda a
+-- soma dos SEUS apontamentos; duas faturas do mesmo período arredondariam duas vezes (16 + 16
+-- min = 32 -> 30 em uma fatura só, mas 30 + 30 = 60 em duas). Duas condições, só quando a fatura
+-- tem hora extra acumulada (sem minutos, o arredondamento não muda nada):
+--   1. o período é um período de fechamento inteiro: 1–15, 16–fim ou o mês inteiro;
+--   2. nenhum dos colaboradores com minutos acumulados nesta fatura já teve minutos acumulados
+--      faturados no mesmo período (o resto do período não pode ser faturado à parte).
+create or replace function public.validar_fechamento_acumulado(
+  p_client_id    uuid,
+  p_inicio       date,
+  p_fim          date,
+  p_apontamentos uuid[]
+) returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  _ultimo date := (date_trunc('month', p_inicio) + interval '1 month - 1 day')::date;
+  _fechamento boolean;
+  _repetido text;
+begin
+  if not exists (
+    select 1
+      from public.timesheet_entries te
+      join public.contract_terms ct on ct.id = te.contract_terms_id
+     where te.id = any(p_apontamentos)
+       and ct.ot_rounding_mode = 'acumulado'
+       and coalesce(te.billed_overtime_minutes, 0) > 0
+  ) then
+    return;
+  end if;
+
+  _fechamento :=
+       (date_trunc('month', p_inicio) = date_trunc('month', p_fim))
+   and ((extract(day from p_inicio) = 1  and extract(day from p_fim) = 15)
+     or (extract(day from p_inicio) = 16 and p_fim = _ultimo)
+     or (extract(day from p_inicio) = 1  and p_fim = _ultimo));
+  if not _fechamento then
+    raise exception 'A fatura tem hora extra com arredondamento acumulado e o período % a % não é um período de fechamento inteiro (1 a 15, 16 ao último dia ou o mês).', p_inicio, p_fim
+      using errcode = '55000',
+            hint = 'Fature o período de fechamento completo: o acumulado dos minutos é calculado sobre ele de uma vez.';
+  end if;
+
+  select string_agg(distinct e.name, ', ') into _repetido
+    from public.timesheet_entries te
+    join public.timesheets t on t.id = te.timesheet_id
+    join public.operations o on o.id = t.operation_id
+    join public.contract_terms ct on ct.id = te.contract_terms_id
+    join public.employees e on e.id = te.employee_id
+   where o.client_id = p_client_id
+     and t.work_date between p_inicio and p_fim
+     and ct.ot_rounding_mode = 'acumulado'
+     and te.invoice_id is not null
+     and coalesce(te.billed_overtime_minutes, 0) > 0
+     and te.employee_id in (
+       select te2.employee_id
+         from public.timesheet_entries te2
+         join public.contract_terms ct2 on ct2.id = te2.contract_terms_id
+        where te2.id = any(p_apontamentos)
+          and ct2.ot_rounding_mode = 'acumulado'
+          and coalesce(te2.billed_overtime_minutes, 0) > 0);
+  if _repetido is not null then
+    raise exception 'O período % a % já tem hora extra acumulada faturada para: %. Faturar o resto à parte arredondaria o mesmo acumulado duas vezes.', p_inicio, p_fim, _repetido
+      using errcode = '55000',
+            hint = 'O arredondamento acumulado é calculado uma vez por período de fechamento; apontamento posterior a essa fatura precisa de decisão comercial.';
+  end if;
+end;
+$$;
+
+-- Fonte única da conciliação (B8.17): Dashboard e Relatórios leem estes números do banco. O
+-- ajuste de arredondamento nunca é recalculado em TypeScript: o faturado vem dos itens da fatura
+-- (tipo 'arredondamento') e o previsto, da mesma função que a fatura usa, sobre as quinzenas
+-- INTEIRAS dentro do período ainda sem fatura.
+--   receita_apontamentos  Σ cobrado dos apontamentos do período (presença e substituição)
+--   adicionais            adicionais não cancelados com o período inteiro dentro do filtro
+--   ajuste_faturado       Σ dos itens de arredondamento de faturas com o período inteiro dentro
+--   ajuste_previsto       arredondamento das quinzenas inteiras ainda não faturadas
+--   receita_total         soma dos quatro acima
+--   a_faturar             apontamentos sem fatura + adicionais sem fatura + ajuste previsto
+--   faturado              Σ total das faturas com o período inteiro dentro do filtro
+-- Filtro de operação: o ajuste é por colaborador, não por operação; com o filtro, os dois ajustes
+-- e o faturado saem zerados e `ajuste_aplicavel` = false (a tela avisa).
+create or replace function public.resumo_financeiro_periodo(
+  p_inicio       date,
+  p_fim          date,
+  p_client_id    uuid default null,
+  p_operation_id uuid default null
+) returns table (
+  receita_apontamentos numeric,
+  adicionais           numeric,
+  ajuste_faturado      numeric,
+  ajuste_previsto      numeric,
+  receita_total        numeric,
+  a_faturar            numeric,
+  faturado             numeric,
+  ajuste_aplicavel     boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  _apont      numeric;
+  _apont_pend numeric;
+  _adic       numeric;
+  _adic_pend  numeric;
+  _aj_fat     numeric := 0;
+  _aj_prev    numeric := 0;
+  _fat        numeric := 0;
+begin
+  perform public.condicoes_exigir_admin();
+  if p_inicio is null or p_fim is null or p_inicio > p_fim then
+    raise exception 'Período válido é obrigatório.' using errcode = '22023';
+  end if;
+
+  select coalesce(sum(te.billed_amount), 0),
+         coalesce(sum(te.billed_amount) filter (where te.invoice_id is null), 0)
+    into _apont, _apont_pend
+    from public.timesheet_entries te
+    join public.timesheets t on t.id = te.timesheet_id
+    join public.operations o on o.id = t.operation_id
+   where t.work_date between p_inicio and p_fim
+     and te.status <> 'absent'::public.attendance_status
+     and (p_client_id is null or o.client_id = p_client_id)
+     and (p_operation_id is null or o.id = p_operation_id);
+
+  select coalesce(sum(a.amount), 0),
+         coalesce(sum(a.amount) filter (where a.invoice_id is null), 0)
+    into _adic, _adic_pend
+    from public.billing_additionals a
+   where a.period_start >= p_inicio and a.period_end <= p_fim
+     and a.canceled_at is null
+     and (p_client_id is null or a.client_id = p_client_id)
+     and (p_operation_id is null or a.operation_id = p_operation_id);
+
+  if p_operation_id is null then
+    select coalesce(sum(it.amount), 0) into _aj_fat
+      from public.invoice_items it
+      join public.invoices i on i.id = it.invoice_id
+     where it.kind = 'arredondamento'
+       and i.period_start >= p_inicio and i.period_end <= p_fim
+       and (p_client_id is null or i.client_id = p_client_id);
+
+    select coalesce(sum(i.total_amount), 0) into _fat
+      from public.invoices i
+     where i.period_start >= p_inicio and i.period_end <= p_fim
+       and (p_client_id is null or i.client_id = p_client_id);
+
+    -- Quinzenas inteiras dentro do período, por cliente com hora extra acumulada sem fatura.
+    select coalesce(sum(a.ajuste), 0) into _aj_prev
+      from (
+        select distinct o.client_id as cli
+          from public.timesheet_entries te
+          join public.timesheets t on t.id = te.timesheet_id
+          join public.operations o on o.id = t.operation_id
+          join public.contract_terms ct on ct.id = te.contract_terms_id
+         where t.work_date between p_inicio and p_fim
+           and te.invoice_id is null
+           and ct.ot_rounding_mode = 'acumulado'
+           and coalesce(te.billed_overtime_minutes, 0) > 0
+           and (p_client_id is null or o.client_id = p_client_id)
+      ) c
+      cross join (
+        select m::date as qi, (m + interval '14 days')::date as qf
+          from generate_series(date_trunc('month', p_inicio), date_trunc('month', p_fim), interval '1 month') m
+        union all
+        select (m + interval '15 days')::date, (m + interval '1 month - 1 day')::date
+          from generate_series(date_trunc('month', p_inicio), date_trunc('month', p_fim), interval '1 month') m
+      ) q
+      cross join lateral public.ajustes_de_arredondamento_acumulado(c.cli, q.qi, q.qf) a
+     where q.qi >= p_inicio and q.qf <= p_fim;
+  end if;
+
+  return query select
+    round(_apont, 2),
+    round(_adic, 2),
+    round(_aj_fat, 2),
+    round(_aj_prev, 2),
+    round(_apont + _adic + _aj_fat + _aj_prev, 2),
+    round(_apont_pend + _adic_pend + _aj_prev, 2),
+    round(_fat, 2),
+    p_operation_id is null;
+end;
+$$;
+
+
 -- ---------------------------------------------------------------------------
 -- 7. gerar_fatura com o arredondamento acumulado
 -- ---------------------------------------------------------------------------
@@ -1149,6 +1359,10 @@ begin
   select coalesce(sum(a.amount), 0) into _total_adic
     from public.billing_additionals a where a.id = any(_adicionais);
 
+  -- B8.17: o arredondamento acumulado só vale sobre um período de fechamento inteiro e sem
+  -- fracionamento do mesmo colaborador entre faturas.
+  perform public.validar_fechamento_acumulado(_client_id, _period_start, _period_end, _ids);
+
   -- B8.15: arredondamento acumulado, calculado sobre os MESMOS apontamentos travados acima (a
   -- função é estável e as linhas estão travadas: as duas leituras abaixo dão o mesmo resultado).
   select coalesce(sum(j.ajuste), 0), coalesce(sum(j.minutos_arredondados - j.minutos_brutos), 0)
@@ -1174,7 +1388,7 @@ begin
 
   -- Diárias por operação (billed_amount - hora extra; na saída antecipada, a diária proporcional).
   insert into public.invoice_items (
-    invoice_id, operation_id, description, quantity, unit_price, amount
+    invoice_id, operation_id, description, quantity, unit_price, amount, kind
   )
   select
     _fatura.id,
@@ -1184,7 +1398,8 @@ begin
     round(
       (sum(te.billed_amount) - sum(greatest(te.billed_amount - te.daily_rate_snapshot, 0)))
       / count(*), 2),
-    sum(te.billed_amount) - sum(greatest(te.billed_amount - te.daily_rate_snapshot, 0))
+    sum(te.billed_amount) - sum(greatest(te.billed_amount - te.daily_rate_snapshot, 0)),
+    'diarias'
   from public.timesheet_entries te
   join public.timesheets t on t.id = te.timesheet_id
   join public.operations  o on o.id = t.operation_id
@@ -1193,7 +1408,7 @@ begin
 
   -- Horas extras por operação, pelos minutos COBRADOS.
   insert into public.invoice_items (
-    invoice_id, operation_id, description, quantity, unit_price, amount
+    invoice_id, operation_id, description, quantity, unit_price, amount, kind
   )
   select
     _fatura.id,
@@ -1207,7 +1422,8 @@ begin
           / (sum(coalesce(te.billed_overtime_minutes, te.overtime_minutes))::numeric / 60), 2)
       else 0
     end,
-    sum(greatest(te.billed_amount - te.daily_rate_snapshot, 0))
+    sum(greatest(te.billed_amount - te.daily_rate_snapshot, 0)),
+    'horas_extras'
   from public.timesheet_entries te
   join public.timesheets t on t.id = te.timesheet_id
   join public.operations  o on o.id = t.operation_id
@@ -1217,7 +1433,7 @@ begin
 
   -- B8.15: um item por colaborador com arredondamento acumulado diferente de zero.
   insert into public.invoice_items (
-    invoice_id, operation_id, description, quantity, unit_price, amount
+    invoice_id, operation_id, description, quantity, unit_price, amount, kind
   )
   select
     _fatura.id,
@@ -1226,13 +1442,14 @@ begin
       || ' (' || j.minutos_brutos || ' min → ' || j.minutos_arredondados || ' min)',
     round((j.minutos_arredondados - j.minutos_brutos)::numeric / 60, 2),
     j.valor_hora,
-    j.ajuste
+    j.ajuste,
+    'arredondamento'
   from public.ajustes_de_arredondamento_acumulado(_client_id, _period_start, _period_end, _ids) j
   where j.ajuste <> 0
   order by j.colaborador, j.employee_id;
 
   insert into public.invoice_items (
-    invoice_id, operation_id, description, quantity, unit_price, amount
+    invoice_id, operation_id, description, quantity, unit_price, amount, kind
   )
   select
     _fatura.id,
@@ -1240,7 +1457,8 @@ begin
     'Adicional — ' || a.description || coalesce(' (ref. ' || a.reference || ')', ''),
     1,
     a.amount,
-    a.amount
+    a.amount,
+    'adicional'
   from public.billing_additionals a
   where a.id = any(_adicionais)
   order by a.period_start, a.id;
@@ -1344,14 +1562,15 @@ begin
          'motor_tipo_do_dia', 'registrar_feriado', 'aposentar_feriado',
          'condicoes_validar_parametros_de_horas', 'registrar_condicao_contrato',
          'corrigir_condicao_contrato', 'criar_contrato_com_vigencia', 'derivar_valores_por_vigencia',
-         'ajustes_de_arredondamento_acumulado', 'saldo_de_horas_do_periodo', 'estado_motor_vigencia')
+         'ajustes_de_arredondamento_acumulado', 'saldo_de_horas_do_periodo', 'estado_motor_vigencia',
+         'validar_fechamento_acumulado', 'resumo_financeiro_periodo')
   loop
     execute format('alter function %s owner to postgres', _f.assinatura);
     execute format('revoke all on function %s from public, anon, authenticated, service_role, bslog_rpc_operacional', _f.assinatura);
     if _f.nome in ('registrar_feriado', 'aposentar_feriado', 'registrar_condicao_contrato',
                    'corrigir_condicao_contrato', 'criar_contrato_com_vigencia',
                    'ajustes_de_arredondamento_acumulado', 'saldo_de_horas_do_periodo',
-                   'estado_motor_vigencia') then
+                   'estado_motor_vigencia', 'resumo_financeiro_periodo') then
       execute format('grant execute on function %s to authenticated', _f.assinatura);
     end if;
   end loop;
@@ -1366,6 +1585,10 @@ comment on function public.aposentar_feriado(uuid, text) is
   'Admin AAL2. Aposenta feriado com motivo e trilha. Apontamentos ja precificados mantem o tipo do dia congelado.';
 comment on function public.ajustes_de_arredondamento_acumulado(uuid, date, date, uuid[]) is
   'Admin AAL2. Arredondamento acumulado da hora extra cobrada por colaborador (contratos em modo acumulado). Sem lista: apontamentos nao faturados do periodo (previa); com lista: os da fatura.';
+comment on function public.resumo_financeiro_periodo(date, date, uuid, uuid) is
+  'Admin AAL2. Fonte unica da conciliacao de Dashboard e Relatorios: apontamentos, adicionais, ajuste de arredondamento (faturado e previsto), a faturar e faturado.';
+comment on function public.validar_fechamento_acumulado(uuid, date, date, uuid[]) is
+  'Interna de gerar_fatura. Recusa (55000) arredondamento acumulado fora de periodo de fechamento inteiro ou ja faturado para o mesmo colaborador no periodo.';
 comment on function public.saldo_de_horas_do_periodo(uuid, date, date) is
   'Admin AAL2. Informativo: excedentes e faltantes brutos a jornada de referencia, por colaborador. Nao altera valores.';
 
@@ -1393,6 +1616,9 @@ begin
   end if;
   if has_column_privilege('bslog_rpc_operacional', 'public.timesheet_entries', 'billed_overtime_minutes', 'SELECT') then
     raise exception '030: o operacional não lê minutos cobrados.';
+  end if;
+  if has_function_privilege('authenticated', 'public.validar_fechamento_acumulado(uuid, date, date, uuid[])', 'EXECUTE') then
+    raise exception '030: a validação do fechamento acumulado é interna.';
   end if;
   if exists (select 1 from pg_proc where pronamespace = 'public'::regnamespace
               and proname = 'derivar_valores_financeiros' and prosrc ilike '%arredondar%') then

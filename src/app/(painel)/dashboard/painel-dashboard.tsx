@@ -41,9 +41,11 @@ import { brl, dateBR, minutesToHours, monthRange, num, pct } from "@/lib/format"
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
-import { useRegrasDaBs } from "@/lib/vigencias-dados";
+import { useRegrasDaBs, useRegrasDefinitivas } from "@/lib/vigencias-dados";
 import { somarAdicionais } from "@/lib/adicionais";
 import { useAdicionaisDoPeriodo } from "@/lib/adicionais-dados";
+import { useResumoFinanceiro } from "@/lib/regras-definitivas-dados";
+import { descricaoDaReceita } from "@/lib/resumo-financeiro";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -59,6 +61,10 @@ export function PainelDashboard() {
   // pelo mesmo critério da fatura. Os gráficos seguem por apontamento (data, cliente, tipo), e o
   // arredondamento acumulado só existe no fechamento (Faturamento).
   const regrasBs = useRegrasDaBs();
+  // Com a 030, a receita vem do banco (`resumo_financeiro_periodo`), a mesma fonte dos Relatórios,
+  // com o ajuste de arredondamento acumulado separado. Antes dela, vale a soma local de antes.
+  const regrasDefinitivas = useRegrasDefinitivas();
+  const resumo = useResumoFinanceiro(start, end, regrasDefinitivas);
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
 
@@ -67,12 +73,12 @@ export function PainelDashboard() {
     [rows, start, end],
   );
 
-  const adicionais = useAdicionaisDoPeriodo(start, end, regrasBs);
+  const adicionais = useAdicionaisDoPeriodo(start, end, regrasBs && !regrasDefinitivas);
   const totalAdicionais = somarAdicionais(adicionais.data ?? []);
 
   const kpis = useMemo(() => {
-    const apontamentos = sumBy(period, (row) => row.billed);
-    const revenue = apontamentos + totalAdicionais;
+    const apontamentos = resumo.data?.receitaApontamentos ?? sumBy(period, (row) => row.billed);
+    const revenue = resumo.data?.receita ?? apontamentos + totalAdicionais;
 
     const cost = sumBy(period, (row) => row.cost);
 
@@ -86,7 +92,7 @@ export function PainelDashboard() {
       margin: revenue - cost,
       marginPct: marginPct(revenue, cost),
     };
-  }, [period, totalAdicionais]);
+  }, [period, totalAdicionais, resumo.data]);
 
   const activeEmployees = useMemo(
     () =>
@@ -222,9 +228,13 @@ export function PainelDashboard() {
               label="Receita"
               value={brl(kpis.revenue)}
               description={
-                regrasBs
-                  ? `Apontamentos ${brl(kpis.apontamentos)} + adicionais ${brl(totalAdicionais)}`
-                  : "Receita gerada no período"
+                resumo.data
+                  ? descricaoDaReceita(resumo.data, brl)
+                  : regrasDefinitivas && resumo.isError
+                    ? "Não foi possível ler a receita do banco"
+                    : regrasBs
+                      ? `Apontamentos ${brl(kpis.apontamentos)} + adicionais ${brl(totalAdicionais)}`
+                      : "Receita gerada no período"
               }
               icon={BadgeDollarSign}
             />

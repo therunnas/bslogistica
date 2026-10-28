@@ -16,6 +16,7 @@
 --   C  Dynamis: saldo de horas informativo (-30 e +30), sem alterar valores
 --   V  parâmetros na vigência: validação, imutabilidade e chamada antiga
 --   P  preservação: motor desligado, vigência nova não muda o já precificado
+--   X  conciliação e fracionamento (B8.17): períodos, ajuste ± 0, fatura única, resumo do banco
 --   K  segurança das RPCs e inventário
 
 begin;
@@ -319,6 +320,73 @@ select pg_temp.registrar('C1. -30 num dia (proporcional 112,50) e +30 no outro (
 select pg_temp.registrar('C2. saldo do período (informativo): excedentes 30, faltantes 30, saldo 0', 'E4 Dynamis|2|30|30|0',
   pg_temp.adm($q$select colaborador || '|' || apontamentos || '|' || minutos_excedentes || '|' || minutos_faltantes || '|' || saldo
                  from public.saldo_de_horas_do_periodo('5c30c000-0000-4000-8000-0000000000c1', '2026-03-16', '2026-03-31')$q$));
+
+-- ---------------------------------------------------------------------------
+-- X. Conciliação e fracionamento (B8.17): Aceville 16–31/03 e abril
+-- ---------------------------------------------------------------------------
+
+select pg_temp.registrar('X0. acumulados de 14,15,16,30,32,40,45,46,60 min -> 0,0,30,30,30,30,30,60,60', '0,0,30,30,30,30,30,60,60',
+  (select string_agg(public.arredondar_minutos_extras(m)::text, ',' order by o) from unnest(array[14,15,16,30,32,40,45,46,60]) with ordinality u(m, o)));
+
+select pg_temp.folha('41', 'a2', date '2026-03-16');
+select pg_temp.folha('42', 'a2', date '2026-03-17');
+select pg_temp.folha('43', 'a2', date '2026-03-18');
+select pg_temp.folha('45', 'a2', date '2026-04-01');
+select pg_temp.registrar('X1. entradas da quinzena brutas: E1 16 min (126,00) duas vezes, E3 46 min (137,25), E4 30 min (131,25)', 'ok|ok|ok|ok|126.00|126.00|137.25|131.25',
+  pg_temp.entrada('51', '41', '1', '06:00', '15:16') || '|' || pg_temp.entrada('52', '42', '1', '06:00', '15:16')
+  || '|' || pg_temp.entrada('53', '41', '3', '06:00', '15:46') || '|' || pg_temp.entrada('54', '42', '4', '06:00', '15:30')
+  || '|' || split_part(pg_temp.v('51'), '|', 1) || '|' || split_part(pg_temp.v('52'), '|', 1)
+  || '|' || split_part(pg_temp.v('53'), '|', 1) || '|' || split_part(pg_temp.v('54'), '|', 1));
+select pg_temp.registrar('X2. prévia 16–31/03: E1 32 -> 30 (ajuste negativo -0,75), E3 46 -> 60 (positivo +5,25), E4 30 -> 30 (zero)',
+  'E1|32|30|-0.75;E3|46|60|5.25;E4 Dynamis|30|30|0.00',
+  pg_temp.adm($q$select string_agg(colaborador || '|' || minutos_brutos || '|' || minutos_arredondados || '|' || ajuste, ';' order by colaborador)
+                 from public.ajustes_de_arredondamento_acumulado('5c30c000-0000-4000-8000-0000000000c2', '2026-03-16', '2026-03-31')$q$));
+select pg_temp.registrar('X3. período fracionado (16–20/03) com hora extra acumulada: recusado (55000), nada faturado', 'erro 55000|0',
+  pg_temp.adm($q$select (public.gerar_fatura('5c30c000-0000-4000-8000-0000000000c2', '2026-03-16', '2026-03-20')).id::text$q$)
+  || '|' || (select count(*)::text from public.timesheet_entries
+              where invoice_id is not null and id in (pg_temp.id_e('51'), pg_temp.id_e('52'), pg_temp.id_e('53'), pg_temp.id_e('54'))));
+insert into _fat select 'c2b', pg_temp.adm($q$select (public.gerar_fatura('5c30c000-0000-4000-8000-0000000000c2', '2026-03-16', '2026-03-31')).id::text$q$);
+select pg_temp.registrar('X4. fatura do fechamento inteiro 16–31/03: total 525,00 (520,50 + ajustes 4,50); 2,00 h; item de ajuste só para E1 e E3',
+  '525.00|2.00|2|4.50',
+  (select total_amount::text || '|' || total_overtime::text from public.invoices where id::text = (select id from _fat where cliente = 'c2b'))
+  || '|' || (select count(*)::text from public.invoice_items where invoice_id::text = (select id from _fat where cliente = 'c2b') and kind = 'arredondamento')
+  || '|' || (select coalesce(sum(amount), 0)::text from public.invoice_items where invoice_id::text = (select id from _fat where cliente = 'c2b') and kind = 'arredondamento'));
+select pg_temp.registrar('X5. itens fecham com o total e todos têm tipo', 'true|0',
+  ((select sum(amount) from public.invoice_items where invoice_id::text = (select id from _fat where cliente = 'c2b'))
+     = (select total_amount from public.invoices where id::text = (select id from _fat where cliente = 'c2b')))::text
+  || '|' || (select count(*)::text from public.invoice_items where invoice_id::text = (select id from _fat where cliente = 'c2b') and kind is null));
+select pg_temp.registrar('X6. fatura duplicada do mesmo período recusada (P0002); apontamento faturado imutável (42501)', 'erro P0002|erro 42501',
+  pg_temp.adm($q$select (public.gerar_fatura('5c30c000-0000-4000-8000-0000000000c2', '2026-03-16', '2026-03-31')).id::text$q$)
+  || '|' || pg_temp.editar('51', $s$check_out = '15:00'$s$));
+select pg_temp.registrar('X7. março do cliente, tudo faturado: apontamentos 1.034,25 + adicionais 0 + ajuste faturado 4,50 = 1.038,75; previsto 0; a faturar 0; faturado 1.038,75 (= receita)',
+  '1034.25|0.00|4.50|0.00|1038.75|0.00|1038.75|true',
+  pg_temp.adm($q$select receita_apontamentos || '|' || adicionais || '|' || ajuste_faturado || '|' || ajuste_previsto || '|' || receita_total || '|' || a_faturar || '|' || faturado || '|' || ajuste_aplicavel
+                   from public.resumo_financeiro_periodo('2026-03-01', '2026-03-31', '5c30c000-0000-4000-8000-0000000000c2')$q$));
+select pg_temp.registrar('X8. hora extra tardia (E1, 16 min em 18/03) em período já faturado para E1: recusada (55000), sem fatura', 'ok|erro 55000|0',
+  pg_temp.entrada('55', '43', '1', '06:00', '15:16')
+  || '|' || pg_temp.adm($q$select (public.gerar_fatura('5c30c000-0000-4000-8000-0000000000c2', '2026-03-16', '2026-03-31')).id::text$q$)
+  || '|' || (select count(*)::text from public.timesheet_entries where id = pg_temp.id_e('55') and invoice_id is not null));
+select pg_temp.registrar('X9. abril sem fatura (E1 16 min): apontamentos 126,00 + previsto +5,25 = 131,25; a faturar 131,25; faturado 0',
+  'ok|126.00|0.00|0.00|5.25|131.25|131.25|0.00|true',
+  pg_temp.entrada('56', '45', '1', '06:00', '15:16')
+  || '|' || pg_temp.adm($q$select receita_apontamentos || '|' || adicionais || '|' || ajuste_faturado || '|' || ajuste_previsto || '|' || receita_total || '|' || a_faturar || '|' || faturado || '|' || ajuste_aplicavel
+                   from public.resumo_financeiro_periodo('2026-04-01', '2026-04-30', '5c30c000-0000-4000-8000-0000000000c2')$q$));
+select pg_temp.registrar('X10. com filtro de operação o ajuste não se aplica (por colaborador, não por operação): ajustes 0 e aviso', '126.00|0.00|0.00|126.00|false',
+  pg_temp.adm($q$select receita_apontamentos || '|' || ajuste_faturado || '|' || ajuste_previsto || '|' || receita_total || '|' || ajuste_aplicavel
+                   from public.resumo_financeiro_periodo('2026-04-01', '2026-04-30', '5c30c000-0000-4000-8000-0000000000c2', '5c30e000-0000-4000-8000-0000000000a2')$q$));
+select pg_temp.registrar('X11. sem filtro de cliente, a receita total é a soma dos clientes (Dashboard = Relatórios = Σ clientes)', 'true',
+  ((select pg_temp.adm($q$select receita_total::text from public.resumo_financeiro_periodo('2026-03-01', '2026-04-30')$q$)::numeric)
+   = (select pg_temp.adm($q$select receita_total::text from public.resumo_financeiro_periodo('2026-03-01', '2026-04-30', '5c30c000-0000-4000-8000-0000000000c1')$q$)::numeric
+    + pg_temp.adm($q$select receita_total::text from public.resumo_financeiro_periodo('2026-03-01', '2026-04-30', '5c30c000-0000-4000-8000-0000000000c2')$q$)::numeric))::text);
+select pg_temp.registrar('X12. a fatura é a fonte do faturado: Σ faturas do cliente em março-abril = faturado do resumo', 'true',
+  ((select coalesce(sum(total_amount), 0) from public.invoices where client_id = '5c30c000-0000-4000-8000-0000000000c2')
+    = pg_temp.adm($q$select faturado::text from public.resumo_financeiro_periodo('2026-03-01', '2026-04-30', '5c30c000-0000-4000-8000-0000000000c2')$q$)::numeric)::text);
+select pg_temp.registrar('X13. segurança: operacional e admin AAL1 não leem o resumo (42501); a validação é interna (42501)', 'erro 42501|erro 42501|erro 42501',
+  pg_temp.ope($q$select receita_total::text from public.resumo_financeiro_periodo('2026-03-01', '2026-03-31')$q$)
+  || '|' || pg_temp.adm1($q$select receita_total::text from public.resumo_financeiro_periodo('2026-03-01', '2026-03-31')$q$)
+  || '|' || pg_temp.adm($q$select public.validar_fechamento_acumulado('5c30c000-0000-4000-8000-0000000000c2', date '2026-03-16', date '2026-03-31', '{}'::uuid[])::text$q$));
+select pg_temp.registrar('X14. custo preservado: o custo dos apontamentos não tem ajuste de arredondamento (E1 16 min a 25/h: 80 + 16/60 × 25)', '86.67',
+  split_part(pg_temp.v('51'), '|', 2));
 
 -- ---------------------------------------------------------------------------
 -- V. Parâmetros da vigência

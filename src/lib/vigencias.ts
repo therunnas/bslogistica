@@ -50,6 +50,7 @@ export const RPC_REGRAS_DEFINITIVAS = {
   saldoDeHoras: "saldo_de_horas_do_periodo",
   registrarFeriado: "registrar_feriado",
   aposentarFeriado: "aposentar_feriado",
+  resumoFinanceiro: "resumo_financeiro_periodo",
 } as const;
 
 /** Datas em `YYYY-MM-DD`. A vigência é o intervalo semiaberto [início, fim). */

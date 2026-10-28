@@ -4,6 +4,7 @@ import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { montarRegistroDeFeriado, type Feriado, type FormularioDeFeriado } from "@/lib/feriados";
 import { toast } from "@/lib/notificacoes";
+import { lerResumoFinanceiro, type ResumoFinanceiro } from "@/lib/resumo-financeiro";
 import { lerConsultaPaginada } from "@/lib/paginacao";
 import { RPC_REGRAS_DEFINITIVAS } from "@/lib/vigencias";
 
@@ -120,6 +121,37 @@ export function useAjustesDeArredondamento(
         valor_arredondado: Number(r.valor_arredondado),
         ajuste: Number(r.ajuste),
       }));
+    },
+  });
+}
+
+export const CHAVE_DO_RESUMO = ["resumo-financeiro"] as const;
+
+/**
+ * Receita do período lida do banco (`resumo_financeiro_periodo`): a mesma fonte para Dashboard e
+ * Relatórios. Resposta inválida é erro, nunca um total inventado.
+ */
+export function useResumoFinanceiro(
+  inicio: string,
+  fim: string,
+  habilitado: boolean,
+  clienteId: string | null = null,
+  operacaoId: string | null = null,
+) {
+  return useQuery({
+    queryKey: [...CHAVE_DO_RESUMO, inicio, fim, clienteId, operacaoId],
+    enabled: habilitado && inicio !== "" && fim !== "" && inicio <= fim,
+    queryFn: async (): Promise<ResumoFinanceiro> => {
+      const { data, error } = await cliente().rpc(RPC_REGRAS_DEFINITIVAS.resumoFinanceiro, {
+        p_inicio: inicio,
+        p_fim: fim,
+        ...(clienteId !== null ? { p_client_id: clienteId } : {}),
+        ...(operacaoId !== null ? { p_operation_id: operacaoId } : {}),
+      });
+      if (error) throw error;
+      const resumo = lerResumoFinanceiro(Array.isArray(data) ? data[0] : data);
+      if (resumo === null) throw new Error("Resposta inválida do resumo financeiro.");
+      return resumo;
     },
   });
 }
