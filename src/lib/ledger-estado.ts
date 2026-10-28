@@ -226,7 +226,9 @@ export function montarLinhas(entrada: {
       employeeName: employee.name,
       status: entry.status,
       workedMinutes: entry.worked_minutes,
-      overtimeMinutes: entry.overtime_minutes,
+      // Minutos COBRADOS (migration 030: arredondados no dia; brutos no modo acumulado), os mesmos
+      // da fatura. Apontamento anterior à 030 não tem a coluna: vale o excedente gravado.
+      overtimeMinutes: entry.billed_overtime_minutes ?? entry.overtime_minutes,
       dailies: entry.status === "absent" ? 0 : 1,
       billed: Number(entry.billed_amount ?? 0),
       otValue:

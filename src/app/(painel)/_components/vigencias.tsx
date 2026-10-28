@@ -33,6 +33,7 @@ import {
   useEncerrarVigencia,
   useRegistrarVigencia,
   useRegrasDaBs,
+  useRegrasDefinitivas,
   useVersoes,
 } from "@/lib/vigencias-dados";
 import {
@@ -72,7 +73,19 @@ type VersaoComValores = VersaoBase & Record<string, unknown>;
 
 function valoresDaVersao(tipo: TipoDeVigencia, v: VersaoComValores): string {
   if (tipo === "contrato") {
-    return `${brl(Number(v["daily_rate"]))} · ${num(Number(v["shift_hours"]), 1)} h · HE ${num(Number(v["ot_factor"]), 2)}x · tol. ${Number(v["ot_tolerance_min"])} min`;
+    const base = `${brl(Number(v["daily_rate"]))} · ${num(Number(v["shift_hours"]), 1)} h · HE ${num(Number(v["ot_factor"]), 2)}x · tol. ${Number(v["ot_tolerance_min"])} min`;
+    // Parâmetros de horas só existem depois da migration 030.
+    if (!("ot_rounding_mode" in v)) return base;
+    const sabado = v["saturday_shift_hours"];
+    const feriado = v["holiday_pay_factor"];
+    return [
+      base,
+      v["ot_rounding_mode"] === "acumulado" ? "arred. acumulado" : "arred. diário",
+      sabado === null || sabado === undefined ? null : `sáb. ${num(Number(sabado), 1)} h`,
+      feriado === null || feriado === undefined ? null : `feriado ×${num(Number(feriado), 2)}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
   if (tipo === "colaborador") {
     // `ot_hourly_cost` só existe depois da migration 029.
@@ -110,7 +123,8 @@ export function HistoricoDeVigencias({
   const encerrar = useEncerrarVigencia(tipo);
   const aposentar = useAposentarVigencia(tipo);
   const regrasBs = useRegrasDaBs();
-  const campos = camposDaVigencia(tipo, regrasBs);
+  const regrasDefinitivas = useRegrasDefinitivas();
+  const campos = camposDaVigencia(tipo, regrasBs, regrasDefinitivas);
   const hoje = hojeEmSaoPaulo();
   const liberado = podeRegistrarVigencia(estado);
 
@@ -135,6 +149,7 @@ export function HistoricoDeVigencias({
     encerrarAnterior,
     fim: fimNova,
     regrasBs,
+    regrasDefinitivas,
   });
   const classe = classificarInicio(inicio, hoje);
 
@@ -302,13 +317,28 @@ export function HistoricoDeVigencias({
             {campos.map((campo) => (
               <div key={campo.chave} className="space-y-2">
                 <Label htmlFor={`vigencia-${campo.chave}`}>{campo.rotulo}</Label>
-                <Input
-                  id={`vigencia-${campo.chave}`}
-                  inputMode="decimal"
-                  value={valores[campo.chave] ?? ""}
-                  onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
-                  className={INPUT_CLASS}
-                />
+                {campo.tipo === "escolha" ? (
+                  <select
+                    id={`vigencia-${campo.chave}`}
+                    value={valores[campo.chave] || campo.padrao || ""}
+                    onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
+                    className={`${INPUT_CLASS} w-full border px-3 text-sm`}
+                  >
+                    {(campo.opcoes ?? []).map((opcao) => (
+                      <option key={opcao.valor} value={opcao.valor}>
+                        {opcao.rotulo}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id={`vigencia-${campo.chave}`}
+                    inputMode="decimal"
+                    value={valores[campo.chave] ?? ""}
+                    onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
+                    className={INPUT_CLASS}
+                  />
+                )}
               </div>
             ))}
 
@@ -356,7 +386,15 @@ export function HistoricoDeVigencias({
                 registrar.mutate(
                   {
                     entidadeId,
-                    form: { inicio, motivo, valores, encerrarAnterior, fim: fimNova, regrasBs },
+                    form: {
+                      inicio,
+                      motivo,
+                      valores,
+                      encerrarAnterior,
+                      fim: fimNova,
+                      regrasBs,
+                      regrasDefinitivas,
+                    },
                   },
                   { onSuccess: () => setNovaOpen(false) },
                 )

@@ -46,6 +46,39 @@ export function useAdicionais(clienteId: string, habilitado: boolean) {
   });
 }
 
+/**
+ * Adicionais NÃO cancelados de todos os clientes com o período inteiro dentro de [inicio, fim]:
+ * o mesmo critério da fatura, para Dashboard e Relatórios somarem o que a fatura somaria.
+ */
+export function useAdicionaisDoPeriodo(inicio: string, fim: string, habilitado: boolean) {
+  return useQuery({
+    queryKey: [...CHAVE_DOS_ADICIONAIS, "periodo", inicio, fim],
+    enabled: habilitado && inicio !== "" && fim !== "" && inicio <= fim,
+    queryFn: async (): Promise<Adicional[]> => {
+      const db = cliente();
+      return lerConsultaPaginada(
+        ({ depoisDe, limite }) => {
+          let q = db
+            .from("billing_additionals")
+            .select("*")
+            .gte("period_start", inicio)
+            .lte("period_end", fim)
+            .is("canceled_at", null);
+          if (depoisDe !== null) q = q.gt("id", depoisDe);
+          return q.order("id", { ascending: true }).limit(limite);
+        },
+        () =>
+          db
+            .from("billing_additionals")
+            .select("*", { count: "exact", head: true })
+            .gte("period_start", inicio)
+            .lte("period_end", fim)
+            .is("canceled_at", null),
+      );
+    },
+  });
+}
+
 function invalidar(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: CHAVE_DOS_ADICIONAIS });
 }

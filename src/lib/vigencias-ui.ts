@@ -16,7 +16,8 @@
  *                 inconsistentes: tratado como "não sei" e NUNCA como desligado.
  */
 
-import type { CondicaoDoDia } from "./apontamentos-financeiro";
+import type { CondicaoDoDia, ParametrosDeHoras } from "./apontamentos-financeiro";
+import type { TipoDoDia } from "./billing";
 import type {
   ParametrosRegistrarCondicaoContrato,
   ParametrosRegistrarCustoColaborador,
@@ -72,6 +73,29 @@ export function interpretarRegrasDaBs(data: unknown, erro: unknown): boolean {
   if (erro !== null && erro !== undefined) return false;
   if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
   return (data as { regras_bs?: unknown }).regras_bs === true;
+}
+
+/**
+ * Regras definitivas da BS (migration 030): arredondamento da hora extra cobrada, saída
+ * antecipada cobrada proporcionalmente, sábado, feriado e saldo de horas. O banco anuncia com
+ * `regras_definitivas = true`; sem o anúncio a tela não oferece nada que dependa da 030.
+ */
+export function interpretarRegrasDefinitivas(data: unknown, erro: unknown): boolean {
+  if (erro !== null && erro !== undefined) return false;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  return (data as { regras_definitivas?: unknown }).regras_definitivas === true;
+}
+
+/**
+ * Tipo do dia de uma data civil `YYYY-MM-DD`, pelo mesmo critério de `motor_tipo_do_dia()`:
+ * feriado cadastrado tem precedência; sábado; o resto (domingo inclusive) é dia útil. Sem `Date`
+ * local: o dia da semana sai do calendário UTC da própria data, igual em qualquer fuso.
+ */
+export function tipoDoDia(data: string, feriados: readonly string[]): TipoDoDia {
+  if (feriados.includes(data)) return "feriado";
+  const [a, m, d] = data.split("-").map(Number);
+  if (!a || !m || !d) return "util";
+  return new Date(Date.UTC(a, m - 1, d)).getUTCDay() === 6 ? "sabado" : "util";
 }
 
 export type ModoDeEdicaoDeTaxa = "direta" | "por-vigencia" | "bloqueada";
@@ -215,12 +239,22 @@ export interface CampoDeVigencia {
   chave: string;
   param: string;
   rotulo: string;
-  tipo: "dinheiro" | "horas" | "fator" | "minutos";
+  tipo: "dinheiro" | "horas" | "fator" | "minutos" | "escolha";
   /** Vazio é aceito e o parâmetro não é enviado (o banco grava NULL). */
   opcional?: boolean;
   /** Só existe com a migration 029 aplicada (`regras_bs`). */
   requerRegrasBs?: boolean;
+  /** Só existe com a migration 030 aplicada (`regras_definitivas`). */
+  requerRegrasDefinitivas?: boolean;
+  /** Campo de escolha: valores aceitos e o padrão (enviado quando vazio). */
+  opcoes?: readonly { valor: string; rotulo: string }[];
+  padrao?: string;
 }
+
+export const OPCOES_DE_ARREDONDAMENTO: readonly { valor: string; rotulo: string }[] = [
+  { valor: "diario", rotulo: "Diário (no próprio dia)" },
+  { valor: "acumulado", rotulo: "Acumulado no período (no fechamento)" },
+];
 
 export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoDeVigencia[]>> = {
   contrato: [
@@ -237,6 +271,31 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
       param: "p_ot_tolerance_min",
       rotulo: "Tolerância (min)",
       tipo: "minutos",
+    },
+    {
+      chave: "ot_rounding_mode",
+      param: "p_ot_rounding_mode",
+      rotulo: "Arredondamento da hora extra cobrada",
+      tipo: "escolha",
+      opcoes: OPCOES_DE_ARREDONDAMENTO,
+      padrao: "diario",
+      requerRegrasDefinitivas: true,
+    },
+    {
+      chave: "saturday_shift_hours",
+      param: "p_saturday_shift_hours",
+      rotulo: "Jornada de referência no sábado (horas, opcional)",
+      tipo: "horas",
+      opcional: true,
+      requerRegrasDefinitivas: true,
+    },
+    {
+      chave: "holiday_pay_factor",
+      param: "p_holiday_pay_factor",
+      rotulo: "Fator de pagamento no feriado (opcional; 2 = +100%)",
+      tipo: "fator",
+      opcional: true,
+      requerRegrasDefinitivas: true,
     },
   ],
   colaborador: [
@@ -282,14 +341,57 @@ export interface FormularioDeVigencia {
   fim?: string;
   /** O banco anunciou a migration 029: os campos `requerRegrasBs` valem. */
   regrasBs?: boolean;
+  /** O banco anunciou a migration 030: os campos `requerRegrasDefinitivas` valem. */
+  regrasDefinitivas?: boolean;
 }
 
-/** Campos que a tela mostra, valida e envia: os da 029 só com o anúncio do banco. */
+/** Campos que a tela mostra, valida e envia: os da 029/030 só com o anúncio do banco. */
 export function camposDaVigencia(
   tipo: TipoDeVigencia,
   regrasBs: boolean,
+  regrasDefinitivas = false,
 ): readonly CampoDeVigencia[] {
-  return CAMPOS_DA_VIGENCIA[tipo].filter((campo) => regrasBs || campo.requerRegrasBs !== true);
+  return CAMPOS_DA_VIGENCIA[tipo].filter(
+    (campo) =>
+      (regrasBs || campo.requerRegrasBs !== true) &&
+      (regrasDefinitivas || campo.requerRegrasDefinitivas !== true),
+  );
+}
+
+/**
+ * Parâmetros da migration 030 que o CADASTRO INICIAL do contrato também define (os mesmos campos
+ * da nova vigência): vazios sem o anúncio do banco (`regras_definitivas`). Só valem quando o
+ * cadastro passa pela RPC atômica (motor por vigência); a edição tradicional não os tem.
+ */
+export function camposDoCadastroInicialDeContrato(
+  regrasDefinitivas: boolean,
+): readonly CampoDeVigencia[] {
+  return camposDaVigencia("contrato", false, regrasDefinitivas).filter(
+    (campo) => campo.requerRegrasDefinitivas === true,
+  );
+}
+
+/** Valores iniciais dos campos acima: arredondamento diário (padrão do banco), sem sábado nem feriado. */
+export const PARAMETROS_030_INICIAIS: Readonly<Record<string, string>> = {
+  ot_rounding_mode: "diario",
+  saturday_shift_hours: "",
+  holiday_pay_factor: "",
+};
+
+/**
+ * Erros dos parâmetros da 030 no cadastro inicial, com a MESMA validação da nova vigência (a
+ * jornada de sábado não passa da jornada do contrato; o fator de feriado é 1 ou mais). Só os
+ * erros desses campos: o resto do formulário segue com a validação que já tinha.
+ */
+export function errosDosParametros030(valores: Readonly<Record<string, string>>): string[] {
+  const rotulos = camposDoCadastroInicialDeContrato(true).map((c) => c.rotulo);
+  return validarNovaVigencia("contrato", {
+    inicio: "2000-01-01",
+    motivo: "Cadastro inicial do contrato",
+    valores,
+    encerrarAnterior: false,
+    regrasDefinitivas: true,
+  }).filter((mensagem) => rotulos.some((r) => mensagem.startsWith(`${r}:`)));
 }
 
 /** "1.234,56" não é aceito de propósito: só dígitos, ponto ou vírgula decimal. */
@@ -325,8 +427,15 @@ export function validarNovaVigencia(tipo: TipoDeVigencia, f: FormularioDeVigenci
       erros.push("O fim da vigência deve ser posterior ao início.");
     }
   }
-  for (const campo of camposDaVigencia(tipo, f.regrasBs === true)) {
+  for (const campo of camposDaVigencia(tipo, f.regrasBs === true, f.regrasDefinitivas === true)) {
     const texto = f.valores[campo.chave] ?? "";
+    if (campo.tipo === "escolha") {
+      const valor = texto.trim() === "" ? (campo.padrao ?? "") : texto.trim();
+      if (!(campo.opcoes ?? []).some((o) => o.valor === valor)) {
+        erros.push(`${campo.rotulo}: escolha uma das opções.`);
+      }
+      continue;
+    }
     if (campo.opcional === true && texto.trim() === "") continue;
     const n = lerNumero(texto);
     if (n === null) {
@@ -343,6 +452,15 @@ export function validarNovaVigencia(tipo: TipoDeVigencia, f: FormularioDeVigenci
     }
     if (campo.opcional === true && n <= 0) {
       erros.push(`${campo.rotulo}: informe um valor maior que zero ou deixe vazio.`);
+    }
+    if (campo.chave === "holiday_pay_factor" && n < 1) {
+      erros.push(`${campo.rotulo}: use 1 ou mais (2 = adicional de 100%).`);
+    }
+    if (campo.chave === "saturday_shift_hours") {
+      const jornada = lerNumero(f.valores["shift_hours"] ?? "");
+      if (jornada !== null && n > jornada) {
+        erros.push(`${campo.rotulo}: não pode passar da jornada do contrato.`);
+      }
     }
   }
   return erros;
@@ -373,8 +491,12 @@ export function montarRegistro(
     p_valid_to: (f.fim ?? "").trim() === "" ? null : (f.fim as string).trim(),
     p_encerrar_anterior: f.encerrarAnterior,
   };
-  for (const campo of camposDaVigencia(tipo, f.regrasBs === true)) {
+  for (const campo of camposDaVigencia(tipo, f.regrasBs === true, f.regrasDefinitivas === true)) {
     const texto = f.valores[campo.chave] ?? "";
+    if (campo.tipo === "escolha") {
+      params[campo.param] = texto.trim() === "" ? (campo.padrao ?? "") : texto.trim();
+      continue;
+    }
     if (campo.opcional === true && texto.trim() === "") continue;
     params[campo.param] = lerNumero(texto) as number;
   }
@@ -419,6 +541,16 @@ export function montarCadastroAtomico(
         p_ot_factor: v["p_ot_factor"] as number,
         p_ot_tolerance_min: v["p_ot_tolerance_min"] as number,
         ...comum,
+        // Só com a 030 (e o anúncio do banco): sem eles, a chamada é a mesma de antes.
+        ...("p_ot_rounding_mode" in v
+          ? { p_ot_rounding_mode: v["p_ot_rounding_mode"] as string }
+          : {}),
+        ...("p_saturday_shift_hours" in v
+          ? { p_saturday_shift_hours: v["p_saturday_shift_hours"] as number }
+          : {}),
+        ...("p_holiday_pay_factor" in v
+          ? { p_holiday_pay_factor: v["p_holiday_pay_factor"] as number }
+          : {}),
       },
     };
   }
@@ -515,6 +647,22 @@ export interface TermoDeContrato extends VersaoBase {
   shift_hours: number | string;
   ot_factor: number | string;
   ot_tolerance_min: number | string;
+  /** Migration 030; ausentes antes dela (parâmetros neutros). */
+  ot_rounding_mode?: string | null;
+  saturday_shift_hours?: number | string | null;
+  holiday_pay_factor?: number | string | null;
+}
+
+const numeroOpcional = (v: unknown): number | null =>
+  v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+
+/** Parâmetros de horas de uma versão de contrato (030); ausentes = neutros. */
+export function parametrosDeHoras(v: TermoDeContrato): ParametrosDeHoras {
+  return {
+    modo: v.ot_rounding_mode === "acumulado" ? "acumulado" : "diario",
+    sabadoHoras: numeroOpcional(v.saturday_shift_hours),
+    fatorFeriado: numeroOpcional(v.holiday_pay_factor),
+  };
 }
 
 export interface TermoDeOperacao extends VersaoBase {
@@ -566,7 +714,9 @@ export function resolverCondicaoDoDia(p: {
     ot_tolerance_min: number;
   };
   let origem: string;
+  let horas: ParametrosDeHoras = { modo: "diario", sabadoHoras: null, fatorFeriado: null };
   if (doContrato) {
+    horas = parametrosDeHoras(doContrato);
     regras = {
       daily_rate: Number(doContrato.daily_rate),
       shift_hours: Number(doContrato.shift_hours),
@@ -604,5 +754,6 @@ export function resolverCondicaoDoDia(p: {
     origem,
     custoHoraExtra:
       horaExtra === null || horaExtra === undefined || horaExtra === "" ? null : Number(horaExtra),
+    horas,
   };
 }

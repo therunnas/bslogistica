@@ -8,7 +8,8 @@
 --
 --   Z  motor DESLIGADO: entrada = saída recusada; custo legado intacto (sem proporcional)
 --   A  diária normal, falta, substituição (apontamento próprio, sem duplicar nem vincular)
---   B  saída antecipada: custo proporcional, cobrança inteira; presença sem horário: pendente
+--   B  saída antecipada: custo proporcional; cobrança proporcional desde a 030 (confirmada pela BS
+--      na C05-B8.15; antes era diária inteira); presença sem horário: diária cheia
 --   C  hora extra cobrada (fator do contrato) e paga (valor-hora acordado, independente)
 --   D  colaboradores com custos diferentes na mesma operação
 --   E  mudança de vigência: valor-hora congelado no apontamento
@@ -237,10 +238,10 @@ select pg_temp.registrar('A4. a falta de E2 continua 0/0 e a folha tem 2 diária
 -- B. Saída antecipada
 -- ---------------------------------------------------------------------------
 
-select pg_temp.registrar('B1. saída antecipada (E1, 06:00-11:00 = 240 de 480): cobra a diária inteira, paga 80 × 240/480 = 40,00',
-  'ok|120.00|40.00|240|0|25.00', pg_temp.entrada('21', '12', '1', _out => '11:00') || '|' || pg_temp.valores('21'));
-select pg_temp.registrar('B2. 5 minutos a menos (06:00-14:55 = 475): sem tolerância nem arredondamento, 80 × 475/480 = 79,17',
-  'ok|120.00|79.17|475|0|25.00', pg_temp.entrada('22', '13', '1', _out => '14:55') || '|' || pg_temp.valores('22'));
+select pg_temp.registrar('B1. saída antecipada (E1, 06:00-11:00 = 240 de 480): cobra 120 × 240/480 = 60,00 (030), paga 80 × 240/480 = 40,00',
+  'ok|60.00|40.00|240|0|25.00', pg_temp.entrada('21', '12', '1', _out => '11:00') || '|' || pg_temp.valores('21'));
+select pg_temp.registrar('B2. 5 minutos a menos (06:00-14:55 = 475): sem tolerância nem arredondamento: cobra 118,75 (030), paga 79,17',
+  'ok|118.75|79.17|475|0|25.00', pg_temp.entrada('22', '13', '1', _out => '14:55') || '|' || pg_temp.valores('22'));
 select pg_temp.registrar('B3. presença SEM saída (E2): regra pendente, sem proporcional (diária de custo inteira, 60) e sem hora extra',
   'ok|120.00|60.00|0|0|-', pg_temp.entrada('23', '13', '2', _out => '') || '|' || pg_temp.valores('23'));
 select pg_temp.registrar('B4. editar a saída antecipada para o turno completo volta ao custo da diária: 80,00', '1|120.00|80.00',
@@ -285,7 +286,7 @@ select pg_temp.registrar('E5. trocar o colaborador do apontamento (E4 -> E7) peg
 -- F. Operação sem contrato (valor acordado)
 -- ---------------------------------------------------------------------------
 
-select pg_temp.registrar('F1. avulsa, saída antecipada (E1, 06:00-11:00): cobra o valor acordado 250,00; paga 40,00', 'ok|250.00|40.00|240|0|25.00',
+select pg_temp.registrar('F1. avulsa, saída antecipada (E1, 06:00-11:00): cobra metade do valor acordado, 125,00 (030); paga 40,00', 'ok|125.00|40.00|240|0|25.00',
   pg_temp.entrada('31', '14', '1', _out => '11:00') || '|' || pg_temp.valores('31'));
 select pg_temp.registrar('F2. avulsa, hora extra (E2): 250 + 2 × 31,25 = 312,50 (fator 1, ainda fixo: pendente); paga 75,00', 'ok|312.50|75.00|600|120|-',
   pg_temp.entrada('32', '14', '2', _out => '17:00') || '|' || pg_temp.valores('32'));
@@ -336,24 +337,25 @@ select pg_temp.registrar('G7. trilha: 4 registros e 1 cancelamento, com ator, mo
 -- H. Fatura, conciliação e congelamento
 -- ---------------------------------------------------------------------------
 
--- Elegível de C1 em 01-15/03: 11 (120/80), 13 (120/80), 21 (120/40), 24 (165/75), 25 (165/130),
--- 27 (187,50/150), 31 (250/40), 32 (312,50/75) = receita 1.440,00, custo 670,00, 8 diárias.
+-- Elegível de C1 em 01-15/03: 11 (120/80), 13 (120/80), 21 (60/40), 24 (165/75), 25 (165/130),
+-- 27 (187,50/150), 31 (125/40), 32 (312,50/75) = receita 1.255,00, custo 670,00, 8 diárias
+-- (21 e 31 são saídas antecipadas: cobrança proporcional desde a 030).
 -- Adicional dentro do período: só A1 (350). A2 cruza a quinzena; A3 está cancelado.
 create temporary table _fat (id text);
 insert into _fat select pg_temp.adm($q$select (public.gerar_fatura('5c29c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15')).id::text$q$);
 
-select pg_temp.registrar('H1. fatura de C1 em 01-15/03: 8 diárias, total 1.440,00 + 350,00 = 1.790,00, custo 670,00', '8.00|1790.00|670.00',
+select pg_temp.registrar('H1. fatura de C1 em 01-15/03: 8 diárias, total 1.255,00 + 350,00 = 1.605,00, custo 670,00', '8.00|1605.00|670.00',
   (select total_dailies::text || '|' || total_amount::text || '|' || total_cost::text from public.invoices where id::text = (select id from _fat)));
-select pg_temp.registrar('H2. itens fecham com o total, e o adicional é item próprio com motivo e referência', '1790.00|1|Adicional — Etiquetagem de 2.000 volumes (ref. OS 123)|350.00',
+select pg_temp.registrar('H2. itens fecham com o total, e o adicional é item próprio com motivo e referência', '1605.00|1|Adicional — Etiquetagem de 2.000 volumes (ref. OS 123)|350.00',
   (select sum(amount)::text from public.invoice_items where invoice_id::text = (select id from _fat))
   || '|' || (select count(*)::text from public.invoice_items where invoice_id::text = (select id from _fat) and description like 'Adicional%')
   || '|' || (select description || '|' || amount::text from public.invoice_items where invoice_id::text = (select id from _fat) and description like 'Adicional%'));
-select pg_temp.registrar('H3. conciliação: total = receita dos apontamentos + adicionais; margem = total - custo = 1.120,00', 'true|1120.00',
+select pg_temp.registrar('H3. conciliação: total = receita dos apontamentos + adicionais; margem = total - custo = 935,00', 'true|935.00',
   (select (i.total_amount = (select sum(billed_amount) from public.timesheet_entries where invoice_id = i.id)
                           + (select sum(amount) from public.billing_additionals where invoice_id = i.id))::text
           || '|' || (i.total_amount - i.total_cost)::text
      from public.invoices i where i.id::text = (select id from _fat)));
-select pg_temp.registrar('H4. o adicional não virou diária nem hora extra: itens de diárias somam 1.220,00 em 8 (extras 220,00 à parte)', '1220.00|8.00|220.00',
+select pg_temp.registrar('H4. o adicional não virou diária nem hora extra: itens de diárias somam 1.035,00 em 8 (extras 220,00 à parte)', '1035.00|8.00|220.00',
   (select sum(amount)::text || '|' || sum(quantity)::text from public.invoice_items where invoice_id::text = (select id from _fat) and description like '%— diárias')
   || '|' || (select sum(amount)::text from public.invoice_items where invoice_id::text = (select id from _fat) and description like '%— horas extras'));
 select pg_temp.registrar('H5. A1 vinculado; A2 (cruza a quinzena) e A3 (cancelado) não', 'true|false|false',
@@ -381,7 +383,7 @@ select pg_temp.registrar('H9. sem apontamento nem adicional elegível: P0002 (in
 select pg_temp.registrar('I1. admin pela API, insert com entrada = saída: 23514', 'erro 23514',
   pg_temp.adm($q$with x as (insert into public.timesheet_entries (timesheet_id, employee_id, status, check_in, check_out, break_minutes)
     values ('5c29b000-0000-4000-8000-000000000012', '5c29f000-0000-4000-8000-000000000004', 'present', '08:00', '08:00', 0) returning 1) select count(*)::text from x$q$));
-select pg_temp.registrar('I2. editar um apontamento (não faturado) para entrada = saída: 23514, e ele não muda', 'erro 23514|120.00|79.17',
+select pg_temp.registrar('I2. editar um apontamento (não faturado) para entrada = saída: 23514, e ele não muda', 'erro 23514|118.75|79.17',
   pg_temp.editar('22', $s$check_in = '14:55'$s$) || '|' || split_part(pg_temp.valores('22'), '|', 1) || '|' || split_part(pg_temp.valores('22'), '|', 2));
 select pg_temp.registrar('I3. falta com horários iguais não é afetada (falta não mede jornada)', 'ok',
   pg_temp.entrada('41', '13', '7', _status => 'absent', _in => '08:00', _out => '08:00'));
@@ -397,7 +399,7 @@ select pg_temp.registrar('I4b. e nada foi gravado na data', '0',
 select pg_temp.registrar('I5. RPC do operador, saída antecipada (06:00-11:00): grava', '1',
   pg_temp.ope($q$select count(*)::text from (select public.salvar_apontamento_operacional('5c29e000-0000-4000-8000-0000000000a3', '5c29a000-0000-4000-8000-0000000000a3', date '2026-03-04',
       '[{"employee_id":"5c29f000-0000-4000-8000-000000000003","status":"present","check_in":"06:00","check_out":"11:00","break_minutes":60}]'::jsonb)) x$q$));
-select pg_temp.registrar('I5b. pela RPC do operador: custo proporcional 40,00, cobrança 250,00', '250.00|40.00',
+select pg_temp.registrar('I5b. pela RPC do operador: custo e cobrança proporcionais (030): 125,00 / 40,00', '125.00|40.00',
   (select billed_amount::text || '|' || cost_amount::text from public.timesheet_entries e join public.timesheets t on t.id = e.timesheet_id where t.work_date = date '2026-03-04'));
 select pg_temp.registrar('I6. o operador não lê valor: listar_apontamentos_do_operador não devolve valor-hora, custo nem cobrança', 'false',
   (select exists (select 1 from unnest(p.proargnames) a where a ilike '%ot_hourly%' or a ilike '%cost%' or a ilike '%billed%' or a ilike '%amount%')::text

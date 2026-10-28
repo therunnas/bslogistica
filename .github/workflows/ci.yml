@@ -129,6 +129,9 @@ jobs:
       - name: Teste regras-bs
         run: npm run test:regras-bs
 
+      - name: Teste regras-definitivas
+        run: npm run test:regras-definitivas
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

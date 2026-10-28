@@ -38,7 +38,8 @@
     "test:ativacao-motor": "node --experimental-strip-types scripts/testar-ativacao-motor.mjs",
     "test:implantacao-vigencias": "node --experimental-strip-types scripts/testar-implantacao-vigencias.mjs",
     "test:vigencias-paginacao": "node --experimental-strip-types scripts/testar-vigencias-paginacao.mjs",
-    "test:regras-bs": "node --experimental-strip-types scripts/testar-regras-bs.mjs"
+    "test:regras-bs": "node --experimental-strip-types scripts/testar-regras-bs.mjs",
+    "test:regras-definitivas": "node --experimental-strip-types scripts/testar-regras-definitivas.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

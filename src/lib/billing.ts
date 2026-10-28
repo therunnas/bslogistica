@@ -66,11 +66,44 @@ export interface EntryCalcInput {
    * custo inteira, como no motor antigo.
    */
   proportionalCost?: boolean;
+  /**
+   * Regras definitivas da BS (migration 030). Presente = regra nova de COBRANÇA: jornada de
+   * referência (sábado, se houver), cobrança proporcional na saída antecipada e hora extra
+   * arredondada no dia ('diario') ou bruta para o fechamento acumular ('acumulado'). Ausente: a
+   * cobrança de antes (diária cheia e minutos exatos após a tolerância).
+   */
+  roundingMode?: ModoDeArredondamento | null;
+  /** Tipo do dia trabalhado (030). Ausente: dia útil. */
+  dayKind?: TipoDoDia;
+  /** Jornada de referência da cobrança no sábado (030), em horas. Ausente ou nula: dia comum. */
+  saturdayShiftHours?: number | null;
+  /** Fator do pagamento em feriado (030; 2 = adicional de 100%). Ausente ou nulo: sem regra. */
+  holidayPayFactor?: number | null;
+}
+
+export type ModoDeArredondamento = "diario" | "acumulado";
+export type TipoDoDia = "util" | "sabado" | "feriado";
+
+/**
+ * Arredondamento da hora extra cobrada (regra da BS, migration 030), aplicado aos minutos
+ * residuais de cada hora, com as horas completas preservadas: até 15 min descarta; de 16 a 45,
+ * 30 min; de 46 a 59, a hora seguinte. Espelha `arredondar_minutos_extras()`.
+ */
+export function arredondarMinutosExtras(minutos: number): number {
+  if (!(minutos > 0)) return 0;
+  const inteiros = Math.floor(minutos);
+  const horas = Math.floor(inteiros / 60);
+  const resto = inteiros % 60;
+  if (resto <= 15) return horas * 60;
+  if (resto <= 45) return horas * 60 + 30;
+  return (horas + 1) * 60;
 }
 
 export interface EntryCalcResult {
   workedMinutes: number;
   overtimeMinutes: number;
+  /** Minutos de hora extra COBRADOS (030); sem as regras novas, iguais a `overtimeMinutes`. */
+  billedOvertimeMinutes: number;
   dailyRate: number;
   otHourRate: number;
   dailyCost: number;
@@ -84,7 +117,10 @@ export interface EntryCalcResult {
  * descontando a tolerância em minutos definida no contrato.
  * Custo: diária de custo (proporcional às horas trabalhadas na saída antecipada, quando
  * `proportionalCost`) + horas excedentes x valor-hora acordado (ou diária de custo / jornada).
- * A ordem das operações é a de `derivar_valores_por_vigencia()` (029), para a paridade.
+ * Com `roundingMode` (030), a cobrança usa a jornada de referência (sábado), é proporcional na
+ * saída antecipada e arredonda a hora extra no dia (ou a deixa bruta para o fechamento acumular);
+ * no feriado com fator, o pagamento é horas trabalhadas × custo-hora × fator.
+ * A ordem das operações é a de `derivar_valores_por_vigencia()`, para a paridade.
  */
 export function calcEntry(input: EntryCalcInput): EntryCalcResult {
   const { rules } = input;
@@ -100,6 +136,7 @@ export function calcEntry(input: EntryCalcInput): EntryCalcResult {
     return {
       workedMinutes: 0,
       overtimeMinutes: 0,
+      billedOvertimeMinutes: 0,
       dailyRate: rules.daily_rate,
       otHourRate,
       dailyCost: input.employeeDailyCost,
@@ -119,14 +156,49 @@ export function calcEntry(input: EntryCalcInput): EntryCalcResult {
       ? (input.employeeDailyCost * worked) / planned
       : input.employeeDailyCost;
 
+  const modo = input.roundingMode;
+  let billedOvertime = overtime;
+  let billedAmount = round2(rules.daily_rate + otHours * otHourRate);
+  if (modo === "diario" || modo === "acumulado") {
+    const sabado = input.saturdayShiftHours;
+    const plannedCob =
+      input.dayKind === "sabado" && sabado !== null && sabado !== undefined && sabado > 0
+        ? sabado * 60
+        : planned;
+    const baseCob =
+      temHorarios && worked < plannedCob
+        ? (rules.daily_rate * worked) / plannedCob
+        : rules.daily_rate;
+    const excessoCob = Math.max(worked - plannedCob, 0);
+    billedOvertime =
+      modo === "acumulado"
+        ? excessoCob
+        : excessoCob > (rules.ot_tolerance_min ?? 0)
+          ? arredondarMinutosExtras(excessoCob)
+          : 0;
+    billedAmount = round2(baseCob + (billedOvertime / 60) * otHourRate);
+  }
+
+  const fatorFeriado = input.holidayPayFactor;
+  const costAmount =
+    modo !== null &&
+    modo !== undefined &&
+    input.dayKind === "feriado" &&
+    fatorFeriado !== null &&
+    fatorFeriado !== undefined &&
+    temHorarios
+      ? round2((worked / 60) * (input.employeeDailyCost / shiftHours) * fatorFeriado)
+      : round2(baseCost + otHours * otCostHourRate);
+
   return {
     workedMinutes: worked,
     overtimeMinutes: overtime,
+    billedOvertimeMinutes: billedOvertime,
     dailyRate: rules.daily_rate,
     otHourRate,
     dailyCost: input.employeeDailyCost,
-    billedAmount: round2(rules.daily_rate + otHours * otHourRate),
-    costAmount: round2(baseCost + otHours * otCostHourRate),
+    billedAmount,
+    costAmount,
   };
 }
 

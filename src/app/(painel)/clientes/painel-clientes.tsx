@@ -47,8 +47,14 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { brl, dateBR, num, todayISO } from "@/lib/format";
 import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
-import { useCriarComVigencia, useEstadoDoMotor } from "@/lib/vigencias-dados";
-import { modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
+import { FeriadosDoCalendario } from "./feriados";
+import { useCriarComVigencia, useEstadoDoMotor, useRegrasDefinitivas } from "@/lib/vigencias-dados";
+import {
+  camposDoCadastroInicialDeContrato,
+  errosDosParametros030,
+  modoDeEdicaoDeTaxa,
+  PARAMETROS_030_INICIAIS,
+} from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { useClients, useContracts, useOperations } from "@/lib/queries";
 import type { Client, Contract } from "@/lib/types";
@@ -97,6 +103,8 @@ export function PainelClientes() {
   const saveContract = useSaveRow("contracts");
   const criarContratoComVigencia = useCriarComVigencia("contrato", ["contracts"]);
   const estadoDoMotor = useEstadoDoMotor();
+  // Calendário de feriados só existe com a migration 030 (o banco anuncia `regras_definitivas`).
+  const regrasDefinitivas = useRegrasDefinitivas();
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");
 
@@ -105,6 +113,10 @@ export function PainelClientes() {
 
   const [clientForm, setClientForm] = useState(emptyClient);
   const [contractForm, setContractForm] = useState(emptyContract);
+  // Parâmetros da 030 do cadastro inicial (só contrato novo, motor por vigência, banco com a 030).
+  const [parametros030, setParametros030] = useState<Record<string, string>>({
+    ...PARAMETROS_030_INICIAIS,
+  });
 
   const clientName = (id: string) => clients.data?.find((client) => client.id === id)?.name ?? "—";
 
@@ -118,6 +130,16 @@ export function PainelClientes() {
   // vigência; sem estado confirmado, nada financeiro é oferecido nem enviado.
   const taxaTravada =
     modoDeTaxa !== "direta" && (Boolean(contractForm.id) || modoDeTaxa === "bloqueada");
+
+  // Contrato novo passa pela RPC atômica (motor por vigência): ela aceita e grava os parâmetros da
+  // 030 na vigência inicial. Com o motor desligado ou sem a 030, os campos não existem.
+  const camposDa030 = camposDoCadastroInicialDeContrato(
+    regrasDefinitivas && modoDeTaxa === "por-vigencia" && !contractForm.id,
+  );
+  const errosDa030 =
+    camposDa030.length > 0
+      ? errosDosParametros030({ ...parametros030, shift_hours: String(contractForm.shift_hours) })
+      : [];
 
   const totalClientes = clients.data?.length ?? 0;
 
@@ -177,6 +199,7 @@ export function PainelClientes() {
       status: contract.status,
     });
 
+    setParametros030({ ...PARAMETROS_030_INICIAIS });
     setContractOpen(true);
   }
 
@@ -217,8 +240,10 @@ export function PainelClientes() {
               shift_hours: String(payload["shift_hours"]),
               ot_factor: String(payload["ot_factor"]),
               ot_tolerance_min: String(payload["ot_tolerance_min"]),
+              ...(camposDa030.length > 0 ? parametros030 : {}),
             },
             encerrarAnterior: false,
+            regrasDefinitivas: camposDa030.length > 0,
           },
         },
         { onSuccess: () => setContractOpen(false) },
@@ -440,6 +465,7 @@ export function PainelClientes() {
                   ...emptyContract,
                   client_id: clients.data?.[0]?.id ?? "",
                 });
+                setParametros030({ ...PARAMETROS_030_INICIAIS });
 
                 setContractOpen(true);
               }}
@@ -581,6 +607,8 @@ export function PainelClientes() {
               </div>
             </CardContent>
           </Card>
+
+          {regrasDefinitivas ? <FeriadosDoCalendario /> : null}
         </TabsContent>
       </Tabs>
 
@@ -903,6 +931,58 @@ export function PainelClientes() {
             </div>
           </div>
 
+          {camposDa030.length > 0 ? (
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <p className="text-xs text-muted-foreground">
+                Regras de hora extra, sábado e feriado, gravadas na vigência inicial do contrato.
+                Para mudar depois, registre uma nova vigência.
+              </p>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {camposDa030.map((campo) => (
+                  <div key={campo.chave} className="space-y-2">
+                    <Label htmlFor={`contrato-${campo.chave}`}>{campo.rotulo}</Label>
+
+                    {campo.tipo === "escolha" ? (
+                      <select
+                        id={`contrato-${campo.chave}`}
+                        value={parametros030[campo.chave] || campo.padrao || ""}
+                        onChange={(event) =>
+                          setParametros030({ ...parametros030, [campo.chave]: event.target.value })
+                        }
+                        className={`${INPUT_CLASS} w-full border px-3 text-sm`}
+                      >
+                        {(campo.opcoes ?? []).map((opcao) => (
+                          <option key={opcao.valor} value={opcao.valor}>
+                            {opcao.rotulo}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        id={`contrato-${campo.chave}`}
+                        inputMode="decimal"
+                        value={parametros030[campo.chave] ?? ""}
+                        onChange={(event) =>
+                          setParametros030({ ...parametros030, [campo.chave]: event.target.value })
+                        }
+                        className={INPUT_CLASS}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {errosDa030.length > 0 ? (
+                <ul className="list-disc pl-5 text-xs text-destructive">
+                  {errosDa030.map((mensagem) => (
+                    <li key={mensagem}>{mensagem}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
           {taxaTravada ? (
             <p className="text-xs text-muted-foreground">
               {modoDeTaxa === "por-vigencia"
@@ -948,6 +1028,7 @@ export function PainelClientes() {
                 !contractForm.name ||
                 !contractForm.client_id ||
                 (modoDeTaxa === "bloqueada" && !contractForm.id) ||
+                errosDa030.length > 0 ||
                 saveContract.isPending ||
                 criarContratoComVigencia.isPending
               }

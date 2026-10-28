@@ -52,8 +52,15 @@ import {
 } from "@/lib/apontamentos-salvar";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
-import { useEstadoDoMotor, useRegrasDaBs, useTermosDoApontamento } from "@/lib/vigencias-dados";
-import { resolverCondicaoDoDia } from "@/lib/vigencias-ui";
+import { datasAtivas } from "@/lib/feriados";
+import { useFeriados } from "@/lib/regras-definitivas-dados";
+import {
+  useEstadoDoMotor,
+  useRegrasDaBs,
+  useRegrasDefinitivas,
+  useTermosDoApontamento,
+} from "@/lib/vigencias-dados";
+import { parametrosDeHoras, resolverCondicaoDoDia, tipoDoDia } from "@/lib/vigencias-ui";
 import { AvisoDoMotor } from "../_components/vigencias";
 import { brl, minutesToLabel, todayISO } from "@/lib/format";
 import { useContractRules } from "@/lib/ledger";
@@ -442,6 +449,10 @@ export function PainelApontamentos() {
   // U3: o estado do motor decide de onde vem o valor mostrado (ver apontamentos-financeiro.ts).
   const estadoDoMotor = useEstadoDoMotor();
   const regrasBs = useRegrasDaBs();
+  // Regras definitivas (030): tipo do dia pelo calendário e parâmetros de horas da versão.
+  const regrasDefinitivas = useRegrasDefinitivas();
+  const feriados = useFeriados(regrasDefinitivas && estadoDoMotor.tag === "ligado");
+  const tipoDaFolha = tipoDoDia(date, datasAtivas(feriados.data ?? []));
   const operacaoDaTela = operationList.find((item) => item.id === operationId) ?? null;
   const termos = useTermosDoApontamento({
     habilitado: estadoDoMotor.tag === "ligado" && Boolean(operationId),
@@ -486,12 +497,20 @@ export function PainelApontamentos() {
       condicaoDoDia,
       plannedMinutes,
       regrasBs,
+      // Sem o calendário carregado, o tipo do dia de uma linha nova não é confiável: sem prévia nova.
+      regrasDefinitivas: regrasDefinitivas && feriados.isSuccess,
+      tipoDoDia: tipoDaFolha,
+      parametrosDaVersao: (id) => {
+        const versao = termos.termosContrato.find((termo) => termo.id === id);
+        return versao ? parametrosDeHoras(versao) : null;
+      },
       calcular: ({
         regras,
         custoDiario,
         plannedMinutes: previstos,
         custoHoraExtra,
         custoProporcional,
+        horas,
       }) =>
         calcEntry({
           status: row.status,
@@ -503,6 +522,14 @@ export function PainelApontamentos() {
           employeeDailyCost: custoDiario,
           employeeOtHourCost: custoHoraExtra,
           proportionalCost: custoProporcional,
+          ...(horas
+            ? {
+                roundingMode: horas.modo,
+                dayKind: horas.tipoDoDia,
+                saturdayShiftHours: horas.sabadoHoras,
+                holidayPayFactor: horas.fatorFeriado,
+              }
+            : {}),
         }),
     });
 

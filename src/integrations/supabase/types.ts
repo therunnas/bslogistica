@@ -154,13 +154,16 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           daily_rate: number;
+          holiday_pay_factor: number | null;
           id: string;
           origin: string;
           ot_factor: number;
+          ot_rounding_mode: string;
           ot_tolerance_min: number;
           reason: string;
           replaced_by: string | null;
           retired_at: string | null;
+          saturday_shift_hours: number | null;
           shift_hours: number;
           valid_from: string;
           valid_to: string | null;
@@ -171,13 +174,16 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           daily_rate: number;
+          holiday_pay_factor?: number | null;
           id?: string;
           origin: string;
           ot_factor: number;
+          ot_rounding_mode?: string;
           ot_tolerance_min: number;
           reason: string;
           replaced_by?: string | null;
           retired_at?: string | null;
+          saturday_shift_hours?: number | null;
           shift_hours: number;
           valid_from: string;
           valid_to?: string | null;
@@ -188,13 +194,16 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           daily_rate?: number;
+          holiday_pay_factor?: number | null;
           id?: string;
           origin?: string;
           ot_factor?: number;
+          ot_rounding_mode?: string;
           ot_tolerance_min?: number;
           reason?: string;
           replaced_by?: string | null;
           retired_at?: string | null;
+          saturday_shift_hours?: number | null;
           shift_hours?: number;
           valid_from?: string;
           valid_to?: string | null;
@@ -395,6 +404,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      financial_holidays: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          holiday_date: string;
+          id: string;
+          name: string;
+          reason: string;
+          retire_reason: string | null;
+          retired_at: string | null;
+          retired_by: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          holiday_date: string;
+          id?: string;
+          name: string;
+          reason: string;
+          retire_reason?: string | null;
+          retired_at?: string | null;
+          retired_by?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          holiday_date?: string;
+          id?: string;
+          name?: string;
+          reason?: string;
+          retire_reason?: string | null;
+          retired_at?: string | null;
+          retired_by?: string | null;
+        };
+        Relationships: [];
+      };
       financial_terms_audit: {
         Row: {
           action: string;
@@ -444,6 +492,7 @@ export type Database = {
           description: string;
           id: string;
           invoice_id: string;
+          kind: string | null;
           operation_id: string | null;
           quantity: number;
           unit_price: number;
@@ -454,6 +503,7 @@ export type Database = {
           description: string;
           id?: string;
           invoice_id: string;
+          kind?: string | null;
           operation_id?: string | null;
           quantity?: number;
           unit_price?: number;
@@ -464,6 +514,7 @@ export type Database = {
           description?: string;
           id?: string;
           invoice_id?: string;
+          kind?: string | null;
           operation_id?: string | null;
           quantity?: number;
           unit_price?: number;
@@ -788,6 +839,7 @@ export type Database = {
       timesheet_entries: {
         Row: {
           billed_amount: number;
+          billed_overtime_minutes: number | null;
           break_minutes: number;
           check_in: string | null;
           check_out: string | null;
@@ -796,6 +848,7 @@ export type Database = {
           created_at: string;
           daily_cost_snapshot: number;
           daily_rate_snapshot: number;
+          day_kind_snapshot: string | null;
           employee_cost_terms_id: string | null;
           employee_id: string;
           id: string;
@@ -819,6 +872,7 @@ export type Database = {
         };
         Insert: {
           billed_amount?: number;
+          billed_overtime_minutes?: number | null;
           break_minutes?: number;
           check_in?: string | null;
           check_out?: string | null;
@@ -827,6 +881,7 @@ export type Database = {
           created_at?: string;
           daily_cost_snapshot?: number;
           daily_rate_snapshot?: number;
+          day_kind_snapshot?: string | null;
           employee_cost_terms_id?: string | null;
           employee_id: string;
           id?: string;
@@ -850,6 +905,7 @@ export type Database = {
         };
         Update: {
           billed_amount?: number;
+          billed_overtime_minutes?: number | null;
           break_minutes?: number;
           check_in?: string | null;
           check_out?: string | null;
@@ -858,6 +914,7 @@ export type Database = {
           created_at?: string;
           daily_cost_snapshot?: number;
           daily_rate_snapshot?: number;
+          day_kind_snapshot?: string | null;
           employee_cost_terms_id?: string | null;
           employee_id?: string;
           id?: string;
@@ -1030,6 +1087,19 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      ajustes_de_arredondamento_acumulado: {
+        Args: { p_apontamentos?: string[]; p_client_id: string; p_fim: string; p_inicio: string };
+        Returns: {
+          ajuste: number;
+          colaborador: string;
+          employee_id: string;
+          minutos_arredondados: number;
+          minutos_brutos: number;
+          valor_arredondado: number;
+          valor_bruto: number;
+          valor_hora: number;
+        }[];
+      };
       alterar_motor_vigencia: {
         Args: {
           p_aceitar_pendencias?: boolean;
@@ -1050,10 +1120,12 @@ export type Database = {
         Args: { p_reason: string; p_term_id: string };
         Returns: undefined;
       };
+      aposentar_feriado: { Args: { p_id: string; p_reason: string }; Returns: undefined };
       aposentar_valor_acordado_operacao: {
         Args: { p_reason: string; p_term_id: string };
         Returns: undefined;
       };
+      arredondar_minutos_extras: { Args: { p_minutos: number }; Returns: number };
       cancelar_adicional: {
         Args: { p_additional_id: string; p_reason: string };
         Returns: undefined;
@@ -1066,13 +1138,16 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           daily_rate: number;
+          holiday_pay_factor: number | null;
           id: string;
           origin: string;
           ot_factor: number;
+          ot_rounding_mode: string;
           ot_tolerance_min: number;
           reason: string;
           replaced_by: string | null;
           retired_at: string | null;
+          saturday_shift_hours: number | null;
           shift_hours: number;
           valid_from: string;
           valid_to: string | null;
@@ -1111,13 +1186,20 @@ export type Database = {
       condicoes_exigir_admin: { Args: never; Returns: undefined };
       condicoes_validar_hora_extra: { Args: { p_valor: number }; Returns: number };
       condicoes_validar_motivo: { Args: { p_reason: string }; Returns: string };
+      condicoes_validar_parametros_de_horas: {
+        Args: { p_feriado: number; p_modo: string; p_sabado: number; p_shift_hours: number };
+        Returns: undefined;
+      };
       conta_ativa: { Args: { p_user_id: string }; Returns: boolean };
       corrigir_condicao_contrato: {
         Args: {
           p_daily_rate: number;
+          p_holiday_pay_factor?: number;
           p_ot_factor: number;
+          p_ot_rounding_mode?: string;
           p_ot_tolerance_min: number;
           p_reason: string;
+          p_saturday_shift_hours?: number;
           p_shift_hours: number;
           p_term_id: string;
           p_valid_from: string;
@@ -1164,10 +1246,13 @@ export type Database = {
         Args: {
           p_client_id: string;
           p_daily_rate: number;
+          p_holiday_pay_factor?: number;
           p_name: string;
           p_ot_factor: number;
+          p_ot_rounding_mode?: string;
           p_ot_tolerance_min: number;
           p_reason: string;
+          p_saturday_shift_hours?: number;
           p_shift_hours: number;
           p_status: string;
           p_valid_from: string;
@@ -1244,13 +1329,16 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           daily_rate: number;
+          holiday_pay_factor: number | null;
           id: string;
           origin: string;
           ot_factor: number;
+          ot_rounding_mode: string;
           ot_tolerance_min: number;
           reason: string;
           replaced_by: string | null;
           retired_at: string | null;
+          saturday_shift_hours: number | null;
           shift_hours: number;
           valid_from: string;
           valid_to: string | null;
@@ -1413,6 +1501,7 @@ export type Database = {
         }[];
       };
       motor_sincronizar_colunas_interno: { Args: never; Returns: Json };
+      motor_tipo_do_dia: { Args: { p_data: string }; Returns: string };
       operador_autorizado: {
         Args: { p_operation_id: string };
         Returns: boolean;
@@ -1448,9 +1537,12 @@ export type Database = {
           p_contract_id: string;
           p_daily_rate: number;
           p_encerrar_anterior?: boolean;
+          p_holiday_pay_factor?: number;
           p_ot_factor: number;
+          p_ot_rounding_mode?: string;
           p_ot_tolerance_min: number;
           p_reason: string;
+          p_saturday_shift_hours?: number;
           p_shift_hours: number;
           p_valid_from: string;
           p_valid_to?: string;
@@ -1469,6 +1561,10 @@ export type Database = {
         };
         Returns: string;
       };
+      registrar_feriado: {
+        Args: { p_data: string; p_nome: string; p_reason: string };
+        Returns: string;
+      };
       registrar_valor_acordado_operacao: {
         Args: {
           p_agreed_amount: number;
@@ -1483,6 +1579,30 @@ export type Database = {
       regularizar_apontamento_legado: {
         Args: { p_aplicar?: boolean; p_entry_id: string; p_reason: string };
         Returns: Json;
+      };
+      resumo_financeiro_periodo: {
+        Args: { p_client_id?: string; p_fim: string; p_inicio: string; p_operation_id?: string };
+        Returns: {
+          a_faturar: number;
+          adicionais: number;
+          ajuste_aplicavel: boolean;
+          ajuste_faturado: number;
+          ajuste_previsto: number;
+          faturado: number;
+          receita_apontamentos: number;
+          receita_total: number;
+        }[];
+      };
+      saldo_de_horas_do_periodo: {
+        Args: { p_client_id: string; p_fim: string; p_inicio: string };
+        Returns: {
+          apontamentos: number;
+          colaborador: string;
+          employee_id: string;
+          minutos_excedentes: number;
+          minutos_faltantes: number;
+          saldo: number;
+        }[];
       };
       salvar_apontamento_operacional: {
         Args: {
@@ -1499,6 +1619,10 @@ export type Database = {
         Returns: boolean;
       };
       uid_do_operador: { Args: never; Returns: string };
+      validar_fechamento_acumulado: {
+        Args: { p_apontamentos: string[]; p_client_id: string; p_fim: string; p_inicio: string };
+        Returns: undefined;
+      };
       valor_acordado_operacao_na_data: {
         Args: { p_operation_id: string; p_work_date: string };
         Returns: {
