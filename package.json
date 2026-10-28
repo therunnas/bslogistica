@@ -46,6 +46,7 @@
     "test:fechamento-tela": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-tela.mjs",
     "test:fechamento-csv": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-csv.mjs",
     "test:fechamento-xlsx": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-xlsx.mjs",
+    "test:apontamentos-c07": "node --experimental-strip-types scripts/testar-apontamentos-c07.mjs",
     "test:fechamento-gate": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-gate.mjs",
     "test:fechamento-conciliacao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-regras-030.mjs"
   },

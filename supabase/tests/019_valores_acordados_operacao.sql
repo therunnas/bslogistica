@@ -607,7 +607,7 @@ select pg_temp.registrar('V3. as 7 funções SECURITY DEFINER novas são do post
       and array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public, pg_temp%'
       and p.proname in ('registrar_valor_acordado_operacao', 'corrigir_valor_acordado_operacao', 'encerrar_valor_acordado_operacao', 'aposentar_valor_acordado_operacao',
                         'valor_acordado_operacao_na_data', 'exigir_valor_acordado_operacao_na_data', 'condicoes_encerrar_operacao_interno')));
-select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 = 13, todos habilitados', '13',
+select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 = 14, todos habilitados', '14',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'));
 select pg_temp.registrar('V5. shifts: 4 triggers originais habilitados + o congelamento DESABILITADO', '4|1',
   (select count(*) filter (where tgenabled = 'O')::text || '|' || count(*) filter (where tgenabled = 'D')::text from pg_trigger where tgrelid = 'public.shifts'::regclass and not tgisinternal));

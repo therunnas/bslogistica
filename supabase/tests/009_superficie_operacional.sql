@@ -1135,8 +1135,8 @@ begin
     'erro 42501', pg_temp.salvar('0a000000-0000-4000-8000-000000000001', 'aal1', _op, _t, '2026-09-17',
       '[{"employee_id":"05000000-0000-4000-8000-000000000002","status":"absent"}]'::jsonb));
 
-  perform pg_temp.registrar('K16. mas o banco sozinho aceita escrever linha de folha fechada (regra e so da RPC)',
-    '1', pg_temp.como_rpc(format(
+  perform pg_temp.registrar('K16. desde a 031 o banco sozinho TAMBÉM recusa escrever linha de folha fechada (55000)',
+    'erro 55000', pg_temp.como_rpc(format(
       'with u as (update public.timesheet_entries set notes = ''x'' where timesheet_id = %L::uuid returning 1) select count(*)::text from u', _folha_vazia)));
 
   -- K17 e K18. Indices unicos nao consultam papel nenhum.

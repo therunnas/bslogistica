@@ -45,10 +45,16 @@ import {
   type AttendanceStatus,
 } from "@/lib/billing";
 import {
+  assinaturasSalvas,
   colaboradoresFaturados,
+  deveAplicarResultado,
+  dirtyAposEdicao,
+  dirtyAposSalvar,
   linhaGravadaFoiAlterada,
   linhasParaSalvar,
   montarCarga,
+  montarCargaDaRpc,
+  type LinhaDoApontamento,
 } from "@/lib/apontamentos-salvar";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
@@ -100,6 +106,9 @@ interface DraftState {
   rows: DraftEntry[];
   dirty: ReadonlySet<string>;
 }
+
+/** PostgREST: a função chamada não existe (banco anterior à migration 031). */
+const CODIGO_DA_RPC_AUSENTE = "PGRST202";
 
 /** Índice que garante a invariável de diária, em public.timesheet_entries. */
 const INDICE_DA_DIARIA = "timesheet_entries_uma_diaria_por_operacao_dia";
@@ -626,6 +635,42 @@ export function PainelApontamentos() {
     ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
   );
 
+  /** O caminho de antes da 031: folha e linhas em duas escritas (não atômico). Só para banco sem a 031. */
+  async function salvarPeloCaminhoAnterior(linhas: (typeof aSalvar)[number]["row"][]) {
+    let timesheetId = timesheet?.id;
+
+    if (!timesheetId) {
+      const { data, error } = await criarClienteNavegador()
+        .from("timesheets")
+        .insert({
+          operation_id: operationId,
+          shift_id: turnoId || null,
+          work_date: date,
+          status: "open",
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      timesheetId = data.id;
+    }
+
+    const payload = linhas.map((row) =>
+      montarCarga(row, { timesheetId: timesheetId!, operationId, workDate: date }, () =>
+        globalThis.crypto.randomUUID(),
+      ),
+    );
+
+    const { error } = await criarClienteNavegador().from("timesheet_entries").upsert(payload);
+
+    if (error) {
+      throw error;
+    }
+  }
+
   const saveAll = useMutation({
     mutationFn: async () => {
       // Sem leitura confiável, "não há folha" pode ser só uma consulta que falhou.
@@ -636,6 +681,8 @@ export function PainelApontamentos() {
       if (!aSalvar.length) {
         return {
           gravadas: 0,
+          contexto: contextKey,
+          salvas: new Map<string, string>() as ReadonlyMap<string, string>,
         };
       }
 
@@ -658,47 +705,34 @@ export function PainelApontamentos() {
         );
       }
 
-      let timesheetId = timesheet?.id;
+      // Folha e linhas numa só chamada, na mesma transação (migration 031): falha no meio não deixa
+      // folha vazia, e um retry resolve a folha e a linha existentes em vez de duplicar. O que foi
+      // enviado (e para qual contexto) volta junto, para o resultado não limpar nada de outro lugar.
+      const linhasDoLote = aSalvar.map(({ row }) => row as LinhaDoApontamento);
 
-      if (!timesheetId) {
-        const { data, error } = await criarClienteNavegador()
-          .from("timesheets")
-          .insert({
-            operation_id: operationId,
-            shift_id: turnoId || null,
-            work_date: date,
-            status: "open",
-          })
-          .select("id")
-          .single();
+      const { error } = await criarClienteNavegador().rpc("salvar_apontamento_admin", {
+        p_operation_id: operationId,
+        ...(turnoId ? { p_shift_id: turnoId } : {}),
+        p_work_date: date,
+        p_linhas: montarCargaDaRpc(linhasDoLote),
+      });
 
-        if (error) {
-          throw error;
-        }
-
-        timesheetId = data.id;
-      }
-
-      // Só as colunas editáveis (mais as chaves de contexto, que o banco sobrescreve com as da
-      // folha). Receita, custo, minutos e snapshots são derivados no banco.
-      const payload = aSalvar.map(({ row }) =>
-        montarCarga(row, { timesheetId: timesheetId!, operationId, workDate: date }, () =>
-          globalThis.crypto.randomUUID(),
-        ),
-      );
-
-      const { error } = await criarClienteNavegador().from("timesheet_entries").upsert(payload);
-
-      if (error) {
+      if (error && error.code === CODIGO_DA_RPC_AUSENTE) {
+        // Banco anterior à migration 031 (a função não existe): segue o caminho antigo, de duas
+        // escritas, que é o único que esse banco tem. Com a 031, nunca passa por aqui.
+        await salvarPeloCaminhoAnterior(aSalvar.map(({ row }) => row));
+      } else if (error) {
         throw error;
       }
 
       return {
-        gravadas: payload.length,
+        gravadas: linhasDoLote.length,
+        contexto: contextKey,
+        salvas: assinaturasSalvas(linhasDoLote),
       };
     },
 
-    onSuccess: async ({ gravadas }) => {
+    onSuccess: async ({ gravadas, contexto, salvas }) => {
       if (!gravadas) {
         toast.info("Nenhuma alteração para salvar.");
         return;
@@ -713,11 +747,13 @@ export function PainelApontamentos() {
         }),
       ]);
 
+      // Só limpa quem foi salvo E não mudou desde o envio, e só se o rascunho ainda é do mesmo
+      // contexto: um retorno atrasado não apaga alteração de outra operação, turno ou data.
       setDraft((atual) =>
-        atual
+        atual && deveAplicarResultado(contexto, atual.key)
           ? {
               ...atual,
-              dirty: new Set<string>(),
+              dirty: dirtyAposSalvar(atual.dirty, atual.rows as LinhaDoApontamento[], salvas),
             }
           : atual,
       );
@@ -726,6 +762,10 @@ export function PainelApontamentos() {
     },
 
     onError: (error: unknown) => {
+      // A gravação é atômica: nada foi criado. Reler assim mesmo mantém a tela fiel ao banco.
+      void queryClient.invalidateQueries({ queryKey: ["timesheets"] });
+      void queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] });
+
       if (ehViolacaoDeDiaria(error)) {
         toast.error(mensagemDeDiariaDuplicada());
         return;
@@ -794,19 +834,23 @@ export function PainelApontamentos() {
         return atual;
       }
 
-      const dirty = new Set(atual.dirty);
-      dirty.add(employeeId);
+      const rows = atual.rows.map((row) =>
+        row.employeeId === employeeId
+          ? {
+              ...row,
+              ...patch,
+            }
+          : row,
+      );
+      const editada = rows.find((row) => row.employeeId === employeeId);
+      const gravado = existingEntries.find((entry) => entry.employee_id === employeeId);
+
+      // Edição integralmente desfeita (igual ao gravado) deixa de ser pendência.
+      const dirty = editada ? dirtyAposEdicao(atual.dirty, editada, gravado) : atual.dirty;
 
       return {
         key: atual.key,
-        rows: atual.rows.map((row) =>
-          row.employeeId === employeeId
-            ? {
-                ...row,
-                ...patch,
-              }
-            : row,
-        ),
+        rows,
         dirty,
       };
     });

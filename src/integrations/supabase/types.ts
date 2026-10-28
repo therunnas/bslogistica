@@ -1604,6 +1604,10 @@ export type Database = {
           saldo: number;
         }[];
       };
+      salvar_apontamento_admin: {
+        Args: { p_linhas: Json; p_operation_id: string; p_shift_id?: string; p_work_date: string };
+        Returns: Json;
+      };
       salvar_apontamento_operacional: {
         Args: {
           p_linhas: Json;
