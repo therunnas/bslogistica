@@ -253,13 +253,16 @@ begin
   insert into public.timesheet_entries (id, timesheet_id, employee_id, status, check_in, check_out, break_minutes)
     values ('5c0bb100-0000-4000-8000-000000000009', '5c0bb000-0000-4000-8000-000000000009', '5c0bf000-0000-4000-8000-000000000009', 'present', '06:00', '15:00', 60);
   update public.timesheet_entries set employee_cost_terms_id = '5c0b9000-0000-4000-8000-000000000009' where id = '5c0bb100-0000-4000-8000-000000000009';
-  delete from public.employees where id = '5c0bf000-0000-4000-8000-000000000009';
-  perform pg_temp.registrar('V15. apagar colaborador leva apontamento e versões em cascata, num comando só (NO ACTION confere no fim)',
-    '0/0/0', (select (select count(*) from public.employees where id = '5c0bf000-0000-4000-8000-000000000009')::text || '/'
+  -- Desde a 031, excluir colaborador com apontamento NÃO faturado é recusado (histórico preservado).
+  begin
+    delete from public.employees where id = '5c0bf000-0000-4000-8000-000000000009';
+  exception when sqlstate '55000' then null; end;
+  perform pg_temp.registrar('V15. apagar colaborador com apontamento não faturado é recusado (031): colaborador, versão e apontamento preservados',
+    '1/1/1', (select (select count(*) from public.employees where id = '5c0bf000-0000-4000-8000-000000000009')::text || '/'
                   || (select count(*) from public.employee_cost_terms where id = '5c0b9000-0000-4000-8000-000000000009')::text || '/'
                   || (select count(*) from public.timesheet_entries where id = '5c0bb100-0000-4000-8000-000000000009')::text));
 exception when others then
-  perform pg_temp.registrar('V15. apagar colaborador leva apontamento e versões em cascata, num comando só', '0/0/0', 'erro ' || sqlstate || ' ' || sqlerrm);
+  perform pg_temp.registrar('V15. apagar colaborador com apontamento não faturado é recusado (031)', '1/1/1', 'erro ' || sqlstate || ' ' || sqlerrm);
 end;
 $d$;
 

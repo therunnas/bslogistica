@@ -1911,10 +1911,11 @@ begin
   begin
     delete from public.operations where id = '44444444-4444-4444-8444-4444444444f1';
     get diagnostics _n = row_count; _e := case when _n > 0 then 'APAGOU' else '0 linhas' end;
-  exception when insufficient_privilege then _e := 'recusou 42501';
+  exception when insufficient_privilege then _e := 'recusou';
+            when sqlstate '55000' then _e := 'recusou'; -- 031: histórico não faturado protegido
             when others then _e := 'erro ' || sqlstate; end;
-  perform pg_temp.registrar('J113. cascata: apagar operação COM folha também falha',
-    'recusou 42501', _e);
+  perform pg_temp.registrar('J113. cascata: apagar operação COM folha também falha (42501 do turno ou 55000 da 031)',
+    'recusou', _e);
 end;
 $delete_turno$;
 

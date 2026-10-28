@@ -375,7 +375,11 @@ verificar(
     ["linhasParaSalvar", "montarCarga", "colaboradoresFaturados"].every((n) => tela.includes(n)),
   true,
 );
-verificar("D2. o salvamento monta a carga por montarCarga", /montarCarga\(/.test(salvar), true);
+verificar(
+  "D2. o salvamento monta a carga da RPC por montarCargaDaRpc; o caminho anterior (banco sem a 031) por montarCarga",
+  /montarCargaDaRpc\(/.test(salvar) && /montarCarga\(/.test(telaSemComentarios),
+  true,
+);
 verificar(
   "D3. o salvamento não envia nenhum valor derivado nem snapshot (nem lê o cálculo da prévia)",
   [
@@ -391,13 +395,15 @@ verificar(
   [],
 );
 verificar(
-  "D4. continua usando upsert numa só chamada (atômico)",
-  (salvar.match(/\.upsert\(/g) ?? []).length === 1 && /\.upsert\(payload\)/.test(salvar),
+  "D4. o upsert em duas escritas só existe no caminho anterior à 031; o salvamento normal é uma RPC atômica",
+  (telaSemComentarios.match(/\.upsert\(/g) ?? []).length === 1 &&
+    /salvarPeloCaminhoAnterior\(/.test(salvar) &&
+    /\.rpc\("salvar_apontamento_admin"/.test(salvar),
   true,
 );
 verificar(
-  "D5. o id das linhas novas vem de crypto.randomUUID",
-  /globalThis\.crypto\.randomUUID\(\)/.test(salvar),
+  "D5. o id das linhas novas (crypto.randomUUID) só é gerado no caminho anterior; a RPC resolve a linha por colaborador na folha",
+  /globalThis\.crypto\.randomUUID\(\)/.test(telaSemComentarios) && !/randomUUID/.test(salvar),
   true,
 );
 verificar(
@@ -418,13 +424,13 @@ verificar(
 );
 verificar(
   "D9. o rascunho continua guardando as linhas tocadas (nada digitado é perdido numa releitura)",
-  /dirty\.add\(employeeId\)/.test(telaSemComentarios) &&
+  /dirtyAposEdicao\(atual\.dirty/.test(telaSemComentarios) &&
     /atual\.dirty\.has\(linha\.employeeId\)/.test(telaSemComentarios),
   true,
 );
 verificar(
   "D10. depois de salvar, as linhas tocadas são limpas e as consultas relidas",
-  /dirty: new Set<string>\(\)/.test(telaSemComentarios) &&
+  /dirtyAposSalvar\(atual\.dirty/.test(telaSemComentarios) &&
     /invalidateQueries\(\{\s*queryKey: \["timesheet_entries"\]/.test(telaSemComentarios),
   true,
 );
@@ -439,9 +445,14 @@ verificar(
     "corrigir_",
     "valor_acordado",
     "_na_data",
-    ".rpc(",
   ].filter((c) => telaSemComentarios.includes(c)),
   [],
+);
+verificar(
+  "D11b. a única RPC da tela é salvar_apontamento_admin (031), com o caminho anterior só se a função não existir",
+  [...telaSemComentarios.matchAll(/\.rpc\("([a-z_]+)"/g)].map((m) => m[1]).join(",") ===
+    "salvar_apontamento_admin" && /CODIGO_DA_RPC_AUSENTE = "PGRST202"/.test(telaSemComentarios),
+  true,
 );
 const modulo = ler("src/lib/apontamentos-salvar.ts");
 verificar(

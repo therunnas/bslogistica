@@ -185,3 +185,95 @@ export function montarCarga(
     notes: linha.notes || null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// C07 — salvamento do administrador: rascunho, contexto e concorrência
+//
+// Tudo puro. A tela só chama estas funções; nenhuma regra de "o que está sujo" fica no componente.
+
+/** O que o salvamento leva de UMA linha, em forma comparável (mesma normalização de `montarCarga`). */
+export function assinaturaDaLinha(linha: LinhaDoApontamento): string {
+  const ausente = linha.status === "absent";
+  return JSON.stringify([
+    linha.employeeId,
+    linha.status,
+    ausente ? "" : soHoraEMinuto(linha.checkIn),
+    ausente ? "" : soHoraEMinuto(linha.checkOut),
+    intervaloNormalizado(linha.breakMinutes),
+    linha.notes,
+  ]);
+}
+
+/** As assinaturas, por colaborador, das linhas que ESTE salvamento levou. */
+export function assinaturasSalvas(
+  linhas: readonly LinhaDoApontamento[],
+): ReadonlyMap<string, string> {
+  return new Map(linhas.map((linha) => [linha.employeeId, assinaturaDaLinha(linha)]));
+}
+
+/**
+ * Carga da RPC `salvar_apontamento_admin`: só as colunas editáveis, sem id, sem folha, sem
+ * contexto. A folha e a identidade da linha (colaborador na folha) são do banco.
+ */
+export function montarCargaDaRpc(linhas: readonly LinhaDoApontamento[]) {
+  return linhas.map((linha) => {
+    const ausente = linha.status === "absent";
+    return {
+      employee_id: linha.employeeId,
+      status: linha.status,
+      check_in: ausente || !linha.checkIn ? null : `${soHoraEMinuto(linha.checkIn)}:00`,
+      check_out: ausente || !linha.checkOut ? null : `${soHoraEMinuto(linha.checkOut)}:00`,
+      break_minutes: intervaloNormalizado(linha.breakMinutes),
+      notes: linha.notes || null,
+    };
+  });
+}
+
+/**
+ * O resultado de um salvamento só vale para o contexto (operação, turno e data) que o pediu. Um
+ * retorno atrasado, depois de a pessoa trocar de contexto, não toca no rascunho de agora.
+ */
+export function deveAplicarResultado(contextoDaMutacao: string, contextoAtual: string): boolean {
+  return contextoDaMutacao === contextoAtual;
+}
+
+/**
+ * Quem continua "sujo" depois de um salvamento: só sai quem foi salvo E não mudou desde o envio.
+ * Uma edição feita enquanto o salvamento corria (assinatura diferente) continua sendo pendência, e
+ * a linha que não entrou no lote também.
+ */
+export function dirtyAposSalvar(
+  dirty: ReadonlySet<string>,
+  linhasAtuais: readonly LinhaDoApontamento[],
+  salvas: ReadonlyMap<string, string>,
+): Set<string> {
+  const restante = new Set(dirty);
+  for (const linha of linhasAtuais) {
+    const enviada = salvas.get(linha.employeeId);
+    if (enviada !== undefined && enviada === assinaturaDaLinha(linha)) {
+      restante.delete(linha.employeeId);
+    }
+  }
+  return restante;
+}
+
+/**
+ * Depois de uma edição: a linha fica "suja" se difere do que o servidor tem; se a edição foi
+ * integralmente desfeita (igual ao gravado), deixa de ser. Linha sem registro no servidor é suja
+ * enquanto tiver uma decisão (status), e deixa de ser ao voltar a "não apontado".
+ */
+export function dirtyAposEdicao(
+  dirty: ReadonlySet<string>,
+  linha: Omit<LinhaDoApontamento, "status"> & { status: AttendanceStatus | null },
+  gravado: ApontamentoGravado | undefined,
+): Set<string> {
+  const novo = new Set(dirty);
+  const igualAoServidor =
+    gravado !== undefined
+      ? linha.status !== null &&
+        linhaFoiAlterada({ ...linha, status: linha.status }, gravado) === false
+      : linha.status === null;
+  if (igualAoServidor) novo.delete(linha.employeeId);
+  else novo.add(linha.employeeId);
+  return novo;
+}

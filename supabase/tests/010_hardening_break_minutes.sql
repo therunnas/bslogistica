@@ -519,12 +519,14 @@ begin
   -- colunas de condições financeiras): são 11, e os 10 originais seguem intactos. A 024
   -- acrescenta o da coluna `operation_terms_id` (valor acordado versionado): são 12. A 025
   -- acrescenta o motor por vigência, criado DESABILITADO (a lista conta o trigger, esteja
-  -- habilitado ou não): são 13. A 029 acrescenta a recusa de entrada igual à saída: são 14.
-  perform pg_temp.registrar('I1. os 14 triggers de timesheet_entries, intactos (um deles dormente)',
+  -- habilitado ou não): são 13. A 029 acrescenta a recusa de entrada igual à saída: são 14. A 031 acrescenta a recusa de
+  -- escrita em folha fechada: são 15.
+  perform pg_temp.registrar('I1. os 15 triggers de timesheet_entries, intactos (um deles dormente; a 031 acrescenta o da folha fechada)',
     'trg_timesheet_entries_ancora_folha, trg_timesheet_entries_bloqueia_condicoes, '
     'trg_timesheet_entries_bloqueia_condicoes_operacao, '
     'trg_timesheet_entries_bloqueia_delete_faturado, '
     'trg_timesheet_entries_bloqueia_desvinculo, trg_timesheet_entries_bloqueia_edicao_faturada, '
+    'trg_timesheet_entries_bloqueia_folha_fechada, '
     'trg_timesheet_entries_bloqueia_horario_igual, '
     'trg_timesheet_entries_bloqueia_truncate, trg_timesheet_entries_bloqueia_vinculo_direto, '
     'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_calculo_financeiro, '
