@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roda as 13 suítes de supabase/tests/ contra um Supabase LOCAL descartável.
+# Roda as 29 suítes de supabase/tests/ contra um Supabase LOCAL descartável.
 #
 # NUNCA toca Production: usa só `supabase start`/`db reset --local` (nenhum
 # `--linked`, nenhum `db push`/`db pull`), e executa os arquivos via `psql`
@@ -70,4 +70,4 @@ if [ -n "$falhou" ]; then
 fi
 
 echo ""
-echo "13/13 PASS."
+echo "29/29 PASS."

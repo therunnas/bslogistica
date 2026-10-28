@@ -6,6 +6,7 @@ import {
   BarChart3,
   Building2,
   CalendarCheck,
+  ClipboardCheck,
   FileText,
   History,
   LayoutDashboard,
@@ -26,6 +27,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 
 import { useTema } from "@/components/theme-provider";
+import { useFechamentoDisponivel } from "@/lib/vigencias-dados";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -48,6 +50,7 @@ const NAVEGACAO = {
     { href: "/clientes", label: "Clientes e contratos", icon: Building2 },
     { href: "/colaboradores", label: "Colaboradores", icon: Users },
     { href: "/faturamento", label: "Faturamento", icon: FileText },
+    { href: "/fechamento", label: "Fechamento", icon: ClipboardCheck },
     { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
   ],
   operacional: [
@@ -93,7 +96,12 @@ export function AppShell({
   email: string;
   papel: PapelEfetivo;
 }) {
-  const navegacao = NAVEGACAO[papel];
+  // O Fechamento só aparece quando o banco o sustenta (030 e motor novo ligado). Esconder o link
+  // é conveniência: a página e as APIs negam no servidor.
+  const fechamentoDisponivel = useFechamentoDisponivel(papel === "admin");
+  const navegacao = NAVEGACAO[papel].filter(
+    (item) => item.href !== "/fechamento" || fechamentoDisponivel,
+  );
   const itensDeConta = MENU_DE_CONTA[papel];
 
   const caminho = usePathname();

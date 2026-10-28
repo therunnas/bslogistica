@@ -52,6 +52,7 @@ src/
 │   ├── mfa.ts                decisões de segundo fator e de acesso, puras
 │   ├── recuperacao-senha.ts · prova-recuperacao.ts
 │   ├── operacional/          contratos e hooks das RPCs do operador
+│   ├── fechamento/           núcleo do fechamento: leitura, banco (030), domínio, exportação
 │   ├── admin-usuarios/       administração de usuários, server-side
 │   └── format.ts · csv.ts · types.ts · utils.ts
 ├── proxy.ts                  renovação de sessão e CSP com nonce
@@ -230,7 +231,63 @@ risco em [PROGRESS.md](../PROGRESS.md).
 | Operações            | operações fixas e avulsas, com turnos e equipe alocada                                                    |
 | Apontamentos         | presença, horários e intervalo por turno, com cálculo automático                                          |
 | Faturamento          | fechamento por cliente e período, com itens por operação                                                  |
+| Fechamento           | conferência por cliente e período, conciliada com o banco, com exportação XLSX e CSV                      |
 | Relatórios           | por colaborador, operação e lançamento, com exportação CSV                                                |
+
+## Fechamento quinzenal
+
+Três módulos distintos, de propósito: **Faturamento** (ciclo de cobrança: lançamentos e faturas),
+**Relatórios** (indicadores e análises) e **Fechamento** (conferência financeira por cliente e
+período: quinzena 1–15, 16–fim, mês inteiro ou período de até 31 dias). Não se unificam, e as
+exportações CSV de Faturamento e Relatórios não mudam. A aprovação do cliente é externa (WhatsApp
+ou e-mail): o sistema não tem fluxo interno de aprovação.
+
+Fluxo de dados, em `src/lib/fechamento/`:
+
+```
+GET /api/fechamento ──► carregar.ts ──► leitura.ts   lançamentos, paginados e provados completos
+                                    ├─► banco.ts     funções oficiais da 030 (resumo, ajuste, saldo, adicionais)
+                                    └─► normalizar.ts ► agregar.ts ► FechamentoData
+                                          financeiro.ts (composição e conciliação) ┘
+                                          assinatura.ts ──► meta.assinatura
+
+tela /fechamento ──── consome FechamentoData
+exportacao.ts ─────── modelo tabular único (colunas e linhas) para CSV e XLSX
+xlsx.ts ───────────── gerador, só servidor (write-excel-file 4.1.1)
+POST /api/fechamento/xlsx ──► carregar.ts ──► confere assinatura ──► xlsx.ts
+```
+
+`FechamentoData` é a única fonte de tela, CSV e XLSX. Dinheiro em **centavos inteiros**, tempo em
+minutos, margem em milésimos. **O TypeScript só soma e compara; a regra financeira é do banco**
+(trigger do apontamento, `ajustes_de_arredondamento_acumulado`, `resumo_financeiro_periodo`).
+Vocabulário: _apontamentos_ (cobrado dos lançamentos), _adicionais_, _ajuste de arredondamento_
+(_já faturado_ e _previsto_), _receita_ (a soma), _a faturar_ e _já faturado_. O saldo de horas
+(compensação entre dias) é **informativo** e não altera nenhum valor.
+
+**Disponibilidade (gate).** O Fechamento depende das migrations 029/030. Página, `GET /api/fechamento`
+e `POST /api/fechamento/xlsx` consultam `estado_motor_vigencia` (sessão do admin, AAL2) **antes** de
+qualquer leitura e só liberam com `regras_definitivas = true`, motor novo ligado e estado
+consistente; erro, resposta desconhecida, 030 ausente ou motor desligado respondem 503
+`fechamento-indisponivel` com frase fixa (a página mostra a mesma mensagem). O link do menu some
+pelo mesmo critério, mas a barreira é o servidor.
+
+**Conciliação.** Cada parcela do Fechamento é comparada com `resumo_financeiro_periodo`, a fonte de
+Dashboard e Relatórios. Diferença vira alerta crítico e nunca é "corrigida". Única diferença
+esperada: o Fechamento arredonda o período pedido de uma vez (como a fatura), enquanto o resumo
+soma o ajuste por quinzena inteira; no mês ou em período personalizado os dois diferem e o alerta
+é de atenção. Regras comerciais sem definição (feriado na cobrança, domingo, hora extra acumulada
+lançada depois da fatura, compensação) só geram aviso.
+
+**XLSX** (três abas, nesta ordem): _Resumo_ (indicadores, conferência com o banco, adicionais,
+ajustes e saldo), _Por colaborador_ (com linha de totais) e _Detalhamento diário_. Dinheiro, horas e
+margem saem como `Number` formatado; datas como `Date`. **CSV**: dois formatos (por colaborador e
+detalhamento diário), `;` como separador, decimal com vírgula, reutilizando `src/lib/csv.ts`.
+
+Limitações conhecidas: o valor é **previsto** (custo previsto não é pagamento realizado); a
+exportação é de um cliente e um período por vez (no máximo 31 dias); a leitura é paginada e, em
+volume alto, lenta (12.400 lançamentos levaram ~20 s localmente). Período só com adicionais (ou
+ajustes), sem diárias, mostra a receita, a conciliação e os adicionais, sem diária nem colaborador
+inventados; só vira "vazio" sem nenhum valor financeiro.
 
 ## Regras de cálculo
 

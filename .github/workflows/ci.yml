@@ -132,6 +132,30 @@ jobs:
       - name: Teste regras-definitivas
         run: npm run test:regras-definitivas
 
+      - name: Teste fechamento-leitura
+        run: npm run test:fechamento-leitura
+
+      - name: Teste fechamento-dominio
+        run: npm run test:fechamento-dominio
+
+      - name: Teste fechamento-carregamento
+        run: npm run test:fechamento-carregamento
+
+      - name: Teste fechamento-tela
+        run: npm run test:fechamento-tela
+
+      - name: Teste fechamento-csv
+        run: npm run test:fechamento-csv
+
+      - name: Teste fechamento-xlsx
+        run: npm run test:fechamento-xlsx
+
+      - name: Teste fechamento-gate
+        run: npm run test:fechamento-gate
+
+      - name: Teste fechamento-conciliacao
+        run: npm run test:fechamento-conciliacao
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.
