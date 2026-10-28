@@ -1,0 +1,889 @@
+{
+  "_leia": [
+    "Fixture ouro do Fechamento. Pequena e auditável de propósito.",
+    "'linhas' está no formato EXATO que src/lib/fechamento/leitura.ts devolve (dinheiro em texto, ::text), e em ordem EMBARALHADA: o resultado não pode depender dela.",
+    "'esperado' foi calculado À MÃO, a partir das linhas, e NUNCA gerado pelo agregador. Se o agregador discordar, quem tem de ser revisto é o agregador (ou esta conta), não o contrário.",
+    "'esperado.gerarFatura' é o que gerar_fatura (migration 009, passos 4 e 5) gravaria para este cliente e período sobre as linhas elegíveis (status <> 'absent' e invoice_id nulo): total_dailies = count(*); total_overtime = round(sum(overtime_minutes)/60, 2); total_amount = sum(billed_amount); total_cost = sum(cost_amount).",
+    "Os valores de faturado/custo/taxa são valores PERSISTIDOS plausíveis, escritos à mão. A etapa de paridade SQL (4.3) confirmará que a fatura real sobre dados equivalentes dá os mesmos totais.",
+    "'contexto.banco' é o que as funções do banco devolveriam para este recorte antes da 030 (sem adicional, sem arredondamento acumulado, sem saldo de horas): o resumo fecha com o consolidado calculado à mão. 'esperado.financeiro' e 'esperado.conciliacao' são a composição e a conferência que daí resultam. Os lançamentos são anteriores à 030 (sem billed_overtime_minutes): as horas cobradas igualam as horas pagas.",
+    "Cobertura: presente, falta, substituto, hora extra, já faturado (2 faturas), a faturar, função nula/vazia/em branco, vários lançamentos por colaborador, centavos (0,10 + 0,20), faturado zero com custo, margem negativa, colaborador só com falta, colaborador só com fatura, folha aberta, lançamento sem horário, operação sem contrato, ordenação com acento."
+  ],
+  "contexto": {
+    "clienteId": "cli-ouro",
+    "clienteNome": "Cliente Ouro",
+    "inicio": "2026-03-01",
+    "fim": "2026-03-15",
+    "geradoEm": "2026-03-16T12:00:00.000Z",
+    "assinatura": "assinatura-da-fixture",
+    "banco": {
+      "resumo": {
+        "receitaApontamentosCentavos": 107764,
+        "adicionaisCentavos": 0,
+        "ajusteFaturadoCentavos": 0,
+        "ajustePrevistoCentavos": 0,
+        "receitaTotalCentavos": 107764,
+        "aFaturarCentavos": 60655,
+        "faturadoCentavos": 47109,
+        "ajusteAplicavel": true
+      },
+      "ajustesPrevistos": [],
+      "ajustesFaturados": [],
+      "adicionais": [],
+      "saldoDeHoras": []
+    }
+  },
+  "linhas": [
+    {
+      "id": "e-09",
+      "employee_id": "emp-fabio",
+      "status": "present",
+      "check_in": "08:00:00",
+      "check_out": "17:00:00",
+      "worked_minutes": 480,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "0.10",
+      "custo": "0.05",
+      "taxa_da_diaria": "0.10",
+      "employees": {
+        "id": "emp-fabio",
+        "name": "Fábio Reis",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-delta-0307",
+        "work_date": "2026-03-07",
+        "status": "open",
+        "operation_id": "op-delta",
+        "operations": {
+          "id": "op-delta",
+          "client_id": "cli-ouro",
+          "name": "Operação Delta",
+          "contract_id": "ctr-delta"
+        },
+        "shifts": null
+      }
+    },
+    {
+      "id": "e-03",
+      "employee_id": "emp-ana",
+      "status": "absent",
+      "check_in": null,
+      "check_out": null,
+      "worked_minutes": 0,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "0.00",
+      "custo": "0.00",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-ana",
+        "name": "Ana Souza",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-alfa-0304",
+        "work_date": "2026-03-04",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-12",
+      "employee_id": "emp-hugo",
+      "status": "present",
+      "check_in": "06:00:00",
+      "check_out": "15:00:00",
+      "worked_minutes": 480,
+      "overtime_minutes": 0,
+      "invoice_id": "inv-002",
+      "faturado": "150.00",
+      "custo": "90.05",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-hugo",
+        "name": "Hugo Pires",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-alfa-0310",
+        "work_date": "2026-03-10",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-05",
+      "employee_id": "emp-bruno",
+      "status": "replacement",
+      "check_in": "06:00:00",
+      "check_out": "15:00:00",
+      "worked_minutes": 480,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "150.00",
+      "custo": "100.00",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-bruno",
+        "name": "Bruno Lima",
+        "role": null
+      },
+      "timesheets": {
+        "id": "ts-alfa-0302",
+        "work_date": "2026-03-02",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-01",
+      "employee_id": "emp-ana",
+      "status": "present",
+      "check_in": "06:00:00",
+      "check_out": "15:00:00",
+      "worked_minutes": 480,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "150.00",
+      "custo": "90.05",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-ana",
+        "name": "Ana Souza",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-alfa-0302",
+        "work_date": "2026-03-02",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-11",
+      "employee_id": "emp-gabi",
+      "status": "absent",
+      "check_in": null,
+      "check_out": null,
+      "worked_minutes": 0,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "0.00",
+      "custo": "0.00",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-gabi",
+        "name": "Gabi Nunes",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-alfa-0309",
+        "work_date": "2026-03-09",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-07",
+      "employee_id": "emp-alvaro",
+      "status": "present",
+      "check_in": "08:00:00",
+      "check_out": "17:00:00",
+      "worked_minutes": 480,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "100.00",
+      "custo": "120.00",
+      "taxa_da_diaria": "100.00",
+      "employees": {
+        "id": "emp-alvaro",
+        "name": "Álvaro Dias",
+        "role": "   "
+      },
+      "timesheets": {
+        "id": "ts-beta-0304",
+        "work_date": "2026-03-04",
+        "status": "open",
+        "operation_id": "op-beta",
+        "operations": {
+          "id": "op-beta",
+          "client_id": "cli-ouro",
+          "name": "Operação Beta",
+          "contract_id": null
+        },
+        "shifts": null
+      }
+    },
+    {
+      "id": "e-02",
+      "employee_id": "emp-ana",
+      "status": "present",
+      "check_in": "06:00:00",
+      "check_out": "17:00:00",
+      "worked_minutes": 600,
+      "overtime_minutes": 120,
+      "invoice_id": null,
+      "faturado": "206.25",
+      "custo": "112.56",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-ana",
+        "name": "Ana Souza",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-alfa-0303",
+        "work_date": "2026-03-03",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-10",
+      "employee_id": "emp-fabio",
+      "status": "present",
+      "check_in": "08:00:00",
+      "check_out": "17:00:00",
+      "worked_minutes": 480,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "0.20",
+      "custo": "0.05",
+      "taxa_da_diaria": "0.20",
+      "employees": {
+        "id": "emp-fabio",
+        "name": "Fábio Reis",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-eps-0308",
+        "work_date": "2026-03-08",
+        "status": "closed",
+        "operation_id": "op-eps",
+        "operations": {
+          "id": "op-eps",
+          "client_id": "cli-ouro",
+          "name": "Operação Épsilon",
+          "contract_id": "ctr-eps"
+        },
+        "shifts": null
+      }
+    },
+    {
+      "id": "e-06",
+      "employee_id": "emp-bruno",
+      "status": "present",
+      "check_in": "06:00:00",
+      "check_out": "15:45:00",
+      "worked_minutes": 525,
+      "overtime_minutes": 45,
+      "invoice_id": "inv-001",
+      "faturado": "171.09",
+      "custo": "109.38",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-bruno",
+        "name": "Bruno Lima",
+        "role": null
+      },
+      "timesheets": {
+        "id": "ts-alfa-0303",
+        "work_date": "2026-03-03",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-04",
+      "employee_id": "emp-ana",
+      "status": "present",
+      "check_in": "06:00:00",
+      "check_out": "15:00:00",
+      "worked_minutes": 480,
+      "overtime_minutes": 0,
+      "invoice_id": "inv-001",
+      "faturado": "150.00",
+      "custo": "90.05",
+      "taxa_da_diaria": "150.00",
+      "employees": {
+        "id": "emp-ana",
+        "name": "Ana Souza",
+        "role": "Auxiliar"
+      },
+      "timesheets": {
+        "id": "ts-alfa-0305",
+        "work_date": "2026-03-05",
+        "status": "closed",
+        "operation_id": "op-alfa",
+        "operations": {
+          "id": "op-alfa",
+          "client_id": "cli-ouro",
+          "name": "Operação Alfa",
+          "contract_id": "ctr-alfa"
+        },
+        "shifts": {
+          "id": "sh-manha",
+          "name": "Manhã"
+        }
+      }
+    },
+    {
+      "id": "e-08",
+      "employee_id": "emp-carla",
+      "status": "present",
+      "check_in": null,
+      "check_out": null,
+      "worked_minutes": 0,
+      "overtime_minutes": 0,
+      "invoice_id": null,
+      "faturado": "0.00",
+      "custo": "80.00",
+      "taxa_da_diaria": "0.00",
+      "employees": {
+        "id": "emp-carla",
+        "name": "Carla Mota",
+        "role": "Conferente"
+      },
+      "timesheets": {
+        "id": "ts-beta-0306",
+        "work_date": "2026-03-06",
+        "status": "closed",
+        "operation_id": "op-beta",
+        "operations": {
+          "id": "op-beta",
+          "client_id": "cli-ouro",
+          "name": "Operação Beta",
+          "contract_id": null
+        },
+        "shifts": null
+      }
+    }
+  ],
+  "esperado": {
+    "linhasLidas": 12,
+    "faltas": 2,
+    "substituicoes": 1,
+    "consolidado": {
+      "diarias": 10,
+      "minutosExtras": 165,
+      "minutosExtrasCobrados": 165,
+      "diariaCentavos": 100030,
+      "extraCentavos": 7734,
+      "custoCentavos": 79219,
+      "faturadoCentavos": 107764,
+      "resultadoCentavos": 28545,
+      "margemPermil": 265
+    },
+    "aFaturar": {
+      "diarias": 7,
+      "minutosExtras": 120,
+      "minutosExtrasCobrados": 120,
+      "diariaCentavos": 55030,
+      "extraCentavos": 5625,
+      "custoCentavos": 50271,
+      "faturadoCentavos": 60655,
+      "resultadoCentavos": 10384,
+      "margemPermil": 171
+    },
+    "jaFaturado": {
+      "diarias": 3,
+      "minutosExtras": 45,
+      "minutosExtrasCobrados": 45,
+      "diariaCentavos": 45000,
+      "extraCentavos": 2109,
+      "custoCentavos": 28948,
+      "faturadoCentavos": 47109,
+      "resultadoCentavos": 18161,
+      "margemPermil": 386
+    },
+    "horasExtrasEmCentesimos": {
+      "consolidado": 275,
+      "aFaturar": 200,
+      "jaFaturado": 75
+    },
+    "gerarFatura": {
+      "total_dailies": 7,
+      "total_overtime": "2.00",
+      "total_amount": "606.55",
+      "total_cost": "502.71"
+    },
+    "ordemDosColaboradores": [
+      "emp-alvaro",
+      "emp-ana",
+      "emp-bruno",
+      "emp-carla",
+      "emp-fabio",
+      "emp-gabi",
+      "emp-hugo"
+    ],
+    "ordemDosDetalhes": [
+      "e-01",
+      "e-05",
+      "e-02",
+      "e-06",
+      "e-07",
+      "e-04",
+      "e-08",
+      "e-09",
+      "e-10",
+      "e-12"
+    ],
+    "colaboradores": {
+      "emp-alvaro": {
+        "nome": "Álvaro Dias",
+        "funcao": "Sem função",
+        "faltas": 0,
+        "substituicoes": 0,
+        "consolidado": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 10000,
+          "extraCentavos": 0,
+          "custoCentavos": 12000,
+          "faturadoCentavos": 10000,
+          "resultadoCentavos": -2000,
+          "margemPermil": -200
+        },
+        "aFaturar": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 10000,
+          "extraCentavos": 0,
+          "custoCentavos": 12000,
+          "faturadoCentavos": 10000,
+          "resultadoCentavos": -2000,
+          "margemPermil": -200
+        },
+        "jaFaturado": {
+          "diarias": 0,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 0,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": 0,
+          "margemPermil": null
+        },
+        "ajusteAcumuladoCentavos": 0
+      },
+      "emp-ana": {
+        "nome": "Ana Souza",
+        "funcao": "Auxiliar",
+        "faltas": 1,
+        "substituicoes": 0,
+        "consolidado": {
+          "diarias": 3,
+          "minutosExtras": 120,
+          "minutosExtrasCobrados": 120,
+          "diariaCentavos": 45000,
+          "extraCentavos": 5625,
+          "custoCentavos": 29266,
+          "faturadoCentavos": 50625,
+          "resultadoCentavos": 21359,
+          "margemPermil": 422
+        },
+        "aFaturar": {
+          "diarias": 2,
+          "minutosExtras": 120,
+          "minutosExtrasCobrados": 120,
+          "diariaCentavos": 30000,
+          "extraCentavos": 5625,
+          "custoCentavos": 20261,
+          "faturadoCentavos": 35625,
+          "resultadoCentavos": 15364,
+          "margemPermil": 431
+        },
+        "jaFaturado": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 15000,
+          "extraCentavos": 0,
+          "custoCentavos": 9005,
+          "faturadoCentavos": 15000,
+          "resultadoCentavos": 5995,
+          "margemPermil": 400
+        },
+        "ajusteAcumuladoCentavos": 0
+      },
+      "emp-bruno": {
+        "nome": "Bruno Lima",
+        "funcao": "Sem função",
+        "faltas": 0,
+        "substituicoes": 1,
+        "consolidado": {
+          "diarias": 2,
+          "minutosExtras": 45,
+          "minutosExtrasCobrados": 45,
+          "diariaCentavos": 30000,
+          "extraCentavos": 2109,
+          "custoCentavos": 20938,
+          "faturadoCentavos": 32109,
+          "resultadoCentavos": 11171,
+          "margemPermil": 348
+        },
+        "aFaturar": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 15000,
+          "extraCentavos": 0,
+          "custoCentavos": 10000,
+          "faturadoCentavos": 15000,
+          "resultadoCentavos": 5000,
+          "margemPermil": 333
+        },
+        "jaFaturado": {
+          "diarias": 1,
+          "minutosExtras": 45,
+          "minutosExtrasCobrados": 45,
+          "diariaCentavos": 15000,
+          "extraCentavos": 2109,
+          "custoCentavos": 10938,
+          "faturadoCentavos": 17109,
+          "resultadoCentavos": 6171,
+          "margemPermil": 361
+        },
+        "ajusteAcumuladoCentavos": 0
+      },
+      "emp-carla": {
+        "nome": "Carla Mota",
+        "funcao": "Conferente",
+        "faltas": 0,
+        "substituicoes": 0,
+        "consolidado": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 8000,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": -8000,
+          "margemPermil": null
+        },
+        "aFaturar": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 8000,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": -8000,
+          "margemPermil": null
+        },
+        "jaFaturado": {
+          "diarias": 0,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 0,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": 0,
+          "margemPermil": null
+        },
+        "ajusteAcumuladoCentavos": 0
+      },
+      "emp-fabio": {
+        "nome": "Fábio Reis",
+        "funcao": "Auxiliar",
+        "faltas": 0,
+        "substituicoes": 0,
+        "consolidado": {
+          "diarias": 2,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 30,
+          "extraCentavos": 0,
+          "custoCentavos": 10,
+          "faturadoCentavos": 30,
+          "resultadoCentavos": 20,
+          "margemPermil": 667
+        },
+        "aFaturar": {
+          "diarias": 2,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 30,
+          "extraCentavos": 0,
+          "custoCentavos": 10,
+          "faturadoCentavos": 30,
+          "resultadoCentavos": 20,
+          "margemPermil": 667
+        },
+        "jaFaturado": {
+          "diarias": 0,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 0,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": 0,
+          "margemPermil": null
+        },
+        "ajusteAcumuladoCentavos": 0
+      },
+      "emp-gabi": {
+        "nome": "Gabi Nunes",
+        "funcao": "Auxiliar",
+        "faltas": 1,
+        "substituicoes": 0,
+        "consolidado": {
+          "diarias": 0,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 0,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": 0,
+          "margemPermil": null
+        },
+        "aFaturar": {
+          "diarias": 0,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 0,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": 0,
+          "margemPermil": null
+        },
+        "jaFaturado": {
+          "diarias": 0,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 0,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": 0,
+          "margemPermil": null
+        },
+        "ajusteAcumuladoCentavos": 0
+      },
+      "emp-hugo": {
+        "nome": "Hugo Pires",
+        "funcao": "Auxiliar",
+        "faltas": 0,
+        "substituicoes": 0,
+        "consolidado": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 15000,
+          "extraCentavos": 0,
+          "custoCentavos": 9005,
+          "faturadoCentavos": 15000,
+          "resultadoCentavos": 5995,
+          "margemPermil": 400
+        },
+        "aFaturar": {
+          "diarias": 0,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 0,
+          "extraCentavos": 0,
+          "custoCentavos": 0,
+          "faturadoCentavos": 0,
+          "resultadoCentavos": 0,
+          "margemPermil": null
+        },
+        "jaFaturado": {
+          "diarias": 1,
+          "minutosExtras": 0,
+          "minutosExtrasCobrados": 0,
+          "diariaCentavos": 15000,
+          "extraCentavos": 0,
+          "custoCentavos": 9005,
+          "faturadoCentavos": 15000,
+          "resultadoCentavos": 5995,
+          "margemPermil": 400
+        },
+        "ajusteAcumuladoCentavos": 0
+      }
+    },
+    "alertas": [
+      {
+        "codigo": "folha-aberta",
+        "severidade": "atencao",
+        "quantidade": 2,
+        "entryIds": [
+          "e-07",
+          "e-09"
+        ]
+      },
+      {
+        "codigo": "dado-incompleto",
+        "severidade": "atencao",
+        "quantidade": 1,
+        "entryIds": [
+          "e-08"
+        ]
+      },
+      {
+        "codigo": "sem-contrato",
+        "severidade": "atencao",
+        "quantidade": 2,
+        "entryIds": [
+          "e-07",
+          "e-08"
+        ]
+      },
+      {
+        "codigo": "diaria-zerada",
+        "severidade": "atencao",
+        "quantidade": 1,
+        "entryIds": [
+          "e-08"
+        ]
+      },
+      {
+        "codigo": "domingo-regra-pendente",
+        "severidade": "informacao",
+        "quantidade": 1,
+        "entryIds": [
+          "e-10"
+        ]
+      },
+      {
+        "codigo": "falta",
+        "severidade": "informacao",
+        "quantidade": 2,
+        "entryIds": [
+          "e-03",
+          "e-11"
+        ]
+      }
+    ],
+    "financeiro": {
+      "apontamentosCentavos": 107764,
+      "adicionaisCentavos": 0,
+      "ajusteFaturadoCentavos": 0,
+      "ajustePrevistoCentavos": 0,
+      "ajusteCentavos": 0,
+      "receitaCentavos": 107764,
+      "custoCentavos": 79219,
+      "resultadoCentavos": 28545,
+      "margemPermil": 265,
+      "aFaturarCentavos": 60655,
+      "jaFaturadoCentavos": 47109
+    },
+    "conciliacao": [
+      {
+        "codigo": "apontamentos",
+        "fechamentoCentavos": 107764,
+        "bancoCentavos": 107764,
+        "confere": true
+      },
+      {
+        "codigo": "adicionais",
+        "fechamentoCentavos": 0,
+        "bancoCentavos": 0,
+        "confere": true
+      },
+      {
+        "codigo": "ajuste-faturado",
+        "fechamentoCentavos": 0,
+        "bancoCentavos": 0,
+        "confere": true
+      },
+      {
+        "codigo": "ajuste-previsto",
+        "fechamentoCentavos": 0,
+        "bancoCentavos": 0,
+        "confere": true
+      },
+      {
+        "codigo": "a-faturar",
+        "fechamentoCentavos": 60655,
+        "bancoCentavos": 60655,
+        "confere": true
+      },
+      {
+        "codigo": "faturado",
+        "fechamentoCentavos": 47109,
+        "bancoCentavos": 47109,
+        "confere": true
+      }
+    ]
+  }
+}

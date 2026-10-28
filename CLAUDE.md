@@ -44,6 +44,8 @@ src/lib/billing.ts           cálculo de diária, hora extra, custo (previsão)
 src/lib/ledger.ts            consolidação apontamento → cliente
 src/lib/mfa.ts               decisões de segundo fator e de acesso, puras
 src/lib/operacional/         contratos e hooks das RPCs — sem tabela direta
+src/lib/fechamento/          Fechamento: lê lançamentos e funções do banco (030), soma e concilia
+                             (a regra financeira é do banco); API em src/app/api/fechamento/
 src/lib/admin-usuarios/      administração de usuários, server-side
 src/lib/prova-recuperacao.ts prova HMAC da recuperação, funções puras
 src/integrations/supabase/   clientes (browser/server/admin) e tipos do banco

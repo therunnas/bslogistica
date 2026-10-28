@@ -14,7 +14,7 @@
  *   - comportamento de `resolverPapelEfetivo`, que é função pura e a única
  *     fonte da regra "admin + operacional = ADMIN";
  *   - forma literal dos arquivos, porque o resto do B2.2 é Server Component e
- *     não se observa de fora sem navegador: que as sete telas chamam o guard
+ *     não se observa de fora sem navegador: que as nove telas chamam o guard
  *     ANTES de renderizar o painel, que a navegação some para quem não é admin,
  *     que a tela de restrição não é a de conta sem papel, e que nada de MFA,
  *     AAL ou `service_role` foi tocado. O projeto já asseve forma literal nas
@@ -60,6 +60,7 @@ const TELAS = [
   ["colaboradores", "PainelColaboradores"],
   ["faturamento", "PainelFaturamento"],
   ["relatorios", "PainelRelatorios"],
+  ["fechamento", "PainelFechamento"],
   ["usuarios", "PainelUsuarios"],
 ];
 
@@ -112,7 +113,7 @@ verificar("A11. ehAdmin concorda com admin", ehAdmin(["admin", "operacional"]), 
 verificar("A12. ehAdmin recusa operacional", ehAdmin(["operacional"]), false);
 verificar("A13. ehAdmin recusa sem papel", ehAdmin([]), false);
 
-console.log("\nB. As oito telas bloqueiam no servidor, antes de renderizar\n");
+console.log("\nB. As nove telas bloqueiam no servidor, antes de renderizar\n");
 
 for (const [rota, componente] of TELAS) {
   const fonte = paginas[rota];
@@ -241,9 +242,9 @@ const TELAS_NAV = TELAS.filter(([rota]) => rota !== "usuarios");
 {
   const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";
   verificar(
-    "E5. admin mantém os sete links da navegação principal",
+    "E5. admin mantém os oito links da navegação principal",
     (bloco.match(/\{ href: "\//g) ?? []).length,
-    7,
+    8,
   );
   verificar(
     "E5b. usuários NÃO é um item da navegação principal",
@@ -344,10 +345,31 @@ console.log("\nF. Esconder o link não é a proteção\n");
 // Se o AppShell fosse a única barreira, nenhuma página chamaria o guard. A
 // contagem existe para que remover a chamada de uma tela apareça aqui.
 verificar(
-  "F1. as oito telas chamam o guard, não sete",
+  "F1. as nove telas chamam o guard, não oito",
   Object.values(paginas).filter((f) => f.includes("await exigirAdmin()")).length,
-  8,
+  9,
 );
+// A tela é só a vitrine: a API do Fechamento é alcançável sem passar por ela, e
+// por isso decide o acesso por conta própria, com a mesma regra central.
+{
+  const rotaFechamento = semComentarios(ler("src/app/api/fechamento/route.ts"));
+  verificar(
+    "F1b. /api/fechamento decide o acesso com lerAcesso e ehAdmin, não com o menu",
+    /lerAcesso\(\)/.test(rotaFechamento) && /ehAdmin\(acesso\.papeis\)/.test(rotaFechamento),
+    true,
+  );
+  verificar(
+    "F1c. /api/fechamento nega antes de carregar qualquer dado",
+    rotaFechamento.indexOf("decidirAcesso(") > -1 &&
+      rotaFechamento.indexOf("decidirAcesso(") < rotaFechamento.indexOf("carregarFechamento("),
+    true,
+  );
+  verificar(
+    "F1d. /api/fechamento não recria a regra de papel",
+    /papeis\.includes|user_roles|role === "admin"/.test(rotaFechamento),
+    false,
+  );
+}
 verificar(
   "F2. o guard bloqueia por papel, não por caminho na URL",
   /pathname|usePathname|caminho/.test(fontes.guard),
