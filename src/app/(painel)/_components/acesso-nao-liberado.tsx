@@ -54,7 +54,7 @@ export function AcessoNaoLiberado({ email }: { email: string }) {
           </div>
 
           <p className="mt-5 text-center text-[11px] text-muted-foreground">
-            BS Soluções Logística · Ambiente interno
+            BS Soluções Logísticas · Ambiente interno
           </p>
         </section>
       </div>

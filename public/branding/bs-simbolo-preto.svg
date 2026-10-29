@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="730" viewBox="0 0 1340 730" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="symbol-title symbol-description">
+  <title id="symbol-title">BS — símbolo vetorial para aprovação</title>
+  <desc id="symbol-description">Monograma BS frontal. Reconstrução da face frontal da referência R4, conferida com R1 e R3. Preenchimento neutro de inspeção; cores não definidas.</desc>
+  <g id="bs-symbol" fill="#333333" fill-rule="nonzero">
+    <g id="letter-b" fill="#000000">
+      <path id="b-upper" d="M 35,35 H 505 C 628,35 710,135 720,267 C 650,261 605,229 553,194 C 521,173 499,160 468,160 H 150 Z" />
+      <path id="b-stem" d="M 80,195 H 245 V 525 L 80,660 Z" />
+      <path id="b-lower" d="M 280,295 H 465 C 484,374 565,425 670,425 H 721 C 747,447 752,488 737,532 C 707,620 622,685 505,685 H 100 L 266,545 H 510 C 558,545 592,518 592,480 C 592,442 561,417 513,417 H 382 Z" />
+    </g>
+    <g id="letter-s" fill="#000000">
+      <path id="s-upper-bar" d="M 635,30 H 1300 L 1150,165 H 755 Z" />
+      <path id="s-body" d="M 497,180 C 552,209 608,280 690,280 H 1045 C 1160,280 1240,367 1240,480 C 1240,594 1158,685 1045,685 H 635 L 785,545 H 955 C 1013,545 1049,519 1049,480 C 1049,438 1018,405 964,405 H 667 C 567,405 484,345 474,262 C 470,230 480,201 497,180 Z" />
+    </g>
+  </g>
+</svg>

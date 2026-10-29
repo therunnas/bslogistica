@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { BSLogo } from "@/components/branding/bs-logo";
 import type { ReactNode } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,13 +24,10 @@ export function MolduraAuth({
 }) {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/40 px-4 py-12">
-      <Image
-        src="/branding/bs-simbolo-retangular.png"
-        alt="BS Soluções Logística"
-        width={1000}
-        height={625}
+      <BSLogo
+        fundo="tema"
         priority
-        className="h-auto w-36 self-start object-contain lg:absolute lg:top-8 lg:left-10 lg:w-40"
+        className="w-40 self-start lg:absolute lg:top-8 lg:left-10 lg:w-44"
       />
       <Card className="w-full max-w-md">
         <CardHeader>

@@ -22,10 +22,19 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: {
-    default: "BS Soluções Logística",
-    template: "%s | BS Soluções Logística",
+    default: "BS Soluções Logísticas",
+    template: "%s | BS Soluções Logísticas",
   },
   description: "Painel interno de gestão operacional e financeira de mão de obra terceirizada.",
+  // Favicon oficial aprovado (BS-favicon.svg e PNGs 16/32/512 de 04_AVATARES-E-ICONES), copiado sem alteração.
+  icons: {
+    icon: [
+      { url: "/branding/bs-favicon.svg", type: "image/svg+xml" },
+      { url: "/branding/bs-favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/branding/bs-favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/branding/bs-app-icon-512x512.png", sizes: "512x512", type: "image/png" }],
+  },
   robots: {
     index: false,
     follow: false,

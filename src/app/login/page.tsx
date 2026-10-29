@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
+import { BSLogo } from "@/components/branding/bs-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,17 +36,13 @@ function AvisoSenhaRedefinida() {
   );
 }
 
+/** Painel esquerdo e versão mobile: fundo claro → logo preta. Painel direito: fundo preto → logo branca. */
 function LogoLogin({ mobile = false }: { mobile?: boolean }) {
   return (
-    <Image
-      src="/branding/bs-simbolo-retangular.png"
-      alt="BS Soluções Logística"
-      width={1774}
-      height={887}
+    <BSLogo
+      fundo={mobile ? "claro" : "escuro"}
       priority
-      className={
-        mobile ? "h-auto w-40 object-contain" : "h-auto w-[320px] object-contain xl:w-[380px]"
-      }
+      className={mobile ? "w-56" : "w-[360px] xl:w-[440px]"}
     />
   );
 }
@@ -101,13 +97,7 @@ export default function Login() {
     <main className="min-h-screen bg-background lg:grid lg:grid-cols-2">
       <section className="relative z-10 flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
         <div className="mb-8 lg:hidden">
-          <div className="inline-flex flex-col items-center">
-            <LogoLogin mobile />
-
-            <p className="mt-2 text-sm text-sm font-medium tracking-[0.04em] text-slate-600">
-              Soluções Logística
-            </p>
-          </div>
+          <LogoLogin mobile />
         </div>
 
         <div className="flex flex-1 items-center justify-center">
@@ -188,7 +178,7 @@ export default function Login() {
         </div>
 
         <p className="mt-1 text-center text-xs text-slate-600 lg:text-left">
-          © {new Date().getFullYear()} BS Soluções Logística
+          © {new Date().getFullYear()} BS Soluções Logísticas
         </p>
       </section>
 
@@ -221,7 +211,7 @@ export default function Login() {
           <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-6">
             <p className="text-xs text-white/40">Sistema interno de gestão</p>
 
-            <p className="text-xs text-white/35">BS Soluções Logística</p>
+            <p className="text-xs text-white/35">BS Soluções Logísticas</p>
           </div>
         </div>
       </section>
