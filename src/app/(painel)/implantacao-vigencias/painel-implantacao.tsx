@@ -88,7 +88,7 @@ export function PainelImplantacaoVigencias({
     <div>
       <PageHeader
         title="Implantação das vigências"
-        description="Cadastros que impedem ligar o motor por vigência. A consulta não registra nem sincroniza nada; a única ação desta tela é ligar o motor, com confirmação."
+        description="Cadastros que impedem ligar o motor por vigência. A consulta não registra nem sincroniza nada; as únicas ações desta tela são ligar o motor e, quando o servidor autorizar, desligá-lo (reversão), ambas com administrador com segundo fator, motivo e confirmação."
       />
 
       {consulta.isPending ? (
