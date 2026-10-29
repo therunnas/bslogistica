@@ -64,17 +64,29 @@ verificar("A4. temaValido só aceita light e dark", ["light", "dark", "x", null]
 ]);
 verificar(
   "A5. armazenamento que lança erro = sem preferência = claro",
-  lerPreferencia({
+  lerPreferencia(() => ({
     getItem() {
       throw new Error("bloqueado");
     },
-  }),
+  })),
   "light",
 );
 verificar(
   "A6. lê a chave certa do armazenamento",
-  lerPreferencia({ getItem: (c) => (c === CHAVE_TEMA ? "dark" : null) }),
+  lerPreferencia(() => ({ getItem: (c) => (c === CHAVE_TEMA ? "dark" : null) })),
   "dark",
+);
+verificar(
+  "A5b. o ACESSO ao armazenamento lançando (SecurityError) também vira claro, sem estourar",
+  lerPreferencia(() => {
+    throw new DOMException("negado", "SecurityError");
+  }),
+  "light",
+);
+verificar(
+  "A5c. armazenamento ausente (null/undefined) = claro",
+  [lerPreferencia(() => null), lerPreferencia(() => undefined)],
+  ["light", "light"],
 );
 verificar(
   "A7. no painel vale a preferência; fora dele, sempre claro",
@@ -223,9 +235,16 @@ verificar(
 );
 verificar(
   "D3. a preferência é lida uma vez, na montagem",
-  /useEffect\(\(\) => \{\s*setPreferido\(lerPreferencia\(localStorage\)\);\s*setPronto\(true\);\s*\}, \[\]\)/.test(
+  /useEffect\(\(\) => \{\s*setPreferido\(lerPreferencia\(\(\) => window\.localStorage\)\);\s*setPronto\(true\);\s*\}, \[\]\)/.test(
     prov,
   ),
+  true,
+);
+verificar(
+  "D3b. nenhum acesso direto a localStorage fora de try: só dentro da função passada a lerPreferencia e no try de definirTema",
+  (prov.match(/localStorage/g) ?? []).length === 2 &&
+    /lerPreferencia\(\(\) => window\.localStorage\)/.test(prov) &&
+    /try \{\s*localStorage\.setItem/.test(prov),
   true,
 );
 verificar(

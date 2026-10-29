@@ -50,7 +50,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [pronto, setPronto] = useState(false);
 
   useEffect(() => {
-    setPreferido(lerPreferencia(localStorage));
+    setPreferido(lerPreferencia(() => window.localStorage));
     setPronto(true);
   }, []);
 

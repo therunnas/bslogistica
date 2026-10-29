@@ -54,10 +54,18 @@ export function temaAplicado(caminho: string, preferido: Tema): Tema {
   return rotaUsaTemaDoPainel(caminho) ? preferido : "light";
 }
 
-/** Lê a preferência de um armazenamento qualquer; qualquer falha vira "sem preferência". */
-export function lerPreferencia(armazenamento: { getItem(chave: string): string | null }): Tema {
+/**
+ * Lê a preferência de um armazenamento qualquer; qualquer falha vira "sem preferência".
+ *
+ * Recebe uma FUNÇÃO que entrega o armazenamento, e não o armazenamento: com o armazenamento
+ * persistente bloqueado, só o ACESSO à propriedade do navegador já lança (SecurityError), e
+ * isso precisa acontecer aqui dentro, onde há `try`.
+ */
+export function lerPreferencia(
+  obterArmazenamento: () => { getItem(chave: string): string | null } | null | undefined,
+): Tema {
   try {
-    return temaDaPreferencia(armazenamento.getItem(CHAVE_TEMA));
+    return temaDaPreferencia(obterArmazenamento()?.getItem(CHAVE_TEMA));
   } catch {
     return "light";
   }
