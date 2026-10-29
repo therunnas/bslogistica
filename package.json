@@ -37,6 +37,7 @@
     "test:interfaces-vigencia": "node --experimental-strip-types scripts/testar-interfaces-vigencia.mjs",
     "test:reversao-motor": "node --experimental-strip-types scripts/testar-reversao-motor.mjs",
     "test:ativacao-motor": "node --experimental-strip-types scripts/testar-ativacao-motor.mjs",
+    "test:tema": "node --experimental-strip-types scripts/testar-tema.mjs",
     "test:marca": "node --experimental-strip-types scripts/testar-marca.mjs",
     "test:interface-simples": "node --experimental-strip-types scripts/testar-interface-simples.mjs",
     "test:implantacao-vigencias": "node --experimental-strip-types scripts/testar-implantacao-vigencias.mjs",

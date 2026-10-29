@@ -11,24 +11,12 @@ import {
   type ReactNode,
 } from "react";
 
-export type Tema = "light" | "dark";
+import { CHAVE_TEMA, lerPreferencia, temaAplicado, temaValido, type Tema } from "@/lib/tema";
 
-const CHAVE_TEMA = "bs-theme";
-
-const ROTAS_COM_TEMA = [
-  "/dashboard",
-  "/apontamentos",
-  "/operacoes",
-  "/clientes",
-  "/colaboradores",
-  "/faturamento",
-  "/relatorios",
-  "/operacional",
-  "/usuarios",
-  "/configuracoes",
-] as const;
+export type { Tema };
 
 type ContextoTema = {
+  /** A PREFERÊNCIA do usuário (não o que está na tela agora: telas de login ficam sempre claras). */
   tema: Tema;
   pronto: boolean;
   definirTema: (tema: Tema) => void;
@@ -36,10 +24,6 @@ type ContextoTema = {
 };
 
 const TemaContext = createContext<ContextoTema | null>(null);
-
-function rotaUsaTemaDoPainel(caminho: string) {
-  return ROTAS_COM_TEMA.some((rota) => caminho === rota || caminho.startsWith(`${rota}/`));
-}
 
 function aplicarTema(tema: Tema) {
   const raiz = document.documentElement;
@@ -49,66 +33,40 @@ function aplicarTema(tema: Tema) {
   raiz.style.colorScheme = tema;
 }
 
-function lerTemaDoSistema(): Tema {
-  try {
-    if (typeof window.matchMedia !== "function") {
-      return "light";
-    }
-
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  } catch {
-    return "light";
-  }
-}
-
-function lerTemaPreferido(): Tema {
-  try {
-    const salvo = localStorage.getItem(CHAVE_TEMA);
-
-    if (salvo === "light" || salvo === "dark") {
-      return salvo;
-    }
-  } catch {
-    return lerTemaDoSistema();
-  }
-
-  return lerTemaDoSistema();
-}
-
+/**
+ * Tema do painel. Regras e fonte única em `@/lib/tema`.
+ *
+ * - A preferência é lida UMA vez, na montagem, e só depois (`pronto`) o tema é aplicado. Antes
+ *   disso o provider não toca em nada: quem pintou a página foi `theme-script.js`, e reaplicar
+ *   "claro" durante a hidratação era o que apagava o escuro.
+ * - Trocar de rota/módulo só reavalia `temaAplicado(caminho, preferência)`: a preferência nunca
+ *   muda sozinha, nem é gravada, por navegação.
+ * - Só `definirTema` (clique do usuário) grava no armazenamento.
+ */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const caminho = usePathname();
-  const usaTemaDoPainel = rotaUsaTemaDoPainel(caminho);
 
-  const [tema, setTema] = useState<Tema>("light");
+  const [preferido, setPreferido] = useState<Tema>("light");
   const [pronto, setPronto] = useState(false);
 
   useEffect(() => {
-    if (!usaTemaDoPainel) {
-      aplicarTema("light");
-      setTema("light");
-      setPronto(true);
-      return;
-    }
-
-    const temaPreferido = lerTemaPreferido();
-
-    aplicarTema(temaPreferido);
-    setTema(temaPreferido);
+    setPreferido(lerPreferencia(() => window.localStorage));
     setPronto(true);
-  }, [usaTemaDoPainel]);
+  }, []);
+
+  useEffect(() => {
+    if (!pronto) return;
+
+    aplicarTema(temaAplicado(caminho, preferido));
+  }, [pronto, caminho, preferido]);
 
   useEffect(() => {
     function sincronizarEntreAbas(evento: StorageEvent) {
-      if (!usaTemaDoPainel || evento.key !== CHAVE_TEMA) {
-        return;
-      }
+      if (evento.key !== CHAVE_TEMA) return;
 
-      if (evento.newValue !== "light" && evento.newValue !== "dark") {
-        return;
-      }
+      const novo = temaValido(evento.newValue);
 
-      aplicarTema(evento.newValue);
-      setTema(evento.newValue);
+      if (novo) setPreferido(novo);
     }
 
     window.addEventListener("storage", sincronizarEntreAbas);
@@ -116,37 +74,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener("storage", sincronizarEntreAbas);
     };
-  }, [usaTemaDoPainel]);
+  }, []);
 
-  const definirTema = useCallback(
-    (novoTema: Tema) => {
-      try {
-        localStorage.setItem(CHAVE_TEMA, novoTema);
-      } catch {
-        // Mantém a troca de tema funcional mesmo sem armazenamento persistente.
-      }
+  const definirTema = useCallback((novoTema: Tema) => {
+    try {
+      localStorage.setItem(CHAVE_TEMA, novoTema);
+    } catch {
+      // A troca continua funcionando na sessão mesmo sem armazenamento.
+    }
 
-      setTema(novoTema);
-
-      if (usaTemaDoPainel) {
-        aplicarTema(novoTema);
-      }
-    },
-    [usaTemaDoPainel],
-  );
+    setPreferido(novoTema);
+  }, []);
 
   const alternarTema = useCallback(() => {
-    definirTema(tema === "dark" ? "light" : "dark");
-  }, [definirTema, tema]);
+    definirTema(preferido === "dark" ? "light" : "dark");
+  }, [definirTema, preferido]);
 
   const valor = useMemo(
-    () => ({
-      tema,
-      pronto,
-      definirTema,
-      alternarTema,
-    }),
-    [tema, pronto, definirTema, alternarTema],
+    () => ({ tema: preferido, pronto, definirTema, alternarTema }),
+    [preferido, pronto, definirTema, alternarTema],
   );
 
   return <TemaContext.Provider value={valor}>{children}</TemaContext.Provider>;
