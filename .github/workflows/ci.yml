@@ -123,6 +123,9 @@ jobs:
       - name: Teste vigencias-paginacao
         run: npm run test:vigencias-paginacao
 
+      - name: Teste tema
+        run: npm run test:tema
+
       - name: Teste marca
         run: npm run test:marca
 
