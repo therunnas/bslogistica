@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description:
     "Feche o período por cliente, some diárias e horas extras e gere a fatura com itens por operação.",
   openGraph: {
-    title: "Faturamento por período | BS Logística",
+    title: "Faturamento por período | BS Soluções Logísticas",
     description: "Fechamento de diárias e horas extras por cliente e período.",
   },
 };

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "Dashboard operacional",
   description: "Diárias, horas extras, receita, custo e margem do período por cliente e operação.",
   openGraph: {
-    title: "Dashboard operacional | BS Logística",
+    title: "Dashboard operacional | BS Soluções Logísticas",
     description: "Indicadores de diárias, horas extras, receita, custo e margem por período.",
   },
 };

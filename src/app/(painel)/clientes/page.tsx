@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description:
     "Cadastro de clientes e regras de cobrança: valor da diária, jornada, fator e tolerância de hora extra.",
   openGraph: {
-    title: "Clientes e contratos | BS Logística",
+    title: "Clientes e contratos | BS Soluções Logísticas",
     description: "Clientes e regras de cobrança por diária e hora extra.",
   },
 };

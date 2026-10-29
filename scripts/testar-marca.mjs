@@ -209,6 +209,23 @@ verificar(
   ],
   [false, false],
 );
+// O rótulo do autenticador (AUTH-01) é o único nome curto que fica, de propósito.
+verificar(
+  "D5. nenhum título de página nem metadado (openGraph) usa o nome curto 'BS Logística'",
+  fontes.filter(
+    (f) =>
+      f !== "src/app/(painel)/configuracoes/painel-configuracoes.tsx" &&
+      /BS Logística/.test(ler(f)),
+  ),
+  [],
+);
+verificar(
+  "D6. as páginas do painel com openGraph usam 'BS Soluções Logísticas' no título",
+  fontes.filter(
+    (f) => /openGraph/.test(ler(f)) && !/title: "[^"]+ \| BS Soluções Logísticas"/.test(ler(f)),
+  ),
+  [],
+);
 verificar(
   "D4. nenhuma tela usa <Image> com a marca antiga nem fixa a logo por tamanho de altura",
   fontes.some((f) => /<BSLogo[^>]*className="[^"]*\bh-\d/.test(semComentarios(ler(f)))),

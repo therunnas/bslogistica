@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description:
     "Operações fixas e avulsas de carga e descarga, com turnos, intervalos e equipe alocada.",
   openGraph: {
-    title: "Operações e turnos | BS Logística",
+    title: "Operações e turnos | BS Soluções Logísticas",
     description: "Operações fixas e avulsas com turnos e equipe alocada.",
   },
 };

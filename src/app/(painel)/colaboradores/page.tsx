@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Colaboradores",
   description: "Cadastro de colaboradores com função, contato e custo por diária.",
   openGraph: {
-    title: "Colaboradores | BS Logística",
+    title: "Colaboradores | BS Soluções Logísticas",
     description: "Cadastro de equipe e custo por diária.",
   },
 };

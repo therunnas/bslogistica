@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description:
     "Conferência de diárias, horas extras, custos e faturamento por cliente e período, com o que ainda falta faturar.",
   openGraph: {
-    title: "Fechamento por cliente e período | BS Logística",
+    title: "Fechamento por cliente e período | BS Soluções Logísticas",
     description: "Diárias, horas extras, custo previsto e faturamento por cliente e período.",
   },
 };

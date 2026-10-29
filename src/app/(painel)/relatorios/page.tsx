@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description:
     "Relatórios por colaborador, operação e lançamento: diárias, faltas, horas extras, receita, custo e margem.",
   openGraph: {
-    title: "Relatórios de diárias e resultado | BS Logística",
+    title: "Relatórios de diárias e resultado | BS Soluções Logísticas",
     description: "Diárias, faltas, horas extras, custo e margem por colaborador e operação.",
   },
 };
