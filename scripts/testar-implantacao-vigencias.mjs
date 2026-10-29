@@ -162,9 +162,10 @@ verificar(
   true,
 );
 verificar(
-  "C2. a rota está no menu de conta do admin e fora do menu do operacional",
-  /admin: \[ITEM_IMPLANTACAO, ITEM_USUARIOS, ITEM_SEGURANCA\]/.test(shell) &&
-    /operacional: \[ITEM_SEGURANCA\]/.test(shell),
+  "C2. a rota é técnica (FIN-01): fora do menu de conta de TODOS os papéis; a proteção é o servidor",
+  /admin: \[ITEM_USUARIOS, ITEM_SEGURANCA\]/.test(shell) &&
+    /operacional: \[ITEM_SEGURANCA\]/.test(shell) &&
+    !/ITEM_IMPLANTACAO/.test(shell),
   true,
 );
 verificar(

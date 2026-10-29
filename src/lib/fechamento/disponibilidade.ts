@@ -32,11 +32,11 @@ export const MENSAGEM_DE_INDISPONIBILIDADE: Record<MotivoDeIndisponibilidade, st
   "verificacao-falhou":
     "Não foi possível verificar se o Fechamento está disponível neste ambiente. Tente novamente mais tarde.",
   "estado-desconhecido":
-    "O estado do motor financeiro não pôde ser confirmado, então o Fechamento está indisponível.",
+    "As regras financeiras não puderam ser confirmadas, então o Fechamento está indisponível.",
   "sem-regras-definitivas":
     "O Fechamento ainda não está disponível neste ambiente: as regras financeiras definitivas não foram instaladas.",
   "motor-desligado":
-    "O Fechamento está indisponível enquanto o motor financeiro por vigência estiver desligado.",
+    "O Fechamento está indisponível enquanto as vigências financeiras não estiverem ativadas.",
 };
 
 /** Decide a partir da resposta e do erro de `estado_motor_vigencia`, tal como vieram. */

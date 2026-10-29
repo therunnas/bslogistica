@@ -22,14 +22,17 @@ import type { AjusteDeArredondamento } from "@/lib/regras-definitivas-dados";
  */
 export function ArredondamentoAcumulado({
   ajustes,
+  aguardando,
   carregando,
   erro,
 }: {
   ajustes: readonly AjusteDeArredondamento[];
+  /** Consulta desabilitada (sem cliente ou sem período válido): orienta, não "calcula". */
+  aguardando: boolean;
   carregando: boolean;
   erro: boolean;
 }) {
-  if (!carregando && !erro && ajustes.length === 0) return null;
+  if (!aguardando && !carregando && !erro && ajustes.length === 0) return null;
 
   return (
     <Card className="mb-6 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
@@ -53,6 +56,10 @@ export function ArredondamentoAcumulado({
         {erro ? (
           <p className="p-5 text-sm text-destructive">
             Não foi possível calcular o arredondamento acumulado.
+          </p>
+        ) : aguardando ? (
+          <p className="p-5 text-sm text-muted-foreground">
+            Selecione um cliente e um período válido para ver o arredondamento acumulado.
           </p>
         ) : carregando ? (
           <p className="p-5 text-sm text-muted-foreground">Calculando o arredondamento…</p>

@@ -986,8 +986,8 @@ export function PainelClientes() {
           {taxaTravada ? (
             <p className="text-xs text-muted-foreground">
               {modoDeTaxa === "por-vigencia"
-                ? "Motor ligado: diária, jornada, fator e tolerância não são editados aqui. Registre uma nova vigência no histórico abaixo."
-                : "Estado do motor não confirmado: as condições financeiras estão somente para leitura."}
+                ? "Diária, jornada, fator e tolerância seguem a vigência: não são editados aqui. Registre uma nova vigência no histórico abaixo."
+                : "Regras financeiras não confirmadas: as condições financeiras estão somente para leitura."}
             </p>
           ) : null}
 

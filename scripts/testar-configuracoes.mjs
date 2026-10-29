@@ -200,7 +200,7 @@ console.log("\nD. Navegação: quem vê o quê no menu de conta\n");
 
 verificar(
   "D1. admin continua vendo 'Usuários'",
-  /admin: \[ITEM_IMPLANTACAO, ITEM_USUARIOS, ITEM_SEGURANCA\]/.test(fontes.shell),
+  /admin: \[ITEM_USUARIOS, ITEM_SEGURANCA\]/.test(fontes.shell),
   true,
 );
 verificar(

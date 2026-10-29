@@ -40,22 +40,22 @@ export function interpretarEstadoDoMotor(data: unknown, erro: unknown): EstadoDo
         ? String((erro as { code: unknown }).code)
         : "";
     if (codigo === "42501" || codigo === "28000") {
-      return { tag: "desconhecido", motivo: "Sem permissão para consultar o estado do motor." };
+      return { tag: "desconhecido", motivo: "Sem permissão para consultar as regras financeiras." };
     }
-    return { tag: "desconhecido", motivo: "Não foi possível consultar o estado do motor." };
+    return { tag: "desconhecido", motivo: "Não foi possível consultar as regras financeiras." };
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    return { tag: "desconhecido", motivo: "Resposta inválida do estado do motor." };
+    return { tag: "desconhecido", motivo: "Resposta inválida da consulta das regras financeiras." };
   }
   const r = data as { ativo?: unknown; consistente?: unknown; ativada_em?: unknown };
   if (typeof r.ativo !== "boolean") {
-    return { tag: "desconhecido", motivo: "Resposta inválida do estado do motor." };
+    return { tag: "desconhecido", motivo: "Resposta inválida da consulta das regras financeiras." };
   }
   if (r.consistente !== true) {
     return {
       tag: "desconhecido",
       motivo:
-        "Os gatilhos do motor não correspondem à configuração. Chame o administrador do banco.",
+        "As regras financeiras estão em estado inconsistente. Chame o administrador do sistema.",
     };
   }
   return r.ativo
@@ -129,27 +129,27 @@ export function avisoDoMotor(estado: EstadoDoMotorUI): {
   switch (estado.tag) {
     case "carregando":
       return {
-        titulo: "Verificando o motor financeiro…",
+        titulo: "Verificando as regras financeiras…",
         texto: "As condições financeiras ficam bloqueadas até a resposta.",
         nivel: "info",
       };
     case "desligado":
       return {
-        titulo: "Motor por vigência desligado",
+        titulo: "Vigências ainda não aplicadas",
         texto:
-          "Os cálculos usam as taxas atuais do cadastro, como sempre. As vigências cadastradas aqui ficam preparadas e só passam a valer quando o motor for ligado.",
+          "Os cálculos usam as taxas atuais do cadastro. As vigências cadastradas aqui ficam preparadas e só passam a valer quando forem ativadas.",
         nivel: "info",
       };
     case "ligado":
       return {
-        titulo: "Motor por vigência ligado",
+        titulo: "Valores por data de vigência",
         texto:
-          "O preço de cada apontamento vem da vigência da data trabalhada. Taxas só mudam registrando uma nova vigência, com motivo.",
+          "O preço de cada apontamento segue a vigência da data trabalhada. Para reajustar, registre uma nova vigência, com motivo.",
         nivel: "info",
       };
     default:
       return {
-        titulo: "Estado do motor financeiro desconhecido",
+        titulo: "Regras financeiras não confirmadas",
         texto: `${estado.motivo} Por segurança, as condições financeiras ficam somente para leitura até a verificação funcionar.`,
         nivel: "alerta",
       };

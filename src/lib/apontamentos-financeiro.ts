@@ -260,8 +260,8 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
     if (semMudanca && e.gravado) return doBanco(e.gravado);
     return INDISPONIVEL(
       estado.tag === "carregando"
-        ? "Prévia indisponível: verificando o motor financeiro."
-        : "Prévia indisponível: o estado do motor financeiro é desconhecido.",
+        ? "Prévia indisponível: verificando as regras financeiras."
+        : "Prévia indisponível: as regras financeiras não foram confirmadas.",
       false,
     );
   }

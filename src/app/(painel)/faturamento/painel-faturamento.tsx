@@ -526,7 +526,8 @@ export function PainelFaturamento() {
           {regrasDefinitivas ? (
             <ArredondamentoAcumulado
               ajustes={ajustes.data ?? []}
-              carregando={ajustes.isPending}
+              aguardando={ajustes.isPending && !ajustes.isFetching}
+              carregando={ajustes.isLoading}
               erro={ajustes.isError}
             />
           ) : null}
@@ -540,7 +541,8 @@ export function PainelFaturamento() {
                 (operation) => operation.client_id === selectedClient,
               )}
               adicionais={adicionais.data ?? []}
-              carregando={adicionais.isPending}
+              aguardando={adicionais.isPending && !adicionais.isFetching}
+              carregando={adicionais.isLoading}
               erro={adicionais.isError}
             />
           ) : null}

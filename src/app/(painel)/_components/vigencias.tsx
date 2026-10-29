@@ -279,7 +279,7 @@ export function HistoricoDeVigencias({
                 ? "Vigência FUTURA: fica preparada e passa a valer na data de início. Não altera nada hoje."
                 : "Início hoje ou no passado: vale desde essa data para os apontamentos dela em diante."}
               {estado.tag === "desligado"
-                ? " Com o motor desligado, os cálculos continuam usando as taxas do cadastro."
+                ? " Enquanto as vigências não estiverem ativadas, os cálculos continuam usando as taxas do cadastro."
                 : ""}
             </DialogDescription>
           </DialogHeader>

@@ -75,14 +75,17 @@ const ITEM_SEGURANCA = {
   icon: ShieldCheck,
 } as const;
 
-const ITEM_IMPLANTACAO = {
+// Rota técnica de manutenção (implantação e reversão do cálculo por vigência): NÃO está no menu.
+// Fica aqui só para o título da página; o acesso é decidido no servidor (`exigirAdmin`, admin com
+// AAL2), e ausência de link não é controle de acesso.
+const ROTA_TECNICA_IMPLANTACAO = {
   href: "/implantacao-vigencias",
   label: "Implantação das vigências",
   icon: History,
 } as const;
 
 const MENU_DE_CONTA = {
-  admin: [ITEM_IMPLANTACAO, ITEM_USUARIOS, ITEM_SEGURANCA],
+  admin: [ITEM_USUARIOS, ITEM_SEGURANCA],
   operacional: [ITEM_SEGURANCA],
   "sem-papel": [],
 } as const;
@@ -113,7 +116,8 @@ export function AppShell({
   const [saindo, iniciarSaida] = useTransition();
 
   const paginaAtual =
-    [...navegacao, ...itensDeConta].find(({ href }) => href === caminho)?.label ?? "Painel interno";
+    [...navegacao, ...itensDeConta, ROTA_TECNICA_IMPLANTACAO].find(({ href }) => href === caminho)
+      ?.label ?? "Painel interno";
 
   const papelVisivel =
     papel === "admin" ? "Administrador" : papel === "operacional" ? "Operacional" : "Sem perfil";

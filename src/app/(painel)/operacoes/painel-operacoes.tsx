@@ -961,8 +961,8 @@ export function PainelOperacoes() {
             {valorTravado ? (
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 {modoDeValor === "por-vigencia"
-                  ? "Motor ligado: o valor acordado não é editado aqui. Registre uma nova vigência no histórico abaixo."
-                  : "Estado do motor não confirmado: o valor acordado está somente para leitura."}
+                  ? "O valor acordado segue a vigência: não é editado aqui. Registre uma nova vigência no histórico abaixo."
+                  : "Regras financeiras não confirmadas: o valor acordado está somente para leitura."}
               </p>
             ) : null}
 
