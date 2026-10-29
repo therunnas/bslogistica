@@ -527,8 +527,8 @@ export function PainelColaboradores() {
           {custoTravado ? (
             <p className="text-xs text-muted-foreground">
               {modoDeCusto === "por-vigencia"
-                ? "Motor ligado: o custo diário não é editado aqui. Registre uma nova vigência no histórico abaixo."
-                : "Estado do motor não confirmado: o custo diário está somente para leitura."}
+                ? "O custo diário segue a vigência: não é editado aqui. Registre uma nova vigência no histórico abaixo."
+                : "Regras financeiras não confirmadas: o custo diário está somente para leitura."}
             </p>
           ) : null}
 

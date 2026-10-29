@@ -123,6 +123,9 @@ jobs:
       - name: Teste vigencias-paginacao
         run: npm run test:vigencias-paginacao
 
+      - name: Teste interface-simples
+        run: npm run test:interface-simples
+
       - name: Teste reversao-motor
         run: npm run test:reversao-motor
 

@@ -54,6 +54,8 @@ export interface AdicionaisDoPeriodoProps {
   fim: string;
   operacoes: readonly { id: string; name: string }[];
   adicionais: readonly Adicional[];
+  /** Consulta desabilitada (sem cliente ou sem período válido): orienta, não "carrega". */
+  aguardando: boolean;
   carregando: boolean;
   erro: boolean;
 }
@@ -68,6 +70,7 @@ export function AdicionaisDoPeriodo({
   fim,
   operacoes,
   adicionais,
+  aguardando,
   carregando,
   erro,
 }: AdicionaisDoPeriodoProps) {
@@ -148,6 +151,10 @@ export function AdicionaisDoPeriodo({
       <CardContent className="p-0">
         {erro ? (
           <p className="p-5 text-sm text-destructive">Não foi possível carregar os adicionais.</p>
+        ) : aguardando ? (
+          <p className="p-5 text-sm text-muted-foreground">
+            Selecione um cliente e um período válido para ver os adicionais.
+          </p>
         ) : carregando ? (
           <p className="p-5 text-sm text-muted-foreground">Carregando adicionais…</p>
         ) : doPeriodo.length === 0 ? (

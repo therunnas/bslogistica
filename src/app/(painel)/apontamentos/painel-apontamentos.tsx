@@ -1060,7 +1060,7 @@ export function PainelApontamentos() {
                       "veja a origem em cada linha"}
                   </>
                 ) : (
-                  "regra financeira indisponível até confirmar o estado do motor"
+                  "regra financeira indisponível até a confirmação das regras"
                 )}
               </p>
             </div>
