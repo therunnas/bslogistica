@@ -20,6 +20,8 @@ import {
   FRASE_DE_CONFIRMACAO,
   MOTIVO_MAXIMO,
   MENSAGEM_ATIVACAO_DESABILITADA,
+  sucessoDaAtivacaoObsoleto,
+  sucessoDaAtivacaoVisivel,
   validarEntradaDeAtivacao,
   type ResultadoDaAtivacao,
 } from "@/lib/ativacao-motor";
@@ -56,18 +58,19 @@ export function AtivarMotor({
 
   const ativar = useMutation({
     mutationFn: (entrada: { motivo: string; confirmacao: string }) => ligarMotorAction(entrada),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       if (r.ok) {
-        setResultado(r);
         setAberto(false);
         setRecusa(null);
       } else {
         setRecusa(r.mensagem);
       }
-      // Em qualquer desfecho a tela relê o estado real, em vez de presumir.
-      void queryClient.invalidateQueries({ queryKey: CHAVE_DO_MOTOR });
+      // Em qualquer desfecho a tela relê o estado real, em vez de presumir. O aviso de sucesso só
+      // é guardado depois da releitura e só aparece se ela mostrar o motor ligado.
       void queryClient.invalidateQueries({ queryKey: CHAVE_DA_IMPLANTACAO });
       void queryClient.invalidateQueries({ queryKey: ["vigencias"] });
+      await queryClient.invalidateQueries({ queryKey: CHAVE_DO_MOTOR });
+      if (r.ok) setResultado(r);
     },
     onError: () => {
       setRecusa(
@@ -79,6 +82,11 @@ export function AtivarMotor({
 
   const entrada = validarEntradaDeAtivacao({ motivo, confirmacao });
 
+  // Depois de uma reversão (ou de uma releitura que não mostra o motor ligado) o sucesso antigo
+  // não pode reaparecer se o motor voltar a ligar por outro caminho. Ajuste de estado durante a
+  // renderização (padrão do React), sem efeito: nada aqui chama o servidor.
+  if (resultado && sucessoDaAtivacaoObsoleto(estado.tag)) setResultado(null);
+
   function fechar(abrir: boolean) {
     if (ativar.isPending) return;
     setAberto(abrir);
@@ -87,19 +95,6 @@ export function AtivarMotor({
       setConfirmacao("");
       setRecusa(null);
     }
-  }
-
-  if (resultado) {
-    return (
-      <Alert className="mb-6">
-        <AlertTitle>Motor por vigência ligado</AlertTitle>
-        <AlertDescription>
-          O banco confirmou a ativação
-          {resultado.ativadaEm ? ` em ${resultado.ativadaEm}` : ""} com {resultado.pendencias}{" "}
-          pendência(s). A ativação ficou registrada na trilha.
-        </AlertDescription>
-      </Alert>
-    );
   }
 
   if (estado.tag === "carregando") {
@@ -112,7 +107,11 @@ export function AtivarMotor({
         <Alert className="mb-6">
           <AlertTitle>Motor por vigência ligado</AlertTitle>
           <AlertDescription>
-            {estado.ativadaEm ? `Ligado em ${estado.ativadaEm}. ` : ""}
+            {sucessoDaAtivacaoVisivel(estado.tag, resultado !== null) && resultado
+              ? `O banco confirmou a ativação${resultado.ativadaEm ? ` em ${resultado.ativadaEm}` : ""} com ${resultado.pendencias} pendência(s). A ativação ficou registrada na trilha. `
+              : estado.ativadaEm
+                ? `Ligado em ${estado.ativadaEm}. `
+                : ""}
             Cada apontamento novo usa as vigências cadastradas; sem vigência na data, o apontamento
             é recusado.
           </AlertDescription>

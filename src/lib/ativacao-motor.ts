@@ -331,3 +331,16 @@ export async function desligarMotorDeVigencia(
   }
   return { ok: true, sincronizacao: (dados as { sincronizacao?: unknown }).sincronizacao ?? null };
 }
+
+/**
+ * O aviso "o banco confirmou a ativação" só vale enquanto a consulta ao banco mostrar o motor
+ * LIGADO. Carregando, desligado ou desconhecido: nada de sucesso na tela.
+ */
+export function sucessoDaAtivacaoVisivel(tagDoEstado: string, temResultado: boolean): boolean {
+  return temResultado && tagDoEstado === "ligado";
+}
+
+/** O sucesso guardado deixa de valer assim que a consulta mostra desligado ou desconhecido. */
+export function sucessoDaAtivacaoObsoleto(tagDoEstado: string): boolean {
+  return tagDoEstado === "desligado" || tagDoEstado === "desconhecido";
+}

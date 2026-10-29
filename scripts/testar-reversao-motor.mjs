@@ -12,6 +12,7 @@
  *   D  confirmação pelo estado depois de desligar; resposta duvidosa não vira sucesso
  *   E  chamada duplicada
  *   F  trava de servidor própria (BS_REVERSAO_MOTOR_HABILITADA) e ordem da Server Action
+ *   H  regressão P2 (PR #73): o sucesso da ativação não esconde o botão de desligar
  *   G  interface: só no ramo "ligado", sem efeito ao carregar, ativação preservada
  */
 
@@ -26,6 +27,8 @@ import {
   desligarMotorDeVigencia,
   ligarMotorDeVigencia,
   reversaoHabilitada,
+  sucessoDaAtivacaoObsoleto,
+  sucessoDaAtivacaoVisivel,
   validarEntradaDeReversao,
 } from "../src/lib/ativacao-motor.ts";
 
@@ -364,6 +367,57 @@ verificar(
 verificar(
   "G8. nenhuma migration nova nesta mudança",
   ler("package.json").includes("test:reversao-motor"),
+  true,
+);
+
+console.log("\nH. Regressão P2: aviso de sucesso x controles de reversão\n");
+verificar(
+  "H1. o aviso de sucesso só vale com o estado confirmado LIGADO",
+  ["carregando", "desligado", "desconhecido", "ligado"].map((t) =>
+    sucessoDaAtivacaoVisivel(t, true),
+  ),
+  [false, false, false, true],
+);
+verificar(
+  "H2. sem resultado guardado não há aviso de sucesso",
+  sucessoDaAtivacaoVisivel("ligado", false),
+  false,
+);
+verificar(
+  "H3. o sucesso guardado fica obsoleto com desligado ou desconhecido (nunca reaparece depois de uma reversão), não com ligado ou carregando",
+  ["desligado", "desconhecido", "ligado", "carregando"].map(sucessoDaAtivacaoObsoleto),
+  [true, true, false, false],
+);
+verificar(
+  "H4. não há mais retorno antecipado por `resultado` (era o que escondia DesligarMotor)",
+  /if \(resultado\)\s*\{?\s*return/.test(ativar),
+  false,
+);
+verificar(
+  "H5. o aviso de sucesso e o DesligarMotor ficam no MESMO ramo do estado ligado",
+  /estado\.tag === "ligado"[\s\S]*?sucessoDaAtivacaoVisivel\(estado\.tag[\s\S]*?<DesligarMotor habilitada=\{reversaoHabilitada\} \/>/.test(
+    ativar,
+  ),
+  true,
+);
+verificar(
+  "H6. o sucesso só é guardado DEPOIS da releitura do estado (await da invalidação)",
+  /await queryClient\.invalidateQueries\(\{ queryKey: CHAVE_DO_MOTOR \}\);\s*if \(r\.ok\) setResultado\(r\)/.test(
+    ativar,
+  ) && !/onSuccess:[^}]*setResultado\(r\);\s*setAberto/.test(ativar),
+  true,
+);
+verificar(
+  "H7. o sucesso antigo é descartado na renderização quando o estado deixa de ser ligado (sem efeito)",
+  /if \(resultado && sucessoDaAtivacaoObsoleto\(estado\.tag\)\) setResultado\(null\)/.test(
+    ativar,
+  ) && !/useEffect/.test(ativar),
+  true,
+);
+verificar(
+  "H8. todos os estados têm ramo próprio: carregando, ligado, desconhecido, janela fechada e formulário",
+  ["carregando", "ligado", "desconhecido"].every((t) => ativar.includes(`estado.tag === "${t}"`)) &&
+    ativar.includes("if (!habilitada)"),
   true,
 );
 
