@@ -217,6 +217,21 @@ select pg_temp.registrar('I9. a função do gatilho não é executável por auth
 select pg_temp.registrar('I10. a diária continua a original depois das tentativas negadas', '120.00',
   (select daily_rate::text from public.contracts where id = '5ac00000-0000-4000-8000-0000000000d1'));
 
+-- I (INSERT). o mesmo vale para a linha que NASCE com taxa informada direto -----------------------------
+select pg_temp.registrar('I11. INSERT de contrato com diária em AAL1 sem fator: negado', 'erro 42501',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.contracts (client_id, name, daily_rate) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins'', 50) returning 1) select count(*)::text from i'));
+select pg_temp.registrar('I12. INSERT de contrato SEM taxa (defaults) em AAL1 sem fator: passa (cotidiano)', '1',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.contracts (client_id, name) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins-vazio'') returning 1) select count(*)::text from i'));
+select pg_temp.registrar('I13. INSERT de colaborador com custo diário em AAL1: negado; sem custo: passa', 'erro 42501|1',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.employees (name, daily_cost) values (''E-ins'', 80) returning 1) select count(*)::text from i') || '|' ||
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.employees (name) values (''E-ins-vazio'') returning 1) select count(*)::text from i'));
+select pg_temp.registrar('I14. INSERT de operação com valor acordado em AAL1: negado; sem valor: passa', 'erro 42501|1',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.operations (client_id, contract_id, name, agreed_amount) values (''5ac00000-0000-4000-8000-0000000000c1'', ''5ac00000-0000-4000-8000-0000000000d1'', ''OP-ins'', 10) returning 1) select count(*)::text from i') || '|' ||
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.operations (client_id, contract_id, name) values (''5ac00000-0000-4000-8000-0000000000c1'', ''5ac00000-0000-4000-8000-0000000000d1'', ''OP-ins-vazia'') returning 1) select count(*)::text from i'));
+select pg_temp.registrar('I15. INSERT com taxa em AAL2 (fator verificado): passa; com fator só pendente em AAL1: negado', '1|erro 42501',
+  pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', 'with i as (insert into public.contracts (client_id, name, daily_rate) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins2'', 60) returning 1) select count(*)::text from i') || '|' ||
+  pg_temp.por('5a000000-0000-4000-8000-000000000003', 'aal1', 'with i as (insert into public.contracts (client_id, name, daily_rate) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins3'', 70) returning 1) select count(*)::text from i'));
+
 -- G. Fator removido / adicionado -----------------------------------------------------------------
 delete from auth.mfa_factors where id = '5afac000-0000-4000-8000-000000000002';
 select pg_temp.registrar('G1. fator removido: o admin volta a trabalhar em AAL1 (a policy lê o banco, não o cookie)', 'true|2',

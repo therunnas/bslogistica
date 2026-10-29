@@ -507,7 +507,7 @@ $function$;
 
 -- 5) permissões inalteradas: CREATE OR REPLACE preserva dono, ACL e comentários das funções acima.
 
--- 6) colunas financeiras legadas exigem AAL2, com o motor ligado ou desligado ------------------
+-- 6) colunas financeiras legadas exigem AAL2 (INSERT e UPDATE), com o motor ligado ou desligado ------------------
 -- As tabelas contracts/employees/operations são classe A (cotidiano). Mas a EDIÇÃO DIRETA das colunas
 -- de taxa (e só dela) é financeiro crítico: com o motor por vigência desligado os gatilhos
 -- *_bloqueia_taxa_direta ficam desabilitados e, sem este gatilho, uma conta sem fator (AAL1) mudaria
@@ -525,18 +525,26 @@ begin
   if current_user in ('postgres', 'service_role') then
     return new;
   end if;
+  -- INSERT: vale o que foge do default da coluna (a linha nasce sem taxa); UPDATE: vale o que mudou.
   if tg_table_name = 'contracts' then
-    _mudou := new.daily_rate is distinct from old.daily_rate
-           or new.shift_hours is distinct from old.shift_hours
-           or new.ot_factor is distinct from old.ot_factor
-           or new.ot_tolerance_min is distinct from old.ot_tolerance_min;
+    _mudou := case when tg_op = 'INSERT'
+      then new.daily_rate is distinct from 0 or new.shift_hours is distinct from 8
+        or new.ot_factor is distinct from 1 or new.ot_tolerance_min is distinct from 10
+      else new.daily_rate is distinct from old.daily_rate
+        or new.shift_hours is distinct from old.shift_hours
+        or new.ot_factor is distinct from old.ot_factor
+        or new.ot_tolerance_min is distinct from old.ot_tolerance_min end;
   elsif tg_table_name = 'employees' then
-    _mudou := new.daily_cost is distinct from old.daily_cost;
+    _mudou := case when tg_op = 'INSERT'
+      then new.daily_cost is distinct from 0
+      else new.daily_cost is distinct from old.daily_cost end;
   else
-    _mudou := new.agreed_amount is distinct from old.agreed_amount;
+    _mudou := case when tg_op = 'INSERT'
+      then new.agreed_amount is not null
+      else new.agreed_amount is distinct from old.agreed_amount end;
   end if;
   if _mudou and coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
-    raise exception 'Alterar condições financeiras exige a verificação em duas etapas (dois fatores).'
+    raise exception 'Informar ou alterar condições financeiras exige a verificação em duas etapas (dois fatores).'
       using errcode = '42501';
   end if;
   return new;
@@ -546,13 +554,13 @@ $$;
 revoke all on function public.exigir_aal2_taxa_legada() from public, anon, authenticated;
 
 create trigger trg_contracts_exige_aal2_taxa_legada
-  before update of daily_rate, shift_hours, ot_factor, ot_tolerance_min on public.contracts
+  before insert or update of daily_rate, shift_hours, ot_factor, ot_tolerance_min on public.contracts
   for each row execute function public.exigir_aal2_taxa_legada();
 create trigger trg_employees_exige_aal2_taxa_legada
-  before update of daily_cost on public.employees
+  before insert or update of daily_cost on public.employees
   for each row execute function public.exigir_aal2_taxa_legada();
 create trigger trg_operations_exige_aal2_taxa_legada
-  before update of agreed_amount on public.operations
+  before insert or update of agreed_amount on public.operations
   for each row execute function public.exigir_aal2_taxa_legada();
 
 commit;

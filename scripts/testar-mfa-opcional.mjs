@@ -403,10 +403,10 @@ verificar(
 );
 
 verificar(
-  "D14. colunas de taxa legadas exigem AAL2 com motor ligado ou desligado: 3 gatilhos próprios, 42501, exceção só para postgres/service_role",
+  "D14. colunas de taxa legadas exigem AAL2 (INSERT e UPDATE) com motor ligado ou desligado: 3 gatilhos próprios, 42501, exceção só para postgres/service_role",
   ["contracts", "employees", "operations"].every((t) =>
     new RegExp(
-      `create trigger trg_${t}_exige_aal2_taxa_legada\\s+before update of [a-z_, ]+ on public\\.${t}`,
+      `create trigger trg_${t}_exige_aal2_taxa_legada\\s+before insert or update of [a-z_, ]+ on public\\.${t}`,
     ).test(corpo),
   ) &&
     /coalesce\(auth\.jwt\(\) ->> 'aal', ''\) <> 'aal2'/.test(corpo) &&
