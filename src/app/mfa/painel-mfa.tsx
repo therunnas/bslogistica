@@ -13,7 +13,7 @@ import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { decidirFluxoMfa, fonteDoQrTotp } from "@/lib/mfa";
 import { toast } from "@/lib/notificacoes";
 
-const NOME_DO_FATOR = "BS Soluções Logística";
+const NOME_DO_FATOR = "BS Soluções Logísticas";
 
 /**
  * Segundo fator por TOTP usando exclusivamente o MFA oficial do Supabase.
@@ -324,7 +324,7 @@ export function PainelMfa({
 
       {/* Rodapé */}
       <p className="text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} BS Soluções Logística
+        © {new Date().getFullYear()} BS Soluções Logísticas
       </p>
     </main>
   );

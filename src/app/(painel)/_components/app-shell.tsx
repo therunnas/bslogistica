@@ -21,11 +21,11 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 
+import { BSLogo } from "@/components/branding/bs-logo";
 import { useTema } from "@/components/theme-provider";
 import { useFechamentoDisponivel } from "@/lib/vigencias-dados";
 import { Button } from "@/components/ui/button";
@@ -162,23 +162,10 @@ export function AppShell({
     return (
       <>
         <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Image
-              src="/branding/bs-simbolo-retangular.png"
-              alt="BS Soluções Logística"
-              width={1774}
-              height={887}
-              priority
-              className="h-auto w-16 shrink-0 object-contain"
-            />
+          <div className="flex min-w-0 flex-col justify-center gap-1.5">
+            <BSLogo fundo="tema" priority className="w-32 shrink-0" />
 
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
-                BS Soluções Logística
-              </p>
-
-              <p className="mt-0.5 text-[10px] text-muted-foreground">Sistema interno</p>
-            </div>
+            <p className="text-[10px] leading-none text-muted-foreground">Sistema interno</p>
           </div>
 
           {mobile ? (
@@ -379,7 +366,7 @@ export function AppShell({
               </p>
 
               <p className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">
-                BS Soluções Logística
+                BS Soluções Logísticas
               </p>
             </div>
           </header>

@@ -65,7 +65,7 @@ export function VerificacaoIndisponivel({ email }: { email: string }) {
           </div>
 
           <p className="mt-5 text-center text-[11px] text-muted-foreground">
-            BS Soluções Logística · Ambiente interno protegido
+            BS Soluções Logísticas · Ambiente interno protegido
           </p>
         </section>
       </div>

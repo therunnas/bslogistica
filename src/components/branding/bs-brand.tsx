@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { BSLogo } from "./bs-logo";
 
 type BSBrandProps = {
   variant?: "light" | "dark";
@@ -9,23 +9,16 @@ type BSBrandProps = {
 };
 
 const tamanhos = {
-  sm: {
-    imagem: "w-36 sm:w-40",
-    texto: "text-xs",
-    espacamento: "mt-2",
-  },
-  md: {
-    imagem: "w-48 sm:w-52",
-    texto: "text-sm",
-    espacamento: "mt-2",
-  },
-  lg: {
-    imagem: "w-64 xl:w-[360px]",
-    texto: "text-base xl:text-lg",
-    espacamento: "mt-3",
-  },
+  sm: "w-40 sm:w-44",
+  md: "w-52 sm:w-56",
+  lg: "w-64 xl:w-[360px]",
 };
 
+/**
+ * Marca das telas de autenticação. A composição horizontal oficial já traz o nome "SOLUÇÕES
+ * LOGÍSTICAS", então não há legenda em texto. `variant="light"` = fundo claro (logo preta);
+ * `"dark"` = fundo escuro (logo branca).
+ */
 export function BSBrand({
   variant = "light",
   size = "sm",
@@ -33,28 +26,15 @@ export function BSBrand({
   priority = false,
   className = "",
 }: BSBrandProps) {
-  const tamanho = tamanhos[size];
-
-  const alinhamento = align === "center" ? "items-center text-center" : "items-start text-left";
-
-  const corDoTexto = variant === "dark" ? "text-white/90" : "text-slate-900";
+  const alinhamento = align === "center" ? "items-center" : "items-start";
 
   return (
     <div className={`flex flex-col ${alinhamento} ${className}`}>
-      <Image
-        src="/branding/bs-simbolo-retangular.png"
-        alt="BS Soluções Logística"
-        width={1774}
-        height={887}
+      <BSLogo
+        fundo={variant === "dark" ? "escuro" : "claro"}
         priority={priority}
-        className={`h-auto object-contain ${tamanho.imagem}`}
+        className={tamanhos[size]}
       />
-
-      <p
-        className={`${tamanho.espacamento} ${tamanho.texto} font-semibold tracking-[0.08em] ${corDoTexto}`}
-      >
-        BS SOLUÇÕES LOGÍSTICA
-      </p>
     </div>
   );
 }

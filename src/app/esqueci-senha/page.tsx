@@ -145,7 +145,7 @@ export default function EsqueciSenha() {
 
       {/* Rodapé */}
       <p className="text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} BS Soluções Logística
+        © {new Date().getFullYear()} BS Soluções Logísticas
       </p>
     </main>
   );
