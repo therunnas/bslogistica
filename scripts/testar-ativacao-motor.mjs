@@ -412,10 +412,15 @@ verificar(
     !/alterar_motor_vigencia|motor\.alterar|RPC_ATIVACAO\.alterar/.test(componente + painel + acao),
   true,
 );
+const trechoDaAtivacao = lib.slice(
+  lib.indexOf("export async function ligarMotorDeVigencia"),
+  lib.indexOf("export const VARIAVEL_DE_REVERSAO"),
+);
 verificar(
-  "E6. só liga: nenhuma chamada com p_ativar: false e nenhum botão de desligar/sincronizar/regularizar",
-  !/p_ativar:\s*false/.test(lib) &&
-    !/Desligar o motor|desligarMotor|sincronizar_colunas|regularizar_apontamento|sincronizarColunas/i.test(
+  "E6. a ATIVAÇÃO só liga: sem p_ativar: false e sem sincronizar/regularizar (a reversão é outro módulo, RB-01)",
+  trechoDaAtivacao.length > 500 &&
+    !/p_ativar:\s*false/.test(trechoDaAtivacao) &&
+    !/sincronizar_colunas|regularizar_apontamento|sincronizarColunas/i.test(
       acao + lib + componente,
     ),
   true,
@@ -538,8 +543,11 @@ verificar(
   true,
 );
 verificar(
-  "F9. continua sem botão de desligar e sem nova página: a rota é a mesma da B8.6",
-  !/Desligar|desligar o motor/i.test(componente.replace(/Desligar depois exige/, "")) &&
+  "F9. a reversão (RB-01) mora em desligar-motor.tsx, montada só no ramo 'ligado'; a rota é a mesma da B8.6",
+  !/Desligar|desligar o motor/i.test(
+    componente.replace(/DesligarMotor|desligar-motor|Desligar o\s+motor/g, ""),
+  ) &&
+    /estado\.tag === "ligado"[\s\S]*?<DesligarMotor/.test(componente) &&
     ler("src/app/(painel)/_components/app-shell.tsx").split("/implantacao-vigencias").length === 2,
   true,
 );

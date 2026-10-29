@@ -72,7 +72,7 @@ cadastrado.
   protegida; tela `/implantacao-vigencias` (consulta). As telas de cadastro não ligam nem
   desligam o motor. A C05-B8.6 acrescenta à `/implantacao-vigencias` o controle de **ligar** o
   motor (Server Action com `exigirAdminAal2()`, RPC `alterar_motor_vigencia` com o JWT da sessão,
-  motivo, frase de confirmação, `p_aceitar_pendencias = false`; sem botão de desligar). Está em PR.
+  motivo, frase de confirmação, `p_aceitar_pendencias = false`). A reversão tem módulo e trava próprios (RB-01, abaixo).
   Usado **só na homologação** (C05-B8.8, 24/10/2026, pelo Preview do PR, admin AAL2): motor
   ligado lá, com dados `HML-TESTE`; em Production o motor segue **desligado**. É controle técnico
   de implantação: a única forma segura de ligar o motor, por isso permanece até existir
@@ -81,10 +81,16 @@ cadastrado.
   pedido se a variável `BS_ATIVACAO_MOTOR_HABILITADA` (server-only, nunca `NEXT_PUBLIC_*`) valer
   exatamente `true`; ausente ou com qualquer outro valor, o padrão em todos os ambientes, ela recusa
   (código `desabilitada`) depois da autorização e antes de tocar o banco, e a tela nem mostra botão
-  nem diálogo. Não substitui nada: admin em AAL2, motivo, frase e a RPC do banco seguem exigidos, e
-  não existe botão de desligar. Procedimento para Production, com autorização própria: definir a
+  nem diálogo. Não substitui nada: admin em AAL2, motivo, frase e a RPC do banco seguem exigidos; a
+  ativação só liga. Procedimento para Production, com autorização própria: definir a
   variável no projeto da Vercel, publicar, ligar o motor pela tela, remover a variável e publicar de
   novo.
+- **RB-01** (reversão controlada do motor, implementada localmente, sem deploy): botão "Desligar
+  motor" em `/implantacao-vigencias`, só com o motor ligado e consistente. Server Action
+  `desligarMotorAction`: `exigirAdminAal2()`, trava própria `BS_REVERSAO_MOTOR_HABILITADA`
+  (server-only; só `true` abre), cliente da sessão (sem `service_role`) e a RPC
+  `alterar_motor_vigencia(false, motivo)`, que audita em `financial_terms_audit`. Motivo e frase
+  `DESLIGAR MOTOR`. Sem migration. Procedimento: `docs/runbooks/reversao-do-motor.md`.
 - **C05-B8.9** (no mesmo PR): as telas de apontamento (admin e operacional) recusam salvar linha
   com entrada igual à saída, que o cálculo mediria como 24 h; o cálculo não mudou e o banco ainda
   aceita a igualdade por outra via (corrigir no banco exige migration própria). O cadastro de

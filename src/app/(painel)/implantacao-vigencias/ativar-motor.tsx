@@ -24,6 +24,7 @@ import {
   type ResultadoDaAtivacao,
 } from "@/lib/ativacao-motor";
 import { CHAVE_DA_IMPLANTACAO, CHAVE_DO_MOTOR, useEstadoDoMotor } from "@/lib/vigencias-dados";
+import { DesligarMotor } from "./desligar-motor";
 import { ligarMotorAction } from "./_acoes";
 
 /**
@@ -31,14 +32,17 @@ import { ligarMotorAction } from "./_acoes";
  *
  * Não liga nada ao carregar: só o clique de confirmação, com motivo e a frase exata, dispara a
  * Server Action. Quem decide é o servidor (admin em AAL2) e o banco; esta tela só pede e mostra o
- * resultado real. Não existe botão de desligar, e nunca se aceita pendência.
+ * resultado real. Nunca se aceita pendência. A reversão (RB-01) mora em `DesligarMotor`, montado
+ * só no ramo em que o motor está comprovadamente ligado.
  */
 export function AtivarMotor({
   semBloqueios,
   habilitada,
+  reversaoHabilitada = false,
 }: {
   semBloqueios: boolean;
   habilitada: boolean;
+  reversaoHabilitada?: boolean;
 }) {
   const estado = useEstadoDoMotor();
   const queryClient = useQueryClient();
@@ -92,7 +96,7 @@ export function AtivarMotor({
         <AlertDescription>
           O banco confirmou a ativação
           {resultado.ativadaEm ? ` em ${resultado.ativadaEm}` : ""} com {resultado.pendencias}{" "}
-          pendência(s). A ativação ficou registrada na trilha. Esta tela não desliga o motor.
+          pendência(s). A ativação ficou registrada na trilha.
         </AlertDescription>
       </Alert>
     );
@@ -104,14 +108,17 @@ export function AtivarMotor({
 
   if (estado.tag === "ligado") {
     return (
-      <Alert className="mb-6">
-        <AlertTitle>Motor por vigência ligado</AlertTitle>
-        <AlertDescription>
-          {estado.ativadaEm ? `Ligado em ${estado.ativadaEm}. ` : ""}
-          Cada apontamento novo usa as vigências cadastradas; sem vigência na data, o apontamento é
-          recusado.
-        </AlertDescription>
-      </Alert>
+      <>
+        <Alert className="mb-6">
+          <AlertTitle>Motor por vigência ligado</AlertTitle>
+          <AlertDescription>
+            {estado.ativadaEm ? `Ligado em ${estado.ativadaEm}. ` : ""}
+            Cada apontamento novo usa as vigências cadastradas; sem vigência na data, o apontamento
+            é recusado.
+          </AlertDescription>
+        </Alert>
+        <DesligarMotor habilitada={reversaoHabilitada} />
+      </>
     );
   }
 
@@ -157,8 +164,8 @@ export function AtivarMotor({
           <DialogHeader>
             <DialogTitle>Confirmar a ativação do motor</DialogTitle>
             <DialogDescription>
-              Esta ação é registrada com o seu usuário e o motivo. Desligar depois exige
-              procedimento próprio, fora desta tela.
+              Esta ação é registrada com o seu usuário e o motivo. Para desfazer, use "Desligar o
+              motor" nesta tela (quando a reversão estiver autorizada neste ambiente).
             </DialogDescription>
           </DialogHeader>
 

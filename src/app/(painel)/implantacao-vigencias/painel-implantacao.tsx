@@ -77,8 +77,10 @@ function Tabela({
 
 export function PainelImplantacaoVigencias({
   ativacaoHabilitada,
+  reversaoHabilitada = false,
 }: {
   ativacaoHabilitada: boolean;
+  reversaoHabilitada?: boolean;
 }) {
   const consulta = useImplantacaoDasVigencias();
 
@@ -127,6 +129,7 @@ export function PainelImplantacaoVigencias({
 
           <AtivarMotor
             habilitada={ativacaoHabilitada}
+            reversaoHabilitada={reversaoHabilitada}
             semBloqueios={
               resumirImplantacao(consulta.data.pendencias, consulta.data.divergencias).semBloqueios
             }
