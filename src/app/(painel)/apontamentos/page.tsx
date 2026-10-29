@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description:
     "Registre presença, faltas, horários e horas extras por turno e gere as diárias faturáveis do dia.",
   openGraph: {
-    title: "Apontamento diário | BS Logística",
+    title: "Apontamento diário | BS Soluções Logísticas",
     description: "Presença, horários e horas extras por turno, com cálculo automático da diária.",
   },
 };

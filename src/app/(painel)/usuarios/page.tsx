@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Usuários",
   description: "Convite, papel e acesso de contas administrativas e operacionais.",
   openGraph: {
-    title: "Usuários | BS Logística",
+    title: "Usuários | BS Soluções Logísticas",
     description: "Gestão de contas, papéis e acesso.",
   },
 };
