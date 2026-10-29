@@ -313,7 +313,12 @@ verificar(
 );
 const reescritas = [...corpo.matchAll(/create or replace function public\.(\w+)\(/gi)]
   .map((m) => m[1])
-  .filter((n) => !["mfa_cotidiano_ok", "condicoes_exigir_admin_leitura"].includes(n))
+  .filter(
+    (n) =>
+      !["mfa_cotidiano_ok", "condicoes_exigir_admin_leitura", "exigir_aal2_taxa_legada"].includes(
+        n,
+      ),
+  )
   .sort();
 verificar(
   "D6. só as 7 RPCs de leitura e o apontamento do admin foram reescritas",
@@ -395,6 +400,32 @@ verificar(
   "D13. a 032 não edita nenhuma migration já aplicada (arquivo novo, após a 031)",
   migrations[0] > "20261029120000_031_integridade_folha_e_historico.sql",
   true,
+);
+
+verificar(
+  "D14. colunas de taxa legadas exigem AAL2 com motor ligado ou desligado: 3 gatilhos próprios, 42501, exceção só para postgres/service_role",
+  ["contracts", "employees", "operations"].every((t) =>
+    new RegExp(
+      `create trigger trg_${t}_exige_aal2_taxa_legada\\s+before update of [a-z_, ]+ on public\\.${t}`,
+    ).test(corpo),
+  ) &&
+    /coalesce\(auth\.jwt\(\) ->> 'aal', ''\) <> 'aal2'/.test(corpo) &&
+    /errcode = '42501'/.test(corpo) &&
+    /current_user in \('postgres', 'service_role'\)/.test(corpo),
+  true,
+);
+verificar(
+  "D15. esses gatilhos não são os *_bloqueia_taxa_direta (que o motor liga e desliga) e o rollback os remove",
+  [
+    !/alter table[^;]*(enable|disable) trigger/i.test(corpo),
+    /drop trigger trg_contracts_exige_aal2_taxa_legada/.test(
+      ler("docs/runbooks/rollback-mfa-opcional.sql"),
+    ),
+    /drop function public\.exigir_aal2_taxa_legada\(\)/.test(
+      ler("docs/runbooks/rollback-mfa-opcional.sql"),
+    ),
+  ],
+  [true, true, true],
 );
 
 console.log("\nE. Mensagem das operações críticas recusadas\n");

@@ -17,6 +17,7 @@
 --   F  apontamento do admin (cotidiano)
 --   G  fator removido / adicionado muda o piso na próxima requisição (sessão após a remoção)
 --   H  forma: o que continua estrito, helpers sem permissão indevida
+--   I  colunas financeiras legadas: AAL2 de fato com o motor desligado (gatilho próprio)
 
 begin;
 
@@ -191,6 +192,30 @@ select pg_temp.registrar('F2. salvar apontamento: admin COM fator em AAL1 negado
   pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal1', $q$select public.salvar_apontamento_admin('5ac00000-0000-4000-8000-0000000000e1', '5ac00000-0000-4000-8000-0000000000f1', date '2026-01-10', '[]'::jsonb)::text$q$));
 select pg_temp.registrar('F3. salvar apontamento: operacional negado', 'erro 42501',
   pg_temp.por('5a000000-0000-4000-8000-000000000004', 'aal1', $q$select public.salvar_apontamento_admin('5ac00000-0000-4000-8000-0000000000e1', '5ac00000-0000-4000-8000-0000000000f1', date '2026-01-10', '[]'::jsonb)::text$q$));
+
+-- I. Colunas financeiras legadas: AAL2 de fato, motor ligado ou desligado ---------------------------------
+select pg_temp.registrar('I1. contrato: admin sem fator em AAL1 NÃO muda a diária (motor desligado)', 'erro 42501',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.contracts set daily_rate = 555 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
+select pg_temp.registrar('I2. colaborador: AAL1 NÃO muda o custo diário', 'erro 42501',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.employees set daily_cost = 77 where id = ''5ac00000-0000-4000-8000-0000000000a1'' returning 1) select count(*)::text from u'));
+select pg_temp.registrar('I3. operação: AAL1 NÃO muda o valor acordado', 'erro 42501',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.operations set agreed_amount = 99 where id = ''5ac00000-0000-4000-8000-0000000000e1'' returning 1) select count(*)::text from u'));
+select pg_temp.registrar('I4. campo cotidiano do mesmo contrato (nome) segue editável em AAL1 sem fator', '1',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.contracts set name = ''K2'' where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
+select pg_temp.registrar('I5. AAL2 (fator verificado) muda a diária legada com o motor desligado', '1',
+  pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', 'with u as (update public.contracts set daily_rate = 120 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
+select pg_temp.registrar('I6. fator NÃO verificado não é AAL2: a diária segue bloqueada', 'erro 42501',
+  pg_temp.por('5a000000-0000-4000-8000-000000000003', 'aal1', 'with u as (update public.contracts set daily_rate = 130 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
+select pg_temp.registrar('I7. operacional (qualquer nível) não muda a diária (a RLS não deixa nem chegar à linha)', '0',
+  pg_temp.por('5a000000-0000-4000-8000-000000000004', 'aal2', 'with u as (update public.contracts set daily_rate = 140 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u') );
+select pg_temp.registrar('I8. o gatilho é independente do motor: os 3 existem e estão sempre habilitados', '3',
+  (select count(*)::text from pg_trigger where not tgisinternal and tgenabled = 'O'
+    and tgname in ('trg_contracts_exige_aal2_taxa_legada','trg_employees_exige_aal2_taxa_legada','trg_operations_exige_aal2_taxa_legada')));
+select pg_temp.registrar('I9. a função do gatilho não é executável por authenticated nem anon', 'false|false',
+  has_function_privilege('authenticated', 'public.exigir_aal2_taxa_legada()', 'execute')::text || '|' ||
+  has_function_privilege('anon', 'public.exigir_aal2_taxa_legada()', 'execute')::text);
+select pg_temp.registrar('I10. a diária continua a original depois das tentativas negadas', '120.00',
+  (select daily_rate::text from public.contracts where id = '5ac00000-0000-4000-8000-0000000000d1'));
 
 -- G. Fator removido / adicionado -----------------------------------------------------------------
 delete from auth.mfa_factors where id = '5afac000-0000-4000-8000-000000000002';

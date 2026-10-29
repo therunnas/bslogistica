@@ -121,7 +121,7 @@ export function PainelConfiguracoes({ email, papel }: { email: string; papel: Pa
           )}
 
           {fase === "com-fator" && fator && (
-            <ComFator fator={fator} aoRemover={() => void carregarFatores()} />
+            <ComFator fator={fator} papel={papel} aoRemover={() => void carregarFatores()} />
           )}
 
           {fase === "sem-fator" && <SemFator texto={texto} aoAtivar={() => setFase("ativando")} />}
@@ -149,7 +149,15 @@ export function PainelConfiguracoes({ email, papel }: { email: string; papel: Pa
  * Perdeu o aplicativo? Sem o código não há como entrar nem remover o fator por esta tela — o
  * procedimento seguro está em docs/SEGURANCA.md e não existe atalho por senha.
  */
-function ComFator({ fator, aoRemover }: { fator: FatorVerificado; aoRemover: () => void }) {
+function ComFator({
+  fator,
+  papel,
+  aoRemover,
+}: {
+  fator: FatorVerificado;
+  papel: PapelEfetivo;
+  aoRemover: () => void;
+}) {
   const [confirmando, setConfirmando] = useState(false);
   const [removendo, setRemovendo] = useState(false);
 
@@ -197,9 +205,10 @@ function ComFator({ fator, aoRemover }: { fator: FatorVerificado; aoRemover: () 
       </div>
 
       <p className="text-sm text-muted-foreground">
-        É opcional: você pode desativar a qualquer momento e voltar a entrar só com a senha. Sem o
-        fator, as operações críticas (administração de usuários, faturamento e reajustes
-        financeiros) ficam fechadas até você ativar de novo.
+        É opcional: você pode desativar a qualquer momento e voltar a entrar só com a senha.
+        {papel === "admin"
+          ? " Sem o fator, as operações críticas (administração de usuários, faturamento e reajustes financeiros) ficam fechadas até você ativar de novo."
+          : ""}
       </p>
       <Button variant="destructive" onClick={() => setConfirmando(true)} disabled={removendo}>
         {removendo ? "Desativando..." : "Desativar autenticação em duas etapas"}
@@ -210,8 +219,10 @@ function ComFator({ fator, aoRemover }: { fator: FatorVerificado; aoRemover: () 
           <AlertDialogHeader>
             <AlertDialogTitle>Desativar verificação em duas etapas</AlertDialogTitle>
             <AlertDialogDescription>
-              Sua conta deixa de pedir o código do aplicativo autenticador nos próximos acessos, e
-              as operações críticas ficam fechadas até você ativar de novo, com um novo QR code.
+              Sua conta deixa de pedir o código do aplicativo autenticador nos próximos acessos.
+              {papel === "admin"
+                ? " As operações críticas ficam fechadas até você ativar de novo, com um novo QR code."
+                : " Para voltar a usar, ative de novo com um novo QR code."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

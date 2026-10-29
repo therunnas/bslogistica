@@ -127,10 +127,15 @@ AAL2 dentro de si.
 1. Criar contrato, colaborador ou operação **já com a vigência inicial** (`criar_*_com_vigencia`)
    chama `registrar_*` (financeiro crítico) e portanto exige AAL2. Admin sem fator cadastra
    contratos só depois de ativar o MFA.
-2. Com o motor por vigência **desligado** (estado legado/reversão), as colunas de taxa de
-   `contracts`/`employees`/`operations` voltam a ser editáveis direto e essas tabelas são
-   classe A: vale também para admin sem fator em AAL1. Com o motor ligado (Production), os
-   gatilhos recusam a edição direta para qualquer nível. A reversão do motor em si exige AAL2.
+2. Com o motor por vigência **desligado** (estado legado/reversão), os gatilhos
+   `*_bloqueia_taxa_direta` ficam desabilitados e as colunas de taxa de `contracts`/`employees`/
+   `operations` voltam a ser editáveis direto. Para que isso não vire brecha para conta sem fator,
+   a 032 cria gatilhos próprios (`trg_*_exige_aal2_taxa_legada`, sempre habilitados, independentes
+   do motor): alterar `daily_rate`, `shift_hours`, `ot_factor`, `ot_tolerance_min`, `daily_cost` ou
+   `agreed_amount` direto exige AAL2 (42501 com "dois fatores"). Os demais campos dessas tabelas
+   seguem cotidianos. Com o motor ligado (Production) os gatilhos originais recusam a edição direta
+   para qualquer nível. As RPCs `registrar_*`/`sincronizar_*` (SECURITY DEFINER) passam como antes.
+   A reversão do motor em si exige AAL2.
 
 ### Gestão individual do fator
 

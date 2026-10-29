@@ -405,4 +405,9 @@ $function$;
 drop function public.condicoes_exigir_admin_leitura();
 drop function public.mfa_cotidiano_ok();
 
+drop trigger trg_contracts_exige_aal2_taxa_legada on public.contracts;
+drop trigger trg_employees_exige_aal2_taxa_legada on public.employees;
+drop trigger trg_operations_exige_aal2_taxa_legada on public.operations;
+drop function public.exigir_aal2_taxa_legada();
+
 commit;
