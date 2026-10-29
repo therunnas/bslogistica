@@ -735,7 +735,7 @@ begin
    where schemaname = 'public'
      and policyname like '%exige_aal2%'
      and permissive = 'RESTRICTIVE';
-  perform pg_temp.registrar('H1. as 11 policies aal2 continuam RESTRICTIVE', '11', _n::text);
+  perform pg_temp.registrar('H1. as 15 policies aal2 continuam RESTRICTIVE (AUTH-01B: 9 cotidianas + 6 de escrita estrita de invoices e invoice_items)', '15', _n::text);
 
   perform pg_temp.registrar('H2. operacional aal1 NAO le operations direto',
     '0', pg_temp.medir('0a000000-0000-4000-8000-000000000001', 'aal1',

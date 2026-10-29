@@ -74,8 +74,8 @@ verificar(
 );
 const pagina = semComentarios(ler(`${PAINEL}/implantacao-vigencias/page.tsx`));
 verificar(
-  "A6. a rota segue protegida NO SERVIDOR: exigirAdmin antes de qualquer conteúdo",
-  /const bloqueio = await exigirAdmin\(\);\s*if \(bloqueio\) return bloqueio;/.test(pagina),
+  "A6. a rota segue protegida NO SERVIDOR: guard crítico (admin com AAL2 de fato) antes de qualquer conteúdo",
+  /const bloqueio = await exigirAdminAal2Tela\(\);\s*if \(bloqueio\) return bloqueio;/.test(pagina),
   true,
 );
 

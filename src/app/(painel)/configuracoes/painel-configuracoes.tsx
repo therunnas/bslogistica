@@ -27,11 +27,10 @@ import type { PapelEfetivo } from "../_papel";
 import {
   faseAposListarFatores,
   textoSemFator,
+  NOME_DO_FATOR,
   type FaseDeSeguranca,
   type TextoDoEstado,
 } from "./_dominio";
-
-const NOME_DO_FATOR = "BS Logística";
 
 interface FatorVerificado {
   id: string;
@@ -41,10 +40,11 @@ interface FatorVerificado {
 /**
  * Configurações → Segurança — ativação e desativação opcionais de MFA (PR F).
  *
- * Autosserviço completo do operacional, como o AGENTS.md define o escopo
- * desta tela: ativar OU desativar o próprio fator. O admin só ativa — nunca
- * pode ficar sem MFA, então esta tela não oferece desativação a ele em
- * nenhuma circunstância, ver `ComFator`.
+ * Autosserviço completo para os DOIS papéis (AUTH-01B): cada titular ativa OU
+ * desativa o próprio fator. O segundo fator é opcional; o que continua exigindo
+ * AAL2 são as operações críticas, no servidor e no banco, não esta tela. Nada
+ * aqui recebe o identificador de um fator de outra conta: a lista vem da
+ * própria sessão e o `unenroll` só aceita fator dela (o Supabase recusa o resto).
  *
  * **Por que desativar aqui é seguro.** Quem chega a esta tela com um fator
  * verificado só chegou depois de completar o desafio TOTP em `/mfa` — a
@@ -121,7 +121,7 @@ export function PainelConfiguracoes({ email, papel }: { email: string; papel: Pa
           )}
 
           {fase === "com-fator" && fator && (
-            <ComFator fator={fator} papel={papel} aoRemover={() => void carregarFatores()} />
+            <ComFator fator={fator} aoRemover={() => void carregarFatores()} />
           )}
 
           {fase === "sem-fator" && <SemFator texto={texto} aoAtivar={() => setFase("ativando")} />}
@@ -142,20 +142,14 @@ export function PainelConfiguracoes({ email, papel }: { email: string; papel: Pa
 }
 
 /**
- * Estado "ativo" — e, só para o operacional, a desativação.
+ * Estado "ativo" e a desativação, para os dois papéis.
  *
- * O admin vê o mesmo card, sem nenhum botão: MFA obrigatório não tem
- * autosserviço de remoção nesta tela, em circunstância nenhuma.
+ * Remover um fator verificado exige AAL2: quem está aqui com fator já provou o código no login, e o
+ * Supabase ainda confere (se a sessão não for AAL2, `unenroll` recusa e o erro aparece no aviso).
+ * Perdeu o aplicativo? Sem o código não há como entrar nem remover o fator por esta tela — o
+ * procedimento seguro está em docs/SEGURANCA.md e não existe atalho por senha.
  */
-function ComFator({
-  fator,
-  papel,
-  aoRemover,
-}: {
-  fator: FatorVerificado;
-  papel: PapelEfetivo;
-  aoRemover: () => void;
-}) {
+function ComFator({ fator, aoRemover }: { fator: FatorVerificado; aoRemover: () => void }) {
   const [confirmando, setConfirmando] = useState(false);
   const [removendo, setRemovendo] = useState(false);
 
@@ -202,38 +196,30 @@ function ComFator({
         </span>
       </div>
 
-      {papel === "operacional" ? (
-        <>
-          <p className="text-sm text-muted-foreground">
-            É opcional para o seu papel: você pode desativar a qualquer momento e voltar a acessar
-            sem o código do aplicativo autenticador.
-          </p>
-          <Button variant="destructive" onClick={() => setConfirmando(true)} disabled={removendo}>
-            {removendo ? "Desativando..." : "Desativar autenticação em duas etapas"}
-          </Button>
+      <p className="text-sm text-muted-foreground">
+        É opcional: você pode desativar a qualquer momento e voltar a entrar só com a senha. Sem o
+        fator, as operações críticas (administração de usuários, faturamento e reajustes
+        financeiros) ficam fechadas até você ativar de novo.
+      </p>
+      <Button variant="destructive" onClick={() => setConfirmando(true)} disabled={removendo}>
+        {removendo ? "Desativando..." : "Desativar autenticação em duas etapas"}
+      </Button>
 
-          <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Desativar verificação em duas etapas</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Sua conta deixa de pedir o código do aplicativo autenticador nos próximos acessos.
-                  Você pode ativar de novo quando quiser, com um novo QR code.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={() => void desativar()}>Desativar</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          A verificação em duas etapas é obrigatória para administradores e não pode ser desativada
-          nesta tela.
-        </p>
-      )}
+      <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar verificação em duas etapas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sua conta deixa de pedir o código do aplicativo autenticador nos próximos acessos, e
+              as operações críticas ficam fechadas até você ativar de novo, com um novo QR code.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void desativar()}>Desativar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -100,6 +100,14 @@ insert into public.user_roles (user_id, role) values
   ('5c0b0000-0000-4000-8000-0000000000a1', 'admin'),
   ('5c0b0000-0000-4000-8000-0000000000a2', 'operacional');
 
+-- AUTH-01B: o admin desta fixture TEM fator verificado. Assim "admin em AAL1" segue significando
+-- TOTP pendente, que continua negado (conta SEM fator em AAL1 é coberta por 032_mfa_opcional.sql).
+insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+  select gen_random_uuid(), ur.user_id, 'fixture AUTH01B', 'totp', 'verified', now(), now()
+    from public.user_roles ur
+    join auth.users u on u.id = ur.user_id
+   where ur.role = 'admin';
+
 -- ---------------------------------------------------------------------------
 -- S. Estrutura (antes de qualquer escrita nas tabelas novas)
 -- ---------------------------------------------------------------------------

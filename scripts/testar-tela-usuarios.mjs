@@ -255,16 +255,17 @@ verificar(
   true,
 );
 verificar(
-  "E2. chama exigirAdmin e devolve o bloqueio",
-  /const bloqueio = await exigirAdmin\(\);\s*\n\s*if \(bloqueio\) return bloqueio;/.test(
+  "E2. chama exigirAdminAal2Tela (área CRÍTICA: AAL2 de fato) e devolve o bloqueio",
+  /const bloqueio = await exigirAdminAal2Tela\(\);\s*\n\s*if \(bloqueio\) return bloqueio;/.test(
     fontes.pagina,
   ),
   true,
 );
 verificar(
   "E3. o guard vem antes do painel administrativo",
-  fontes.pagina.includes("await exigirAdmin()") &&
-    fontes.pagina.indexOf("await exigirAdmin()") < fontes.pagina.indexOf("<PainelUsuarios />"),
+  fontes.pagina.includes("await exigirAdminAal2Tela()") &&
+    fontes.pagina.indexOf("await exigirAdminAal2Tela()") <
+      fontes.pagina.indexOf("<PainelUsuarios />"),
   true,
 );
 verificar(
@@ -503,7 +504,7 @@ verificar(
 );
 verificar(
   "I2. a tela não referencia aal1/aal2 (isso é decisão do guard e do backend)",
-  /aal1|aal2/i.test(semComentarios(telaInteira + fontes.pagina)),
+  /\baal[12]\b/i.test(semComentarios(telaInteira + fontes.pagina)),
   false,
 );
 verificar(

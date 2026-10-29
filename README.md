@@ -18,7 +18,7 @@ Uso interno, publicado em `admin.bslogisticas.com.br`; não há cadastro públic
   atribuição de operações e auditoria das alterações.
 - **Área operacional** — tela separada, sem valores financeiros, para quem
   registra a presença em campo.
-- **Segurança** — segundo fator (TOTP) obrigatório para o administrador, RLS no
+- **Segurança** — segundo fator (TOTP) opcional, exigido nas operações críticas, RLS no
   banco e valores financeiros calculados no banco.
 
 ## Stack
@@ -104,8 +104,8 @@ Detalhes em [Arquitetura](docs/ARQUITETURA.md).
 
 ## Segurança
 
-Sem cadastro público. Dois papéis (`admin` e `operacional`), MFA obrigatório para
-o administrador, RLS no banco como proteção real dos dados, valores financeiros
+Sem cadastro público. Dois papéis (`admin` e `operacional`), MFA opcional (obrigatório
+nas operações críticas e para quem o ativou), RLS no banco como proteção real dos dados, valores financeiros
 derivados no banco e operações privilegiadas somente no servidor. O modelo
 completo e os riscos residuais estão em [Segurança](docs/SEGURANCA.md).
 

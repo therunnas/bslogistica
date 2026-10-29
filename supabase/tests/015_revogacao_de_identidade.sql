@@ -236,6 +236,14 @@ insert into public.user_roles (user_id, role) values
   ('2c000000-0000-4000-8000-000000000014', 'admin'),
   ('2c000000-0000-4000-8000-000000000015', 'admin');
 
+-- AUTH-01B: o admin desta fixture TEM fator verificado. Assim "admin em AAL1" segue significando
+-- TOTP pendente, que continua negado (conta SEM fator em AAL1 é coberta por 032_mfa_opcional.sql).
+insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+  select gen_random_uuid(), ur.user_id, 'fixture AUTH01B', 'totp', 'verified', now(), now()
+    from public.user_roles ur
+    join auth.users u on u.id = ur.user_id
+   where ur.role = 'admin';
+
 -- Conta 13: banimento que JÁ TERMINOU. banned_until no passado não bane.
 update auth.users set banned_until = now() - interval '1 day'
  where id = '2c000000-0000-4000-8000-000000000013';
@@ -783,54 +791,62 @@ $bloco_h$;
 do $bloco_h_forma$
 declare _n int; _sobra int;
 begin
-  perform pg_temp.registrar('H-F1. public tem 64 policies', '64',
+  perform pg_temp.registrar('H-F1. public tem 70 policies', '70',
     (select count(*)::text from pg_policies where schemaname = 'public'));
-  perform pg_temp.registrar('H-F2. 30 RESTRICTIVE e 34 PERMISSIVE', '30/34',
+  perform pg_temp.registrar('H-F2. 36 RESTRICTIVE e 34 PERMISSIVE', '36/34',
     (select count(*) filter (where permissive = 'RESTRICTIVE') || '/' || count(*) filter (where permissive = 'PERMISSIVE')
        from pg_policies where schemaname = 'public'));
 
-  -- Inventário exato (tabela, nome, tipo, comando) em AMBAS as direções: nada sumiu,
+  -- Inventário exato (tabela, nome, tipo, comando) em AMBAS as direções (atualizado pela migration 032,
+  -- AUTH-01B: invoices/invoice_items e as 5 tabelas de vigência trocaram a RESTRICTIVE ALL por policies
+  -- por comando): nada sumiu,
   -- nada foi criado, nada mudou de PERMISSIVE/RESTRICTIVE nem de comando.
   with esperado(tabela, nome, tipo, cmd) as (values
       ('admin_audit_log', 'admin_audit_log_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('admin_audit_log', 'admin_audit_log_leitura_admin', 'PERMISSIVE', 'SELECT'),
-      ('billing_additionals', 'billing_additionals_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('billing_additionals', 'billing_additionals_leitura_admin', 'PERMISSIVE', 'SELECT'),
+      ('billing_additionals', 'billing_additionals_leitura_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('clients', 'clients_exige_aal2', 'RESTRICTIVE', 'ALL'),
       ('clients', 'clients_exige_admin', 'RESTRICTIVE', 'ALL'),
       ('clients', 'clients_select_staff', 'PERMISSIVE', 'SELECT'),
       ('clients', 'clients_write_admin', 'PERMISSIVE', 'ALL'),
-      ('contract_terms', 'contract_terms_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('contract_terms', 'contract_terms_leitura_admin', 'PERMISSIVE', 'SELECT'),
+      ('contract_terms', 'contract_terms_leitura_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('contracts', 'contracts_exige_aal2', 'RESTRICTIVE', 'ALL'),
       ('contracts', 'contracts_exige_admin', 'RESTRICTIVE', 'ALL'),
       ('contracts', 'contracts_select_staff', 'PERMISSIVE', 'SELECT'),
       ('contracts', 'contracts_write_admin', 'PERMISSIVE', 'ALL'),
-      ('employee_cost_terms', 'employee_cost_terms_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('employee_cost_terms', 'employee_cost_terms_leitura_admin', 'PERMISSIVE', 'SELECT'),
+      ('employee_cost_terms', 'employee_cost_terms_leitura_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('employees', 'employees_exige_aal2', 'RESTRICTIVE', 'ALL'),
       ('employees', 'employees_exige_admin', 'RESTRICTIVE', 'ALL'),
       ('employees', 'employees_select_staff', 'PERMISSIVE', 'SELECT'),
       ('employees', 'employees_write_admin', 'PERMISSIVE', 'ALL'),
       ('financial_engine_settings', 'financial_engine_settings_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('financial_engine_settings', 'financial_engine_settings_leitura_admin', 'PERMISSIVE', 'SELECT'),
-      ('financial_holidays', 'financial_holidays_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('financial_holidays', 'financial_holidays_leitura_admin', 'PERMISSIVE', 'SELECT'),
+      ('financial_holidays', 'financial_holidays_leitura_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('financial_terms_audit', 'financial_terms_audit_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('financial_terms_audit', 'financial_terms_audit_leitura_admin', 'PERMISSIVE', 'SELECT'),
-      ('invoice_items', 'invoice_items_exige_aal2', 'RESTRICTIVE', 'ALL'),
+      ('invoice_items', 'invoice_items_delete_exige_aal2', 'RESTRICTIVE', 'DELETE'),
       ('invoice_items', 'invoice_items_exige_admin', 'RESTRICTIVE', 'ALL'),
+      ('invoice_items', 'invoice_items_insert_exige_aal2', 'RESTRICTIVE', 'INSERT'),
+      ('invoice_items', 'invoice_items_leitura_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('invoice_items', 'invoice_items_select_staff', 'PERMISSIVE', 'SELECT'),
+      ('invoice_items', 'invoice_items_update_exige_aal2', 'RESTRICTIVE', 'UPDATE'),
       ('invoice_items', 'invoice_items_write_admin', 'PERMISSIVE', 'ALL'),
-      ('invoices', 'invoices_exige_aal2', 'RESTRICTIVE', 'ALL'),
+      ('invoices', 'invoices_delete_exige_aal2', 'RESTRICTIVE', 'DELETE'),
       ('invoices', 'invoices_exige_admin', 'RESTRICTIVE', 'ALL'),
+      ('invoices', 'invoices_insert_exige_aal2', 'RESTRICTIVE', 'INSERT'),
+      ('invoices', 'invoices_leitura_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('invoices', 'invoices_select_staff', 'PERMISSIVE', 'SELECT'),
+      ('invoices', 'invoices_update_exige_aal2', 'RESTRICTIVE', 'UPDATE'),
       ('invoices', 'invoices_write_admin', 'PERMISSIVE', 'ALL'),
       ('operation_team', 'operation_team_exige_aal2', 'RESTRICTIVE', 'ALL'),
       ('operation_team', 'operation_team_exige_admin', 'RESTRICTIVE', 'ALL'),
       ('operation_team', 'operation_team_staff', 'PERMISSIVE', 'ALL'),
-      ('operation_terms', 'operation_terms_exige_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('operation_terms', 'operation_terms_leitura_admin', 'PERMISSIVE', 'SELECT'),
+      ('operation_terms', 'operation_terms_leitura_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('operations', 'operations_delete_admin', 'PERMISSIVE', 'DELETE'),
       ('operations', 'operations_exige_aal2', 'RESTRICTIVE', 'ALL'),
       ('operations', 'operations_exige_admin', 'RESTRICTIVE', 'ALL'),
@@ -864,7 +880,7 @@ begin
     into _n;
   perform pg_temp.registrar('H-F3. inventario de policies identico ao anterior (tabela, nome, tipo, comando)', '0', _n::text);
 
-  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated', '64',
+  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated', '70',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and roles = array['authenticated']::name[]));
 
@@ -892,12 +908,17 @@ begin
          ~ '(has_role|is_staff)\(';
   perform pg_temp.registrar('H-F8. nenhuma chamada a has_role()/is_staff() solta (por linha) nas policies', '0', _sobra::text);
 
-  perform pg_temp.registrar('H-F9. as 11 *_exige_aal2 seguem iguais (so olham o claim aal)', '11',
+  perform pg_temp.registrar('H-F9. as 6 policies ESTRITAS de escrita de invoices/invoice_items seguem lendo so o claim aal', '6',
     (select count(*)::text from pg_policies
-      where schemaname = 'public' and policyname like '%\_exige\_aal2' and permissive = 'RESTRICTIVE'
-        and qual = '(( SELECT (auth.jwt() ->> ''aal''::text)) = ''aal2''::text)'
-        and with_check = qual));
-end;
+      where schemaname = 'public' and policyname ~ '^(invoices|invoice_items)_(insert|update|delete)_exige_aal2$'
+        and permissive = 'RESTRICTIVE'
+        and (qual = '(( SELECT (auth.jwt() ->> ''aal''::text)) = ''aal2''::text)'
+          or with_check = '(( SELECT (auth.jwt() ->> ''aal''::text)) = ''aal2''::text)')));
+  perform pg_temp.registrar('H-F10. as 9 *_exige_aal2 cotidianas so olham mfa_cotidiano_ok() (AAL2 ou AAL1 de conta sem fator)', '9',
+    (select count(*)::text from pg_policies
+      where schemaname = 'public' and policyname like '%\_exige\_aal2' and permissive = 'RESTRICTIVE' and cmd = 'ALL'
+        and qual = '( SELECT mfa_cotidiano_ok() AS mfa_cotidiano_ok)' and with_check = qual));
+  end;
 $bloco_h_forma$;
 
 

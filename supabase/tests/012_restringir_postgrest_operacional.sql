@@ -114,6 +114,14 @@ insert into public.user_roles (user_id, role) values
   ('0a000000-0000-4000-8000-000000000006', 'admin'),
   ('0a000000-0000-4000-8000-000000000006', 'operacional');
 
+-- AUTH-01B: o admin desta fixture TEM fator verificado. Assim "admin em AAL1" segue significando
+-- TOTP pendente, que continua negado (conta SEM fator em AAL1 é coberta por 032_mfa_opcional.sql).
+insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+  select gen_random_uuid(), ur.user_id, 'fixture AUTH01B', 'totp', 'verified', now(), now()
+    from public.user_roles ur
+    join auth.users u on u.id = ur.user_id
+   where ur.role = 'admin';
+
 insert into public.clients (id, name, doc, contact_name, email, phone) values
   ('0c000000-0000-4000-8000-000000000001', 'Cliente Alfa', '12.345.678/0001-90',
    'Contato Alfa', 'contato@alfa.test', '11 90000-0000');
@@ -480,7 +488,7 @@ begin
         and permissive = 'RESTRICTIVE' and cmd = 'ALL'
         and roles = array['authenticated']::name[]));
 
-  perform pg_temp.registrar('I2. as onze *_exige_aal2 seguem intactas', '11',
+  perform pg_temp.registrar('I2. as quinze *_exige_aal2 seguem presentes (AUTH-01B: 9 cotidianas + 6 de escrita estrita de invoices e invoice_items)', '15',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and policyname like '%\_exige\_aal2'
         and permissive = 'RESTRICTIVE'));

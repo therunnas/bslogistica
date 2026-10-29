@@ -117,10 +117,15 @@ console.log("\nB. As nove telas bloqueiam no servidor, antes de renderizar\n");
 
 for (const [rota, componente] of TELAS) {
   const fonte = paginas[rota];
+  // AUTH-01B: a administração de usuários é área CRÍTICA e usa o guard que exige AAL2 de fato; as
+  // demais telas usam o guard cotidiano (MFA opcional).
+  const guarda = rota === "usuarios" ? "exigirAdminAal2Tela" : "exigirAdmin";
   verificar(`B1.${rota} — importa o guard central`, /from "\.\.\/_exigir-admin"/.test(fonte), true);
   verificar(
-    `B2.${rota} — chama exigirAdmin e devolve o bloqueio`,
-    /const bloqueio = await exigirAdmin\(\);\s*\n\s*if \(bloqueio\) return bloqueio;/.test(fonte),
+    `B2.${rota} — chama ${guarda} e devolve o bloqueio`,
+    new RegExp(
+      `const bloqueio = await ${guarda}\\(\\);\\s*\\n\\s*if \\(bloqueio\\) return bloqueio;`,
+    ).test(fonte),
     true,
   );
   // A ordem é o ponto: o guard tem de vir ANTES do painel na função. A
@@ -128,8 +133,8 @@ for (const [rota, componente] of TELAS) {
   // `indexOf` devolve -1 para o que não existe, e -1 é menor que tudo.
   verificar(
     `B3.${rota} — o guard vem antes do painel administrativo`,
-    fonte.includes("await exigirAdmin()") &&
-      fonte.indexOf("await exigirAdmin()") < fonte.indexOf(`<${componente} />`),
+    fonte.includes(`await ${guarda}()`) &&
+      fonte.indexOf(`await ${guarda}()`) < fonte.indexOf(`<${componente} />`),
     true,
   );
   // Reimplementar a regra é o que não pode: ler `user_roles` na página ou
@@ -346,7 +351,9 @@ console.log("\nF. Esconder o link não é a proteção\n");
 // contagem existe para que remover a chamada de uma tela apareça aqui.
 verificar(
   "F1. as nove telas chamam o guard, não oito",
-  Object.values(paginas).filter((f) => f.includes("await exigirAdmin()")).length,
+  Object.values(paginas).filter(
+    (f) => f.includes("await exigirAdmin()") || f.includes("await exigirAdminAal2Tela()"),
+  ).length,
   9,
 );
 // A tela é só a vitrine: a API do Fechamento é alcançável sem passar por ela, e
@@ -390,10 +397,8 @@ verificar(
   true,
 );
 verificar(
-  "G2. o layout continua fechando o painel sem AAL2",
-  /situacao === "mfa-ausente" \|\| acesso\.situacao === "mfa-pendente"\) redirect\("\/mfa"\)/.test(
-    fontes.layout,
-  ),
+  "G2. o layout continua fechando o painel até o TOTP de quem JÁ tem fator ativo (AUTH-01B)",
+  /situacao === "mfa-pendente"\) redirect\("\/mfa"\)/.test(fontes.layout),
   true,
 );
 verificar(
@@ -402,14 +407,14 @@ verificar(
   false,
 );
 verificar(
-  "G4. nenhum aal foi liberado por papel",
-  /aal1|aal2/i.test(
-    semComentarios(fontes.guard) +
-      semComentarios(fontes.papel) +
-      semComentarios(fontes.shell) +
-      semComentarios(fontes.layout),
-  ),
-  false,
+  "G4. nenhum aal foi liberado por papel: só o guard crítico fala em aal2, explicitamente",
+  String([
+    /aal1|aal2/i.test(
+      semComentarios(fontes.papel) + semComentarios(fontes.shell) + semComentarios(fontes.layout),
+    ),
+    (semComentarios(fontes.guard).match(/"aal[12]"/g) ?? []).length,
+  ]),
+  "false,1",
 );
 verificar(
   "G5. o destino pós-login segue /dashboard, sem depender de papel",

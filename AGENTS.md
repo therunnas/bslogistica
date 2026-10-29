@@ -30,11 +30,13 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
 - **Sem cadastro público**, sem bootstrap automático de admin. Papel é atribuição
   administrativa explícita. O último admin é protegido, e alterações de usuário e
   papel são auditadas.
-- **MFA TOTP é obrigatório para o admin** (AAL2). Para `operacional` é opcional,
-  mas quem o ativou não acessa dados sem concluir o TOTP. A decisão de acesso é
-  uma só (`lerAcesso()`); não a recriar em outro lugar.
-- **O MFA também é exigido no banco**: 11 tabelas de negócio com policy
-  RESTRICTIVE de `aal2`, e acesso direto exige também `admin`. `user_roles` fica
+- **MFA TOTP é opcional para `admin` e `operacional`** (AUTH-01B), mas quem o ativou
+  não acessa dados sem concluir o TOTP, e as operações críticas exigem AAL2 de
+  fato (`exigirAdminAal2`, `condicoes_exigir_admin()`). A decisão de acesso é uma
+  só (`lerAcesso()`); não a recriar em outro lugar.
+- **O MFA também é exigido no banco**, por classe (migration 032: cotidiano aceita
+  `mfa_cotidiano_ok()`; escrita financeira, auditoria e identidade seguem `aal2`
+  literal), e acesso direto exige também `admin`. `user_roles` fica
   fora de propósito — não adicionar AAL2 nela. Não remover a policy global sem
   substituição segura.
 - **`operacional` só alcança dados pelas cinco RPCs operacionais**, que revalidam

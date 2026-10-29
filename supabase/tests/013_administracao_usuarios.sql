@@ -366,7 +366,7 @@ $bloco_lock$;
 
 do $bloco_c$
 begin
-  perform pg_temp.registrar('C1. as 11 *_exige_aal2 continuam 11', '11',
+  perform pg_temp.registrar('C1. as 15 *_exige_aal2 continuam 15 (AUTH-01B: 9 cotidianas + 6 de escrita estrita de invoices e invoice_items)', '15',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and policyname like '%_exige_aal2'));
 

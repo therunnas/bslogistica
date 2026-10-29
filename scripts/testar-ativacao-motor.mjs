@@ -448,9 +448,9 @@ verificar(
   true,
 );
 verificar(
-  "E11. a página segue protegida por exigirAdmin antes do componente",
-  /exigirAdmin\(\)/.test(pagina) &&
-    pagina.indexOf("exigirAdmin()") < pagina.indexOf("<PainelImplantacaoVigencias"),
+  "E11. a página segue protegida por exigirAdminAal2Tela (AAL2 de fato, AUTH-01B) antes do componente",
+  /exigirAdminAal2Tela\(\)/.test(pagina) &&
+    pagina.indexOf("exigirAdminAal2Tela()") < pagina.indexOf("<PainelImplantacaoVigencias"),
   true,
 );
 verificar(

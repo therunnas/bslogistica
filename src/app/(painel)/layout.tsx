@@ -29,9 +29,10 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   if (acesso.situacao === "mfa-indisponivel")
     return <VerificacaoIndisponivel email={acesso.email} />;
 
-  // Cadastrar o primeiro fator e responder ao desafio acontecem na mesma tela,
-  // que fica fora deste layout justamente para não ser barrada por ele.
-  if (acesso.situacao === "mfa-ausente" || acesso.situacao === "mfa-pendente") redirect("/mfa");
+  // Responder ao desafio do fator JÁ ATIVO acontece em /mfa, que fica fora deste layout justamente
+  // para não ser barrada por ele. Conta SEM fator não passa por aqui (AUTH-01B: o segundo fator é
+  // opcional) e entra em AAL1; as operações críticas exigem AAL2 por conta própria.
+  if (acesso.situacao === "mfa-pendente") redirect("/mfa");
 
   // O papel decide o que a navegação oferece. O que ela NÃO oferece continua
   // alcançável por URL, e é `exigirAdmin()`, em cada tela administrativa, que

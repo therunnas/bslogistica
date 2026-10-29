@@ -525,7 +525,7 @@ $bloco_h$;
 
 do $bloco_i$
 begin
-  perform pg_temp.registrar('I1. as 11 policies *_exige_aal2 seguem RESTRICTIVE', '11',
+  perform pg_temp.registrar('I1. as 15 policies *_exige_aal2 seguem RESTRICTIVE (AUTH-01B: 9 cotidianas + 6 de escrita estrita de invoices e invoice_items)', '15',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and policyname like '%\_exige\_aal2'
         and permissive = 'RESTRICTIVE'));

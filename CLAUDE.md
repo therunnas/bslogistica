@@ -95,10 +95,18 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   administrador restante.
 - **Alteração de usuário ou papel é auditada.** A auditoria é _best-effort_: não
   afirmar cobertura transacional.
-- **MFA TOTP é obrigatório para o admin**, sempre em AAL2; sem ele a rota
-  redireciona para `/mfa`. Para `operacional` o MFA é opcional, mas **opcional não
-  é dispensável**: quem ativou continua obrigado a concluir o TOTP. Nenhum papel
-  entra no painel com estado de MFA desconhecido.
+- **MFA TOTP é OPCIONAL para `admin` e para `operacional`** (AUTH-01B). Conta sem
+  fator verificado trabalha em AAL1 no uso cotidiano; cada titular ativa e desativa
+  o próprio fator em Configurações > Segurança. **Opcional não é dispensável**:
+  quem ativou continua obrigado a concluir o TOTP no login. Nenhum papel entra no
+  painel com estado de MFA desconhecido.
+- **As operações críticas continuam exigindo AAL2 DE FATO**, no servidor e no
+  banco: financeiro crítico (faturar, reajustar, motor e sua reversão),
+  administração de usuários e papéis, auditoria e configuração do motor. "Liberado"
+  **não** implica AAL2: quem protege uma operação crítica olha o `nivel` de
+  `lerAcesso()` (`exigirAdminAal2`, `exigirAdminAal2Tela`) e, no banco,
+  `condicoes_exigir_admin()`/policies estritas. A classificação A/B/C/D está em
+  [docs/SEGURANCA.md](docs/SEGURANCA.md); na dúvida, fica a proteção mais forte.
 - **Conta com MFA ativo exige TOTP no login.** Não existe caminho que aceite só a
   senha para uma conta com fator verificado.
 - **Recovery de conta com MFA exige um TOTP — e apenas um.** Depois de uma
@@ -124,11 +132,10 @@ A decisão mora em **`lerAcesso()`**, é uma só, e layout, `/mfa`, `/dashboard`
 guards apenas a leem. **Não recriar essa decisão** em outro lugar: duas definições
 de "liberado" produzem laço entre as rotas.
 
-- `admin` nunca é liberado em AAL1. `mfa-ausente` (cadastrar o primeiro fator) e
-  `mfa-pendente` (desafiar um fator verificado) fecham o painel do mesmo jeito e
-  mandam para `/mfa`; trocar um pelo outro quebra o cadastro inicial do admin.
-- `operacional` sem fator verificado trabalha em AAL1; **com** fator verificado é
-  barrado até concluir o TOTP.
+- Sem fator verificado, `admin` e `operacional` são liberados em AAL1 (`nivel:
+"aal1"`). **Com** fator verificado, em AAL1 são barrados em `mfa-pendente` e
+  mandados para `/mfa` até concluir o TOTP. `mfa-ausente` deixou de ser uma decisão
+  do painel.
 - `admin` + `operacional` decide como admin. Sem papel, bloqueia. Erro de leitura,
   claim `aal` ausente ou nível desconhecido **fecha**.
 - O estado do fator **não vem do cookie**: vem de
@@ -144,9 +151,11 @@ implementar isso só no guard ou no frontend:** o enforcement do banco é o que 
 - Todas as tabelas de `public` têm RLS ativa. Autorização em SQL usa
   `public.has_role()` e `public.is_staff()`; **`is_staff()` vale para qualquer
   papel atribuído**, não separa `admin` de `operacional`.
-- **O MFA também é exigido no banco.** As 11 tabelas de negócio têm policy
-  RESTRICTIVE pedindo `aal2`, globalmente: a exceção de AAL1 **não** entra por
-  policy. Derrubar essa policy reabre uma vulnerabilidade já corrigida.
+- **O MFA também é exigido no banco**, por classe (migration 032): as tabelas de uso
+  cotidiano aceitam `mfa_cotidiano_ok()` (AAL2, ou AAL1 de conta SEM fator
+  verificado); escrita em faturas, vigências, auditoria, motor e identidade segue
+  RESTRICTIVE pedindo `aal2` de fato. **Não substituir as policies estritas por uma
+  exceção ampla**: derrubá-las reabre a exposição financeira.
 - **Acesso direto também exige `admin`.** Uma RESTRICTIVE `*_exige_admin` por
   tabela faz o acesso direto de `authenticated` exigir **`aal2` e `admin`**. O
   `operacional` lê zero linha de tabela de negócio pelo PostgREST, em qualquer

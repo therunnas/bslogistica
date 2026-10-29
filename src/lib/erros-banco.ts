@@ -41,6 +41,19 @@ export function ehTurnoProtegido(erro: unknown): boolean {
   );
 }
 
+/**
+ * O segundo fator é opcional (AUTH-01B), mas as operações financeiras críticas o exigem. A recusa do
+ * banco chega como `42501`, com o texto do guard ("Autenticação de dois fatores obrigatória.") ou
+ * com o nome da policy estrita (`*_exige_aal2`) quando a escrita é direta. Em ambos os casos a
+ * orientação é a mesma: ativar o fator em Segurança.
+ */
+export const MENSAGEM_EXIGE_SEGUNDO_FATOR =
+  "Esta operação exige a verificação em duas etapas. Ative em Segurança (menu da conta) e tente novamente.";
+
+function ehExigenciaDeSegundoFator(e: { code?: unknown }, mensagem: string): boolean {
+  return e.code === "42501" && /dois fatores|exige_aal2/i.test(mensagem);
+}
+
 interface ErroDoBanco {
   message?: unknown;
   code?: unknown;
@@ -49,6 +62,10 @@ interface ErroDoBanco {
 export function mensagemDoErro(erro: unknown): string {
   const e: ErroDoBanco = typeof erro === "object" && erro !== null ? (erro as ErroDoBanco) : {};
   const mensagem = typeof e.message === "string" ? e.message : "";
+
+  if (ehExigenciaDeSegundoFator(e, mensagem)) {
+    return MENSAGEM_EXIGE_SEGUNDO_FATOR;
+  }
 
   if (e.code === "23503" && mensagem.includes(CONSTRAINT_CLIENTE_CONTRATO)) {
     // `UPDATE` de contracts: o Postgres fala da tabela referenciada. `INSERT` ou

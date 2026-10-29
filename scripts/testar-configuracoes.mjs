@@ -87,9 +87,9 @@ verificar(
   "liberado",
 );
 verificar(
-  "A4. admin em AAL1 continua bloqueado, mesmo sem fator (vai para cadastro, não libera)",
-  decidirAcesso("admin", "aal1", "sem-fator") !== "liberado",
-  true,
+  "A4. admin em AAL1 SEM fator é liberado (AUTH-01B: MFA opcional); o que é crítico exige AAL2 por conta própria",
+  decidirAcesso("admin", "aal1", "sem-fator"),
+  "liberado",
 );
 verificar(
   "A4b. admin em AAL1 com fator pendente também continua bloqueado",
@@ -133,8 +133,8 @@ verificar("B6. operacional tem acesso à rota", papelTemAcessoAConfiguracoes("op
 verificar("B7. sem-papel NÃO tem acesso à rota", papelTemAcessoAConfiguracoes("sem-papel"), false);
 
 verificar(
-  "B8. o texto para admin fala em conta de administrador",
-  /administrador/i.test(textoSemFator("admin").corpo),
+  "B8. o texto do admin explica o que continua fechado sem o fator (operações críticas)",
+  /críticas/i.test(textoSemFator("admin").corpo),
   true,
 );
 verificar(
@@ -143,9 +143,9 @@ verificar(
   true,
 );
 verificar(
-  "B10. o texto do admin NÃO diz 'opcional' — para ele MFA não é opcional",
+  "B10. o texto do admin também diz 'opcional' (AUTH-01B)",
   /opcional/i.test(textoSemFator("admin").corpo),
-  false,
+  true,
 );
 verificar(
   "B11. os dois papéis têm título igual (o que muda é o corpo, não o fato de faltar)",
@@ -300,17 +300,14 @@ verificar(
   false,
 );
 verificar(
-  "F2. o operacional COM fator vê a ação de desativação",
-  /papel === "operacional" \? \([\s\S]{0,400}Desativar autenticação em duas etapas/.test(
-    fontes.painel,
-  ),
+  "F2. quem tem fator (admin ou operacional) vê a ação de desativação, sem ramo por papel",
+  /Desativar autenticação em duas etapas/.test(fontes.painel) &&
+    !/papel === "operacional" \? \(/.test(fontes.painel),
   true,
 );
 verificar(
-  "F3. o admin COM fator NÃO vê a ação de desativação (ramo dele não tem botão)",
-  /\) : \(\s*<p className="text-sm text-muted-foreground">\s*A verificação em duas etapas é obrigatória para administradores e não pode ser desativada/.test(
-    fontes.painel,
-  ) && !/administradores e não pode ser desativada[\s\S]{0,200}Button/.test(fontes.painel),
+  "F3. a tela não diz mais que o MFA do admin é obrigatório nem esconde a desativação dele",
+  !/obrigatória para administradores|não pode ser desativada/.test(fontes.painel),
   true,
 );
 verificar(
@@ -420,17 +417,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. conjunto de migrations contém 36 arquivos, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
+  "G10. conjunto de migrations contém 37 arquivos, até a 032 (MFA opcional, AUTH-01B; local, ainda não aplicada) e, antes dela, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  36,
+  37,
 );
 verificar(
-  "G10b. a migration mais recente é a 031 (integridade da folha e do histórico, C06/C07)",
+  "G10b. a migration mais recente é a 032 (MFA opcional, AUTH-01B)",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_031_"),
+    .includes("_032_"),
   true,
 );
 

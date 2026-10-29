@@ -65,7 +65,8 @@ verificar(
         !a.includes("_028_") &&
         !a.includes("_029_") &&
         !a.includes("_030_") &&
-        !a.includes("_031_"),
+        !a.includes("_031_") &&
+        !a.includes("_032_"),
     )
     .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,

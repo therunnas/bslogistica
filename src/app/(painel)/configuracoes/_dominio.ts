@@ -38,24 +38,25 @@ export interface TextoDoEstado {
 }
 
 /**
- * O texto muda por papel só na ausência de fator — é a única situação em que
- * a política difere de verdade entre os dois papéis. Com fator verificado, os
- * dois veem "MFA ativo"; a diferença está em como a AUSÊNCIA é enquadrada:
- * normal para o operacional, e uma situação que não deveria ocorrer para o
- * admin, que não chega a `liberado` sem ter passado por AAL2 — e portanto sem
- * fator verificado.
+ * A verificação em duas etapas é OPCIONAL para os dois papéis (AUTH-01B). O texto da ausência de
+ * fator só difere no que o admin ainda perde sem ela: as áreas críticas (administração de usuários,
+ * implantação financeira) e as operações financeiras críticas (faturar, reajustar, motor) exigem o
+ * fator de verdade, e sem ele ficam fechadas.
  */
 export function textoSemFator(papel: PapelEfetivo): TextoDoEstado {
   if (papel === "admin") {
     return {
       titulo: "Verificação em duas etapas não configurada",
       corpo:
-        "Sua conta de administrador exige um segundo fator para acessar o painel. Ative agora para continuar entrando normalmente.",
+        "É opcional para o uso diário: você pode continuar entrando só com a senha. Sem ela, porém, as operações críticas ficam fechadas: administração de usuários, faturamento e reajustes financeiros. Ative para liberá-las. Depois de ativar, todo acesso passa a pedir o código do seu aplicativo autenticador.",
     };
   }
   return {
     titulo: "Verificação em duas etapas não configurada",
     corpo:
-      "É opcional para o seu papel: você pode continuar usando o sistema sem ativar. Se ativar, os próximos acessos vão pedir o código do seu aplicativo autenticador.",
+      "É opcional: você pode continuar usando o sistema sem ativar. Se ativar, os próximos acessos vão pedir o código do seu aplicativo autenticador.",
   };
 }
+
+/** O fator só é gerenciado pelo próprio titular: nada aqui recebe um identificador de outra conta. */
+export const NOME_DO_FATOR = "BS Soluções Logísticas";

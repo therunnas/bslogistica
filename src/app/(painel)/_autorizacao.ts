@@ -12,9 +12,16 @@ export type Acesso =
   | { situacao: "sem-sessao" }
   | { situacao: "sem-papel"; email: string }
   | { situacao: "mfa-indisponivel"; email: string; papeis: Papel[] }
-  | { situacao: "mfa-ausente"; email: string; papeis: Papel[] }
   | { situacao: "mfa-pendente"; email: string; papeis: Papel[] }
-  | { situacao: "liberado"; email: string; papeis: Papel[] };
+  | { situacao: "liberado"; email: string; papeis: Papel[]; nivel: NivelAcesso };
+
+/**
+ * O nível de garantia da sessão que foi liberada (AUTH-01B).
+ *
+ * "Liberado" já não implica AAL2: conta sem fator trabalha em AAL1. Quem protege uma operação
+ * crítica pergunta o `nivel`, nunca a situação.
+ */
+export type NivelAcesso = "aal1" | "aal2";
 
 /** Nome da função da migration 012, como o PostgREST a expõe. */
 export const RPC_ESTADO_DE_MFA = "mfa_bloqueia_excecao_aal1";
@@ -122,7 +129,16 @@ export const lerAcesso = cache(async (): Promise<Acesso> => {
 
   const decisao = decidirAcesso(papel, nivelAtual, estadoDoFator);
 
-  return decisao === "sem-papel"
-    ? { situacao: "sem-papel", email }
-    : { situacao: decisao, email, papeis };
+  if (decisao === "sem-papel") return { situacao: "sem-papel", email };
+
+  if (decisao === "liberado") {
+    return {
+      situacao: "liberado",
+      email,
+      papeis,
+      nivel: nivelAtual === "aal2" ? "aal2" : "aal1",
+    };
+  }
+
+  return { situacao: decisao, email, papeis };
 });

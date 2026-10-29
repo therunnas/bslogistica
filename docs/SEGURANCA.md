@@ -34,7 +34,7 @@ automático do primeiro admin foi **removido** (migration
 | Papel                 | Acesso                                                               |
 | --------------------- | -------------------------------------------------------------------- |
 | `admin` em AAL2       | leitura e escrita nas tabelas de negócio, pelo painel administrativo |
-| `admin` em AAL1       | nenhum dado de negócio; o guard envia a `/mfa`                       |
+| `admin` em AAL1       | só conta SEM fator: uso cotidiano; com fator, o guard envia a `/mfa` |
 | `operacional`         | **nenhuma** tabela de negócio pelo PostgREST; só as cinco RPCs       |
 | autenticado sem papel | nenhum dado de negócio                                               |
 | não autenticado       | redirecionado ao login                                               |
@@ -46,11 +46,12 @@ automático do primeiro admin foi **removido** (migration
 TOTP pelo MFA oficial do Supabase. Nenhum segredo é gerado, guardado ou
 conferido pela aplicação, e não existe tabela própria de OTP.
 
-- **`admin`: MFA obrigatório**, sempre AAL2.
-- **`operacional`: MFA opcional.** Sem fator verificado, trabalha em AAL1; com
-  fator verificado, é barrado em AAL1 até concluir o TOTP. Opcional **não** é
-  dispensável: quem optou pelo segundo fator não continua acessando dados só com
-  a senha.
+- **`admin` e `operacional`: MFA OPCIONAL** (AUTH-01B). Sem fator verificado,
+  trabalham em AAL1 no uso cotidiano; com fator verificado, são barrados em AAL1
+  até concluir o TOTP. Opcional **não** é dispensável: quem optou pelo segundo
+  fator não continua acessando dados só com a senha.
+- **As operações críticas exigem AAL2 de verdade** (ver "MFA opcional e a
+  classificação das operações" abaixo).
 - **Conta com fator verificado exige TOTP no login.** Não há caminho que aceite
   só a senha.
 - **Falha ao consultar o nível de garantia não é ausência de fator.** Erro
@@ -66,7 +67,7 @@ em `src/lib/mfa.ts`. Layout, `/mfa`, dashboard e guards apenas a leem.
 | ------------- | ------ | --------------- | ------------------ |
 | `admin`       | `aal2` | qualquer        | liberado           |
 | `admin`       | `aal1` | com fator       | `mfa-pendente`     |
-| `admin`       | `aal1` | sem fator       | `mfa-ausente`      |
+| `admin`       | `aal1` | sem fator       | liberado (AAL1)    |
 | `operacional` | `aal1` | sem fator       | liberado           |
 | `operacional` | `aal1` | com fator       | `mfa-pendente`     |
 | `operacional` | `aal2` | qualquer        | liberado           |
@@ -74,10 +75,10 @@ em `src/lib/mfa.ts`. Layout, `/mfa`, dashboard e guards apenas a leem.
 | qualquer      | outro  | qualquer        | `mfa-indisponivel` |
 | qualquer      | `aal1` | indeterminado   | `mfa-indisponivel` |
 
-`mfa-ausente` e `mfa-pendente` fecham o painel do mesmo jeito e mandam para
-`/mfa`; a diferença é o fluxo que a tela abre — cadastrar o primeiro fator ou
-desafiar um já verificado. Trocar um pelo outro quebra o cadastro inicial do
-admin.
+`lerAcesso()` devolve também o `nivel` (`aal1`/`aal2`) de quem foi liberado, e é ele,
+não a palavra "liberado", que as operações críticas conferem. `mfa-pendente` manda
+para `/mfa` (desafiar o fator já verificado). `mfa-ausente` só sobrevive na
+recuperação de senha e na tela `/mfa`; o painel não o produz mais.
 
 ### Onde a verdade do MFA mora
 
@@ -95,6 +96,79 @@ AAL2 é o próprio GoTrue.
 
 A tela `/mfa` fica fora do grupo `(painel)`, para não ser barrada pela guarda que
 a invoca. Exige sessão e papel, mas não AAL2 — é o que se vem obter ali.
+
+## MFA opcional e a classificação das operações (AUTH-01B, migration 032)
+
+**Política:** o segundo fator é opcional para `admin` e `operacional`; cada titular o
+ativa e desativa em Configurações > Segurança. Com fator verificado, o TOTP é
+obrigatório no login. **O que é crítico continua exigindo AAL2 de verdade.** Na dúvida
+sobre uma operação, ficou a proteção mais forte e a decisão foi registrada.
+
+| Classe | O quê                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Nível exigido                                                          |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| A      | cadastros e apontamento diário (clients, contracts, employees, operations, shifts, timesheets, timesheet_entries, operation_team, profiles); **leitura** de faturas, vigências, adicionais e feriados; RPCs de leitura (`resumo_financeiro_periodo`, `saldo_de_horas_do_periodo`, `ajustes_de_arredondamento_acumulado`, `estado_motor_vigencia`, `condicao_contrato_na_data`, `custo_colaborador_na_data`, `valor_acordado_operacao_na_data`); `salvar_apontamento_admin` | AAL2, **ou AAL1 de conta sem fator** (`mfa_cotidiano_ok()`)            |
+| B/C    | financeiro crítico: escrita em `invoices`/`invoice_items`; `gerar_fatura`; registrar/corrigir/encerrar/aposentar condição de contrato, custo e valor acordado; adicionais; feriados; `regularizar_apontamento_legado`; `sincronizar_colunas_legadas`; `alterar_motor_vigencia` (ativar **e** reverter); pendências/divergências da implantação; `financial_engine_settings`; `financial_terms_audit`                                                                       | **AAL2** (`condicoes_exigir_admin()` e policies estritas, não tocadas) |
+| D      | identidade e segurança: `admin_audit_log`, `user_operation_access`; administração de usuários e papéis (Server Action com `service_role`, atrás de `exigirAdminAal2`)                                                                                                                                                                                                                                                                                                      | **AAL2**                                                               |
+
+Na aplicação: `exigirAdmin()` (telas cotidianas, AAL1 sem fator ok), `exigirAdminAal2Tela()`
+(Usuários e Implantação: sem AAL2 mostra "ative o MFA") e `exigirAdminAal2()` (Server
+Actions críticas: lança sem `nivel === "aal2"`). Nenhuma delas substitui o banco.
+
+**Como o banco decide:** `mfa_cotidiano_ok()` = sessão válida de conta existente e
+(`aal2` ou (`aal1` e `mfa_bloqueia_excecao_aal1() = false`, isto é, SEM fator verificado)).
+Falha fechada: sem sessão, conta inexistente ou estado desconhecido nega. O guard
+`condicoes_exigir_admin_leitura()` serve só às 7 RPCs de leitura; a
+`condicoes_exigir_admin()` original **não foi alterada**, então toda RPC não listada
+segue estrita por padrão. Uma RPC nova com `SECURITY DEFINER` continua escrevendo o
+AAL2 dentro de si.
+
+**Decisões pendentes (mantidas no mais forte):**
+
+1. Criar contrato, colaborador ou operação **já com a vigência inicial** (`criar_*_com_vigencia`)
+   chama `registrar_*` (financeiro crítico) e portanto exige AAL2. Admin sem fator cadastra
+   contratos só depois de ativar o MFA.
+2. Com o motor por vigência **desligado** (estado legado/reversão), as colunas de taxa de
+   `contracts`/`employees`/`operations` voltam a ser editáveis direto e essas tabelas são
+   classe A: vale também para admin sem fator em AAL1. Com o motor ligado (Production), os
+   gatilhos recusam a edição direta para qualquer nível. A reversão do motor em si exige AAL2.
+
+### Gestão individual do fator
+
+- Só o titular gerencia o próprio fator: a tela lista os fatores **da própria sessão**
+  (`listFactors`) e o `unenroll` recebe esse identificador; o Supabase recusa fator de
+  outra conta. Nenhuma Server Action, rota ou parâmetro recebe o id de fator alheio.
+- Remover um fator verificado exige AAL2 (regra do próprio Supabase); depois da remoção a
+  tela chama `refreshSession()` e relê o estado. O banco lê `auth.mfa_factors` a cada
+  requisição, então a primeira operação seguinte já usa o piso de AAL1, mesmo que o cookie
+  ainda traga `aal2`.
+- O rótulo do fator em novos cadastros é "BS Soluções Logísticas"; fatores existentes não
+  foram alterados.
+- Nenhum segredo TOTP é registrado em log ou gravado pela aplicação.
+
+### Perda do autenticador
+
+Quem tem fator verificado e perdeu o aplicativo **não entra só com a senha** (isso seria o
+bypass que a política proíbe). O caminho é o procedimento de recuperação conduzido pelo
+responsável do projeto, fora do aplicativo: confirmar a identidade da pessoa por canal
+próprio e remover o fator dela pelo painel de autenticação do Supabase (ação auditável do
+dono do projeto), com registro. **Esta etapa não criou nenhuma tela de remoção de fator de
+terceiros**, de propósito.
+
+### Implantação (plano) e rollback
+
+1. Backup novo de Production (o PROD-02 é anterior às migrations 029–031).
+2. Homologação: aplicar a 032, rodar as 32 suítes SQL (`supabase/tests`), validar login sem
+   fator, com fator, e as operações críticas negadas em AAL1.
+3. Production, com autorização por etapa: **a migration primeiro**, depois o aplicativo.
+   A 032 só afrouxa a classe A e só para contas **sem fator**; as classes B/C/D não mudam. O
+   aplicativo antigo continua mandando o admin para o MFA na interface, então nada crítico
+   fica exposto entre as duas etapas. A ordem inversa também falha fechada (a interface
+   liberaria o admin sem fator e o banco antigo negaria tudo).
+4. Hoje há um admin com fator verificado: ele **continua exigindo o TOTP** até remover o próprio
+   fator. Nenhum fator ou usuário existente é alterado.
+5. **Rollback:** reverter o aplicativo primeiro; depois aplicar
+   `docs/runbooks/rollback-mfa-opcional.sql` (restaura policies e funções originais; verificado
+   rodando as suítes ORIGINAIS no banco revertido). Não executar sem autorização.
 
 ## Recuperação de senha
 
@@ -124,9 +198,12 @@ a invoca. Exige sessão e papel, mas não AAL2 — é o que se vem obter ali.
 - Autorização em SQL usa `public.has_role()` e `public.is_staff()`.
   **`is_staff()` é verdadeira para qualquer papel atribuído**, não distingue
   `admin` de `operacional`; por isso não é a barreira entre os dois.
-- **MFA também é exigido no banco.** As 11 tabelas de negócio têm policy
-  RESTRICTIVE pedindo `aal2` (`*_exige_aal2`). Papel sozinho não distinguia uma
-  sessão AAL1, e quem tivesse só a senha alcançaria os dados pelo PostgREST.
+- **MFA também é exigido no banco**, por classe. Desde a migration 032 as 9 tabelas
+  de uso cotidiano (`*_exige_aal2`) aceitam `mfa_cotidiano_ok()`; a ESCRITA em
+  `invoices`/`invoice_items` e as policies de auditoria, motor e acesso por operação
+  seguem pedindo `aal2` literal. Papel sozinho não distingue uma sessão AAL1 de uma
+  AAL2: quem tem fator verificado e só a senha continua sem alcançar os dados pelo
+  PostgREST.
 - **Acesso direto exige `aal2` E `admin`.** Uma RESTRICTIVE adicional
   `*_exige_admin` (migration `016`) fecha as dez tabelas de negócio para qualquer
   papel que não seja `admin`. Sem ela, um `operacional` que concluísse o TOTP

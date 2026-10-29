@@ -1136,13 +1136,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. a 031 (integridade da folha, C06/C07) é a última migration, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
+  "I1. a 032 (MFA opcional, AUTH-01B) é a última migration, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [36, "20261029120000_031_integridade_folha_e_historico.sql", false],
+  [37, "20261030120000_032_mfa_opcional.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",

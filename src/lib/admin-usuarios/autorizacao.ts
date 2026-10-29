@@ -1,11 +1,10 @@
 /**
- * A porta de entrada de toda ação administrativa de usuários.
+ * A porta de entrada de toda ação administrativa crítica (usuários, papéis, motor financeiro).
  *
- * `lerAcesso()` (`src/app/(painel)/_autorizacao.ts`) já decide "liberado" de
- * um jeito que, para o papel `admin`, SEMPRE implica AAL2 — a tabela de
- * `_autorizacao.ts` não tem uma linha `admin` + `aal1` + `liberado`. Então
- * checar `situacao === "liberado" && ehAdmin(papeis)` aqui É checar
- * admin+AAL2, sem duplicar a decisão de nível de garantia.
+ * AUTH-01B: o segundo fator é OPCIONAL, então "liberado" já não implica AAL2 — conta sem fator
+ * trabalha em AAL1. Por isso esta porta exige o `nivel === "aal2"` explicitamente: operação crítica
+ * continua pedindo um fator verificado, e quem não tem um recebe a orientação de ativar em
+ * Configurações > Segurança. A decisão de nível continua vindo de `lerAcesso()`, sem duplicá-la.
  *
  * Por que não reaproveitar `exigirAdmin()` (o guard de `_exigir-admin.tsx`):
  * ele devolve `ReactNode | null`, pensado para telas. Toda Server Action deste
@@ -33,14 +32,14 @@ export interface AtorAdministrativo {
 }
 
 /**
- * Lança se quem chama não é admin com acesso `liberado` (o que, para admin,
- * é sempre AAL2). Nunca aceitar um `userId` alternativo por parâmetro: a
- * identidade de quem autoriza é sempre a da sessão corrente.
+ * Lança se quem chama não é admin liberado EM AAL2. Admin liberado em AAL1 (conta sem fator) não
+ * passa: operação crítica exige o segundo fator. Nunca aceitar um `userId` alternativo por
+ * parâmetro: a identidade de quem autoriza é sempre a da sessão corrente.
  */
 export async function exigirAdminAal2(): Promise<AtorAdministrativo> {
   const acesso = await lerAcesso();
 
-  if (acesso.situacao !== "liberado" || !ehAdmin(acesso.papeis)) {
+  if (acesso.situacao !== "liberado" || acesso.nivel !== "aal2" || !ehAdmin(acesso.papeis)) {
     throw new ErroDeAutorizacaoAdministrativa();
   }
 
