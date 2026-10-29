@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
-import { VARIAVEL_DE_ATIVACAO, ativacaoHabilitada } from "@/lib/ativacao-motor";
+import {
+  VARIAVEL_DE_ATIVACAO,
+  VARIAVEL_DE_REVERSAO,
+  ativacaoHabilitada,
+  reversaoHabilitada,
+} from "@/lib/ativacao-motor";
 
 import { exigirAdmin } from "../_exigir-admin";
 import { PainelImplantacaoVigencias } from "./painel-implantacao";
@@ -20,6 +25,7 @@ export default async function ImplantacaoVigencias() {
   return (
     <PainelImplantacaoVigencias
       ativacaoHabilitada={ativacaoHabilitada(process.env[VARIAVEL_DE_ATIVACAO])}
+      reversaoHabilitada={reversaoHabilitada(process.env[VARIAVEL_DE_REVERSAO])}
     />
   );
 }

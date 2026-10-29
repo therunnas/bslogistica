@@ -197,8 +197,8 @@ verificar(
   true,
 );
 verificar(
-  "C8. a consulta não registra nem sincroniza; a única ação é ligar o motor, com confirmação (C05-B8.6)",
-  /não registra nem sincroniza nada; a única ação desta tela é ligar o motor, com confirmação/.test(
+  "C8. a consulta não registra nem sincroniza; as únicas ações são ligar o motor e, quando o servidor autorizar, desligá-lo, ambas com confirmação (C05-B8.6 e RB-01)",
+  /não registra nem sincroniza nada; as únicas ações desta tela são ligar o motor e, quando o servidor autorizar, desligá-lo \(reversão\), ambas com administrador com segundo fator, motivo e confirmação/.test(
     painel,
   ) &&
     /<AtivarMotor/.test(painel) &&

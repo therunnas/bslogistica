@@ -4,10 +4,15 @@ import { criarClienteServidor } from "@/integrations/supabase/server";
 import { ErroDeAutorizacaoAdministrativa, exigirAdminAal2 } from "@/lib/admin-usuarios/autorizacao";
 import {
   MENSAGEM_ATIVACAO_DESABILITADA,
+  MENSAGEM_REVERSAO_DESABILITADA,
   VARIAVEL_DE_ATIVACAO,
+  VARIAVEL_DE_REVERSAO,
   ativacaoHabilitada,
+  desligarMotorDeVigencia,
   ligarMotorDeVigencia,
+  reversaoHabilitada,
   type ResultadoDaAtivacao,
+  type ResultadoDaReversao,
 } from "@/lib/ativacao-motor";
 
 /**
@@ -46,6 +51,42 @@ export async function ligarMotorAction(entrada: {
 
   const supabase = await criarClienteServidor();
   return ligarMotorDeVigencia(
+    { rpc: (nome, argumentos) => supabase.rpc(nome as never, argumentos as never) },
+    entrada,
+  );
+}
+
+/**
+ * Desliga o motor por vigência (RB-01): a reversão da ativação, pelo mesmo caminho seguro.
+ *
+ * Mesma ordem da ativação: `exigirAdminAal2()` primeiro; depois a trava de servidor PRÓPRIA da
+ * reversão (`BS_REVERSAO_MOTOR_HABILITADA`, fechada por padrão); só então o cliente da SESSÃO
+ * (JWT do próprio admin) chama `alterar_motor_vigencia(false, ...)`. Sem `service_role`, sem
+ * identidade vinda do cliente.
+ */
+export async function desligarMotorAction(entrada: {
+  motivo: unknown;
+  confirmacao: unknown;
+}): Promise<ResultadoDaReversao> {
+  try {
+    await exigirAdminAal2();
+  } catch (erro) {
+    if (erro instanceof ErroDeAutorizacaoAdministrativa) {
+      return {
+        ok: false,
+        codigo: "nao-autorizado",
+        mensagem: "Desligar o motor exige administrador com segundo fator.",
+      };
+    }
+    throw erro;
+  }
+
+  if (!reversaoHabilitada(process.env[VARIAVEL_DE_REVERSAO])) {
+    return { ok: false, codigo: "desabilitada", mensagem: MENSAGEM_REVERSAO_DESABILITADA };
+  }
+
+  const supabase = await criarClienteServidor();
+  return desligarMotorDeVigencia(
     { rpc: (nome, argumentos) => supabase.rpc(nome as never, argumentos as never) },
     entrada,
   );
