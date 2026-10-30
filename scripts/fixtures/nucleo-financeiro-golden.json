@@ -1,0 +1,717 @@
+{
+  "meta": {
+    "descricao": "Casos de referência das regras v2 (FIN-DESENHO-01 R2), com o resultado CALCULADO À MÃO. Não saem do núcleo, do oráculo nem do banco: são eles que os três precisam reproduzir.",
+    "unidades": "dinheiro em centavos; tempo em minutos; fatores em centésimos (150 = 1,5).",
+    "esperado": "campos omitidos valem 0 (ou false em cruzaMeiaNoite). 'erro' = código que o núcleo deve devolver.",
+    "contas": "hora da diária = 200,00 ÷ 8 = 25,00; HE = 25,00 × 1,5 = 37,50/h; hora especial = 25,00 × 2 = 50,00/h; hora do custo = 120,00 ÷ 8 = 15,00 (HE paga sem fator); hora especial paga = 30,00.",
+    "dados": "sintéticos; nenhum nome real."
+  },
+  "padrao": {
+    "status": "present",
+    "tipoDoDia": "util",
+    "entrada": "08:00",
+    "saida": "17:00",
+    "intervaloMinutos": 60,
+    "diariaCentavos": 20000,
+    "fatorHeCentesimos": 150,
+    "fatorEspecialCentesimos": 200,
+    "toleranciaMinutos": 10,
+    "modoHe": "diario",
+    "arredondamentoEspecial": "minutos",
+    "adicionalCentavos": 0,
+    "custoDiarioCentavos": 12000,
+    "custoHoraHeCentavos": null
+  },
+  "casos": [
+    {
+      "codigo": "G01",
+      "descricao": "útil, 8 h exatas",
+      "entrada": {},
+      "esperado": {
+        "minutosTrabalhados": 480,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G02",
+      "descricao": "útil, excedente 14 min: passa a tolerância 10 e arredonda para 0; o custo paga 14 min",
+      "entrada": { "saida": "17:14" },
+      "esperado": {
+        "minutosTrabalhados": 494,
+        "heMinutosPagos": 14,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 350,
+        "custoTotalCentavos": 12350
+      }
+    },
+    {
+      "codigo": "G03",
+      "descricao": "útil, excedente 15 min = 30 min cobrados",
+      "entrada": { "saida": "17:15" },
+      "esperado": {
+        "minutosTrabalhados": 495,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 15,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 375,
+        "custoTotalCentavos": 12375
+      }
+    },
+    {
+      "codigo": "G04",
+      "descricao": "útil, excedente 16 min = 30",
+      "entrada": { "saida": "17:16" },
+      "esperado": {
+        "minutosTrabalhados": 496,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 16,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 400,
+        "custoTotalCentavos": 12400
+      }
+    },
+    {
+      "codigo": "G05",
+      "descricao": "útil, excedente 44 min = 30",
+      "entrada": { "saida": "17:44" },
+      "esperado": {
+        "minutosTrabalhados": 524,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 44,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1100,
+        "custoTotalCentavos": 13100
+      }
+    },
+    {
+      "codigo": "G06",
+      "descricao": "útil, excedente 45 min = 60",
+      "entrada": { "saida": "17:45" },
+      "esperado": {
+        "minutosTrabalhados": 525,
+        "heMinutosCobrados": 60,
+        "heMinutosPagos": 45,
+        "baseCentavos": 20000,
+        "heCentavos": 3750,
+        "totalCentavos": 23750,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1125,
+        "custoTotalCentavos": 13125
+      }
+    },
+    {
+      "codigo": "G07",
+      "descricao": "útil, excedente 46 min = 60",
+      "entrada": { "saida": "17:46" },
+      "esperado": {
+        "minutosTrabalhados": 526,
+        "heMinutosCobrados": 60,
+        "heMinutosPagos": 46,
+        "baseCentavos": 20000,
+        "heCentavos": 3750,
+        "totalCentavos": 23750,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1150,
+        "custoTotalCentavos": 13150
+      }
+    },
+    {
+      "codigo": "G08",
+      "descricao": "útil, excedente 1h14 = 1h (horas inteiras preservadas)",
+      "entrada": { "saida": "18:14" },
+      "esperado": {
+        "minutosTrabalhados": 554,
+        "heMinutosCobrados": 60,
+        "heMinutosPagos": 74,
+        "baseCentavos": 20000,
+        "heCentavos": 3750,
+        "totalCentavos": 23750,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1850,
+        "custoTotalCentavos": 13850
+      }
+    },
+    {
+      "codigo": "G09",
+      "descricao": "útil, excedente 1h15 = 1h30",
+      "entrada": { "saida": "18:15" },
+      "esperado": {
+        "minutosTrabalhados": 555,
+        "heMinutosCobrados": 90,
+        "heMinutosPagos": 75,
+        "baseCentavos": 20000,
+        "heCentavos": 5625,
+        "totalCentavos": 25625,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1875,
+        "custoTotalCentavos": 13875
+      }
+    },
+    {
+      "codigo": "G10",
+      "descricao": "útil, excedente 1h45 = 2h",
+      "entrada": { "saida": "18:45" },
+      "esperado": {
+        "minutosTrabalhados": 585,
+        "heMinutosCobrados": 120,
+        "heMinutosPagos": 105,
+        "baseCentavos": 20000,
+        "heCentavos": 7500,
+        "totalCentavos": 27500,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 2625,
+        "custoTotalCentavos": 14625
+      }
+    },
+    {
+      "codigo": "G11",
+      "descricao": "útil, excedente 2h59 = 3h",
+      "entrada": { "saida": "19:59" },
+      "esperado": {
+        "minutosTrabalhados": 659,
+        "heMinutosCobrados": 180,
+        "heMinutosPagos": 179,
+        "baseCentavos": 20000,
+        "heCentavos": 11250,
+        "totalCentavos": 31250,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 4475,
+        "custoTotalCentavos": 16475
+      }
+    },
+    {
+      "codigo": "G12",
+      "descricao": "tolerância 0, excedente 14 = 0 cobrado; pago 14",
+      "entrada": { "saida": "17:14", "toleranciaMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 494,
+        "heMinutosPagos": 14,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 350,
+        "custoTotalCentavos": 12350
+      }
+    },
+    {
+      "codigo": "G13",
+      "descricao": "tolerância 0, excedente 15 = 30",
+      "entrada": { "saida": "17:15", "toleranciaMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 495,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 15,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 375,
+        "custoTotalCentavos": 12375
+      }
+    },
+    {
+      "codigo": "G14",
+      "descricao": "tolerância 15, excedente 15: não passa do limiar, nada cobrado nem pago",
+      "entrada": { "saida": "17:15", "toleranciaMinutos": 15 },
+      "esperado": {
+        "minutosTrabalhados": 495,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G15",
+      "descricao": "tolerância 15, excedente 16 = 30",
+      "entrada": { "saida": "17:16", "toleranciaMinutos": 15 },
+      "esperado": {
+        "minutosTrabalhados": 496,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 16,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 400,
+        "custoTotalCentavos": 12400
+      }
+    },
+    {
+      "codigo": "G16",
+      "descricao": "tolerância 10, excedente 10: descartado",
+      "entrada": { "saida": "17:10" },
+      "esperado": {
+        "minutosTrabalhados": 490,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G17",
+      "descricao": "descarte, não subtração: excedente 80 com tolerância 10 = 90 cobrados (subtrair daria 60)",
+      "entrada": { "saida": "18:20" },
+      "esperado": {
+        "minutosTrabalhados": 560,
+        "heMinutosCobrados": 90,
+        "heMinutosPagos": 80,
+        "baseCentavos": 20000,
+        "heCentavos": 5625,
+        "totalCentavos": 25625,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 2000,
+        "custoTotalCentavos": 14000
+      }
+    },
+    {
+      "codigo": "G18",
+      "descricao": "sábado 3h59: diária inteira, sem HE",
+      "entrada": { "tipoDoDia": "sabado", "saida": "11:59", "intervaloMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 239,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G19",
+      "descricao": "sábado 4h: diária inteira",
+      "entrada": { "tipoDoDia": "sabado", "saida": "12:00", "intervaloMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 240,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G20",
+      "descricao": "sábado 4h01: 1 min de excedente, descartado",
+      "entrada": { "tipoDoDia": "sabado", "saida": "12:01", "intervaloMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 241,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G21",
+      "descricao": "sábado 4h15: HE de 30 min com divisor 8 = 18,75 (divisor 4 daria 37,50); pago 15 min",
+      "entrada": { "tipoDoDia": "sabado", "saida": "12:15", "intervaloMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 255,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 15,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 375,
+        "custoTotalCentavos": 12375
+      }
+    },
+    {
+      "codigo": "G22",
+      "descricao": "sábado 5h: 1 h de HE cobrada e paga",
+      "entrada": { "tipoDoDia": "sabado", "saida": "13:00", "intervaloMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 300,
+        "heMinutosCobrados": 60,
+        "heMinutosPagos": 60,
+        "baseCentavos": 20000,
+        "heCentavos": 3750,
+        "totalCentavos": 23750,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1500,
+        "custoTotalCentavos": 13500
+      }
+    },
+    {
+      "codigo": "G23",
+      "descricao": "sábado com entrada, saída e zero minuto trabalhado: recusado (não vira diária inteira)",
+      "entrada": { "tipoDoDia": "sabado", "saida": "09:00" },
+      "esperado": { "erro": "zero_minuto_com_horarios" }
+    },
+    {
+      "codigo": "G24",
+      "descricao": "sábado sem horários: diária inteira",
+      "entrada": { "tipoDoDia": "sabado", "entrada": null, "saida": null },
+      "esperado": {
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G25",
+      "descricao": "útil, saída antecipada 4h: meia diária e meio custo",
+      "entrada": { "saida": "13:00" },
+      "esperado": {
+        "minutosTrabalhados": 240,
+        "baseCentavos": 10000,
+        "totalCentavos": 10000,
+        "custoBaseCentavos": 6000,
+        "custoTotalCentavos": 6000
+      }
+    },
+    {
+      "codigo": "G26",
+      "descricao": "útil, saída antecipada 7h13: 200,00 × 433/480 = 180,4166... -> 180,42",
+      "entrada": { "saida": "16:13" },
+      "esperado": {
+        "minutosTrabalhados": 433,
+        "baseCentavos": 18042,
+        "totalCentavos": 18042,
+        "custoBaseCentavos": 10825,
+        "custoTotalCentavos": 10825
+      }
+    },
+    {
+      "codigo": "G27",
+      "descricao": "útil sem horários: diária inteira",
+      "entrada": { "entrada": null, "saida": null },
+      "esperado": {
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G28",
+      "descricao": "útil com entrada, saída e zero minuto: recusado",
+      "entrada": { "saida": "09:00" },
+      "esperado": { "erro": "zero_minuto_com_horarios" }
+    },
+    {
+      "codigo": "G29",
+      "descricao": "domingo 6h: sem diária; 6 × 50,00 = 300,00; pago 6 × 30,00 = 180,00",
+      "entrada": { "tipoDoDia": "domingo", "saida": "14:00", "intervaloMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 360,
+        "especialMinutosCobrados": 360,
+        "especialCentavos": 30000,
+        "totalCentavos": 30000,
+        "custoEspecialCentavos": 18000,
+        "custoTotalCentavos": 18000
+      }
+    },
+    {
+      "codigo": "G30",
+      "descricao": "feriado 6h07 em minutos exatos: 367/60 × 50,00 = 305,8333... -> 305,83; pago 183,50",
+      "entrada": { "tipoDoDia": "feriado", "saida": "14:07", "intervaloMinutos": 0 },
+      "esperado": {
+        "minutosTrabalhados": 367,
+        "especialMinutosCobrados": 367,
+        "especialCentavos": 30583,
+        "totalCentavos": 30583,
+        "custoEspecialCentavos": 18350,
+        "custoTotalCentavos": 18350
+      }
+    },
+    {
+      "codigo": "G31",
+      "descricao": "feriado 6h07 com arredondamento 15/45: cobra 6h; o pagamento continua exato",
+      "entrada": {
+        "tipoDoDia": "feriado",
+        "saida": "14:07",
+        "intervaloMinutos": 0,
+        "arredondamentoEspecial": "meia_hora_15_45"
+      },
+      "esperado": {
+        "minutosTrabalhados": 367,
+        "especialMinutosCobrados": 360,
+        "especialCentavos": 30000,
+        "totalCentavos": 30000,
+        "custoEspecialCentavos": 18350,
+        "custoTotalCentavos": 18350
+      }
+    },
+    {
+      "codigo": "G32",
+      "descricao": "domingo 6h20 com arredondamento 15/45: cobra 6h30 = 325,00; paga 6h20 = 190,00",
+      "entrada": {
+        "tipoDoDia": "domingo",
+        "saida": "14:20",
+        "intervaloMinutos": 0,
+        "arredondamentoEspecial": "meia_hora_15_45"
+      },
+      "esperado": {
+        "minutosTrabalhados": 380,
+        "especialMinutosCobrados": 390,
+        "especialCentavos": 32500,
+        "totalCentavos": 32500,
+        "custoEspecialCentavos": 19000,
+        "custoTotalCentavos": 19000
+      }
+    },
+    {
+      "codigo": "G33",
+      "descricao": "domingo sem horários: recusado",
+      "entrada": { "tipoDoDia": "domingo", "entrada": null, "saida": null },
+      "esperado": { "erro": "especial_sem_horarios" }
+    },
+    {
+      "codigo": "G34",
+      "descricao": "feriado 9h: só horas × 2, sem HE de 50% em cima",
+      "entrada": { "tipoDoDia": "feriado", "saida": "18:00" },
+      "esperado": {
+        "minutosTrabalhados": 540,
+        "especialMinutosCobrados": 540,
+        "especialCentavos": 45000,
+        "totalCentavos": 45000,
+        "custoEspecialCentavos": 27000,
+        "custoTotalCentavos": 27000
+      }
+    },
+    {
+      "codigo": "G35",
+      "descricao": "útil 8h com adicional de 35,00: total sobe, custo não",
+      "entrada": { "adicionalCentavos": 3500 },
+      "esperado": {
+        "minutosTrabalhados": 480,
+        "baseCentavos": 20000,
+        "adicionalCentavos": 3500,
+        "totalCentavos": 23500,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G36",
+      "descricao": "adicional fora da base da HE: excedente 45 com adicional 40,00 continua 37,50 de HE",
+      "entrada": { "saida": "17:45", "adicionalCentavos": 4000 },
+      "esperado": {
+        "minutosTrabalhados": 525,
+        "heMinutosCobrados": 60,
+        "heMinutosPagos": 45,
+        "baseCentavos": 20000,
+        "heCentavos": 3750,
+        "adicionalCentavos": 4000,
+        "totalCentavos": 27750,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1125,
+        "custoTotalCentavos": 13125
+      }
+    },
+    {
+      "codigo": "G37",
+      "descricao": "domingo 6h com adicional de 30,00",
+      "entrada": {
+        "tipoDoDia": "domingo",
+        "saida": "14:00",
+        "intervaloMinutos": 0,
+        "adicionalCentavos": 3000
+      },
+      "esperado": {
+        "minutosTrabalhados": 360,
+        "especialMinutosCobrados": 360,
+        "especialCentavos": 30000,
+        "adicionalCentavos": 3000,
+        "totalCentavos": 33000,
+        "custoEspecialCentavos": 18000,
+        "custoTotalCentavos": 18000
+      }
+    },
+    {
+      "codigo": "G38",
+      "descricao": "falta: tudo zero",
+      "entrada": { "status": "absent", "entrada": null, "saida": null },
+      "esperado": {}
+    },
+    {
+      "codigo": "G39",
+      "descricao": "falta com adicional: recusado",
+      "entrada": { "status": "absent", "entrada": null, "saida": null, "adicionalCentavos": 500 },
+      "esperado": { "erro": "falta_com_adicional" }
+    },
+    {
+      "codigo": "G40",
+      "descricao": "precisão: diária 333,33, HE 30 min = 31,2496875; total exato 364,5796875 -> 364,58; HE = 31,25",
+      "entrada": { "saida": "17:15", "diariaCentavos": 33333 },
+      "esperado": {
+        "minutosTrabalhados": 495,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 15,
+        "baseCentavos": 33333,
+        "heCentavos": 3125,
+        "totalCentavos": 36458,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 375,
+        "custoTotalCentavos": 12375
+      }
+    },
+    {
+      "codigo": "G41",
+      "descricao": "precisão: meia diária de 100,01 = 50,005 -> 50,01 (meio centavo para cima)",
+      "entrada": { "saida": "13:00", "diariaCentavos": 10001 },
+      "esperado": {
+        "minutosTrabalhados": 240,
+        "baseCentavos": 5001,
+        "totalCentavos": 5001,
+        "custoBaseCentavos": 6000,
+        "custoTotalCentavos": 6000
+      }
+    },
+    {
+      "codigo": "G42",
+      "descricao": "custo-hora acordado de 25,00: 1 h de HE paga = 25,00 (cobrança independente)",
+      "entrada": { "saida": "18:00", "custoHoraHeCentavos": 2500 },
+      "esperado": {
+        "minutosTrabalhados": 540,
+        "heMinutosCobrados": 60,
+        "heMinutosPagos": 60,
+        "baseCentavos": 20000,
+        "heCentavos": 3750,
+        "totalCentavos": 23750,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 2500,
+        "custoTotalCentavos": 14500
+      }
+    },
+    {
+      "codigo": "G43",
+      "descricao": "acumulado: 14 min brutos, sem tolerância nem arredondamento (14 × 0,625 = 8,75)",
+      "entrada": { "saida": "17:14", "modoHe": "acumulado" },
+      "esperado": {
+        "minutosTrabalhados": 494,
+        "heMinutosCobrados": 14,
+        "heMinutosPagos": 14,
+        "baseCentavos": 20000,
+        "heCentavos": 875,
+        "totalCentavos": 20875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 350,
+        "custoTotalCentavos": 12350
+      }
+    },
+    {
+      "codigo": "G44",
+      "descricao": "acumulado: 26 min brutos = 16,25",
+      "entrada": { "saida": "17:26", "modoHe": "acumulado" },
+      "esperado": {
+        "minutosTrabalhados": 506,
+        "heMinutosCobrados": 26,
+        "heMinutosPagos": 26,
+        "baseCentavos": 20000,
+        "heCentavos": 1625,
+        "totalCentavos": 21625,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 650,
+        "custoTotalCentavos": 12650
+      }
+    },
+    {
+      "codigo": "G45",
+      "descricao": "acumulado no sábado: 50 min brutos acima de 4 h = 31,25",
+      "entrada": {
+        "tipoDoDia": "sabado",
+        "saida": "12:50",
+        "intervaloMinutos": 0,
+        "modoHe": "acumulado"
+      },
+      "esperado": {
+        "minutosTrabalhados": 290,
+        "heMinutosCobrados": 50,
+        "heMinutosPagos": 50,
+        "baseCentavos": 20000,
+        "heCentavos": 3125,
+        "totalCentavos": 23125,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 1250,
+        "custoTotalCentavos": 13250
+      }
+    },
+    {
+      "codigo": "G46",
+      "descricao": "noturno 22:00–07:00 com 1 h de intervalo: 8 h, cruza a meia-noite",
+      "entrada": { "entrada": "22:00", "saida": "07:00" },
+      "esperado": {
+        "minutosTrabalhados": 480,
+        "cruzaMeiaNoite": true,
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G47",
+      "descricao": "noturno 22:00–07:20: excedente 20 = 30 cobrados",
+      "entrada": { "entrada": "22:00", "saida": "07:20" },
+      "esperado": {
+        "minutosTrabalhados": 500,
+        "cruzaMeiaNoite": true,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 20,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 500,
+        "custoTotalCentavos": 12500
+      }
+    },
+    {
+      "codigo": "G48",
+      "descricao": "entrada igual à saída: recusado",
+      "entrada": { "saida": "08:00" },
+      "esperado": { "erro": "entrada_igual_saida" }
+    },
+    {
+      "codigo": "G49",
+      "descricao": "útil só com a entrada: tratado como sem horários (diária inteira)",
+      "entrada": { "saida": null },
+      "esperado": {
+        "baseCentavos": 20000,
+        "totalCentavos": 20000,
+        "custoBaseCentavos": 12000,
+        "custoTotalCentavos": 12000
+      }
+    },
+    {
+      "codigo": "G50",
+      "descricao": "substituição segue a presença (igual a G03)",
+      "entrada": { "status": "replacement", "saida": "17:15" },
+      "esperado": {
+        "minutosTrabalhados": 495,
+        "heMinutosCobrados": 30,
+        "heMinutosPagos": 15,
+        "baseCentavos": 20000,
+        "heCentavos": 1875,
+        "totalCentavos": 21875,
+        "custoBaseCentavos": 12000,
+        "custoHeCentavos": 375,
+        "custoTotalCentavos": 12375
+      }
+    },
+    {
+      "codigo": "G51",
+      "descricao": "domingo com entrada, saída e zero minuto: recusado",
+      "entrada": { "tipoDoDia": "domingo", "saida": "09:00" },
+      "esperado": { "erro": "zero_minuto_com_horarios" }
+    }
+  ]
+}
