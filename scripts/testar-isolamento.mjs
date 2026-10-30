@@ -1420,14 +1420,14 @@ verificar(
 const pacote = JSON.parse(fonte("package.json"));
 const trava = JSON.parse(fonte("package-lock.json"));
 verificar(
-  "F17. nenhuma dependência nova nesta etapa (Sentry fixado como antes)",
+  "F17. Sentry na faixa corrigida do GHSA-mchm-gjx6-7h55 (SEC-DEP-01)",
   pacote.dependencies["@sentry/nextjs"],
-  "^10.73.0",
+  "^10.75.2",
 );
 verificar(
-  "F18. o lockfile continua em @sentry/nextjs 10.73.0",
+  "F18. o lockfile resolve @sentry/nextjs 10.75.2 (versão corrigida)",
   trava.packages["node_modules/@sentry/nextjs"]?.version,
-  "10.73.0",
+  "10.75.2",
 );
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);
