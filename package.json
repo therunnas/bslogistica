@@ -53,7 +53,10 @@
     "test:fechamento-xlsx": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-xlsx.mjs",
     "test:apontamentos-c07": "node --experimental-strip-types scripts/testar-apontamentos-c07.mjs",
     "test:fechamento-gate": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-gate.mjs",
-    "test:fechamento-conciliacao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-regras-030.mjs"
+    "test:fechamento-conciliacao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-regras-030.mjs",
+    "test:nucleo-v2": "node --experimental-strip-types scripts/testar-nucleo-v2.mjs",
+    "test:nucleo-legado": "node --experimental-strip-types scripts/testar-nucleo-legado.mjs",
+    "test:nucleo-isolamento": "node --experimental-strip-types scripts/testar-nucleo-isolamento.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
