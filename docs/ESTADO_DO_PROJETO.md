@@ -204,7 +204,7 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 | Suítes Node (`test:*`)          | 29 scripts, todos exigidos pela CI; 11 deles são da C05-B                                                            |
 | Testes SQL (`supabase/tests`)   | 26 arquivos; rodam localmente (`scripts/testar-sql-local.sh`), **não** na CI                                         |
 | CI (`.github/workflows/ci.yml`) | em todo PR e em push para `main`: lint, `tsc`, as 29 suítes e build, sem secret e sem tocar o Supabase de Production |
-| `npm audit`                     | 0 vulnerabilidades                                                                                                   |
+| `npm audit`                     | 0 vulnerabilidades (SEC-DEP-01: `@sentry/nextjs` 10.75.2 e `fast-uri` 3.1.9; ver [SEGURANCA.md](SEGURANCA.md))       |
 
 ## Riscos e pendências confirmados
 

@@ -532,6 +532,13 @@ upgrade-insecure-requests; report-uri <endpoint do Sentry — só em Production>
   e-mail e a Site URL de produção.
 - Dependências: `npm audit` deve permanecer em zero; o estado atual está em
   [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md).
+- SEC-DEP-01 (GHSA-mchm-gjx6-7h55, Sentry `tunnelRoute`): corrigido em
+  `@sentry/nextjs` 10.75.2 (antes 10.73.0); `fast-uri` 3.1.8 → 3.1.9 (transitiva).
+  Exposição avaliada como não explorável aqui: o advisory exige build com webpack
+  (o `next build` usa Turbopack), rota própria sob `/monitoring` (não existe nenhuma)
+  e autorização só no middleware (as rotas validam sessão também no servidor). O
+  `matcher` do `proxy.ts` já excluía `/monitoring` por decisão própria, anterior ao
+  advisory. Nenhuma configuração mudou.
 
 ## Riscos residuais
 
