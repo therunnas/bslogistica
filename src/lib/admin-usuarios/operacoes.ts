@@ -2,7 +2,7 @@
  * Atribuição de operações ao operacional — `public.user_operation_access`.
  *
  * Ao contrário de `servico.ts`, este módulo NÃO usa `service_role`: a tabela
- * já tem policy `FOR ALL` para admin em AAL2 desde a migration 013 (permissiva
+ * já tem policy `FOR ALL` para admin desde a migration 013 (permissiva
  * + RESTRICTIVE de mesmo predicado). A sessão real do admin, pela RLS, já
  * basta — usar `service_role` aqui só ampliaria superfície sem necessidade,
  * e essa tabela não tem trigger de proteção que precise ser contornado, ao
@@ -247,12 +247,12 @@ export interface OperacaoResumo {
 /**
  * Lista as operações que existem, para o picker de atribuição da tela de
  * usuários — NUNCA para o operador ver: quem chama isto já passou por
- * `exigirAdminAal2()`.
+ * `exigirAdminAtor()`.
  *
  * Ao contrário de `user_operation_access`, `operations` está no `Database`
  * gerado, então esta função usa o cliente de sessão (RLS) tipado direto, sem
  * a forma própria que `ClienteDeOperacoes` precisa para a tabela sem tipos.
- * Mesma razão de não usar `service_role` aqui: a policy de admin+AAL2 já
+ * Mesma razão de não usar `service_role` aqui: a policy de admin já
  * libera a leitura pela sessão real, e usar `service_role` só ampliaria
  * superfície sem necessidade — como o comentário do topo deste arquivo já
  * registra para `user_operation_access`.

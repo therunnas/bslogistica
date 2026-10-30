@@ -15,7 +15,7 @@ export const metadata: Metadata = {
  * Configurações → Segurança (PR F) — a única tela administrativa acessível
  * pelos DOIS papéis, admin e operacional. É aqui que cada titular ativa ou
  * desativa o próprio segundo fator, por vontade própria (AUTH-01B: opcional
- * para os dois). O que continua exigindo AAL2 são as operações críticas.
+ * para os dois). Nenhuma funcionalidade exige o segundo fator.
  *
  * O `(painel)/layout.tsx` já garante `liberado` antes de qualquer página
  * deste grupo renderizar — sem sessão vai para `/login`, sem papel para a

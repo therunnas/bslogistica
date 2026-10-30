@@ -14,6 +14,7 @@
  *   E  mensagem das operações críticas recusadas
  *   F  documentação
  */
+import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
 import { decidirAcesso } from "../src/lib/mfa.ts";
@@ -110,12 +111,13 @@ verificar(
   false,
 );
 
-console.log("\nB. 'Liberado' não é AAL2\n");
+console.log("\nB. MFA só protege o login: nenhum guard pede AAL2 (AUTH-01D.R1)\n");
 const aut = semComentarios(ler("src/app/(painel)/_autorizacao.ts"));
 verificar(
-  "B1. lerAcesso devolve o nível de quem foi liberado (aal1 ou aal2, nunca presumido)",
-  /nivel: nivelAtual === "aal2" \? "aal2" : "aal1"/.test(aut) &&
-    /situacao: "liberado"; email: string; papeis: Papel\[\]; nivel: NivelAcesso/.test(aut),
+  "B1. lerAcesso devolve 'liberado' sem expor nível (nenhuma funcionalidade depende de AAL)",
+  !/nivel: /.test(aut) &&
+    !/NivelAcesso/.test(aut) &&
+    /situacao: "liberado"; email: string; papeis: Papel\[\] \}/.test(aut),
   true,
 );
 verificar(
@@ -125,36 +127,36 @@ verificar(
 );
 const aa = semComentarios(ler("src/lib/admin-usuarios/autorizacao.ts"));
 verificar(
-  "B3. exigirAdminAal2 (Server Actions críticas) exige nivel === 'aal2' além de admin liberado",
-  /acesso\.situacao !== "liberado" \|\| acesso\.nivel !== "aal2" \|\| !ehAdmin\(acesso\.papeis\)/.test(
-    aa,
-  ),
+  "B3. exigirAdminAtor exige só 'liberado' e papel admin (sem nível aal2)",
+  /acesso\.situacao !== "liberado" \|\| !ehAdmin\(acesso\.papeis\)/.test(aa) &&
+    !/aal2|nivel/.test(aa),
   true,
 );
 const guard = semComentarios(ler("src/app/(painel)/_exigir-admin.tsx"));
 verificar(
-  "B4. exigirAdminAal2Tela mostra a orientação de ativar o MFA quando o nível não é aal2",
-  /export async function exigirAdminAal2Tela/.test(guard) &&
-    /acesso\.nivel !== "aal2"\) return <ExigeSegundoFator \/>/.test(guard),
-  true,
+  "B4. a tela ExigeSegundoFator e o guard exigirAdminAal2Tela foram removidos",
+  [
+    existsSync(new URL("../src/app/(painel)/_components/exige-segundo-fator.tsx", import.meta.url)),
+    /ExigeSegundoFator|exigirAdminAal2/.test(guard),
+  ],
+  [false, false],
 );
 verificar(
-  "B5. exigirAdmin (cotidiano) NÃO ganhou exigência de aal2",
-  /export async function exigirAdmin\(\)[\s\S]*?return null;\s*\}/.test(guard) &&
-    !/export async function exigirAdmin\(\)[\s\S]*?nivel[\s\S]*?return null;\s*\}\s*\n\s*\/\*\*/.test(
-      guard,
-    ),
+  "B5. exigirAdmin confere sessão liberada e papel admin, só isso",
+  /export async function exigirAdmin\(\)[\s\S]*?acesso\.situacao !== "liberado" \|\| !ehAdmin\(acesso\.papeis\)[\s\S]*?return null;\s*\}/.test(
+    guard,
+  ) && !/aal|nivel/i.test(guard),
   true,
 );
 const pag = (p) => semComentarios(ler(`src/app/(painel)/${p}/page.tsx`));
 verificar(
-  "B6. áreas críticas (Usuários e Implantação) usam o guard de AAL2 de fato",
-  /await exigirAdminAal2Tela\(\)/.test(pag("usuarios")) &&
-    /await exigirAdminAal2Tela\(\)/.test(pag("implantacao-vigencias")),
+  "B6. Usuários e Implantação usam exigirAdmin como as demais telas",
+  /await exigirAdmin\(\)/.test(pag("usuarios")) &&
+    /await exigirAdmin\(\)/.test(pag("implantacao-vigencias")),
   true,
 );
 verificar(
-  "B7. telas cotidianas seguem com exigirAdmin",
+  "B7. todas as telas administrativas seguem com exigirAdmin",
   [
     "dashboard",
     "clientes",
@@ -168,31 +170,43 @@ verificar(
   true,
 );
 verificar(
-  "B8. Server Actions críticas (usuários e motor: ativar e reverter) chamam exigirAdminAal2 antes de agir",
+  "B8. Server Actions de usuários e motor chamam exigirAdminAtor antes de agir",
   ["usuarios/_acoes.ts", "implantacao-vigencias/_acoes.ts"].every((f) =>
-    /exigirAdminAal2\(\)/.test(semComentarios(ler(`src/app/(painel)/${f}`))),
+    /exigirAdminAtor\(\)/.test(semComentarios(ler(`src/app/(painel)/${f}`))),
   ),
   true,
 );
 verificar(
-  "B9. a Server Action de reverter o motor segue com admin AAL2 ANTES da trava",
-  /desligarMotorAction[\s\S]*?exigirAdminAal2\(\)[\s\S]*?reversaoHabilitada\(/.test(
+  "B9. a Server Action de reverter o motor segue com admin ANTES da trava de servidor",
+  /desligarMotorAction[\s\S]*?exigirAdminAtor\(\)[\s\S]*?reversaoHabilitada\(/.test(
     semComentarios(ler("src/app/(painel)/implantacao-vigencias/_acoes.ts")),
   ),
   true,
 );
 verificar(
-  "B10. o layout só manda para /mfa quem JÁ tem fator (mfa-pendente)",
+  "B10. o layout só manda para /mfa quem JÁ tem fator (mfa-pendente): o desafio de LOGIN segue obrigatório",
   /acesso\.situacao === "mfa-pendente"\) redirect\("\/mfa"\)/.test(
     semComentarios(ler("src/app/(painel)/layout.tsx")),
   ),
   true,
 );
-const tela = ler("src/app/(painel)/_components/exige-segundo-fator.tsx");
 verificar(
-  "B11. a tela de orientação aponta para Configurações e não oferece contornar",
-  /href="\/configuracoes"/.test(tela) && !/service_role|bypass/i.test(tela),
-  true,
+  "B11. nenhum arquivo de src/app ou src/lib testa nível aal2 para liberar funcionalidade (só mfa/recuperação)",
+  (() => {
+    const lista = execSync(
+      'grep -rlE "nivel === |nivel !== |currentLevel" src --include=*.ts --include=*.tsx || true',
+      { cwd: new URL("..", import.meta.url), encoding: "utf8" },
+    )
+      .split("\n")
+      .filter(Boolean);
+    return lista.filter(
+      (f) =>
+        !/lib\/mfa\.ts|redefinir-senha|recuperacao-senha|confirmar-recuperacao|app\/mfa\/|_autorizacao\.ts|vigencias\.tsx/.test(
+          f,
+        ),
+    );
+  })(),
+  [],
 );
 
 console.log("\nC. Configurações > Segurança\n");
@@ -239,13 +253,14 @@ verificar(
 );
 verificar("C8. nada de segredo TOTP em log", /console\.(log|info|warn|error)/.test(painel), false);
 verificar(
-  "C9. o texto do admin sem fator explica o opcional e o que fica fechado; o do operacional segue opcional",
+  "C9. o texto do admin sem fator diz que é opcional e que a conta fica só com a senha (nada de 'operações críticas fechadas'); o do operacional segue opcional",
   [
     /opcional/i.test(textoSemFator("admin").corpo),
-    /críticas/i.test(textoSemFator("admin").corpo),
+    /apenas pela senha/i.test(textoSemFator("admin").corpo),
+    /críticas|fechadas/i.test(textoSemFator("admin").corpo),
     /opcional/i.test(textoSemFator("operacional").corpo),
   ],
-  [true, true, true],
+  [true, true, false, true],
 );
 verificar(
   "C10. a aplicação não tem rota nem Server Action que gerencie fator de OUTRA conta",
@@ -511,7 +526,7 @@ verificar(
   (() => {
     const d = ler("docs/SEGURANCA.md");
     return [
-      /033, AUTH-01C\.1/.test(d),
+      /Integridade financeira com o motor ligado \(033\)/.test(d),
       /rollback-taxa-legada-vigencia\.sql/.test(d),
       /na mesma transação/.test(d),
     ];
@@ -519,14 +534,78 @@ verificar(
   [true, true, true],
 );
 
+console.log("\nH. Migration 034 (MFA protege só o login)\n");
+const m34 = "20261101120000_034_mfa_somente_login.sql";
+const sql34 = semSql(ler(`supabase/migrations/${m34}`));
+verificar(
+  "H1. a 034 é posterior à 033 e as migrations 032 e 033 não mencionam a 034",
+  [
+    m34 > "20261031120000_033_taxa_legada_exige_vigencia.sql",
+    /034/.test(semSql(ler("supabase/migrations/20261030120000_032_mfa_opcional.sql"))),
+    /034/.test(sql33),
+  ],
+  [true, false, false],
+);
+verificar(
+  "H2. troca o aal2 literal por mfa_cotidiano_ok() nas 3 funções e nas 14 policies, e não deixa 'aal2' cru",
+  [
+    (sql34.match(/alter policy/gi) ?? []).length,
+    /create or replace function public\.(condicoes_exigir_admin|gerar_fatura|exigir_aal2_taxa_legada)/gi.test(
+      sql34,
+    ),
+    /'aal2'/.test(sql34),
+  ],
+  [14, true, false],
+);
+verificar(
+  "H3. nenhuma verificação de papel removida: gerar_fatura e condicoes_exigir_admin seguem com has_role; policies seguem com has_role('admin')",
+  [
+    /has_role\(auth\.uid\(\), 'admin'::public\.app_role\)/.test(sql34),
+    (sql34.match(/has_role/g) ?? []).length >= 6,
+  ],
+  [true, true],
+);
+verificar(
+  "H4. nada concedido a anon/public, sem service_role, sem policy nova, sem drop, transação única",
+  [
+    /grant /i.test(sql34),
+    /grant [^;]*service_role/i.test(sql34),
+    /create policy|drop policy|drop function|drop trigger/i.test(sql34),
+    /^begin;/m.test(sql34) && /^commit;/m.test(sql34),
+  ],
+  [false, false, false, true],
+);
+verificar(
+  "H5. a 034 não toca a 033 (nenhuma menção aos gatilhos de vigência)",
+  /exigir_vigencia_na_taxa|trg_.*_exige_vigencia/.test(sql34),
+  false,
+);
+verificar(
+  "H6. rollback da 034 restaura o AAL2 literal e não toca a 033",
+  (() => {
+    const r = ler("docs/runbooks/rollback-mfa-somente-login.sql");
+    return [
+      /'aal2'/.test(r),
+      /exigir_vigencia_na_taxa|trg_.*_exige_vigencia/.test(r),
+      (r.match(/alter policy/gi) ?? []).length,
+    ];
+  })(),
+  [true, false, 14],
+);
+verificar(
+  "H7. suíte SQL da 034 existe",
+  existsSync(new URL("../supabase/tests/034_mfa_somente_login.sql", import.meta.url)),
+  true,
+);
+
 console.log("\nE. Mensagem das operações críticas recusadas\n");
 verificar(
-  "E1. recusa de MFA do guard (42501) vira a orientação de ativar",
+  "E1. recusa de MFA do guard (42501: TOTP pendente) vira a orientação de concluir o login",
   mensagemDoErro({ code: "42501", message: "Autenticação de dois fatores obrigatória." }),
   MENSAGEM_EXIGE_SEGUNDO_FATOR,
 );
 verificar(
-  "E2. recusa direta por policy estrita (exige_aal2) também",
+  "E2. recusa direta por policy (exige_aal2, nome histórico) também",
   mensagemDoErro({
     code: "42501",
     message:
@@ -553,26 +632,42 @@ verificar(
   [false, false],
 );
 verificar(
-  "F2. CLAUDE.md registra MFA opcional e AAL2 nas operações críticas",
-  /OPCIONAL para `admin` e para `operacional`/.test(claude) &&
-    /continuam exigindo AAL2 DE FATO/.test(claude),
-  true,
+  "F2. CLAUDE.md e AGENTS.md registram: MFA protege só o login, nenhuma funcionalidade exige AAL2",
+  [
+    /protege só o LOGIN/.test(claude),
+    /Nenhuma funcionalidade exige AAL2/.test(claude),
+    /protege só o LOGIN/.test(ler("AGENTS.md")),
+    /continuam exigindo AAL2 DE FATO/.test(claude + ler("AGENTS.md")),
+  ],
+  [true, true, true, false],
 );
 verificar(
-  "F3. SEGURANCA.md traz a classificação, a gestão do fator, a perda do autenticador, a implantação e o rollback",
+  "F3. SEGURANCA.md traz política, matriz, gestão do fator, perda do autenticador, rollout/compatibilidade, rollback e o runbook do 55006",
   [
-    "MFA opcional e a classificação das operações",
+    "MFA só no login: política, matriz e rollout",
+    "Matriz de permissões",
     "Gestão individual do fator",
     "Perda do autenticador",
-    "Implantação \\(plano\\) e rollback",
-    "rollback-mfa-opcional.sql",
-    "Decisões pendentes",
+    "Compatibilidade entre versões",
+    "rollback-mfa-somente-login.sql",
+    "SET CONSTRAINTS ALL IMMEDIATE",
+    "55006",
   ].every((t) => new RegExp(t).test(seg)),
   true,
 );
 verificar(
-  "F4. a tabela de decisão do SEGURANCA.md mostra admin sem fator liberado em AAL1",
-  /\| `admin`       \| `aal1` \| sem fator       \| liberado \(AAL1\)    \|/.test(seg),
+  "F4. SEGURANCA.md registra o limite do Supabase (unenroll só exige AAL2; código novo é da interface) e o risco de contas sem MFA",
+  [
+    /apenas sessão AAL2/.test(seg),
+    /imposto pela \*\*interface\*\*/.test(seg),
+    /protegida \*\*apenas pela senha\*\*/.test(seg),
+    /administradores ativam o MFA voluntariamente/.test(seg),
+  ],
+  [true, true, true, true],
+);
+verificar(
+  "F5. as revisões anteriores ficam como histórico e não aprovam o novo HEAD",
+  /Não são aprovação\*\* da política final/.test(seg),
   true,
 );
 

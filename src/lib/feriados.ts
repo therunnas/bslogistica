@@ -2,7 +2,7 @@
  * Calendário de feriados do motor financeiro (C05-B8.15, migration 030).
  *
  * O feriado muda o PAGAMENTO do dia quando o contrato define o fator (2 = adicional de 100%). O
- * banco é a barreira: `registrar_feriado` e `aposentar_feriado` (admin AAL2, motivo, trilha), um
+ * banco é a barreira: `registrar_feriado` e `aposentar_feriado` (admin, motivo, trilha), um
  * feriado ativo por data, nada se apaga, e o tipo do dia fica congelado no apontamento já
  * precificado. Este módulo só valida o formulário e monta os parâmetros.
  *

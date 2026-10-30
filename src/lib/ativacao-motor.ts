@@ -2,8 +2,8 @@
  * Ativação do motor por vigência, pelo administrador (C05-B8.6).
  *
  * É a única escrita da tela de implantação das vigências. Roda no servidor (Server Action), com o
- * cliente da SESSÃO — o JWT do próprio admin em AAL2 —, nunca com `service_role` e sem simular
- * `auth.uid()`: quem decide é a RPC `alterar_motor_vigencia`, que exige admin em AAL2 por dentro e
+ * cliente da SESSÃO — o JWT do próprio admin —, nunca com `service_role` e sem simular
+ * `auth.uid()`: quem decide é a RPC `alterar_motor_vigencia`, que exige admin por dentro e
  * grava a trilha. Este módulo só acrescenta, ANTES da RPC, o que a tela promete: motivo e frase de
  * confirmação válidos, motor comprovadamente desligado e nenhuma pendência nem divergência.
  *
@@ -210,7 +210,7 @@ export async function ligarMotorDeVigencia(
 // ativação, para abrir uma janela não abrir a outra). Só desliga se o motor estiver
 // comprovadamente LIGADO; estado desconhecido ou inconsistente recusa. Nunca aceita pendência
 // (não existe pendência a aceitar ao desligar) e nunca usa `service_role` nem simula identidade:
-// `alterar_motor_vigencia` repete admin + AAL2 por dentro e grava a trilha em
+// `alterar_motor_vigencia` repete admin por dentro e grava a trilha em
 // `financial_terms_audit` (`motor_vigencia_desativado`). Depois de desligar, relê o estado e só
 // declara sucesso se o banco confirmar `desligado` e consistente.
 
@@ -283,7 +283,7 @@ export async function desligarMotorDeVigencia(
     );
   }
 
-  // 2. A RPC oficial, com o JWT da sessão. O banco repete admin + AAL2 e grava a trilha.
+  // 2. A RPC oficial, com o JWT da sessão. O banco repete admin e grava a trilha.
   const r = await db.rpc(RPC_ATIVACAO.alterar, {
     p_ativar: false,
     p_reason: valida.motivo,

@@ -149,21 +149,21 @@ select pg_temp.registrar('C5. operacional não lê vigências em nenhum nível',
   pg_temp.por('5a000000-0000-4000-8000-000000000004', 'aal1', 'select count(*)::text from public.contract_terms') || '|' || pg_temp.por('5a000000-0000-4000-8000-000000000005', 'aal2', 'select count(*)::text from public.contract_terms'));
 
 -- D. Escrita crítica e auditoria ------------------------------------------------------------------
-select pg_temp.registrar('D1. INSERT em invoices por admin sem fator em AAL1: NEGADO', 'erro 42501',
+select pg_temp.registrar('D1. AUTH-01D.R1: INSERT em invoices por admin sem fator em AAL1: permitido (o MFA só protege o login)', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$with i as (insert into public.invoices (client_id, period_start, period_end) values ('5ac00000-0000-4000-8000-0000000000c1', date '2026-02-01', date '2026-02-15') returning 1) select count(*)::text from i$q$));
-select pg_temp.registrar('D2. UPDATE em invoices por admin sem fator em AAL1: 0 linhas', '0',
+select pg_temp.registrar('D2. UPDATE em invoices por admin sem fator em AAL1: permitido (2 faturas)', '2',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$with u as (update public.invoices set notes = 'sem mfa' returning 1) select count(*)::text from u$q$));
-select pg_temp.registrar('D3. UPDATE em invoices em AAL2: permitido', '1',
+select pg_temp.registrar('D3. UPDATE em invoices em AAL2: permitido', '2',
   pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', $q$with u as (update public.invoices set notes = 'com mfa' returning 1) select count(*)::text from u$q$));
-select pg_temp.registrar('D4. DELETE em invoices por admin sem fator em AAL1: 0 linhas e a fatura segue', '0|1',
-  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$with d as (delete from public.invoices returning 1) select count(*)::text from d$q$) || '|' || (select count(*)::text from public.invoices));
+select pg_temp.registrar('D4. DELETE de uma fatura por admin sem fator em AAL1: permitido', '1',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$with d as (delete from public.invoices where id = '5ac00000-0000-4000-8000-0000000000b1' returning 1) select count(*)::text from d$q$));
 select pg_temp.registrar('D5. escrita direta em vigência: sem policy permissiva, negada até em AAL2', 'erro 42501',
   pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', $q$with i as (insert into public.contract_terms (contract_id, valid_from, daily_rate, shift_hours, ot_factor, ot_tolerance_min, origin, reason) values ('5ac00000-0000-4000-8000-0000000000d1', date '2026-03-01', 1, 8, 1, 10, 'informada', 'direto') returning 1) select count(*)::text from i$q$));
-select pg_temp.registrar('D6. configuração do motor: admin sem fator em AAL1 não enxerga', '0', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'select count(*)::text from public.financial_engine_settings'));
+select pg_temp.registrar('D6. configuração do motor: admin sem fator em AAL1 enxerga', '1', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'select count(*)::text from public.financial_engine_settings'));
 select pg_temp.registrar('D7. configuração do motor: admin em AAL2 enxerga', '1', pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', 'select count(*)::text from public.financial_engine_settings'));
-select pg_temp.registrar('D8. auditoria administrativa: sem fator em AAL1 não enxerga; AAL2 enxerga', '0|1',
+select pg_temp.registrar('D8. auditoria administrativa: admin sem fator em AAL1 e admin em AAL2 enxergam', '1|1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'select count(*)::text from public.admin_audit_log') || '|' || pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', 'select count(*)::text from public.admin_audit_log'));
-select pg_temp.registrar('D9. acesso por operação (user_operation_access): sem fator em AAL1 não escreve', 'erro 42501',
+select pg_temp.registrar('D9. acesso por operação (user_operation_access): admin sem fator em AAL1 escreve', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$with i as (insert into public.user_operation_access (user_id, operation_id) values ('5a000000-0000-4000-8000-000000000004', '5ac00000-0000-4000-8000-0000000000e1') returning 1) select count(*)::text from i$q$));
 
 -- E. RPCs ----------------------------------------------------------------------------------------
@@ -174,13 +174,18 @@ select pg_temp.registrar('E4. estado do motor: admin em AAL2 ok', 'true', pg_tem
 select pg_temp.registrar('E5. resumo financeiro (leitura): AAL1 sem fator = AAL2, sem erro',
   pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', 'select count(*)::text from public.resumo_financeiro_periodo(date ''2026-01-01'', date ''2026-01-31'', null, null)'),
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'select count(*)::text from public.resumo_financeiro_periodo(date ''2026-01-01'', date ''2026-01-31'', null, null)'));
-select pg_temp.registrar('E6. CRÍTICO negado em AAL1 mesmo SEM fator: ativar motor', 'erro 42501', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select public.alterar_motor_vigencia(true, 'sem mfa', false)::text$q$));
-select pg_temp.registrar('E7. CRÍTICO negado em AAL1 sem fator: gerar fatura', 'erro 42501', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select public.gerar_fatura('5ac00000-0000-4000-8000-0000000000c1', date '2026-04-01', date '2026-04-15')::text$q$));
-select pg_temp.registrar('E8. CRÍTICO negado em AAL1 sem fator: registrar feriado', 'erro 42501', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select public.registrar_feriado(date '2026-12-25', 'Natal', 'Teste sem mfa')::text$q$));
-select pg_temp.registrar('E9. CRÍTICO negado em AAL1 sem fator: registrar condição de contrato (reajuste)', 'erro 42501',
+select pg_temp.registrar('E6. admin sem fator em AAL1 liga o motor (sem step-up)', 'true',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select (public.alterar_motor_vigencia(true, 'sem mfa', false)->>'ativo')$q$));
+select pg_temp.registrar('E7. admin sem fator em AAL1: gerar fatura passa o guard (cliente sem lançamentos: P0002)', 'erro P0002', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select public.gerar_fatura('5ac00000-0000-4000-8000-0000000000c1', date '2026-04-01', date '2026-04-15')::text$q$));
+select pg_temp.registrar('E8. admin sem fator em AAL1: registrar feriado', 'true',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select (public.registrar_feriado(date '2026-12-25', 'Natal', 'Teste sem mfa') is not null)::text$q$));
+select pg_temp.registrar('E9. admin sem fator em AAL1: registrar condição de contrato passa o guard (validação 22023)', 'erro 22023',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select public.registrar_condicao_contrato('5ac00000-0000-4000-8000-0000000000d1', date '2026-05-01', 120, 8, 1, 10, 'Reajuste sem mfa', null, true, null, null, null)::text$q$));
-select pg_temp.registrar('E10. CRÍTICO negado em AAL1 sem fator: sincronizar colunas', 'erro 42501', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select public.sincronizar_colunas_legadas('sem mfa')::text$q$));
-select pg_temp.registrar('E11. CRÍTICO negado em AAL1 sem fator: pendências da implantação', 'erro 42501', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'select count(*)::text from public.pendencias_implantacao_vigencias()'));
+select pg_temp.registrar('E10. admin sem fator em AAL1: sincronizar colunas', '0',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select (public.sincronizar_colunas_legadas('sem mfa')->>'contratos')$q$));
+select pg_temp.registrar('E11. admin sem fator em AAL1: pendências da implantação', '0', pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'select count(*)::text from public.pendencias_implantacao_vigencias()'));
+select pg_temp.registrar('E12. admin sem fator em AAL1 desliga o motor de volta', 'false',
+  pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', $q$select (public.alterar_motor_vigencia(false, 'sem mfa')->>'ativo')$q$));
 select pg_temp.registrar('E12. CRÍTICO em AAL2: o guard passa (o erro, se houver, é de validação, nunca 42501 de MFA)', 'true',
   (pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', $q$select public.registrar_feriado(date '2026-12-25', 'Natal', 'Teste com mfa')::text$q$) <> 'erro 42501')::text);
 select pg_temp.registrar('E13. operacional em AAL2 não chega às RPCs administrativas', 'erro 42501', pg_temp.por('5a000000-0000-4000-8000-000000000005', 'aal2', 'select (public.estado_motor_vigencia() is not null)::text'));
@@ -194,17 +199,17 @@ select pg_temp.registrar('F3. salvar apontamento: operacional negado', 'erro 425
   pg_temp.por('5a000000-0000-4000-8000-000000000004', 'aal1', $q$select public.salvar_apontamento_admin('5ac00000-0000-4000-8000-0000000000e1', '5ac00000-0000-4000-8000-0000000000f1', date '2026-01-10', '[]'::jsonb)::text$q$));
 
 -- I. Colunas financeiras legadas: AAL2 de fato, motor ligado ou desligado ---------------------------------
-select pg_temp.registrar('I1. contrato: admin sem fator em AAL1 NÃO muda a diária (motor desligado)', 'erro 42501',
+select pg_temp.registrar('I1. contrato: admin sem fator em AAL1 muda a diária (motor desligado)', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.contracts set daily_rate = 555 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
-select pg_temp.registrar('I2. colaborador: AAL1 NÃO muda o custo diário', 'erro 42501',
+select pg_temp.registrar('I2. colaborador: AAL1 sem fator muda o custo diário', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.employees set daily_cost = 77 where id = ''5ac00000-0000-4000-8000-0000000000a1'' returning 1) select count(*)::text from u'));
-select pg_temp.registrar('I3. operação: AAL1 NÃO muda o valor acordado', 'erro 42501',
+select pg_temp.registrar('I3. operação: AAL1 sem fator muda o valor acordado', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.operations set agreed_amount = 99 where id = ''5ac00000-0000-4000-8000-0000000000e1'' returning 1) select count(*)::text from u'));
 select pg_temp.registrar('I4. campo cotidiano do mesmo contrato (nome) segue editável em AAL1 sem fator', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with u as (update public.contracts set name = ''K2'' where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
 select pg_temp.registrar('I5. AAL2 (fator verificado) muda a diária legada com o motor desligado', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', 'with u as (update public.contracts set daily_rate = 120 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
-select pg_temp.registrar('I6. fator NÃO verificado não é AAL2: a diária segue bloqueada', 'erro 42501',
+select pg_temp.registrar('I6. fator NÃO verificado equivale a conta sem fator: muda a diária', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000003', 'aal1', 'with u as (update public.contracts set daily_rate = 130 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u'));
 select pg_temp.registrar('I7. operacional (qualquer nível) não muda a diária (a RLS não deixa nem chegar à linha)', '0',
   pg_temp.por('5a000000-0000-4000-8000-000000000004', 'aal2', 'with u as (update public.contracts set daily_rate = 140 where id = ''5ac00000-0000-4000-8000-0000000000d1'' returning 1) select count(*)::text from u') );
@@ -214,21 +219,21 @@ select pg_temp.registrar('I8. o gatilho é independente do motor: os 3 existem e
 select pg_temp.registrar('I9. a função do gatilho não é executável por authenticated nem anon', 'false|false',
   has_function_privilege('authenticated', 'public.exigir_aal2_taxa_legada()', 'execute')::text || '|' ||
   has_function_privilege('anon', 'public.exigir_aal2_taxa_legada()', 'execute')::text);
-select pg_temp.registrar('I10. a diária continua a original depois das tentativas negadas', '120.00',
+select pg_temp.registrar('I10. a diária ficou a do último UPDATE permitido', '130.00',
   (select daily_rate::text from public.contracts where id = '5ac00000-0000-4000-8000-0000000000d1'));
 
 -- I (INSERT). o mesmo vale para a linha que NASCE com taxa informada direto -----------------------------
-select pg_temp.registrar('I11. INSERT de contrato com diária em AAL1 sem fator: negado', 'erro 42501',
+select pg_temp.registrar('I11. INSERT de contrato com diária em AAL1 sem fator: permitido', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.contracts (client_id, name, daily_rate) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins'', 50) returning 1) select count(*)::text from i'));
 select pg_temp.registrar('I12. INSERT de contrato SEM taxa (defaults) em AAL1 sem fator: passa (cotidiano)', '1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.contracts (client_id, name) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins-vazio'') returning 1) select count(*)::text from i'));
-select pg_temp.registrar('I13. INSERT de colaborador com custo diário em AAL1: negado; sem custo: passa', 'erro 42501|1',
+select pg_temp.registrar('I13. INSERT de colaborador com custo em AAL1 sem fator: permitido; sem custo: permitido', '1|1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.employees (name, daily_cost) values (''E-ins'', 80) returning 1) select count(*)::text from i') || '|' ||
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.employees (name) values (''E-ins-vazio'') returning 1) select count(*)::text from i'));
-select pg_temp.registrar('I14. INSERT de operação com valor acordado em AAL1: negado; sem valor: passa', 'erro 42501|1',
+select pg_temp.registrar('I14. INSERT de operação com valor acordado em AAL1 sem fator: permitido; sem valor: permitido', '1|1',
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.operations (client_id, contract_id, name, agreed_amount) values (''5ac00000-0000-4000-8000-0000000000c1'', ''5ac00000-0000-4000-8000-0000000000d1'', ''OP-ins'', 10) returning 1) select count(*)::text from i') || '|' ||
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal1', 'with i as (insert into public.operations (client_id, contract_id, name) values (''5ac00000-0000-4000-8000-0000000000c1'', ''5ac00000-0000-4000-8000-0000000000d1'', ''OP-ins-vazia'') returning 1) select count(*)::text from i'));
-select pg_temp.registrar('I15. INSERT com taxa em AAL2 (fator verificado): passa; com fator só pendente em AAL1: negado', '1|erro 42501',
+select pg_temp.registrar('I15. INSERT com taxa em AAL2 (fator verificado): passa; com fator só pendente em AAL1: passa', '1|1',
   pg_temp.por('5a000000-0000-4000-8000-000000000002', 'aal2', 'with i as (insert into public.contracts (client_id, name, daily_rate) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins2'', 60) returning 1) select count(*)::text from i') || '|' ||
   pg_temp.por('5a000000-0000-4000-8000-000000000003', 'aal1', 'with i as (insert into public.contracts (client_id, name, daily_rate) values (''5ac00000-0000-4000-8000-0000000000c1'', ''K-ins3'', 70) returning 1) select count(*)::text from i'));
 
@@ -246,16 +251,19 @@ select pg_temp.registrar('G4. cada um só enxerga o próprio fator (terceiro nã
   pg_temp.por('5a000000-0000-4000-8000-000000000001', 'aal2', 'select count(*)::text from auth.mfa_factors'));
 
 -- H. Forma ----------------------------------------------------------------------------------------------
-select pg_temp.registrar('H1. condicoes_exigir_admin() segue estrita (AAL2 escrito dentro)', 'true',
-  (select (prosrc ilike '%''aal2''%')::text from pg_proc where proname = 'condicoes_exigir_admin' and pronamespace = 'public'::regnamespace));
-select pg_temp.registrar('H2. gerar_fatura e alterar_motor_vigencia seguem estritas', 'true',
-  (select bool_and(prosrc ilike '%''aal2''%' or prosrc ilike '%condicoes_exigir_admin()%')::text from pg_proc where pronamespace = 'public'::regnamespace and proname in ('gerar_fatura', 'alterar_motor_vigencia')));
-select pg_temp.registrar('H3. nenhuma tabela estrita perdeu a exigência de AAL2', '4',
+select pg_temp.registrar('H1. condicoes_exigir_admin() usa o piso mfa_cotidiano_ok() e não escreve aal2 (034)', 'true',
+  (select (prosrc ilike '%mfa_cotidiano_ok()%' and prosrc not ilike '%''aal2''%')::text from pg_proc where proname = 'condicoes_exigir_admin' and pronamespace = 'public'::regnamespace));
+select pg_temp.registrar('H2. gerar_fatura e alterar_motor_vigencia usam o piso (direto ou via guard) e nenhum escreve aal2', 'true',
+  (select bool_and((prosrc ilike '%mfa_cotidiano_ok()%' or prosrc ilike '%condicoes_exigir_admin()%') and prosrc not ilike '%''aal2''%')::text from pg_proc where pronamespace = 'public'::regnamespace and proname in ('gerar_fatura', 'alterar_motor_vigencia')));
+select pg_temp.registrar('H3. nenhuma policy restritiva de motor, auditoria ou acesso por operação lê aal2 cru; todas usam mfa_cotidiano_ok', '0|4',
   (select count(*)::text from pg_policy p join pg_class c on c.oid = p.polrelid where c.relnamespace = 'public'::regnamespace and not p.polpermissive
-     and c.relname in ('financial_engine_settings', 'financial_terms_audit', 'admin_audit_log', 'user_operation_access') and pg_get_expr(p.polqual, p.polrelid) ilike '%aal2%'));
-select pg_temp.registrar('H4. escrita em invoices/invoice_items: 3 policies estritas cada (insert, update, delete)', '6',
+     and c.relname in ('financial_engine_settings', 'financial_terms_audit', 'admin_audit_log', 'user_operation_access') and pg_get_expr(p.polqual, p.polrelid) ilike '%aal2%')
+  || '|' ||
   (select count(*)::text from pg_policy p join pg_class c on c.oid = p.polrelid where c.relnamespace = 'public'::regnamespace and not p.polpermissive
-     and c.relname in ('invoices', 'invoice_items') and p.polcmd::text in ('a', 'w', 'd') and coalesce(pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid)) ilike '%aal2%'));
+     and c.relname in ('financial_engine_settings', 'financial_terms_audit', 'admin_audit_log', 'user_operation_access') and pg_get_expr(p.polqual, p.polrelid) ilike '%mfa_cotidiano_ok%'));
+select pg_temp.registrar('H4. escrita em invoices/invoice_items: 3 policies cada (insert, update, delete) usam mfa_cotidiano_ok', '6',
+  (select count(*)::text from pg_policy p join pg_class c on c.oid = p.polrelid where c.relnamespace = 'public'::regnamespace and not p.polpermissive
+     and c.relname in ('invoices', 'invoice_items') and p.polcmd::text in ('a', 'w', 'd') and coalesce(pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid)) ilike '%mfa_cotidiano_ok%'));
 select pg_temp.registrar('H5. helpers: anônimo não executa; o guard de leitura não é chamável por authenticated', 'false|false',
   has_function_privilege('anon', 'public.mfa_cotidiano_ok()', 'execute')::text || '|' || has_function_privilege('authenticated', 'public.condicoes_exigir_admin_leitura()', 'execute')::text);
 select pg_temp.registrar('H6. o aplicativo (authenticated) executa o helper do piso', 'true',

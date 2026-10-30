@@ -3,7 +3,7 @@
  *
  * Nada aqui fala com o banco nem importa módulo em tempo de execução: a suíte
  * `test:interfaces-vigencia` executa este arquivo de verdade. O banco continua sendo a
- * barreira (RLS, triggers e RPCs com admin AAL2); este módulo só decide O QUE A TELA OFERECE
+ * barreira (RLS, triggers e RPCs com admin); este módulo só decide O QUE A TELA OFERECE
  * e COMO ELA EXPLICA, sempre do lado seguro.
  *
  * O ponto central é o ESTADO DO MOTOR. Ele tem quatro valores, e só `desligado` libera a

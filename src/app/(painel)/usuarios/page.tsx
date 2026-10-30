@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { exigirAdminAal2Tela } from "../_exigir-admin";
+import { exigirAdmin } from "../_exigir-admin";
 import { PainelUsuarios } from "./painel-usuarios";
 
 export const metadata: Metadata = {
@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 
 export default async function Usuarios() {
   // Bloqueio server-side: a tela nem chega a existir na árvore quando a
-  // sessão não é de administrador em AAL2 — mesmo padrão das outras sete
+  // sessão não é de administrador — mesmo padrão das outras sete
   // telas administrativas.
-  const bloqueio = await exigirAdminAal2Tela();
+  const bloqueio = await exigirAdmin();
   if (bloqueio) return bloqueio;
 
   return <PainelUsuarios />;

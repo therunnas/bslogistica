@@ -95,18 +95,20 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   administrador restante.
 - **Alteração de usuário ou papel é auditada.** A auditoria é _best-effort_: não
   afirmar cobertura transacional.
-- **MFA TOTP é OPCIONAL para `admin` e para `operacional`** (AUTH-01B). Conta sem
-  fator verificado trabalha em AAL1 no uso cotidiano; cada titular ativa e desativa
-  o próprio fator em Configurações > Segurança. **Opcional não é dispensável**:
-  quem ativou continua obrigado a concluir o TOTP no login. Nenhum papel entra no
-  painel com estado de MFA desconhecido.
-- **As operações críticas continuam exigindo AAL2 DE FATO**, no servidor e no
-  banco: financeiro crítico (faturar, reajustar, motor e sua reversão),
-  administração de usuários e papéis, auditoria e configuração do motor. "Liberado"
-  **não** implica AAL2: quem protege uma operação crítica olha o `nivel` de
-  `lerAcesso()` (`exigirAdminAal2`, `exigirAdminAal2Tela`) e, no banco,
-  `condicoes_exigir_admin()`/policies estritas. A classificação A/B/C/D está em
-  [docs/SEGURANCA.md](docs/SEGURANCA.md); na dúvida, fica a proteção mais forte.
+- **MFA TOTP é OPCIONAL para `admin` e para `operacional` e protege só o LOGIN e a
+  própria conta** (AUTH-01D.R1). Sem fator: e-mail e senha e todas as funcionalidades
+  do papel. Com fator: TOTP em todo novo login, sessão AAL1 barrada no app e no banco,
+  e depois do TOTP tudo do papel, **sem novo código por operação**. **Opcional não é
+  dispensável**: quem ativou continua obrigado a concluir o TOTP no login. Nenhum
+  papel entra no painel com estado de MFA desconhecido.
+- **Nenhuma funcionalidade exige AAL2.** Os guards (`exigirAdmin`, `exigirAdminAtor`)
+  conferem sessão liberada e papel; no banco `condicoes_exigir_admin()`, `gerar_fatura`
+  e as policies usam `mfa_cotidiano_ok()` (034). **Não reintroduzir exigência de AAL2
+  por função.** Única exceção: desativar o PRÓPRIO fator pede código novo
+  (`challengeAndVerify` antes de `unenroll`), imposto só pela interface — o GoTrue
+  exige apenas AAL2 para o `unenroll`, limite registrado em
+  [docs/SEGURANCA.md](docs/SEGURANCA.md). Risco assumido: conta sem MFA fica protegida
+  só pela senha; recomenda-se que admins ativem.
 - **Conta com MFA ativo exige TOTP no login.** Não existe caminho que aceite só a
   senha para uma conta com fator verificado.
 - **Recovery de conta com MFA exige um TOTP — e apenas um.** Depois de uma
@@ -151,11 +153,12 @@ implementar isso só no guard ou no frontend:** o enforcement do banco é o que 
 - Todas as tabelas de `public` têm RLS ativa. Autorização em SQL usa
   `public.has_role()` e `public.is_staff()`; **`is_staff()` vale para qualquer
   papel atribuído**, não separa `admin` de `operacional`.
-- **O MFA também é exigido no banco**, por classe (migration 032): as tabelas de uso
-  cotidiano aceitam `mfa_cotidiano_ok()` (AAL2, ou AAL1 de conta SEM fator
-  verificado); escrita em faturas, vigências, auditoria, motor e identidade segue
-  RESTRICTIVE pedindo `aal2` de fato. **Não substituir as policies estritas por uma
-  exceção ampla**: derrubá-las reabre a exposição financeira.
+- **O piso de MFA vale no banco** (migrations 032 e 034): todas as policies e funções
+  usam `mfa_cotidiano_ok()` (AAL2 se a conta tem fator verificado; AAL1 se não tem;
+  sessão inválida nega). Os nomes `*_exige_aal2` são históricos. **Papel continua
+  sendo exigido em tudo** (`has_role`, `*_exige_admin`). A proteção da 033
+  (INSERT de taxa legada exige vigência com o motor ligado) é independente e não
+  deve ser removida numa reversão do MFA.
 - **Acesso direto também exige `admin`.** Uma RESTRICTIVE `*_exige_admin` por
   tabela faz o acesso direto de `authenticated` exigir **`aal2` e `admin`**. O
   `operacional` lê zero linha de tabela de negócio pelo PostgREST, em qualquer
@@ -163,12 +166,12 @@ implementar isso só no guard ou no frontend:** o enforcement do banco é o que 
 - **A CSP está em enforcement** (nonce por requisição, montada em `src/proxy.ts`).
   Não afrouxar nem voltar para `report-only`; ver
   [docs/SEGURANCA.md](docs/SEGURANCA.md).
-- **`user_roles` fica fora do enforcement de AAL2, de propósito.** O guard lê o
+- **`user_roles` fica fora do enforcement de MFA, de propósito.** O guard lê o
   papel em AAL1, antes do MFA; bloquear a tabela cria deadlock. Não adicionar
-  policy de AAL2 nela. Ficam de fora também `profiles` e `user_operation_access`.
+  policy de MFA nela.
 - **Função `SECURITY DEFINER` roda acima da RLS**, então policy não a protege: a
-  exigência de `aal2` e de papel precisa estar escrita dentro da função, como em
-  `gerar_fatura`. Vale para toda RPC nova com `SECURITY DEFINER`.
+  exigência do piso de MFA (`mfa_cotidiano_ok()`) e de papel precisa estar escrita
+  dentro da função, como em `gerar_fatura`. Vale para toda RPC nova com `SECURITY DEFINER`.
 
 ### A superfície operacional (RPC)
 

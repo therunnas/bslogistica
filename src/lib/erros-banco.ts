@@ -42,13 +42,13 @@ export function ehTurnoProtegido(erro: unknown): boolean {
 }
 
 /**
- * O segundo fator é opcional (AUTH-01B), mas as operações financeiras críticas o exigem. A recusa do
- * banco chega como `42501`, com o texto do guard ("Autenticação de dois fatores obrigatória.") ou
- * com o nome da policy estrita (`*_exige_aal2`) quando a escrita é direta. Em ambos os casos a
- * orientação é a mesma: ativar o fator em Segurança.
+ * O segundo fator protege só o login (AUTH-01D.R1): nenhuma operação o exige. A única recusa de MFA
+ * que o banco ainda emite é a de uma sessão AAL1 de conta COM fator verificado (TOTP pendente), que
+ * chega como `42501`, com o texto do guard ("Autenticação de dois fatores obrigatória.") ou com o
+ * nome da policy (`*_exige_aal2`, nome histórico). A saída é concluir o desafio no login.
  */
 export const MENSAGEM_EXIGE_SEGUNDO_FATOR =
-  "Esta operação exige a verificação em duas etapas. Ative em Segurança (menu da conta) e tente novamente.";
+  "Sua sessão ainda não concluiu a verificação em duas etapas. Saia e entre novamente, informando o código do aplicativo autenticador.";
 
 function ehExigenciaDeSegundoFator(e: { code?: unknown }, mensagem: string): boolean {
   return e.code === "42501" && /dois fatores|exige_aal2/i.test(mensagem);

@@ -65,8 +65,8 @@ export const PARAMETROS_ACEITOS = ["cliente", "inicio", "fim"] as const;
 
 /**
  * Quem pode chamar. Recebe a `situacao` de `lerAcesso()` (a única decisão de
- * acesso do projeto) e se o papel é `admin`. `liberado` já implica AAL2 para o
- * admin, então não há segunda checagem de nível aqui — recriá-la é como se
+ * acesso do projeto) e se o papel é `admin`. `liberado` já inclui o TOTP quando a
+ * conta tem fator, então não há segunda checagem de nível aqui — recriá-la é como se
  * produz duas definições de "liberado".
  */
 export function decidirAcesso(situacao: string, ehAdmin: boolean): RespostaDeErro | null {

@@ -644,9 +644,9 @@ const migrations = readdirSync("supabase/migrations")
   .filter((f) => f.endsWith(".sql"))
   .sort();
 verificar(
-  "G1. a 030 existe, a 033 (taxas legadas exigem vigência, AUTH-01C.1) é a última migration e a 019 continua ausente",
+  "G1. a 030 existe, a 034 (MFA só no login, AUTH-01D.R1) é a última migration e a 019 continua ausente",
   [migrations.includes(NOME), migrations.at(-1), migrations.some((m) => m.includes("_019_"))],
-  [true, "20261031120000_033_taxa_legada_exige_vigencia.sql", false],
+  [true, "20261101120000_034_mfa_somente_login.sql", false],
 );
 verificar(
   "G2. arredondamento só na COBRANÇA: o custo usa o excedente exato; o feriado só no custo",

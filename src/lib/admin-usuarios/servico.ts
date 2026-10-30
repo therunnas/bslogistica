@@ -8,7 +8,7 @@
  *
  * Nenhuma função aqui decide AUTORIZAÇÃO — isso é `autorizacao.ts`, chamado
  * antes, em `_acoes.ts`. Estas funções assumem que quem as chama já provou
- * ser admin em AAL2, e recebem o `ator` só para carimbar a auditoria.
+ * ser admin, e recebem o `ator` só para carimbar a auditoria.
  */
 
 import {
@@ -191,7 +191,7 @@ export async function alterarPapel(
  * 1. `revogarTodosOsPapeis` — o ÚNICO passo que o banco pode recusar (último
  *    admin). Se recusar, nada mais é tentado: zero efeito colateral.
  * 2. `removerTodasAsAtribuicoes` — `user_operation_access` via RLS (sessão do
- *    admin, não `service_role`: a tabela já concede `FOR ALL` a admin+AAL2
+ *    admin, não `service_role`: a tabela já concede `FOR ALL` a admin
  *    desde a 013).
  * 3. `banirUsuario`.
  *

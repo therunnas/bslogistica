@@ -8,7 +8,7 @@ import { toast } from "@/lib/notificacoes";
 import { lerConsultaPaginada } from "@/lib/paginacao";
 
 /**
- * Camada de dados dos adicionais de serviço (migration 029). Leitura direta (RLS: admin AAL2) e
+ * Camada de dados dos adicionais de serviço (migration 029). Leitura direta (RLS: admin) e
  * escrita só pelas RPCs; o banco recusa qualquer escrita direta na tabela.
  */
 

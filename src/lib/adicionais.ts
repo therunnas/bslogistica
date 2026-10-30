@@ -5,7 +5,7 @@
  * valores extras no período SEM alterar a diária padrão e sem criar outra diária. Cada adicional
  * tem motivo, valor, referência, período, cliente e, opcionalmente, a operação.
  *
- * O banco é a barreira: `registrar_adicional` e `cancelar_adicional` (admin AAL2, trilha),
+ * O banco é a barreira: `registrar_adicional` e `cancelar_adicional` (admin, trilha),
  * tabela sem escrita direta, adicional faturado imutável, e `gerar_fatura` que soma os adicionais
  * do período. Este módulo só valida o formulário, monta os parâmetros e reproduz, para a prévia,
  * o mesmo critério de elegibilidade da fatura.

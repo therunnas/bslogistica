@@ -155,8 +155,8 @@ const hook = dados.slice(dados.indexOf("export function useImplantacaoDasVigenci
 const shell = ler("src/app/(painel)/_components/app-shell.tsx");
 
 verificar(
-  "C1. a página chama o guard crítico (exigirAdminAal2Tela) ANTES de renderizar o painel",
-  /const bloqueio = await exigirAdminAal2Tela\(\);\s+if \(bloqueio\) return bloqueio;[\s\S]*?return \(\s*<PainelImplantacaoVigencias/.test(
+  "C1. a página chama o guard crítico (exigirAdmin) ANTES de renderizar o painel",
+  /const bloqueio = await exigirAdmin\(\);\s+if \(bloqueio\) return bloqueio;[\s\S]*?return \(\s*<PainelImplantacaoVigencias/.test(
     page,
   ),
   true,

@@ -38,6 +38,8 @@ import {
   faseAposListarFatores,
   papelTemAcessoAConfiguracoes,
   textoSemFator,
+  codigoTotpCompleto,
+  mensagemDeCodigoInvalido,
 } from "../src/app/(painel)/configuracoes/_dominio.ts";
 
 let passou = 0;
@@ -133,9 +135,33 @@ verificar("B6. operacional tem acesso à rota", papelTemAcessoAConfiguracoes("op
 verificar("B7. sem-papel NÃO tem acesso à rota", papelTemAcessoAConfiguracoes("sem-papel"), false);
 
 verificar(
-  "B8. o texto do admin explica o que continua fechado sem o fator (operações críticas)",
-  /críticas/i.test(textoSemFator("admin").corpo),
-  true,
+  "B8. o texto do admin diz que nada depende do fator e que a conta fica só com a senha (AUTH-01D.R1)",
+  String([
+    /nenhuma função/i.test(textoSemFator("admin").corpo),
+    /apenas pela senha/i.test(textoSemFator("admin").corpo),
+    /críticas/i.test(textoSemFator("admin").corpo),
+  ]),
+  "true,true,false",
+);
+verificar(
+  "B10. código TOTP da desativação: exatamente seis dígitos (AUTH-01D.R1)",
+  String(
+    ["123456", " 123456 ", "12345", "1234567", "12345a", "", "000000"].map((c) =>
+      codigoTotpCompleto(c),
+    ),
+  ),
+  "true,true,false,false,false,false,true",
+);
+verificar(
+  "B11. código recusado pelo Supabase vira texto claro; outros erros mantêm a mensagem",
+  [
+    mensagemDeCodigoInvalido({
+      code: "mfa_verification_failed",
+      message: "Invalid TOTP code entered",
+    }),
+    mensagemDeCodigoInvalido({ message: "Failed to fetch" }),
+  ].join(" | "),
+  "Código inválido. Confira o aplicativo autenticador e tente novamente. | Failed to fetch",
 );
 verificar(
   "B9. o texto para operacional diz que é opcional",
@@ -287,9 +313,9 @@ verificar(
   true,
 );
 verificar(
-  "E11. o desafio de quem está entrando continua só em /mfa — esta tela não chama challengeAndVerify fora do fluxo de ativação nova",
+  "E11. o desafio de quem está entrando continua só em /mfa — esta tela só chama challengeAndVerify na ativação nova e na confirmação da desativação (2 chamadas)",
   (semComentarios(fontes.painel).match(/challengeAndVerify/g) ?? []).length,
-  1,
+  2,
 );
 
 console.log("\nF. Desativação de MFA — autosserviço do operacional, achado P1 do Codex\n");
@@ -311,11 +337,10 @@ verificar(
   true,
 );
 verificar(
-  "F4. a desativação exige confirmação por AlertDialog, não window.confirm",
+  "F4. a desativação exige confirmação por AlertDialog com campo de código de seis dígitos, não window.confirm",
   /<AlertDialog open=\{confirmando\}/.test(fontes.painel) &&
-    /<AlertDialogAction onClick=\{\(\) => void desativar\(\)\}>Desativar<\/AlertDialogAction>/.test(
-      fontes.painel,
-    ),
+    /id="codigo-desativacao"/.test(fontes.painel) &&
+    /codigoTotpCompleto\(codigo\)/.test(fontes.painel),
   true,
 );
 verificar(
@@ -324,8 +349,28 @@ verificar(
   false,
 );
 verificar(
-  "F5. a desativação usa supabase.auth.mfa.unenroll, a API oficial",
-  /async function desativar\(\)[\s\S]{0,300}supabase\.auth\.mfa\.unenroll\(\{ factorId: fator\.id \}\)/.test(
+  "F5. a desativação verifica um código NOVO (challengeAndVerify do fator que será removido) ANTES de chamar unenroll",
+  (() => {
+    const f =
+      semComentarios(fontes.painel).match(
+        /async function desativar\([\s\S]*?\n  \}\n\n  return \(/,
+      )?.[0] ?? "";
+    const iv = f.indexOf("mfa.challengeAndVerify({\n      factorId: fator.id");
+    const iu = f.indexOf("mfa.unenroll({ factorId: fator.id })");
+    return iv > 0 && iu > iv;
+  })(),
+  true,
+);
+verificar(
+  "F5b. código inválido: avisa, limpa o campo e SAI antes do unenroll (nada é removido)",
+  /if \(erroVerificacao\) \{[\s\S]{0,260}?return;\s*\}\s*\/\/ 2\. Só depois da verificação, a remoção\./.test(
+    fontes.painel,
+  ),
+  true,
+);
+verificar(
+  "F5c. o limite do Supabase está documentado no próprio componente (o servidor só exige AAL2 para unenroll)",
+  /LIMITE REAL DO SUPABASE[\s\S]{0,400}imposta por ESTA INTERFACE, não pelo servidor Auth/.test(
     fontes.painel,
   ),
   true,
@@ -350,7 +395,7 @@ verificar(
 );
 verificar(
   "F9. falha do unenroll NÃO mostra sucesso nem relê fatores — sai antes de aoRemover()",
-  /if \(erroUnenroll\) \{\s*toast\.error\(erroUnenroll\.message\);\s*setRemovendo\(false\);\s*return;\s*\}/.test(
+  /if \(erroUnenroll\) \{\s*toast\.error\(erroUnenroll\.message\);\s*setCodigo\(""\);\s*setRemovendo\(false\);\s*return;\s*\}/.test(
     fontes.painel,
   ),
   true,
@@ -417,17 +462,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. conjunto de migrations contém 38 arquivos, até a 033 (taxas legadas exigem vigência com o motor ligado, AUTH-01C.1), a 032 (MFA opcional, AUTH-01B) e, antes dela, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
+  "G10. conjunto de migrations contém 39 arquivos, até a 034 (MFA protege só o login, AUTH-01D.R1), a 033 (taxas legadas exigem vigência com o motor ligado, AUTH-01C.1), a 032 (MFA opcional, AUTH-01B) e, antes dela, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  38,
+  39,
 );
 verificar(
-  "G10b. a migration mais recente é a 033 (taxas legadas exigem vigência, AUTH-01C.1)",
+  "G10b. a migration mais recente é a 034 (MFA protege só o login, AUTH-01D.R1)",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_033_"),
+    .includes("_034_"),
   true,
 );
 

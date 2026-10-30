@@ -908,12 +908,15 @@ begin
          ~ '(has_role|is_staff)\(';
   perform pg_temp.registrar('H-F8. nenhuma chamada a has_role()/is_staff() solta (por linha) nas policies', '0', _sobra::text);
 
-  perform pg_temp.registrar('H-F9. as 6 policies ESTRITAS de escrita de invoices/invoice_items seguem lendo so o claim aal', '6',
+  perform pg_temp.registrar('H-F9. AUTH-01D.R1: as 6 policies de escrita de invoices/invoice_items agora so olham mfa_cotidiano_ok() (nenhuma policy de public le o claim aal2 cru)', '6|0',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and policyname ~ '^(invoices|invoice_items)_(insert|update|delete)_exige_aal2$'
         and permissive = 'RESTRICTIVE'
-        and (qual = '(( SELECT (auth.jwt() ->> ''aal''::text)) = ''aal2''::text)'
-          or with_check = '(( SELECT (auth.jwt() ->> ''aal''::text)) = ''aal2''::text)')));
+        and coalesce(qual, '') || coalesce(with_check, '') like '%mfa_cotidiano_ok%'
+        and coalesce(qual, '') || coalesce(with_check, '') not like '%aal2%')
+    || '|' ||
+    (select count(*)::text from pg_policies
+      where schemaname = 'public' and coalesce(qual, '') || coalesce(with_check, '') like '%''aal2''%'));
   perform pg_temp.registrar('H-F10. as 9 *_exige_aal2 cotidianas so olham mfa_cotidiano_ok() (AAL2 ou AAL1 de conta sem fator)', '9',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and policyname like '%\_exige\_aal2' and permissive = 'RESTRICTIVE' and cmd = 'ALL'

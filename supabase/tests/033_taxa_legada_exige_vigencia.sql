@@ -123,9 +123,9 @@ select pg_temp.registrar('A3. AAL2: INSERT de operação com valor acordado pass
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000001', 'aal2', $q$with i as (insert into public.operations (client_id, name, agreed_amount) values ('5bc00000-0000-4000-8000-0000000000c1', 'A3 op', 70) returning 1) select count(*)::text from i$q$));
 select pg_temp.registrar('A4. AAL2: UPDATE direto da diária passa com o motor desligado', '1',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000001', 'aal2', $q$with u as (update public.contracts set daily_rate = 105 where id = '5bc00000-0000-4000-8000-0000000000d1' returning 1) select count(*)::text from u$q$));
-select pg_temp.registrar('A5. AAL1 sem fator: INSERT com diária segue negado (032)', 'erro 42501',
+select pg_temp.registrar('A5. AAL1 sem fator: INSERT com diária passa com o motor desligado (AUTH-01D.R1: o MFA só protege o login)', '1',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000002', 'aal1', pg_temp.ins_contrato('A5 contrato', 60)));
-select pg_temp.registrar('A6. AAL1 sem fator: UPDATE da diária segue negado (032)', 'erro 42501',
+select pg_temp.registrar('A6. AAL1 sem fator: UPDATE da diária passa com o motor desligado', '1',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000002', 'aal1', $q$with u as (update public.contracts set daily_rate = 106 where id = '5bc00000-0000-4000-8000-0000000000d1' returning 1) select count(*)::text from u$q$));
 select pg_temp.registrar('A7. AAL1 sem fator: contrato sem taxa continua cotidiano', '1',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000002', 'aal1', $q$with i as (insert into public.contracts (client_id, name) values ('5bc00000-0000-4000-8000-0000000000c1', 'A7 sem taxa') returning 1) select count(*)::text from i$q$));
@@ -150,7 +150,7 @@ select pg_temp.registrar('B3. AAL2: INSERT direto de operação com valor acorda
 select pg_temp.registrar('B3b. a linha não nasceu', '0', pg_temp.n('operations', 'B3 op'));
 select pg_temp.registrar('B4. contrato com outro campo financeiro fora do default (jornada 9) e sem vigência: 55000', 'erro 55000',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000001', 'aal2', $q$with i as (insert into public.contracts (client_id, name, shift_hours) values ('5bc00000-0000-4000-8000-0000000000c1', 'B4 contrato', 9) returning 1) select count(*)::text from i$q$));
-select pg_temp.registrar('B5. AAL1 sem fator: INSERT com diária segue negado (42501, 032)', 'erro 42501',
+select pg_temp.registrar('B5. AAL1 sem fator: INSERT com diária sem vigência segue recusado com o motor LIGADO (033, 55000)', 'erro 55000',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000002', 'aal1', pg_temp.ins_contrato('B5 contrato', 60)));
 select pg_temp.registrar('B6. AAL2: UPDATE direto da diária segue recusado (55000, 025)', 'erro 55000',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000001', 'aal2', $q$with u as (update public.contracts set daily_rate = 999 where id = '5bc00000-0000-4000-8000-0000000000d1' returning 1) select count(*)::text from u$q$));
@@ -178,7 +178,7 @@ select pg_temp.registrar('C3. criar_operacao_com_vigencia (AAL2) funciona', '1',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000001', 'aal2', $q$select count(*)::text from (select public.criar_operacao_com_vigencia('5bc00000-0000-4000-8000-0000000000c1', 'fixed', 'C3 op', null, date '2026-01-01', 'active', null, 75, date '2026-01-01', 'AUTH01C1')) x$q$));
 select pg_temp.registrar('C3b. a vigência do valor acordado existe e o espelho legado é igual', '1|75.00|75.00',
   (select count(*)::text || '|' || min(o.agreed_amount)::text || '|' || min(t.agreed_amount)::text from public.operations o join public.operation_terms t on t.operation_id = o.id where o.name = 'C3 op'));
-select pg_temp.registrar('C4. criar_contrato_com_vigencia em AAL1 sem fator: negado, nada nasce', 'erro 42501|0',
+select pg_temp.registrar('C4. criar_contrato_com_vigencia em AAL1 sem fator: funciona (a vigência é a barreira, não o MFA)', '1|1',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000002', 'aal1', $q$select count(*)::text from (select public.criar_contrato_com_vigencia('5bc00000-0000-4000-8000-0000000000c1', 'C4 contrato', date '2026-01-01', null, 'active', 130, 8, 1.5, 10, 'x')) x$q$) || '|' || pg_temp.n('contracts', 'C4 contrato'));
 select pg_temp.registrar('C5. cadastro com vigência inválida (motivo vazio) desfaz a entidade (atomicidade)', 'erro 22023|0',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000001', 'aal2', $q$select count(*)::text from (select public.criar_contrato_com_vigencia('5bc00000-0000-4000-8000-0000000000c1', 'C5 contrato', date '2026-01-01', null, 'active', 130, 8, 1.5, 10, '  ')) x$q$) || '|' || pg_temp.n('contracts', 'C5 contrato'));
@@ -244,7 +244,7 @@ select pg_temp.registrar('F4. a 032 segue instalada (helper e gatilhos AAL2)', '
 select pg_temp.registrar('F5. motor DESLIGADO de novo: a regra da 033 deixa de agir (INSERT com taxa em AAL2 passa)', 'true|1',
   (select (pg_temp.por('5b000000-0000-4000-8000-000000000001', 'aal2', $q$select public.alterar_motor_vigencia(false, 'AUTH01C.1 teste reverso')::text$q$) not like 'erro%')::text)
   || '|' || pg_temp.com_commit('5b000000-0000-4000-8000-000000000001', 'aal2', pg_temp.ins_contrato('F5 contrato', 44)));
-select pg_temp.registrar('F6. com o motor desligado AAL1 sem fator segue sem poder informar taxa', 'erro 42501',
+select pg_temp.registrar('F6. com o motor desligado AAL1 sem fator informa taxa', '1',
   pg_temp.com_commit('5b000000-0000-4000-8000-000000000002', 'aal1', pg_temp.ins_contrato('F6 contrato', 45)));
 
 -- ---------------------------------------------------------------------------

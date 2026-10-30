@@ -33,7 +33,7 @@ import { ligarMotorAction } from "./_acoes";
  * Controle de ativação do motor por vigência (C05-B8.6).
  *
  * Não liga nada ao carregar: só o clique de confirmação, com motivo e a frase exata, dispara a
- * Server Action. Quem decide é o servidor (admin em AAL2) e o banco; esta tela só pede e mostra o
+ * Server Action. Quem decide é o servidor (admin) e o banco; esta tela só pede e mostra o
  * resultado real. Nunca se aceita pendência. A reversão (RB-01) mora em `DesligarMotor`, montado
  * só no ramo em que o motor está comprovadamente ligado.
  */

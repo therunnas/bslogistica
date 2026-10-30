@@ -30,7 +30,7 @@ import { desligarMotorAction } from "./_acoes";
  * LIGADO (`AtivarMotor` o renderiza no ramo "ligado").
  *
  * Não desliga nada ao carregar: só o clique de confirmação, com motivo e a frase exata, dispara a
- * Server Action. Quem decide é o servidor (admin em AAL2, trava própria da reversão) e o banco.
+ * Server Action. Quem decide é o servidor (admin, trava própria da reversão) e o banco.
  * Esta tela só pede e mostra o resultado real, e relê o estado em qualquer desfecho.
  */
 export function DesligarMotor({ habilitada }: { habilitada: boolean }) {

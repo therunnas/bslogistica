@@ -280,7 +280,7 @@ const trecho = acao.slice(acao.indexOf("export async function desligarMotorActio
 const ordem = (t, a, b) => t.indexOf(a) > -1 && t.indexOf(a) < t.indexOf(b);
 verificar(
   "F3. a ação exige admin AAL2 ANTES da trava, e a trava ANTES de criar o cliente do banco",
-  ordem(trecho, "exigirAdminAal2()", "reversaoHabilitada(") &&
+  ordem(trecho, "exigirAdminAtor()", "reversaoHabilitada(") &&
     ordem(trecho, "reversaoHabilitada(", "criarClienteServidor()"),
   true,
 );

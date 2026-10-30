@@ -67,6 +67,16 @@ insert into auth.sessions (id, user_id, not_after) values
 insert into public.user_roles (user_id, role) values
   ('5c0c0000-0000-4000-8000-0000000000b1', 'admin'),
   ('5c0c0000-0000-4000-8000-0000000000b2', 'operacional');
+
+-- AUTH-01D.R1: o admin desta fixture TEM fator verificado. "Admin em AAL1" segue significando TOTP
+-- pendente (barrado no banco). Conta SEM fator em AAL1 trabalha normalmente: ver 034_mfa_somente_login.sql.
+insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+  select gen_random_uuid(), ur.user_id, 'fixture AUTH01D', 'totp', 'verified', now(), now()
+    from public.user_roles ur
+    join auth.users u on u.id = ur.user_id
+   where ur.role = 'admin'
+     and not exists (select 1 from auth.mfa_factors f where f.user_id = ur.user_id);
+
 insert into public.clients (id, name) values ('5c0cc000-0000-4000-8000-0000000000cb', 'C05B5 cliente');
 
 -- Dados que NÃO podem mudar (apontamento e fatura existentes, criados antes de tudo).

@@ -38,24 +38,38 @@ export interface TextoDoEstado {
 }
 
 /**
- * A verificação em duas etapas é OPCIONAL para os dois papéis (AUTH-01B). O texto da ausência de
- * fator só difere no que o admin ainda perde sem ela: as áreas críticas (administração de usuários,
- * implantação financeira) e as operações financeiras críticas (faturar, reajustar, motor) exigem o
- * fator de verdade, e sem ele ficam fechadas.
+ * O texto de ausência de fator é o mesmo para os dois papéis (AUTH-01D.R1): o segundo fator protege só
+ * o login e a própria conta, e nenhuma funcionalidade o exige. Ativá-lo é uma recomendação, sobretudo
+ * para administradores: sem ele a conta fica protegida apenas pela senha.
  */
 export function textoSemFator(papel: PapelEfetivo): TextoDoEstado {
   if (papel === "admin") {
     return {
       titulo: "Verificação em duas etapas não configurada",
       corpo:
-        "É opcional para o uso diário: você pode continuar entrando só com a senha. Sem ela, porém, as operações críticas ficam fechadas: administração de usuários, faturamento e reajustes financeiros. Ative para liberá-las. Depois de ativar, todo acesso passa a pedir o código do seu aplicativo autenticador.",
+        "É opcional e nenhuma função do sistema depende dela. Sem ela, sua conta fica protegida apenas pela senha; recomendamos ativar. Depois de ativar, todo login passa a pedir o código do seu aplicativo autenticador.",
     };
   }
   return {
     titulo: "Verificação em duas etapas não configurada",
     corpo:
-      "É opcional: você pode continuar usando o sistema sem ativar. Se ativar, os próximos acessos vão pedir o código do seu aplicativo autenticador.",
+      "É opcional: você pode continuar usando o sistema sem ativar. Se ativar, todo login passa a pedir o código do seu aplicativo autenticador.",
   };
+}
+
+/** O código TOTP tem exatamente seis dígitos; qualquer outra coisa nem chega ao Supabase. */
+export function codigoTotpCompleto(codigo: string): boolean {
+  return /^[0-9]{6}$/.test(codigo.trim());
+}
+
+/** Código recusado pelo Supabase vira texto claro; outros erros mantêm a mensagem original. */
+export function mensagemDeCodigoInvalido(erro: {
+  code?: string | undefined;
+  message: string;
+}): string {
+  return erro.code === "mfa_verification_failed"
+    ? "Código inválido. Confira o aplicativo autenticador e tente novamente."
+    : erro.message;
 }
 
 /** O fator só é gerenciado pelo próprio titular: nada aqui recebe um identificador de outra conta. */

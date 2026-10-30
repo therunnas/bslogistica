@@ -54,7 +54,7 @@ function BadgeDeSituacao({ usuario }: { usuario: UsuarioAdministrativo }) {
  *
  * Consome exclusivamente o backend do PR D, por `_hooks.ts` -> `_acoes.ts`.
  * Nenhuma decisão de autorização mora aqui: `page.tsx` já bloqueou quem não é
- * admin em AAL2 antes deste componente existir na árvore, e cada Server
+ * admin antes deste componente existir na árvore, e cada Server
  * Action revalida tudo de novo do lado do servidor.
  */
 export function PainelUsuarios() {

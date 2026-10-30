@@ -127,11 +127,10 @@ export function interpretarBloqueioDeExcecao(data: unknown, houveErro: boolean):
  *    AAL1**: MFA opcional não é MFA dispensável;
  * 6. `aal1` sem fator verificado -> `liberado`, para os DOIS papéis.
  *
- * AUTH-01B: o MFA é opcional para `admin` e para `operacional`. Não há mais assimetria entre os
- * papéis. "Liberado" em AAL1 é só o uso cotidiano: o que o aplicativo e o banco classificaram como
- * crítico (financeiro, motor, identidade, auditoria) continua exigindo AAL2 DE FATO — por isso
- * `lerAcesso()` devolve também o `nivel`, e nenhum guard crítico pode tratar "liberado" como AAL2.
- * Com fator verificado nada muda: o passo 5 barra em AAL1 até o TOTP, "opcional" não é dispensável.
+ * AUTH-01D.R1: o MFA é opcional para `admin` e para `operacional` e protege só o LOGIN. "Liberado"
+ * vale para qualquer funcionalidade do papel: nenhuma operação exige AAL2 nem novo código (a única
+ * exceção, desativar o próprio fator, é imposta pela interface de Configurações). Com fator
+ * verificado nada muda no login: o passo 5 barra em AAL1 até o TOTP, "opcional" não é dispensável.
  *
  * `admin` + `operacional` não aparece aqui porque já chega resolvido: o papel
  * efetivo de quem acumula os dois é `admin`, como em `resolverPapelEfetivo` e
@@ -146,8 +145,8 @@ export function interpretarBloqueioDeExcecao(data: unknown, houveErro: boolean):
  * servidor por `getUser()`.
  *
  * E o mais importante: isto decide o que a interface entrega. Quem recusa os
- * dados é o banco — as 11 policies `*_exige_aal2` e as cinco RPCs, que
- * revalidam papel, nível e estado de MFA por dentro, com ou sem este arquivo.
+ * dados é o banco — as policies (`*_exige_aal2`, nome histórico, que hoje chamam
+ * `mfa_cotidiano_ok()`) e as RPCs, que revalidam papel e estado de MFA por dentro, com ou sem este arquivo.
  */
 export function decidirAcesso(
   papel: PapelDoAcesso,

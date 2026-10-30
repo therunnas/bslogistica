@@ -25,7 +25,9 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "../_components/app-shell";
 import type { PapelEfetivo } from "../_papel";
 import {
+  codigoTotpCompleto,
   faseAposListarFatores,
+  mensagemDeCodigoInvalido,
   textoSemFator,
   NOME_DO_FATOR,
   type FaseDeSeguranca,
@@ -40,21 +42,16 @@ interface FatorVerificado {
 /**
  * Configurações → Segurança — ativação e desativação opcionais de MFA (PR F).
  *
- * Autosserviço completo para os DOIS papéis (AUTH-01B): cada titular ativa OU
- * desativa o próprio fator. O segundo fator é opcional; o que continua exigindo
- * AAL2 são as operações críticas, no servidor e no banco, não esta tela. Nada
- * aqui recebe o identificador de um fator de outra conta: a lista vem da
- * própria sessão e o `unenroll` só aceita fator dela (o Supabase recusa o resto).
+ * Autosserviço completo para os DOIS papéis: cada titular ativa OU desativa o próprio fator. O
+ * segundo fator protege só o LOGIN (AUTH-01D.R1): nenhuma funcionalidade o exige. Nada aqui recebe o
+ * identificador de um fator de outra conta: a lista vem da própria sessão e o `unenroll` só aceita
+ * fator dela (o Supabase recusa o resto).
  *
- * **Por que desativar aqui é seguro.** Quem chega a esta tela com um fator
- * verificado só chegou depois de completar o desafio TOTP em `/mfa` — a
- * sessão já está em AAL2. `unenroll` de um fator TOTP é a própria API oficial
- * do Supabase, chamada com sessão já reautenticada por segundo fator; não é
- * "apagar sem confirmar posse".
+ * Desativar pede um código NOVO (`challengeAndVerify` antes do `unenroll`): ver `ComFator`, com o
+ * limite que o Supabase impõe a essa garantia.
  *
- * O desafio do segundo fator continua inteiramente em `/mfa` — esta tela
- * nunca chama `challengeAndVerify` para uma sessão tentando entrar, só para
- * confirmar um cadastro NOVO, iniciado aqui mesmo.
+ * O desafio do segundo fator de LOGIN continua inteiramente em `/mfa` — esta tela só chama
+ * `challengeAndVerify` para confirmar um cadastro NOVO ou uma desativação, iniciados aqui mesmo.
  *
  * O enroll só começa quando a pessoa clica em "Ativar": listar fatores ao
  * carregar a tela não cria nada, então só visitar esta página nunca deixa um
@@ -121,7 +118,7 @@ export function PainelConfiguracoes({ email, papel }: { email: string; papel: Pa
           )}
 
           {fase === "com-fator" && fator && (
-            <ComFator fator={fator} papel={papel} aoRemover={() => void carregarFatores()} />
+            <ComFator fator={fator} aoRemover={() => void carregarFatores()} />
           )}
 
           {fase === "sem-fator" && <SemFator texto={texto} aoAtivar={() => setFase("ativando")} />}
@@ -142,37 +139,65 @@ export function PainelConfiguracoes({ email, papel }: { email: string; papel: Pa
 }
 
 /**
- * Estado "ativo" e a desativação, para os dois papéis.
+ * Estado "ativo" e a desativação (AUTH-01D.R1), para os dois papéis.
  *
- * Remover um fator verificado exige AAL2: quem está aqui com fator já provou o código no login, e o
- * Supabase ainda confere (se a sessão não for AAL2, `unenroll` recusa e o erro aparece no aviso).
+ * Desativar o PRÓPRIO fator é a única ação do sistema que pede um segundo código, e pede o código
+ * NOVO: `challengeAndVerify` com o fator que será removido acontece ANTES do `unenroll`, e um código
+ * inválido impede a remoção (nada de `unenroll` sem a verificação ter dado certo). A autenticação do
+ * login não é reaproveitada.
+ *
+ * LIMITE REAL DO SUPABASE (não é uma garantia do servidor): o GoTrue só exige sessão AAL2 para
+ * remover um fator verificado. Quem tem uma sessão AAL2 e chama a API direto consegue `unenroll`
+ * sem este código. A exigência do código novo é imposta por ESTA INTERFACE, não pelo servidor Auth.
+ * Ver docs/SEGURANCA.md (risco residual).
+ *
  * Perdeu o aplicativo? Sem o código não há como entrar nem remover o fator por esta tela — o
  * procedimento seguro está em docs/SEGURANCA.md e não existe atalho por senha.
  */
-function ComFator({
-  fator,
-  papel,
-  aoRemover,
-}: {
-  fator: FatorVerificado;
-  papel: PapelEfetivo;
-  aoRemover: () => void;
-}) {
+function ComFator({ fator, aoRemover }: { fator: FatorVerificado; aoRemover: () => void }) {
   const [confirmando, setConfirmando] = useState(false);
   const [removendo, setRemovendo] = useState(false);
+  const [codigo, setCodigo] = useState("");
 
-  async function desativar() {
-    setConfirmando(false);
+  function fecharConfirmacao(aberto: boolean) {
+    if (removendo) return;
+    setConfirmando(aberto);
+    if (!aberto) setCodigo("");
+  }
+
+  async function desativar(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!codigoTotpCompleto(codigo)) return;
     setRemovendo(true);
 
     const supabase = criarClienteNavegador();
+
+    // 1. Código NOVO, verificado agora contra o fator que será removido.
+    const { error: erroVerificacao } = await supabase.auth.mfa.challengeAndVerify({
+      factorId: fator.id,
+      code: codigo.trim(),
+    });
+
+    if (erroVerificacao) {
+      // Código inválido: o fator permanece e `unenroll` NÃO é chamado.
+      toast.error(mensagemDeCodigoInvalido(erroVerificacao));
+      setCodigo("");
+      setRemovendo(false);
+      return;
+    }
+
+    // 2. Só depois da verificação, a remoção.
     const { error: erroUnenroll } = await supabase.auth.mfa.unenroll({ factorId: fator.id });
 
     if (erroUnenroll) {
       toast.error(erroUnenroll.message);
+      setCodigo("");
       setRemovendo(false);
       return;
     }
+
+    setConfirmando(false);
+    setCodigo("");
 
     // A partir daqui o fator já foi removido no servidor — o estado
     // persistente principal já mudou, e nenhuma falha NESTE PONTO EM DIANTE
@@ -205,30 +230,57 @@ function ComFator({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        É opcional: você pode desativar a qualquer momento e voltar a entrar só com a senha.
-        {papel === "admin"
-          ? " Sem o fator, as operações críticas (administração de usuários, faturamento e reajustes financeiros) ficam fechadas até você ativar de novo."
-          : ""}
+        A verificação em duas etapas protege o seu acesso: todo login pede o código do aplicativo
+        autenticador. Para desativá-la, é preciso informar um código atual.
       </p>
       <Button variant="destructive" onClick={() => setConfirmando(true)} disabled={removendo}>
         {removendo ? "Desativando..." : "Desativar autenticação em duas etapas"}
       </Button>
 
-      <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+      <AlertDialog open={confirmando} onOpenChange={fecharConfirmacao}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Desativar verificação em duas etapas</AlertDialogTitle>
-            <AlertDialogDescription>
-              Sua conta deixa de pedir o código do aplicativo autenticador nos próximos acessos.
-              {papel === "admin"
-                ? " As operações críticas ficam fechadas até você ativar de novo, com um novo QR code."
-                : " Para voltar a usar, ative de novo com um novo QR code."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void desativar()}>Desativar</AlertDialogAction>
-          </AlertDialogFooter>
+          <form onSubmit={(e) => void desativar(e)} className="space-y-4">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Desativar verificação em duas etapas</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sua conta deixa de pedir o código do aplicativo autenticador nos próximos acessos e
+                passa a ser protegida só pela senha. Informe um código novo do aplicativo para
+                confirmar.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-1.5">
+              <Label htmlFor="codigo-desativacao">Código de seis dígitos</Label>
+              <Input
+                id="codigo-desativacao"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                placeholder="000000"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+                required
+                autoFocus
+              />
+            </div>
+            <AlertDialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fecharConfirmacao(false)}
+                disabled={removendo}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={removendo || !codigoTotpCompleto(codigo)}
+              >
+                {removendo ? "Verificando..." : "Desativar"}
+              </Button>
+            </AlertDialogFooter>
+          </form>
         </AlertDialogContent>
       </AlertDialog>
     </div>

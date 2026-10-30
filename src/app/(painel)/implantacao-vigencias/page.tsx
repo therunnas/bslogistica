@@ -7,7 +7,7 @@ import {
   reversaoHabilitada,
 } from "@/lib/ativacao-motor";
 
-import { exigirAdminAal2Tela } from "../_exigir-admin";
+import { exigirAdmin } from "../_exigir-admin";
 import { PainelImplantacaoVigencias } from "./painel-implantacao";
 
 export const metadata: Metadata = {
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default async function ImplantacaoVigencias() {
   // Bloqueio server-side, como nas demais telas administrativas.
-  const bloqueio = await exigirAdminAal2Tela();
+  const bloqueio = await exigirAdmin();
   if (bloqueio) return bloqueio;
 
   // A trava é lida aqui, no servidor; o navegador só recebe o resultado. Quem recusa é a Server

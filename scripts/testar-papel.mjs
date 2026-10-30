@@ -119,7 +119,7 @@ for (const [rota, componente] of TELAS) {
   const fonte = paginas[rota];
   // AUTH-01B: a administração de usuários é área CRÍTICA e usa o guard que exige AAL2 de fato; as
   // demais telas usam o guard cotidiano (MFA opcional).
-  const guarda = rota === "usuarios" ? "exigirAdminAal2Tela" : "exigirAdmin";
+  const guarda = rota === "usuarios" ? "exigirAdmin" : "exigirAdmin";
   verificar(`B1.${rota} — importa o guard central`, /from "\.\.\/_exigir-admin"/.test(fonte), true);
   verificar(
     `B2.${rota} — chama ${guarda} e devolve o bloqueio`,
@@ -352,7 +352,7 @@ console.log("\nF. Esconder o link não é a proteção\n");
 verificar(
   "F1. as nove telas chamam o guard, não oito",
   Object.values(paginas).filter(
-    (f) => f.includes("await exigirAdmin()") || f.includes("await exigirAdminAal2Tela()"),
+    (f) => f.includes("await exigirAdmin()") || f.includes("await exigirAdmin()"),
   ).length,
   9,
 );
@@ -407,14 +407,14 @@ verificar(
   false,
 );
 verificar(
-  "G4. nenhum aal foi liberado por papel: só o guard crítico fala em aal2, explicitamente",
+  "G4. nenhum aal foi liberado por papel e nenhum guard do painel fala em aal (AUTH-01D.R1: o MFA só protege o login)",
   String([
     /aal1|aal2/i.test(
       semComentarios(fontes.papel) + semComentarios(fontes.shell) + semComentarios(fontes.layout),
     ),
     (semComentarios(fontes.guard).match(/"aal[12]"/g) ?? []).length,
   ]),
-  "false,1",
+  "false,0",
 );
 verificar(
   "G5. o destino pós-login segue /dashboard, sem depender de papel",

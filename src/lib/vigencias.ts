@@ -9,7 +9,7 @@
  * `test:motor-vigencia` confere cada nome e cada parâmetro contra as migrations 023, 024 e
  * 025: renomear uma coluna do SQL sem atualizar este arquivo falha lá.
  *
- * Todas exigem administrador, AAL2 e sessão válida; o operacional não executa nenhuma.
+ * Todas exigem administrador e sessão válida; o operacional não executa nenhuma.
  */
 
 export const RPC_VIGENCIAS = {
@@ -44,7 +44,7 @@ export const RPC_VIGENCIAS = {
   },
 } as const;
 
-/** RPCs da migration 030 (fechamento e calendário). Admin AAL2; o operacional não executa. */
+/** RPCs da migration 030 (fechamento e calendário). Admin; o operacional não executa. */
 export const RPC_REGRAS_DEFINITIVAS = {
   ajustesDeArredondamento: "ajustes_de_arredondamento_acumulado",
   saldoDeHoras: "saldo_de_horas_do_periodo",

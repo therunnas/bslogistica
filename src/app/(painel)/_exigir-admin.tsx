@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { lerAcesso } from "./_autorizacao";
 import { ehAdmin } from "./_papel";
 import { AcessoAdministrativoRestrito } from "./_components/acesso-administrativo-restrito";
-import { ExigeSegundoFator } from "./_components/exige-segundo-fator";
 
 /**
  * Guarda server-side das telas administrativas.
@@ -31,8 +30,8 @@ import { ExigeSegundoFator } from "./_components/exige-segundo-fator";
  * `cache` do React: nada de autorização atravessa usuários ou requisições.
  *
  * Isto governa o que a interface entrega. Quem protege os dados continua sendo a
- * RLS — em AAL1 as 11 policies `*_exige_aal2` recusam as tabelas de negócio, com
- * ou sem este arquivo.
+ * RLS — as policies de papel e o piso de MFA da conta (`mfa_cotidiano_ok()`) recusam quem não é
+ * admin ou está com o TOTP pendente, com ou sem este arquivo.
  */
 export async function exigirAdmin(): Promise<ReactNode | null> {
   const acesso = await lerAcesso();
@@ -40,24 +39,6 @@ export async function exigirAdmin(): Promise<ReactNode | null> {
   if (acesso.situacao !== "liberado" || !ehAdmin(acesso.papeis)) {
     return <AcessoAdministrativoRestrito />;
   }
-
-  return null;
-}
-
-/**
- * O guard das telas CRÍTICAS (AUTH-01B): administração de usuários e implantação financeira.
- *
- * Como `exigirAdmin()`, mas exige AAL2 DE FATO. O segundo fator é opcional, então "liberado" já não
- * significa AAL2: conta sem fator trabalha em AAL1 e vê aqui a orientação de ativar o seu. Não
- * substitui a proteção real, que continua na Server Action (`exigirAdminAal2`) e no banco.
- */
-export async function exigirAdminAal2Tela(): Promise<ReactNode | null> {
-  const acesso = await lerAcesso();
-
-  if (acesso.situacao !== "liberado" || !ehAdmin(acesso.papeis)) {
-    return <AcessoAdministrativoRestrito />;
-  }
-  if (acesso.nivel !== "aal2") return <ExigeSegundoFator />;
 
   return null;
 }

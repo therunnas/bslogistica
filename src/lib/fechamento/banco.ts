@@ -1,7 +1,7 @@
 /**
  * Leitura do que o Fechamento pede ao BANCO além dos lançamentos (migration 030).
  *
- * Quatro fontes oficiais, todas por funções e tabelas que o banco já protege com `aal2` e `admin`:
+ * Quatro fontes oficiais, todas por funções e tabelas que o banco já protege com `admin` e o piso de MFA da conta:
  *
  *   resumo_financeiro_periodo               receita, adicionais, ajustes, a faturar e faturado
  *   ajustes_de_arredondamento_acumulado     o ajuste da hora extra acumulada, por colaborador
