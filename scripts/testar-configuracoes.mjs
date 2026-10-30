@@ -417,17 +417,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. conjunto de migrations contém 37 arquivos, até a 032 (MFA opcional, AUTH-01B; local, ainda não aplicada) e, antes dela, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
+  "G10. conjunto de migrations contém 38 arquivos, até a 033 (taxas legadas exigem vigência com o motor ligado, AUTH-01C.1), a 032 (MFA opcional, AUTH-01B) e, antes dela, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  37,
+  38,
 );
 verificar(
-  "G10b. a migration mais recente é a 032 (MFA opcional, AUTH-01B)",
+  "G10b. a migration mais recente é a 033 (taxas legadas exigem vigência, AUTH-01C.1)",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_032_"),
+    .includes("_033_"),
   true,
 );
 

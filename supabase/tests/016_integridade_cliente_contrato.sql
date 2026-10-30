@@ -268,6 +268,11 @@ $a9$;
 --    da migration são reaplicados.
 -- ---------------------------------------------------------------------------
 
+-- AUTH-01C.1: eventos deferidos da 033 (INSERT com taxa feito como authenticated) precisam ser
+-- verificados antes de um ALTER TABLE na mesma transação.
+set constraints all immediate;
+set constraints all deferred;
+
 alter table public.operations drop constraint operations_contrato_do_cliente_fkey;
 
 insert into public.operations (id, client_id, contract_id, name) values

@@ -131,11 +131,23 @@ AAL2 dentro de si.
    `*_bloqueia_taxa_direta` ficam desabilitados e as colunas de taxa de `contracts`/`employees`/
    `operations` voltam a ser editáveis direto. Para que isso não vire brecha para conta sem fator,
    a 032 cria gatilhos próprios (`trg_*_exige_aal2_taxa_legada`, sempre habilitados, independentes
-   do motor, em INSERT e UPDATE): informar ou alterar `daily_rate`, `shift_hours`, `ot_factor`, `ot_tolerance_min`, `daily_cost` ou
-   `agreed_amount` direto exige AAL2 (no INSERT, vale o que foge do default da coluna; 42501 com "dois fatores"). Os demais campos dessas tabelas
-   seguem cotidianos. Com o motor ligado (Production) os gatilhos originais recusam a edição direta
-   para qualquer nível. As RPCs `registrar_*`/`sincronizar_*` (SECURITY DEFINER) passam como antes.
+   do motor, em INSERT e UPDATE): informar ou alterar `daily_rate`, `shift_hours`, `ot_factor`,
+   `ot_tolerance_min`, `daily_cost` ou `agreed_amount` direto exige AAL2 (no INSERT, vale o que foge
+   do default da coluna; 42501 com "dois fatores"). Os demais campos dessas tabelas seguem
+   cotidianos. As RPCs `registrar_*`/`sincronizar_*` (SECURITY DEFINER) passam como antes.
    A reversão do motor em si exige AAL2.
+3. **Com o motor ligado (033, AUTH-01C.1)**, nenhum INSERT/UPDATE direto introduz ou altera valor
+   legado sem vigência, nem em AAL2. UPDATE já era recusado pelos gatilhos 025 (55000). O INSERT
+   direto com taxa fora do default passava para admin AAL2 e criava a linha sem
+   `contract_terms`/`employee_cost_terms`/`operation_terms`. A 033 adiciona três CONSTRAINT TRIGGER
+   (`trg_*_exige_vigencia_na_taxa`) deferidos: a linha só é aceita se, **na mesma transação**,
+   existir uma vigência ativa de valor igual. O cadastro atômico (`criar_*_com_vigencia`, 026) é
+   `SECURITY INVOKER` e faz o INSERT com a taxa espelhada na coluna legada e, na sequência,
+   `registrar_*`; por isso o INSERT com taxa não pode ser simplesmente proibido, e o commit confere.
+   Sem flag, parâmetro ou GUC que o cliente controle; `authenticated` não ganha bypass (a isenção é
+   só `postgres`/`service_role`, como nos gatilhos 025). "Motor ligado" é lido do catálogo (gatilho
+   de bloqueio habilitado), não da tabela da chave, que está sob RLS. Linha sem taxa (defaults)
+   segue livre e aparece nas pendências. Rollback: `docs/runbooks/rollback-taxa-legada-vigencia.sql`.
 
 ### Gestão individual do fator
 

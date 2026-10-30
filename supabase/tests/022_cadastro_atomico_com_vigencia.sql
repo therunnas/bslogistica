@@ -179,6 +179,10 @@ select pg_temp.registrar('C7. tipo inválido: falha (22P02) e nada é criado', '
 -- ---------------------------------------------------------------------------
 
 select pg_temp.registrar('D0. motor desligado antes do teste', 'false', (select vigencia_ativa::text from public.financial_engine_settings));
+-- AUTH-01C.1: verifica os eventos deferidos da 033 antes de o motor fazer ALTER TABLE na mesma transação.
+set constraints all immediate;
+set constraints all deferred;
+
 select pg_temp.registrar('D1. admin AAL2 liga o motor (pré-condição do bloco)', 'ok',
   pg_temp.adm($q$select public.alterar_motor_vigencia(true, 'Teste do cadastro atômico', true)$q$));
 select pg_temp.registrar('D2. contrato com o motor LIGADO: criado com a vigência', 'ok',
@@ -201,6 +205,8 @@ select pg_temp.registrar('D7. com o motor ligado, nenhuma entidade criada pelas 
 select pg_temp.registrar('D8. as funções não mudaram o estado do motor (continua ligado)', 'true', (select vigencia_ativa::text from public.financial_engine_settings));
 select pg_temp.registrar('D9. o apontamento legado não foi recalculado nem ganhou versão (ainda sem referência de vigência)', 'nulo',
   (select coalesce(contract_terms_id::text, 'nulo') from public.timesheet_entries where id = '5c0cb100-0000-4000-8000-0000000000b0'));
+set constraints all immediate;
+set constraints all deferred;
 select pg_temp.registrar('D10. desliga o motor de volta', 'ok',
   pg_temp.adm($q$select public.alterar_motor_vigencia(false, 'Fim do teste do cadastro atômico')$q$));
 

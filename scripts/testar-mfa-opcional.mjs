@@ -428,6 +428,97 @@ verificar(
   [true, true, true],
 );
 
+console.log("\nG. Migration 033 (taxas legadas exigem vigência com o motor ligado)\n");
+const m33 = "20261031120000_033_taxa_legada_exige_vigencia.sql";
+const sql33 = semSql(ler(`supabase/migrations/${m33}`));
+verificar(
+  "G1. a 033 é posterior à 032 e a 032 não foi tocada para isso (nenhuma menção à regra nova)",
+  [
+    m33 > migrations[0],
+    /exigir_vigencia_na_taxa_legada/.test(ler(`supabase/migrations/${migrations[0]}`)),
+  ],
+  [true, false],
+);
+verificar(
+  "G2. três CONSTRAINT TRIGGER AFTER INSERT, deferidos, com WHEN que exclui postgres/service_role",
+  ["contracts", "employees", "operations"].every((t) =>
+    new RegExp(
+      `create constraint trigger trg_${t}_exige_vigencia_na_taxa\\s+after insert on public\\.${t}\\s+deferrable initially deferred\\s+for each row\\s+when \\(current_user not in \\('postgres', 'service_role'\\)`,
+    ).test(sql33),
+  ),
+  true,
+);
+verificar(
+  "G3. a função é SECURITY INVOKER, com search_path fixo e sem EXECUTE para public/anon/authenticated",
+  [
+    /security invoker/.test(sql33),
+    /set search_path = pg_catalog, public, pg_temp/.test(sql33),
+    /revoke all on function public\.exigir_vigencia_na_taxa_legada\(\) from public, anon, authenticated/.test(
+      sql33,
+    ),
+    /\bgrant\b/i.test(sql33),
+  ],
+  [true, true, true, false],
+);
+verificar(
+  "G4. nenhuma exceção controlável pelo cliente: sem flag, parâmetro, GUC (current_setting/set_config) nem leitura do JWT",
+  /current_setting|set_config|auth\.jwt|request\.jwt/i.test(sql33),
+  false,
+);
+verificar(
+  "G5. a recusa é 55000 e nunca concede nada: sem policy, sem alter policy, sem grant, sem service_role em chave",
+  [
+    /errcode = '55000'/.test(sql33),
+    /(create|alter|drop) policy/i.test(sql33),
+    /grant /i.test(sql33),
+  ],
+  [true, false, false],
+);
+verificar(
+  "G6. 'motor ligado' vem do catálogo (gatilho de bloqueio habilitado), não da tabela da chave sob RLS (evita fail-open)",
+  [/from pg_trigger/.test(sql33), /from public\.financial_engine_settings/.test(sql33)],
+  [true, false],
+);
+verificar(
+  "G7. compara com a vigência ATIVA de valor igual nas três tabelas de vigência",
+  ["contract_terms", "employee_cost_terms", "operation_terms"].every((t) =>
+    new RegExp(`from public\\.${t} t[\\s\\S]*?t\\.active`).test(sql33),
+  ),
+  true,
+);
+verificar(
+  "G8. rollback da 033 existe, fora de supabase/migrations, e dropa os 3 gatilhos e a função",
+  (() => {
+    const r = ler("docs/runbooks/rollback-taxa-legada-vigencia.sql");
+    return (
+      ["contracts", "employees", "operations"].every((t) =>
+        new RegExp(`drop trigger trg_${t}_exige_vigencia_na_taxa on public\\.${t}`).test(r),
+      ) && /drop function public\.exigir_vigencia_na_taxa_legada\(\)/.test(r)
+    );
+  })(),
+  true,
+);
+verificar(
+  "G9. suíte SQL da 033 existe e o CI roda as suítes novas",
+  [
+    existsSync(new URL("../supabase/tests/033_taxa_legada_exige_vigencia.sql", import.meta.url)),
+    /Teste mfa-opcional/.test(ler(".github/workflows/ci.yml")),
+  ],
+  [true, true],
+);
+verificar(
+  "G10. documentação registra a 033 e a decisão (INSERT direto exige vigência com motor ligado)",
+  (() => {
+    const d = ler("docs/SEGURANCA.md");
+    return [
+      /033, AUTH-01C\.1/.test(d),
+      /rollback-taxa-legada-vigencia\.sql/.test(d),
+      /na mesma transação/.test(d),
+    ];
+  })(),
+  [true, true, true],
+);
+
 console.log("\nE. Mensagem das operações críticas recusadas\n");
 verificar(
   "E1. recusa de MFA do guard (42501) vira a orientação de ativar",

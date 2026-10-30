@@ -2161,6 +2161,10 @@ $contrato$;
 -- é "não enquanto existir lastro faturado". Instalação nova continua truncável.
 -- ---------------------------------------------------------------------------
 
+-- AUTH-01C.1: verifica os eventos deferidos da 033 antes dos TRUNCATE (mesma transação).
+set constraints all immediate;
+set constraints all deferred;
+
 do $truncate$
 declare
   _e text;
