@@ -30,8 +30,8 @@ import { AcessoAdministrativoRestrito } from "./_components/acesso-administrativ
  * `cache` do React: nada de autorização atravessa usuários ou requisições.
  *
  * Isto governa o que a interface entrega. Quem protege os dados continua sendo a
- * RLS — em AAL1 as 11 policies `*_exige_aal2` recusam as tabelas de negócio, com
- * ou sem este arquivo.
+ * RLS — as policies de papel e o piso de MFA da conta (`mfa_cotidiano_ok()`) recusam quem não é
+ * admin ou está com o TOTP pendente, com ou sem este arquivo.
  */
 export async function exigirAdmin(): Promise<ReactNode | null> {
   const acesso = await lerAcesso();

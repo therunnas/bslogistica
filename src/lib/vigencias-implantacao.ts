@@ -2,8 +2,7 @@
  * Regras puras da tela de implantação das vigências (C05-B5.7).
  *
  * Nada aqui fala com o banco nem inventa valor: a tela só LISTA o que as RPCs de implantação já
- * devolvem (`pendencias_implantacao_vigencias` e `divergencias_implantacao_vigencias`, admin
- * AAL2) e aponta para a tela do cadastro, onde a vigência é registrada com data de início e
+ * devolvem (`pendencias_implantacao_vigencias` e `divergencias_implantacao_vigencias`, admin) e aponta para a tela do cadastro, onde a vigência é registrada com data de início e
  * motivo informados por quem decide. Preço histórico nunca é presumido: sem vigência para hoje,
  * o cadastro continua pendente e a ativação do motor continua bloqueada pelo banco.
  */
@@ -88,7 +87,7 @@ export function rotuloDosCampos(campos: readonly string[]): string {
 export interface ResumoDaImplantacao {
   pendentes: number;
   divergentes: number;
-  /** Só informativo: ligar o motor continua sendo ato do banco, com admin AAL2 e motivo. */
+  /** Só informativo: ligar o motor continua sendo ato do banco, com admin e motivo. */
   semBloqueios: boolean;
 }
 

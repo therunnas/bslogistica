@@ -1,7 +1,7 @@
 "use server";
 
 import { criarClienteServidor } from "@/integrations/supabase/server";
-import { ErroDeAutorizacaoAdministrativa, exigirAdminAal2 } from "@/lib/admin-usuarios/autorizacao";
+import { ErroDeAutorizacaoAdministrativa, exigirAdminAtor } from "@/lib/admin-usuarios/autorizacao";
 import {
   MENSAGEM_ATIVACAO_DESABILITADA,
   MENSAGEM_REVERSAO_DESABILITADA,
@@ -18,10 +18,10 @@ import {
 /**
  * Liga o motor por vigência (C05-B8.6). A única escrita da tela de implantação.
  *
- * `exigirAdminAal2()` vem ANTES de qualquer consulta: quem não é administrador com acesso liberado
- * (o que, para admin, é sempre AAL2) recebe a recusa sem que o banco seja tocado. Depois disso, a
+ * `exigirAdminAtor()` vem ANTES de qualquer consulta: quem não é administrador com acesso liberado
+ * (admin; sessão com TOTP pendente não chega a "liberado") recebe a recusa sem que o banco seja tocado. Depois disso, a
  * RPC roda com o cliente da SESSÃO (cookies do próprio admin): o JWT dele é o que o banco avalia,
- * e `alterar_motor_vigencia` repete admin + AAL2 por dentro e grava a trilha. Não há `service_role`
+ * e `alterar_motor_vigencia` repete admin por dentro e grava a trilha. Não há `service_role`
  * aqui, nem identidade vinda do cliente.
  *
  * Depois da autorização e ANTES de criar o cliente do banco, a trava de servidor decide se a janela
@@ -33,7 +33,7 @@ export async function ligarMotorAction(entrada: {
   confirmacao: unknown;
 }): Promise<ResultadoDaAtivacao> {
   try {
-    await exigirAdminAal2();
+    await exigirAdminAtor();
   } catch (erro) {
     if (erro instanceof ErroDeAutorizacaoAdministrativa) {
       return {
@@ -59,7 +59,7 @@ export async function ligarMotorAction(entrada: {
 /**
  * Desliga o motor por vigência (RB-01): a reversão da ativação, pelo mesmo caminho seguro.
  *
- * Mesma ordem da ativação: `exigirAdminAal2()` primeiro; depois a trava de servidor PRÓPRIA da
+ * Mesma ordem da ativação: `exigirAdminAtor()` primeiro; depois a trava de servidor PRÓPRIA da
  * reversão (`BS_REVERSAO_MOTOR_HABILITADA`, fechada por padrão); só então o cliente da SESSÃO
  * (JWT do próprio admin) chama `alterar_motor_vigencia(false, ...)`. Sem `service_role`, sem
  * identidade vinda do cliente.
@@ -69,7 +69,7 @@ export async function desligarMotorAction(entrada: {
   confirmacao: unknown;
 }): Promise<ResultadoDaReversao> {
   try {
-    await exigirAdminAal2();
+    await exigirAdminAtor();
   } catch (erro) {
     if (erro instanceof ErroDeAutorizacaoAdministrativa) {
       return {

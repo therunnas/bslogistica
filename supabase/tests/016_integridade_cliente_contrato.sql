@@ -127,6 +127,14 @@ insert into public.user_roles (user_id, role) values
   ('5c050000-0000-4000-8000-0000000000a1', 'admin'),
   ('5c050000-0000-4000-8000-0000000000a2', 'operacional');
 
+-- AUTH-01B: o admin desta fixture TEM fator verificado. Assim "admin em AAL1" segue significando
+-- TOTP pendente, que continua negado (conta SEM fator em AAL1 é coberta por 032_mfa_opcional.sql).
+insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+  select gen_random_uuid(), ur.user_id, 'fixture AUTH01B', 'totp', 'verified', now(), now()
+    from public.user_roles ur
+    join auth.users u on u.id = ur.user_id
+   where ur.role = 'admin';
+
 insert into public.clients (id, name) values
   ('5c05c000-0000-4000-8000-0000000000ca', 'C05 marcador cliente A'),
   ('5c05c000-0000-4000-8000-0000000000cb', 'C05 marcador cliente B'),
@@ -259,6 +267,11 @@ $a9$;
 --    transação (estado anterior à migration), a linha inválida é criada, e os comandos
 --    da migration são reaplicados.
 -- ---------------------------------------------------------------------------
+
+-- AUTH-01C.1: eventos deferidos da 033 (INSERT com taxa feito como authenticated) precisam ser
+-- verificados antes de um ALTER TABLE na mesma transação.
+set constraints all immediate;
+set constraints all deferred;
 
 alter table public.operations drop constraint operations_contrato_do_cliente_fkey;
 

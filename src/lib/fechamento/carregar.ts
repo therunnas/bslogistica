@@ -21,7 +21,7 @@
  *
  * As dependências são injetáveis: a suíte troca a fonte de linhas, a busca do
  * cliente e o relógio por falsos. A versão real usa o cliente Supabase da
- * SESSÃO do admin, então a RLS (`aal2` e `admin`) segue sendo a fronteira.
+ * SESSÃO do admin, então a RLS (`admin` e o piso de MFA da conta, `mfa_cotidiano_ok()`) segue sendo a fronteira.
  * Nenhum `service_role` aqui.
  */
 

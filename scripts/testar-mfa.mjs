@@ -202,11 +202,15 @@ const MATRIZ = [
   ["C13. claim aal indefinida", "admin", undefined, "sem-fator", "mfa-indisponivel"],
   ["C14. claim aal desconhecida", "operacional", "aal3", "sem-fator", "mfa-indisponivel"],
   ["C15. claim aal vazia", "operacional", "", "sem-fator", "mfa-indisponivel"],
-  // Não estava na matriz enviada, e é o único caso em que `mfa-ausente` ainda
-  // nasce: administrador que ainda não cadastrou fator. Ele NÃO é liberado — vai
-  // para /mfa cadastrar. Mandá-lo como "mfa-pendente" quebraria o cadastro, que
-  // `decidirFluxoMfa` recusa quando não há fator verificado.
-  ["C16. admin + aal1 sem fator -> cadastro", "admin", "aal1", "sem-fator", "mfa-ausente"],
+  // AUTH-01B: o segundo fator é OPCIONAL para os dois papéis. Admin sem fator trabalha em AAL1
+  // (uso cotidiano); as operações críticas exigem AAL2 por conta própria, no servidor e no banco.
+  [
+    "C16. admin + aal1 sem fator -> liberado (MFA opcional)",
+    "admin",
+    "aal1",
+    "sem-fator",
+    "liberado",
+  ],
 ];
 
 for (const [caso, papel, nivel, fator, esperado] of MATRIZ) {
@@ -214,9 +218,9 @@ for (const [caso, papel, nivel, fator, esperado] of MATRIZ) {
 }
 
 // C17 — varredura exaustiva: `liberado` só pode sair de aal2 com papel, ou de
-// aal1 com papel operacional e SEM fator verificado. Qualquer outra combinação
-// que liberasse seria concessão indevida, e esta varredura pega inclusive a que
-// ninguém pensou em escrever como caso.
+// aal1 com papel reconhecido e SEM fator verificado (AUTH-01B: admin e operacional). Qualquer outra
+// combinação que liberasse seria concessão indevida, e esta varredura pega inclusive a que ninguém
+// pensou em escrever como caso.
 {
   let indevidas = 0;
   for (const papel of ["admin", "operacional", "sem-papel"]) {
@@ -225,8 +229,7 @@ for (const [caso, papel, nivel, fator, esperado] of MATRIZ) {
         if (decidirAcesso(papel, nivel, fator) !== "liberado") continue;
         const previsto =
           papel !== "sem-papel" &&
-          (nivel === "aal2" ||
-            (nivel === "aal1" && papel === "operacional" && fator === "sem-fator"));
+          (nivel === "aal2" || (nivel === "aal1" && fator === "sem-fator"));
         if (!previsto) indevidas++;
       }
     }
@@ -240,14 +243,24 @@ for (const [caso, papel, nivel, fator, esperado] of MATRIZ) {
 
 console.log("\nregressões da política\n");
 
-// R-C1 — admin nunca é liberado em AAL1, com fator, sem fator ou sem saber.
-for (const fator of ["sem-fator", "exige-fator", "indeterminado"]) {
+// R-C1 — admin em AAL1 só é liberado SEM fator verificado (AUTH-01B). Com fator verificado, ou sem
+// saber, nunca: "opcional" não é "dispensável" depois de ativado.
+for (const [fator, liberado] of [
+  ["sem-fator", "true"],
+  ["exige-fator", "false"],
+  ["indeterminado", "false"],
+]) {
   verificar(
-    `R-C1. admin + aal1 (${fator}) nunca é liberado`,
+    `R-C1. admin + aal1 (${fator}) liberado = ${liberado}`,
     String(decidirAcesso("admin", "aal1", fator) === "liberado"),
-    "false",
+    liberado,
   );
 }
+verificar(
+  "R-C1b. admin sem fator + aal1 nunca vai para cadastro: o fator é opcional",
+  String(decidirAcesso("admin", "aal1", "sem-fator") === "mfa-ausente"),
+  "false",
+);
 
 // R-C2 — operacional COM fator verificado não trabalha em AAL1. É a diferença
 // entre "MFA opcional" e "MFA dispensável".

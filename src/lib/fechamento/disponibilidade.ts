@@ -14,7 +14,7 @@
  * inconsistente — nega o acesso ao módulo. Negar é o padrão: "não sei" nunca vira "disponível".
  *
  * Este módulo só importa TIPOS e não usa `service_role`: a consulta usa o cliente da SESSÃO do
- * admin, e o próprio banco exige `admin` e AAL2 nela. A decisão (`decidirDisponibilidade`) é pura.
+ * admin, e o próprio banco exige `admin` e o piso de MFA da conta nela. A decisão (`decidirDisponibilidade`) é pura.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";

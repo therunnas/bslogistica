@@ -24,8 +24,8 @@ import type { RespostaDeErro } from "@/lib/fechamento/http";
  * **Este endpoint se protege sozinho.** O layout do painel e o `exigirAdmin()`
  * da futura página governam o que a interface mostra; uma rota de API é
  * alcançável sem passar por nenhum dos dois. A decisão de acesso é a de sempre,
- * `lerAcesso()` — sem sessão, 401; sem papel `admin` ou sem segundo fator, 403
- * (para o admin, "liberado" já implica AAL2). A RLS é a segunda barreira: a
+ * `lerAcesso()` — sem sessão, 401; sem papel `admin` ou com o segundo fator pendente, 403
+ * (`lerAcesso()` só devolve "liberado" depois do TOTP, quando a conta tem fator). A RLS é a segunda barreira: a
  * leitura usa o cliente da sessão, nunca `service_role`.
  *
  * Sempre `no-store`: o fechamento precisa refletir apontamento, fechamento de

@@ -242,7 +242,7 @@ begin
      and permissive = 'RESTRICTIVE';
 
   perform pg_temp.registrar(
-    'J4. as 11 policies aal2 continuam RESTRICTIVE', '11', _aal2::text);
+    'J4. as 15 policies aal2 continuam RESTRICTIVE (AUTH-01B: 9 cotidianas + 6 de escrita estrita de invoices e invoice_items)', '15', _aal2::text);
 end;
 $superficie$;
 

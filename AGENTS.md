@@ -30,12 +30,16 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
 - **Sem cadastro público**, sem bootstrap automático de admin. Papel é atribuição
   administrativa explícita. O último admin é protegido, e alterações de usuário e
   papel são auditadas.
-- **MFA TOTP é obrigatório para o admin** (AAL2). Para `operacional` é opcional,
-  mas quem o ativou não acessa dados sem concluir o TOTP. A decisão de acesso é
-  uma só (`lerAcesso()`); não a recriar em outro lugar.
-- **O MFA também é exigido no banco**: 11 tabelas de negócio com policy
-  RESTRICTIVE de `aal2`, e acesso direto exige também `admin`. `user_roles` fica
-  fora de propósito — não adicionar AAL2 nela. Não remover a policy global sem
+- **MFA TOTP é opcional para `admin` e `operacional` e protege só o LOGIN**
+  (AUTH-01D.R1): sem fator, e-mail e senha dão acesso a tudo do papel; com fator,
+  todo login exige TOTP e sessão AAL1 fica barrada (app e banco). **Nenhuma
+  funcionalidade exige MFA nem novo código** — não reintroduzir AAL2 por função. A
+  única exceção é desativar o próprio fator (código novo, só na interface). A decisão
+  de acesso é uma só (`lerAcesso()`); não a recriar em outro lugar.
+- **O MFA também vale no banco** pelo piso `mfa_cotidiano_ok()` (032/034): conta com
+  fator verificado precisa de AAL2; conta sem fator trabalha em AAL1; sessão inválida
+  nega. Acesso direto exige também `admin`. Nenhuma verificação de PAPEL foi
+  removida. `user_roles` segue fora do enforcement. Não remover a policy global sem
   substituição segura.
 - **`operacional` só alcança dados pelas cinco RPCs operacionais**, que revalidam
   papel, nível de MFA e atribuição por dentro, sempre sobre `auth.uid()`, nunca
@@ -44,8 +48,8 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
   o dono das funções.
 - **A CSP está em enforcement** (`src/proxy.ts`); não a afrouxar. Ver
   [Segurança](docs/SEGURANCA.md).
-- **Função `SECURITY DEFINER` roda acima da RLS**: a verificação de papel e de
-  `aal2` precisa estar dentro da função.
+- **Função `SECURITY DEFINER` roda acima da RLS**: a verificação de papel e do piso
+  de MFA (`mfa_cotidiano_ok()`) precisa estar dentro da função.
 - **Falha ao consultar o estado de MFA não é ausência de fator.** Nunca mandar
   para o cadastro de fator por causa de um erro transitório.
 - **Token de recuperação de senha não se consome em GET.** O GET só confere

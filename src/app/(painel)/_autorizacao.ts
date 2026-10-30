@@ -12,7 +12,6 @@ export type Acesso =
   | { situacao: "sem-sessao" }
   | { situacao: "sem-papel"; email: string }
   | { situacao: "mfa-indisponivel"; email: string; papeis: Papel[] }
-  | { situacao: "mfa-ausente"; email: string; papeis: Papel[] }
   | { situacao: "mfa-pendente"; email: string; papeis: Papel[] }
   | { situacao: "liberado"; email: string; papeis: Papel[] };
 
@@ -122,7 +121,13 @@ export const lerAcesso = cache(async (): Promise<Acesso> => {
 
   const decisao = decidirAcesso(papel, nivelAtual, estadoDoFator);
 
-  return decisao === "sem-papel"
-    ? { situacao: "sem-papel", email }
-    : { situacao: decisao, email, papeis };
+  if (decisao === "sem-papel") return { situacao: "sem-papel", email };
+
+  if (decisao === "liberado") {
+    // "Liberado" = sessão válida e papel; conta sem fator trabalha em AAL1, conta com fator só depois
+    // do TOTP. O nível não é exposto: nenhuma funcionalidade depende dele (AUTH-01D.R1).
+    return { situacao: "liberado", email, papeis };
+  }
+
+  return { situacao: decisao, email, papeis };
 });

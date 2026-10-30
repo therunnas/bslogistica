@@ -74,7 +74,7 @@ verificar(
 );
 const pagina = semComentarios(ler(`${PAINEL}/implantacao-vigencias/page.tsx`));
 verificar(
-  "A6. a rota segue protegida NO SERVIDOR: exigirAdmin antes de qualquer conteúdo",
+  "A6. a rota segue protegida NO SERVIDOR: guard crítico (admin com AAL2 de fato) antes de qualquer conteúdo",
   /const bloqueio = await exigirAdmin\(\);\s*if \(bloqueio\) return bloqueio;/.test(pagina),
   true,
 );
@@ -226,8 +226,8 @@ const acoes = semComentarios(ler(`${PAINEL}/implantacao-vigencias/_acoes.ts`));
 verificar(
   "D1. ativação e reversão seguem exigindo admin AAL2 antes de qualquer outra coisa",
   [
-    /ligarMotorAction[\s\S]*?exigirAdminAal2\(\)/.test(acoes),
-    /desligarMotorAction[\s\S]*?exigirAdminAal2\(\)/.test(acoes),
+    /ligarMotorAction[\s\S]*?exigirAdminAtor\(\)/.test(acoes),
+    /desligarMotorAction[\s\S]*?exigirAdminAtor\(\)/.test(acoes),
   ],
   [true, true],
 );

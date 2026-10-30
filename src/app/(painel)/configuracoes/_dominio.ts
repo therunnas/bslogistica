@@ -38,24 +38,39 @@ export interface TextoDoEstado {
 }
 
 /**
- * O texto muda por papel só na ausência de fator — é a única situação em que
- * a política difere de verdade entre os dois papéis. Com fator verificado, os
- * dois veem "MFA ativo"; a diferença está em como a AUSÊNCIA é enquadrada:
- * normal para o operacional, e uma situação que não deveria ocorrer para o
- * admin, que não chega a `liberado` sem ter passado por AAL2 — e portanto sem
- * fator verificado.
+ * O texto de ausência de fator é o mesmo para os dois papéis (AUTH-01D.R1): o segundo fator protege só
+ * o login e a própria conta, e nenhuma funcionalidade o exige. Ativá-lo é uma recomendação, sobretudo
+ * para administradores: sem ele a conta fica protegida apenas pela senha.
  */
 export function textoSemFator(papel: PapelEfetivo): TextoDoEstado {
   if (papel === "admin") {
     return {
       titulo: "Verificação em duas etapas não configurada",
       corpo:
-        "Sua conta de administrador exige um segundo fator para acessar o painel. Ative agora para continuar entrando normalmente.",
+        "É opcional e nenhuma função do sistema depende dela. Sem ela, sua conta fica protegida apenas pela senha; recomendamos ativar. Depois de ativar, todo login passa a pedir o código do seu aplicativo autenticador.",
     };
   }
   return {
     titulo: "Verificação em duas etapas não configurada",
     corpo:
-      "É opcional para o seu papel: você pode continuar usando o sistema sem ativar. Se ativar, os próximos acessos vão pedir o código do seu aplicativo autenticador.",
+      "É opcional: você pode continuar usando o sistema sem ativar. Se ativar, todo login passa a pedir o código do seu aplicativo autenticador.",
   };
 }
+
+/** O código TOTP tem exatamente seis dígitos; qualquer outra coisa nem chega ao Supabase. */
+export function codigoTotpCompleto(codigo: string): boolean {
+  return /^[0-9]{6}$/.test(codigo.trim());
+}
+
+/** Código recusado pelo Supabase vira texto claro; outros erros mantêm a mensagem original. */
+export function mensagemDeCodigoInvalido(erro: {
+  code?: string | undefined;
+  message: string;
+}): string {
+  return erro.code === "mfa_verification_failed"
+    ? "Código inválido. Confira o aplicativo autenticador e tente novamente."
+    : erro.message;
+}
+
+/** O fator só é gerenciado pelo próprio titular: nada aqui recebe um identificador de outra conta. */
+export const NOME_DO_FATOR = "BS Soluções Logísticas";

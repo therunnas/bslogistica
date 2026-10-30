@@ -12,7 +12,7 @@
  *
  * Os cenários de identidade (anônimo, operacional, admin em AAL1) são provados no banco, pela
  * suíte SQL `supabase/tests/026_ativacao_banco_vazio.sql`; aqui se prova que a Server Action
- * chama `exigirAdminAal2()` antes de qualquer outra coisa.
+ * chama `exigirAdminAtor()` antes de qualquer outra coisa.
  */
 
 import { readFileSync } from "node:fs";
@@ -388,10 +388,10 @@ const acaoBruta = ler("src/app/(painel)/implantacao-vigencias/_acoes.ts");
 
 verificar("E1. a Server Action é 'use server'", /^"use server";/.test(acaoBruta), true);
 verificar(
-  "E2. exigirAdminAal2() é a primeira coisa da ação, antes de criar o cliente e de qualquer RPC",
-  acao.indexOf("exigirAdminAal2()") > 0 &&
-    acao.indexOf("exigirAdminAal2()") < acao.indexOf("criarClienteServidor()") &&
-    acao.indexOf("exigirAdminAal2()") < acao.indexOf("ligarMotorDeVigencia("),
+  "E2. exigirAdminAtor() é a primeira coisa da ação, antes de criar o cliente e de qualquer RPC",
+  acao.indexOf("exigirAdminAtor()") > 0 &&
+    acao.indexOf("exigirAdminAtor()") < acao.indexOf("criarClienteServidor()") &&
+    acao.indexOf("exigirAdminAtor()") < acao.indexOf("ligarMotorDeVigencia("),
   true,
 );
 verificar(
@@ -448,7 +448,7 @@ verificar(
   true,
 );
 verificar(
-  "E11. a página segue protegida por exigirAdmin antes do componente",
+  "E11. a página segue protegida por exigirAdmin (AAL2 de fato, AUTH-01B) antes do componente",
   /exigirAdmin\(\)/.test(pagina) &&
     pagina.indexOf("exigirAdmin()") < pagina.indexOf("<PainelImplantacaoVigencias"),
   true,
@@ -501,7 +501,7 @@ verificar(
   "F3. a Server Action recusa com a janela fechada: depois da autorização, antes de criar o cliente do banco e de qualquer RPC",
   /ativacaoHabilitada\(process\.env\[VARIAVEL_DE_ATIVACAO\]\)/.test(acao) &&
     /codigo: "desabilitada"/.test(acao) &&
-    acao.indexOf("exigirAdminAal2()") < acao.indexOf("ativacaoHabilitada(") &&
+    acao.indexOf("exigirAdminAtor()") < acao.indexOf("ativacaoHabilitada(") &&
     acao.indexOf("ativacaoHabilitada(") < acao.indexOf("criarClienteServidor()") &&
     acao.indexOf("ativacaoHabilitada(") < acao.indexOf("ligarMotorDeVigencia("),
   true,
@@ -531,7 +531,7 @@ verificar(
 );
 verificar(
   "F7. a trava não cria bypass: continua exigindo admin em AAL2, motivo, frase e a RPC oficial, sem service_role e sem aceitar pendência",
-  /exigirAdminAal2\(\)/.test(acao) &&
+  /exigirAdminAtor\(\)/.test(acao) &&
     /p_aceitar_pendencias: false/.test(lib) &&
     !/service_role|SERVICE_ROLE|criarClienteAdmin/i.test(acao + lib + componente + pagina),
   true,

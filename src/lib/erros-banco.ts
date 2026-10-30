@@ -41,6 +41,19 @@ export function ehTurnoProtegido(erro: unknown): boolean {
   );
 }
 
+/**
+ * O segundo fator protege só o login (AUTH-01D.R1): nenhuma operação o exige. A única recusa de MFA
+ * que o banco ainda emite é a de uma sessão AAL1 de conta COM fator verificado (TOTP pendente), que
+ * chega como `42501`, com o texto do guard ("Autenticação de dois fatores obrigatória.") ou com o
+ * nome da policy (`*_exige_aal2`, nome histórico). A saída é concluir o desafio no login.
+ */
+export const MENSAGEM_EXIGE_SEGUNDO_FATOR =
+  "Sua sessão ainda não concluiu a verificação em duas etapas. Saia e entre novamente, informando o código do aplicativo autenticador.";
+
+function ehExigenciaDeSegundoFator(e: { code?: unknown }, mensagem: string): boolean {
+  return e.code === "42501" && /dois fatores|exige_aal2/i.test(mensagem);
+}
+
 interface ErroDoBanco {
   message?: unknown;
   code?: unknown;
@@ -49,6 +62,10 @@ interface ErroDoBanco {
 export function mensagemDoErro(erro: unknown): string {
   const e: ErroDoBanco = typeof erro === "object" && erro !== null ? (erro as ErroDoBanco) : {};
   const mensagem = typeof e.message === "string" ? e.message : "";
+
+  if (ehExigenciaDeSegundoFator(e, mensagem)) {
+    return MENSAGEM_EXIGE_SEGUNDO_FATOR;
+  }
 
   if (e.code === "23503" && mensagem.includes(CONSTRAINT_CLIENTE_CONTRATO)) {
     // `UPDATE` de contracts: o Postgres fala da tabela referenciada. `INSERT` ou

@@ -13,13 +13,13 @@ export const metadata: Metadata = {
 
 /**
  * Configurações → Segurança (PR F) — a única tela administrativa acessível
- * pelos DOIS papéis, admin e operacional. É aqui que o operacional ativa o
- * segundo fator por vontade própria; o admin só vê o próprio estado, que já
- * chega sempre "ativo" (ele não alcança `liberado` sem ter passado por AAL2).
+ * pelos DOIS papéis, admin e operacional. É aqui que cada titular ativa ou
+ * desativa o próprio segundo fator, por vontade própria (AUTH-01B: opcional
+ * para os dois). Nenhuma funcionalidade exige o segundo fator.
  *
  * O `(painel)/layout.tsx` já garante `liberado` antes de qualquer página
  * deste grupo renderizar — sem sessão vai para `/login`, sem papel para a
- * tela de conta sem papel, e `mfa-ausente`/`mfa-pendente` para `/mfa`. Esta
+ * tela de conta sem papel, e `mfa-pendente` (fator ativo sem o código) para `/mfa`. Esta
  * checagem não confia nessa ordem, no mesmo espírito de
  * `exigirAdmin()`/`exigirOperacional()`: fecha de novo, por conta própria, e
  * não reimplementa a decisão — só chama `lerAcesso()` e `resolverPapelEfetivo()`,

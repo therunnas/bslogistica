@@ -10,7 +10,7 @@ import { RPC_REGRAS_DEFINITIVAS } from "@/lib/vigencias";
 
 /**
  * Camada de dados da migration 030: calendário de feriados e o arredondamento acumulado do
- * fechamento. Leitura sob RLS (admin AAL2); escrita só pelas RPCs.
+ * fechamento. Leitura sob RLS (admin); escrita só pelas RPCs.
  */
 
 const cliente = () => criarClienteNavegador();

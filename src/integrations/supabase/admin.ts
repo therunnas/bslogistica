@@ -23,11 +23,10 @@ import type { Database } from "./types";
  *     não existe outra forma de chamar a Admin API do GoTrue;
  *   - escrever em `public.user_roles`: a tabela só tem
  *     `user_roles_select_own` (SELECT da própria linha). Não há NENHUMA
- *     policy de INSERT/UPDATE/DELETE para `authenticated` — nem para admin em
- *     AAL2 —, de propósito, então só `service_role` grava papel.
+ *     policy de INSERT/UPDATE/DELETE para `authenticated` — nem para admin —, de propósito, então só `service_role` grava papel.
  *
  * `public.user_operation_access`, ao contrário, JÁ tem policy `FOR ALL` para
- * admin em AAL2 desde a migration 013 — por isso
+ * admin desde a migration 013 — por isso
  * `src/lib/admin-usuarios/operacoes.ts` usa `criarClienteServidor()` (a
  * sessão real do admin), não este cliente. Menos código correndo com
  * privilégio total é menos superfície.

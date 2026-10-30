@@ -389,11 +389,11 @@ $bloco_d$;
 
 do $bloco_f$
 begin
-  perform pg_temp.registrar('F1. 11 policies *_exige_aal2 continuam existindo', '11',
+  perform pg_temp.registrar('F1. 15 policies *_exige_aal2 continuam existindo (AUTH-01B: 9 cotidianas + 6 de escrita estrita de invoices e invoice_items)', '15',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and policyname like '%_exige_aal2'));
 
-  perform pg_temp.registrar('F2. e todas continuam RESTRICTIVE', '11',
+  perform pg_temp.registrar('F2. e todas continuam RESTRICTIVE', '15',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and policyname like '%_exige_aal2'
         and permissive = 'RESTRICTIVE'));

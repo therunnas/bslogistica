@@ -293,7 +293,7 @@ export const SELECT_DO_FECHAMENTO = [
 ].join(", ");
 
 /**
- * A fonte real. Usa o cliente da SESSÃO do admin, então a RLS (`aal2` e `admin`)
+ * A fonte real. Usa o cliente da SESSÃO do admin, então a RLS (`admin` e o piso de MFA da conta, `mfa_cotidiano_ok()`)
  * continua sendo a fronteira dos dados. Nenhum `service_role`.
  */
 export function criarFonteSupabase(

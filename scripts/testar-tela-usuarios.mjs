@@ -255,7 +255,7 @@ verificar(
   true,
 );
 verificar(
-  "E2. chama exigirAdmin e devolve o bloqueio",
+  "E2. chama exigirAdmin (área CRÍTICA: AAL2 de fato) e devolve o bloqueio",
   /const bloqueio = await exigirAdmin\(\);\s*\n\s*if \(bloqueio\) return bloqueio;/.test(
     fontes.pagina,
   ),
@@ -306,8 +306,8 @@ for (const arquivo of ["hooks", "painel", "gerenciar"]) {
     false,
   );
   verificar(
-    `F5.${arquivo} — sem exigirAdminAal2 duplicado (isso é do backend)`,
-    /exigirAdminAal2/.test(fontes[arquivo]),
+    `F5.${arquivo} — sem exigirAdminAtor duplicado (isso é do backend)`,
+    /exigirAdminAtor/.test(fontes[arquivo]),
     false,
   );
 }
@@ -339,8 +339,8 @@ verificar(
   false,
 );
 verificar(
-  "F9. _acoes.ts não foi alterado para pular a autorização (chama exigirAdminAal2 em toda ação)",
-  (fontes.acoes.match(/await exigirAdminAal2\(\)/g) ?? []).length,
+  "F9. _acoes.ts não foi alterado para pular a autorização (chama exigirAdminAtor em toda ação)",
+  (fontes.acoes.match(/await exigirAdminAtor\(\)/g) ?? []).length,
   9,
 );
 
@@ -370,7 +370,7 @@ verificar(
 );
 verificar(
   "F14. a Server Action de operações disponíveis exige admin em AAL2",
-  /export async function listarOperacoesDisponiveisAction\(\)[\s\S]{0,120}await exigirAdminAal2\(\)/.test(
+  /export async function listarOperacoesDisponiveisAction\(\)[\s\S]{0,120}await exigirAdminAtor\(\)/.test(
     fontes.acoes,
   ),
   true,
@@ -503,7 +503,7 @@ verificar(
 );
 verificar(
   "I2. a tela não referencia aal1/aal2 (isso é decisão do guard e do backend)",
-  /aal1|aal2/i.test(semComentarios(telaInteira + fontes.pagina)),
+  /\baal[12]\b/i.test(semComentarios(telaInteira + fontes.pagina)),
   false,
 );
 verificar(

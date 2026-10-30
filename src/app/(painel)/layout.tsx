@@ -12,8 +12,9 @@ import { VerificacaoIndisponivel } from "./_components/verificacao-indisponivel"
  *
  * A verificação acontece no servidor, antes de qualquer HTML ser enviado: quem
  * não tem acesso não recebe nem a marcação da tela. Vale também para o segundo
- * fator — sem AAL2 o painel não é renderizado, então não existe caminho de
- * "esconder no cliente" a ser burlado desativando JavaScript.
+ * fator, quando a conta tem um: sem o TOTP (sessão AAL1 de conta com fator verificado) o painel
+ * não é renderizado, então não existe caminho de "esconder no cliente" a ser burlado desativando
+ * JavaScript.
  *
  * Isto governa o que a interface mostra. A proteção real dos dados continua
  * sendo a RLS no banco.
@@ -29,9 +30,10 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   if (acesso.situacao === "mfa-indisponivel")
     return <VerificacaoIndisponivel email={acesso.email} />;
 
-  // Cadastrar o primeiro fator e responder ao desafio acontecem na mesma tela,
-  // que fica fora deste layout justamente para não ser barrada por ele.
-  if (acesso.situacao === "mfa-ausente" || acesso.situacao === "mfa-pendente") redirect("/mfa");
+  // Responder ao desafio do fator JÁ ATIVO acontece em /mfa, que fica fora deste layout justamente
+  // para não ser barrada por ele. Conta SEM fator não passa por aqui (o segundo fator é opcional e
+  // protege só o login) e entra em AAL1 com tudo do seu papel; nenhuma operação pede novo código.
+  if (acesso.situacao === "mfa-pendente") redirect("/mfa");
 
   // O papel decide o que a navegação oferece. O que ela NÃO oferece continua
   // alcançável por URL, e é `exigirAdmin()`, em cada tela administrativa, que

@@ -77,8 +77,14 @@ export type PapelDoAcesso = "admin" | "operacional" | "sem-papel";
  */
 export type EstadoDoFator = "sem-fator" | "exige-fator" | "indeterminado";
 
-/** Saídas possíveis da decisão de acesso, incluindo a que não é de MFA. */
-export type DecisaoDeAcesso = SituacaoMfa | "sem-papel";
+/**
+ * Saídas possíveis da decisão de acesso, incluindo a que não é de MFA.
+ *
+ * `mfa-ausente` NÃO está aqui desde a AUTH-01B: o segundo fator é opcional para os dois papéis, então
+ * conta sem fator é `liberado` em AAL1. O valor continua existindo em `SituacaoMfa` só para a
+ * recuperação de senha e a tela `/mfa`, que ainda distinguem "não tem fator" de "tem e não provou".
+ */
+export type DecisaoDeAcesso = Exclude<SituacaoMfa, "mfa-ausente"> | "sem-papel";
 
 /**
  * Traduz a resposta crua da RPC de MFA para o estado do fator.
@@ -119,13 +125,12 @@ export function interpretarBloqueioDeExcecao(data: unknown, houveErro: boolean):
  * 5. fator verificado (ou conta inexistente) em `aal1` -> `mfa-pendente`, para
  *    os dois papéis. **É aqui que o operacional que optou por MFA é barrado em
  *    AAL1**: MFA opcional não é MFA dispensável;
- * 6. `aal1` sem fator verificado -> `liberado` para `operacional`,
- *    `mfa-ausente` para `admin`.
+ * 6. `aal1` sem fator verificado -> `liberado`, para os DOIS papéis.
  *
- * O passo 6 é a única assimetria entre os papéis, e é a política inteira do PR
- * C: o administrador nunca recebe exceção de AAL1 — sem fator, ele vai
- * cadastrar um —, e o operacional sem fator trabalha em AAL1 pela superfície
- * estreita de RPC da `013`, sem ser obrigado a cadastrar MFA.
+ * AUTH-01D.R1: o MFA é opcional para `admin` e para `operacional` e protege só o LOGIN. "Liberado"
+ * vale para qualquer funcionalidade do papel: nenhuma operação exige AAL2 nem novo código (a única
+ * exceção, desativar o próprio fator, é imposta pela interface de Configurações). Com fator
+ * verificado nada muda no login: o passo 5 barra em AAL1 até o TOTP, "opcional" não é dispensável.
  *
  * `admin` + `operacional` não aparece aqui porque já chega resolvido: o papel
  * efetivo de quem acumula os dois é `admin`, como em `resolverPapelEfetivo` e
@@ -140,8 +145,8 @@ export function interpretarBloqueioDeExcecao(data: unknown, houveErro: boolean):
  * servidor por `getUser()`.
  *
  * E o mais importante: isto decide o que a interface entrega. Quem recusa os
- * dados é o banco — as 11 policies `*_exige_aal2` e as cinco RPCs, que
- * revalidam papel, nível e estado de MFA por dentro, com ou sem este arquivo.
+ * dados é o banco — as policies (`*_exige_aal2`, nome histórico, que hoje chamam
+ * `mfa_cotidiano_ok()`) e as RPCs, que revalidam papel e estado de MFA por dentro, com ou sem este arquivo.
  */
 export function decidirAcesso(
   papel: PapelDoAcesso,
@@ -153,7 +158,7 @@ export function decidirAcesso(
   if (nivelAtual !== "aal1") return "mfa-indisponivel";
   if (estadoDoFator === "indeterminado") return "mfa-indisponivel";
   if (estadoDoFator === "exige-fator") return "mfa-pendente";
-  return papel === "operacional" ? "liberado" : "mfa-ausente";
+  return "liberado";
 }
 
 export type DecisaoMfaNaRecuperacao = "desafiar-mfa" | "prosseguir" | "falhar";

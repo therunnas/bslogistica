@@ -241,19 +241,13 @@ verificar(
 console.log("\nC. MFA, AAL e o restante seguem intocados\n");
 
 verificar(
-  "C1. o layout continua fechando o painel sem AAL2",
-  /situacao === "mfa-ausente" \|\| acesso\.situacao === "mfa-pendente"\) redirect\("\/mfa"\)/.test(
-    fontes.layout,
-  ),
+  "C1. o layout continua fechando o painel até o TOTP de quem já tem fator ativo (AUTH-01B)",
+  /situacao === "mfa-pendente"\) redirect\("\/mfa"\)/.test(fontes.layout),
   true,
 );
 verificar(
-  "C2. nenhum aal foi tocado pelo B2.3",
-  /aal1|aal2/i.test(
-    semComentarios(fontes.guard) +
-      semComentarios(caminhoOperacional) +
-      semComentarios(fontes.dashboard),
-  ),
+  "C2. nenhum aal foi tocado pelo B2.3 (o guard crítico da AUTH-01B é de outra etapa)",
+  /\baal[12]\b/i.test(semComentarios(caminhoOperacional) + semComentarios(fontes.dashboard)),
   false,
 );
 verificar(

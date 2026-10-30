@@ -3,8 +3,8 @@
  *
  * Este módulo é a única porta de dados do caminho operacional, e ele fala
  * **somente** por RPC: nenhuma leitura ou escrita direta de tabela acontece
- * aqui. Não é preferência de estilo — em AAL1 as 11 policies `*_exige_aal2`
- * recusam as tabelas de negócio, e um `from(...)` devolveria zero linha ou erro.
+ * aqui. Não é preferência de estilo — as policies das tabelas de negócio
+ * recusam o papel operacional, e um `from(...)` devolveria zero linha ou erro.
  *
  * Também não importa `../billing` nem `../ledger`, e não conhece contrato,
  * fatura nem qualquer número de dinheiro: o que essa superfície transporta é

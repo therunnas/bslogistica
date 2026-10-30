@@ -3,7 +3,7 @@
  *
  * Um caminho só: `salvar_apontamento_operacional`. Não há mutation de exclusão
  * — a superfície não tem DELETE —, nem de fechar ou reabrir folha, que é ato
- * administrativo em AAL2.
+ * administrativo.
  *
  * Depois do sucesso, invalida **apenas** os apontamentos daquele par
  * operação/turno e data. Operações, turnos e equipe não mudam por conta de uma

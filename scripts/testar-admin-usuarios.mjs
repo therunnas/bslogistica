@@ -102,19 +102,19 @@ const servicoFonte = readFileSync(
 );
 
 verificar(
-  "A1. exigirAdminAal2 não recebe parâmetro nenhum",
-  /export async function exigirAdminAal2\(\)/.test(autorizacao),
+  "A1. exigirAdminAtor não recebe parâmetro nenhum",
+  /export async function exigirAdminAtor\(\)/.test(autorizacao),
   true,
 );
 verificar(
-  "A2. exigirAdminAal2 lê o uid da sessão via getUser, não de argumento",
+  "A2. exigirAdminAtor lê o uid da sessão via getUser, não de argumento",
   /supabase\.auth\.getUser\(\)/.test(autorizacao),
   true,
 );
 verificar('A3. admin.ts nunca declara "use client"', !/["']use client["']/.test(admin), true);
 verificar(
-  "A4. toda Server Action de _acoes.ts chama exigirAdminAal2 antes de tudo",
-  (acoes.match(/exigirAdminAal2\(\)/g) ?? []).length >= 8,
+  "A4. toda Server Action de _acoes.ts chama exigirAdminAtor antes de tudo",
+  (acoes.match(/exigirAdminAtor\(\)/g) ?? []).length >= 8,
   true,
 );
 verificar(

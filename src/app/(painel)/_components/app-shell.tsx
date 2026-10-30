@@ -76,8 +76,7 @@ const ITEM_SEGURANCA = {
 } as const;
 
 // Rota técnica de manutenção (implantação e reversão do cálculo por vigência): NÃO está no menu.
-// Fica aqui só para o título da página; o acesso é decidido no servidor (`exigirAdmin`, admin com
-// AAL2), e ausência de link não é controle de acesso.
+// Fica aqui só para o título da página; o acesso é decidido no servidor (`exigirAdmin`, só admin), e ausência de link não é controle de acesso.
 const ROTA_TECNICA_IMPLANTACAO = {
   href: "/implantacao-vigencias",
   label: "Implantação das vigências",

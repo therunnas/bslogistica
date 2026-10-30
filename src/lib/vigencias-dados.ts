@@ -23,7 +23,7 @@ import {
  * Camada de dados das condições financeiras versionadas (C05-B4.6).
  *
  * Usa o cliente tipado pelo `Database` gerado (tabelas de versões, RPCs e a chave do motor vêm
- * das migrations 021 a 026). Tudo aqui é leitura ou RPC de administrador (AAL2): quem não é admin
+ * das migrations 021 a 026). Tudo aqui é leitura ou RPC de administrador: quem não é admin
  * recebe `42501` do banco, e a tela nem chega a este ponto (o painel é protegido pelo guard).
  * Nenhuma escrita direta em tabela de versões.
  */
@@ -320,7 +320,7 @@ export function useCriarComVigencia(tipo: TipoDeVigencia, invalidar: string[]) {
 
 /**
  * Implantação (C05-B5.7): as duas listas que o banco já calcula (pendências e divergências) e a
- * contagem dos apontamentos legados. Só leitura, admin AAL2; erro nunca vira "lista vazia".
+ * contagem dos apontamentos legados. Só leitura, admin; erro nunca vira "lista vazia".
  */
 export const CHAVE_DA_IMPLANTACAO = ["vigencias-implantacao"] as const;
 
