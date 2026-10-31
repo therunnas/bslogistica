@@ -1548,11 +1548,11 @@ select pg_temp.registrar('F. motor_custo_do_dia (20261021100000_025)', '1|e72d9d
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'motor_custo_do_dia'));
-select pg_temp.registrar('F. gerar_fatura (20261101120000_034)', '1|994858a45b04f13cdf1e930eda028c54',
+select pg_temp.registrar('F. gerar_fatura (20261104120000_037)', '1|b649c403882f4a779707b19694a02bf8',
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'gerar_fatura'));
-select pg_temp.registrar('F. ajustes_de_arredondamento_acumulado (20261030120000_032)', '1|2deb9b6990a8976e769dfe6d4311b872',
+select pg_temp.registrar('F. ajustes_de_arredondamento_acumulado (20261104120000_037)', '1|2a28f0618bb71f4be49d621c98321033',
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'ajustes_de_arredondamento_acumulado'));

@@ -499,6 +499,16 @@ function ledgerOriginal({ entries, timesheets, operations, clients, employees, s
         overtimeMinutes: entry.overtime_minutes,
         dailies: entry.status === "absent" ? 0 : 1,
         billed: Number(entry.billed_amount ?? 0),
+        // FIN-PR-03: o legado decompõe pela regra de sempre; a diária é o cobrado menos a HE, e não
+        // há horas especiais nem adicional diário.
+        dailyValue:
+          entry.status === "absent"
+            ? 0
+            : Number(entry.billed_amount ?? 0) -
+              Math.max(
+                0,
+                Number(entry.billed_amount ?? 0) - Number(entry.daily_rate_snapshot ?? 0),
+              ),
         otValue:
           entry.status === "absent"
             ? 0
@@ -506,6 +516,8 @@ function ledgerOriginal({ entries, timesheets, operations, clients, employees, s
                 0,
                 Number(entry.billed_amount ?? 0) - Number(entry.daily_rate_snapshot ?? 0),
               ),
+        specialValue: 0,
+        additionalValue: 0,
         cost: Number(entry.cost_amount ?? 0),
         invoiceId: entry.invoice_id,
         timesheetStatus: ts.status,
@@ -831,9 +843,20 @@ console.log("\nG. Pureza do núcleo e sem laço de invalidação\n");
 
 {
   const nucleo = ler("src/lib/ledger-estado.ts");
+  // FIN-PR-03: o único valor importado é a regra compartilhada dos componentes, que por sua vez
+  // não importa nada (a suíte segue rodando o núcleo direto, com o resolvedor de .ts).
   verificar(
-    "G1. núcleo não importa valor algum (só tipos)",
-    String(/^\s*import\s+(?!type\b)/m.test(nucleo)),
+    "G1. núcleo só importa tipos e a regra dos componentes (sem dependência própria)",
+    String(
+      [...nucleo.matchAll(/^\s*import\s+(?!type\b)[^;]*from\s+"([^"]+)"/gm)]
+        .map((m) => m[1])
+        .join(","),
+    ),
+    "./componentes-financeiros",
+  );
+  verificar(
+    "G1b. a regra dos componentes não importa nada em tempo de execução",
+    String(/^\s*import\s+(?!type\b)/m.test(ler("src/lib/componentes-financeiros.ts"))),
     "false",
   );
   verificar(

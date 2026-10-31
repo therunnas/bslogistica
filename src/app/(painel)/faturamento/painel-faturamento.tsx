@@ -107,6 +107,7 @@ export function PainelFaturamento() {
         dailies: number;
         otMinutes: number;
         billed: number;
+        dailyValue: number;
         otValue: number;
         cost: number;
       }
@@ -118,6 +119,7 @@ export function PainelFaturamento() {
         dailies: 0,
         otMinutes: 0,
         billed: 0,
+        dailyValue: 0,
         otValue: 0,
         cost: 0,
       };
@@ -125,6 +127,7 @@ export function PainelFaturamento() {
       item.dailies += row.dailies;
       item.otMinutes += row.overtimeMinutes;
       item.billed += row.billed;
+      item.dailyValue += row.dailyValue;
       item.otValue += row.otValue;
       item.cost += row.cost;
 
@@ -145,6 +148,7 @@ export function PainelFaturamento() {
       cost: sumBy(period, (row) => row.cost),
       otMinutes: sumBy(period, (row) => row.overtimeMinutes),
       dailies: sumBy(period, (row) => row.dailies),
+      dailyValue: round2(sumBy(period, (row) => row.dailyValue)),
       otValue: round2(sumBy(period, (row) => row.otValue)),
     };
   }, [period]);
@@ -166,7 +170,8 @@ export function PainelFaturamento() {
   const semNadaParaGerar =
     (!period.length && !adicionaisElegiveis.length) || !adicionaisProntos || !ajustesProntos;
 
-  const dailiesValue = round2(totals.billed - totals.otValue);
+  // Diárias pelo componente (FIN-PR-03): adicional e horas especiais não entram aqui nem na HE.
+  const dailiesValue = totals.dailyValue;
 
   const overtimeValue = totals.otValue;
 

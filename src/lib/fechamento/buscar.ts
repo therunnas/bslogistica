@@ -72,6 +72,8 @@ function ehValores(valor: unknown): boolean {
       "minutosExtrasCobrados",
       "diariaCentavos",
       "extraCentavos",
+      "especialCentavos",
+      "adicionalDiarioCentavos",
       "custoCentavos",
       "faturadoCentavos",
       "resultadoCentavos",

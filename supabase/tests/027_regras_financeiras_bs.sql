@@ -365,9 +365,10 @@ select pg_temp.registrar('H3. conciliação: total = receita dos apontamentos + 
                           + (select sum(amount) from public.billing_additionals where invoice_id = i.id))::text
           || '|' || (i.total_amount - i.total_cost)::text
      from public.invoices i where i.id::text = (select id from _fat)));
+-- FIN-PR-03: itens lidos pelo TIPO; a descrição passou a nomear a tarifa.
 select pg_temp.registrar('H4. o adicional não virou diária nem hora extra: itens de diárias somam 1.035,00 em 8 (extras 220,00 à parte)', '1035.00|8.00|220.00',
-  (select sum(amount)::text || '|' || sum(quantity)::text from public.invoice_items where invoice_id::text = (select id from _fat) and description like '%— diárias')
-  || '|' || (select sum(amount)::text from public.invoice_items where invoice_id::text = (select id from _fat) and description like '%— horas extras'));
+  (select sum(amount)::text || '|' || sum(quantity)::text from public.invoice_items where invoice_id::text = (select id from _fat) and kind = 'diarias')
+  || '|' || (select sum(amount)::text from public.invoice_items where invoice_id::text = (select id from _fat) and kind = 'horas_extras'));
 select pg_temp.registrar('H5. A1 vinculado; A2 (cruza a quinzena) e A3 (cancelado) não', 'true|false|false',
   (select (invoice_id::text = (select id from _fat))::text from public.billing_additionals where id::text = (select id from _adic where k = 'A1'))
   || '|' || (select (invoice_id is not null)::text from public.billing_additionals where id::text = (select id from _adic where k = 'A2'))

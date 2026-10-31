@@ -77,6 +77,17 @@ function tupla(linha: LinhaNormalizada) {
     linha.funcao,
     linha.operacao,
     linha.turno,
+    // FIN-PR-03: componentes só entram na assinatura quando são dado gravado (V2). O legado é
+    // derivado do cobrado e da diária, que já estão acima, e a assinatura dele não muda.
+    ...(linha.versaoDoCalculo === 2
+      ? [
+          2,
+          linha.diariaCentavos,
+          linha.extraCentavos,
+          linha.especialCentavos,
+          linha.adicionalDiarioCentavos,
+        ]
+      : []),
   ];
 }
 

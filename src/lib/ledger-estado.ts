@@ -24,6 +24,11 @@
  * Coerência transacional exige uma agregação no banco, fora desta fase.
  */
 
+import {
+  ErroDeComponentes,
+  centavosDeReais,
+  componentesDoLancamento,
+} from "./componentes-financeiros";
 import type {
   AttendanceStatus,
   Client,
@@ -51,7 +56,14 @@ export interface LedgerRow {
   overtimeMinutes: number;
   dailies: number;
   billed: number;
+  /** Diária cobrada (V2: componente gravado; legado: cobrado − HE). */
+  dailyValue: number;
+  /** Hora extra cobrada (V2: componente gravado; legado: max(cobrado − diária, 0)). */
   otValue: number;
+  /** Horas especiais de domingo/feriado (V2, PR 09). Zero no legado. */
+  specialValue: number;
+  /** Adicional diário (PR 08). Zero no legado. */
+  additionalValue: number;
   cost: number;
   invoiceId: string | null;
   timesheetStatus: "open" | "closed";
@@ -109,7 +121,8 @@ export type TipoDeRelacaoAusente =
   | "folha-sem-operacao"
   | "operacao-sem-cliente"
   | "lancamento-sem-colaborador"
-  | "folha-sem-turno";
+  | "folha-sem-turno"
+  | "componentes-inconsistentes";
 
 export interface ProblemaDeRelacao {
   readonly tipo: TipoDeRelacaoAusente;
@@ -124,6 +137,7 @@ const CONSULTAS_DA_RELACAO: Readonly<Record<TipoDeRelacaoAusente, readonly NomeD
   "operacao-sem-cliente": ["operations", "clients"],
   "lancamento-sem-colaborador": ["entries", "employees"],
   "folha-sem-turno": ["timesheets", "shifts"],
+  "componentes-inconsistentes": ["entries"],
 };
 
 const ROTULO_DA_RELACAO: Readonly<Record<TipoDeRelacaoAusente, string>> = {
@@ -132,6 +146,8 @@ const ROTULO_DA_RELACAO: Readonly<Record<TipoDeRelacaoAusente, string>> = {
   "operacao-sem-cliente": "lançamento(s) de operação sem cliente",
   "lancamento-sem-colaborador": "lançamento(s) sem colaborador",
   "folha-sem-turno": "lançamento(s) de folha com turno inexistente",
+  "componentes-inconsistentes":
+    "lançamento(s) com componentes do valor que não fecham com o cobrado",
 };
 
 export type LedgerAvaliacao =
@@ -212,6 +228,27 @@ export function montarLinhas(entrada: {
     }
     if (!completa || !op || !client || !employee) continue;
 
+    // Componentes do valor cobrado: uma regra só, em `componentes-financeiros.ts`. Lançamento V2
+    // com componentes que não fecham fica fora das linhas e aparece como problema, nunca "consertado".
+    let componentes;
+    try {
+      componentes = componentesDoLancamento({
+        rotulo: `lançamento ${entry.id}`,
+        status: entry.status,
+        cobradoCentavos: centavosDeReais(entry.billed_amount ?? 0) ?? 0,
+        diariaSnapshotCentavos: centavosDeReais(entry.daily_rate_snapshot ?? 0) ?? 0,
+        calcVersion: entry.calc_version,
+        baseCentavos: centavosDeReais(entry.billed_base_amount),
+        extraCentavos: centavosDeReais(entry.billed_overtime_amount),
+        especialCentavos: centavosDeReais(entry.billed_special_amount),
+        adicionalCentavos: centavosDeReais(entry.additional_amount),
+      });
+    } catch (erro) {
+      if (!(erro instanceof ErroDeComponentes)) throw erro;
+      marcar("componentes-inconsistentes");
+      continue;
+    }
+
     rows.push({
       entryId: entry.id,
       timesheetId: ts.id,
@@ -231,10 +268,10 @@ export function montarLinhas(entrada: {
       overtimeMinutes: entry.billed_overtime_minutes ?? entry.overtime_minutes,
       dailies: entry.status === "absent" ? 0 : 1,
       billed: Number(entry.billed_amount ?? 0),
-      otValue:
-        entry.status === "absent"
-          ? 0
-          : Math.max(0, Number(entry.billed_amount ?? 0) - Number(entry.daily_rate_snapshot ?? 0)),
+      dailyValue: componentes.diariaCentavos / 100,
+      otValue: componentes.extraCentavos / 100,
+      specialValue: componentes.especialCentavos / 100,
+      additionalValue: componentes.adicionalCentavos / 100,
       cost: Number(entry.cost_amount ?? 0),
       invoiceId: entry.invoice_id,
       timesheetStatus: ts.status,

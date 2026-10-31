@@ -93,6 +93,16 @@ export interface LinhaBrutaDoFechamento {
   invoice_id: string | null;
   faturado: string;
   custo: string;
+  /**
+   * Componentes do valor cobrado (migration 036). Só vêm quando o banco anuncia o núcleo V2
+   * (`nucleo_v2`) e a leitura usa `SELECT_DO_FECHAMENTO_COM_COMPONENTES`; num banco sem a 036 a
+   * consulta não pede essas colunas (elas não existem lá). `calc_version` nulo = legado.
+   */
+  calc_version?: number | null;
+  base?: string | null;
+  he?: string | null;
+  especial?: string | null;
+  adicional_diario?: string | null;
   taxa_da_diaria: string;
   employees: { id: string; name: string; role: string | null } | null;
   timesheets: {
@@ -293,13 +303,29 @@ export const SELECT_DO_FECHAMENTO = [
 ].join(", ");
 
 /**
+ * O mesmo `select` com os componentes do valor cobrado (FIN-PR-03). Só para banco com a migration
+ * 036 — quem decide é `estado_motor_vigencia().nucleo_v2`, lido antes da consulta. Pedir estas
+ * colunas num banco sem a 036 faria a consulta inteira falhar.
+ */
+export const SELECT_DO_FECHAMENTO_COM_COMPONENTES = [
+  SELECT_DO_FECHAMENTO,
+  "calc_version",
+  "base:billed_base_amount::text",
+  "he:billed_overtime_amount::text",
+  "especial:billed_special_amount::text",
+  "adicional_diario:additional_amount::text",
+].join(", ");
+
+/**
  * A fonte real. Usa o cliente da SESSÃO do admin, então a RLS (`admin` e o piso de MFA da conta, `mfa_cotidiano_ok()`)
  * continua sendo a fronteira dos dados. Nenhum `service_role`.
  */
 export function criarFonteSupabase(
   supabase: SupabaseClient<Database>,
   filtro: FiltroDoFechamento,
+  componentes = false,
 ): FonteDeLinhas {
+  const colunas = componentes ? SELECT_DO_FECHAMENTO_COM_COMPONENTES : SELECT_DO_FECHAMENTO;
   return {
     async lerPagina({ cursor, limite, contar }) {
       // O recorte de cliente e período é repetido (e não compartilhado) na
@@ -307,7 +333,7 @@ export function criarFonteSupabase(
       // filtro, e um teste confere que ele chega ao banco nas duas.
       let consulta = supabase
         .from("timesheet_entries")
-        .select(SELECT_DO_FECHAMENTO, contar ? { count: "exact" } : undefined)
+        .select(colunas, contar ? { count: "exact" } : undefined)
         .eq("timesheets.operations.client_id", filtro.clienteId)
         .gte("timesheets.work_date", filtro.inicio)
         .lte("timesheets.work_date", filtro.fim);

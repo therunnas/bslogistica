@@ -64,10 +64,20 @@ export interface Valores {
    * a regra que a cobrança seguia então — a mesma que `gerar_fatura` aplica.
    */
   minutosExtrasCobrados: number;
-  /** Soma das diárias de cada lançamento (`billed − extra`), em centavos. */
+  /**
+   * Soma das diárias, em centavos. V2 (`calc_version = 2`): o componente gravado
+   * `billed_base_amount`. Legado: `billed − extra` (ver `componentes-financeiros.ts`).
+   */
   diariaCentavos: number;
-  /** Soma de `GREATEST(billed − daily_rate_snapshot, 0)` por lançamento, em centavos. */
+  /**
+   * Soma das horas extras, em centavos. V2: `billed_overtime_amount`. Legado:
+   * `GREATEST(billed − daily_rate_snapshot, 0)` por lançamento.
+   */
   extraCentavos: number;
+  /** Soma das horas especiais de domingo/feriado (V2, PR 09), em centavos. Zero no legado. */
+  especialCentavos: number;
+  /** Soma do adicional diário (PR 08), em centavos. Zero no legado. Não é `billing_additionals`. */
+  adicionalDiarioCentavos: number;
   /** Soma de `cost_amount` (custo previsto = valor devido), em centavos. */
   custoCentavos: number;
   /** Soma de `billed_amount`, em centavos. */
@@ -334,5 +344,11 @@ export interface LinhaNormalizada {
   diariaSnapshotCentavos: number;
   diariaCentavos: number;
   extraCentavos: number;
+  /** Horas especiais de domingo/feriado (V2, PR 09). Zero no legado e até lá. */
+  especialCentavos: number;
+  /** Adicional diário (PR 08). Zero no legado e até lá. Não é `billing_additionals`. */
+  adicionalDiarioCentavos: number;
+  /** `calc_version`: 2 = núcleo V2; `null` = legado (030 ou anterior, ou banco sem a 036). */
+  versaoDoCalculo: 2 | null;
   invoiceId: string | null;
 }

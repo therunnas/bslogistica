@@ -16,6 +16,8 @@ export interface Acumulador {
   minutosExtrasCobrados: number;
   diariaCentavos: number;
   extraCentavos: number;
+  especialCentavos: number;
+  adicionalDiarioCentavos: number;
   custoCentavos: number;
   faturadoCentavos: number;
 }
@@ -27,6 +29,8 @@ export function novoAcumulador(): Acumulador {
     minutosExtrasCobrados: 0,
     diariaCentavos: 0,
     extraCentavos: 0,
+    especialCentavos: 0,
+    adicionalDiarioCentavos: 0,
     custoCentavos: 0,
     faturadoCentavos: 0,
   };
@@ -58,6 +62,16 @@ export function acumular(acumulador: Acumulador, linha: LinhaNormalizada): void 
     linha.extraCentavos,
     "horas extras (centavos)",
   );
+  acumulador.especialCentavos = somarCentavos(
+    acumulador.especialCentavos,
+    linha.especialCentavos,
+    "horas especiais (centavos)",
+  );
+  acumulador.adicionalDiarioCentavos = somarCentavos(
+    acumulador.adicionalDiarioCentavos,
+    linha.adicionalDiarioCentavos,
+    "adicional diário (centavos)",
+  );
   acumulador.custoCentavos = somarCentavos(
     acumulador.custoCentavos,
     linha.custoCentavos,
@@ -83,6 +97,8 @@ export function fecharValores(acumulador: Acumulador): Valores {
     minutosExtrasCobrados: acumulador.minutosExtrasCobrados,
     diariaCentavos: acumulador.diariaCentavos,
     extraCentavos: acumulador.extraCentavos,
+    especialCentavos: acumulador.especialCentavos,
+    adicionalDiarioCentavos: acumulador.adicionalDiarioCentavos,
     custoCentavos: acumulador.custoCentavos,
     faturadoCentavos: acumulador.faturadoCentavos,
     resultadoCentavos,

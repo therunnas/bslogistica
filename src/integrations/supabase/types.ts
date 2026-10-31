@@ -838,9 +838,14 @@ export type Database = {
       };
       timesheet_entries: {
         Row: {
+          additional_amount: number;
           billed_amount: number;
+          billed_base_amount: number | null;
+          billed_overtime_amount: number | null;
           billed_overtime_minutes: number | null;
+          billed_special_amount: number | null;
           break_minutes: number;
+          calc_version: number | null;
           check_in: string | null;
           check_out: string | null;
           contract_terms_id: string | null;
@@ -871,9 +876,14 @@ export type Database = {
           worked_minutes: number;
         };
         Insert: {
+          additional_amount?: number;
           billed_amount?: number;
+          billed_base_amount?: number | null;
+          billed_overtime_amount?: number | null;
           billed_overtime_minutes?: number | null;
+          billed_special_amount?: number | null;
           break_minutes?: number;
+          calc_version?: number | null;
           check_in?: string | null;
           check_out?: string | null;
           contract_terms_id?: string | null;
@@ -904,9 +914,14 @@ export type Database = {
           worked_minutes?: number;
         };
         Update: {
+          additional_amount?: number;
           billed_amount?: number;
+          billed_base_amount?: number | null;
+          billed_overtime_amount?: number | null;
           billed_overtime_minutes?: number | null;
+          billed_special_amount?: number | null;
           break_minutes?: number;
+          calc_version?: number | null;
           check_in?: string | null;
           check_out?: string | null;
           contract_terms_id?: string | null;
@@ -1129,6 +1144,19 @@ export type Database = {
       cancelar_adicional: {
         Args: { p_additional_id: string; p_reason: string };
         Returns: undefined;
+      };
+      componentes_do_lancamento: {
+        Args: {
+          p_adicional: number;
+          p_base: number;
+          p_calc_version: number;
+          p_cobrado: number;
+          p_diaria: number;
+          p_especial: number;
+          p_extra: number;
+          p_status: string;
+        };
+        Returns: Record<string, unknown>;
       };
       condicao_contrato_na_data: {
         Args: { p_contract_id: string; p_work_date: string };
@@ -1502,6 +1530,53 @@ export type Database = {
       };
       motor_sincronizar_colunas_interno: { Args: never; Returns: Json };
       motor_tipo_do_dia: { Args: { p_data: string }; Returns: string };
+      nucleo_arredondar_centavos: {
+        Args: { p_denominador: number; p_numerador: number };
+        Returns: number;
+      };
+      nucleo_arredondar_he_diaria: { Args: { p_minutos: number }; Returns: number };
+      nucleo_componentes_legado_010: {
+        Args: {
+          p_custo: number;
+          p_diaria: number;
+          p_entrada: string;
+          p_fator: number;
+          p_intervalo: number;
+          p_jornada: number;
+          p_previsto: number;
+          p_saida: string;
+          p_status: string;
+          p_tolerancia: number;
+        };
+        Returns: Record<string, unknown>;
+      };
+      nucleo_componentes_v2: {
+        Args: {
+          p_adicional: number;
+          p_arredondamento_especial: string;
+          p_custo_diario: number;
+          p_custo_hora_he: number;
+          p_diaria: number;
+          p_entrada: string;
+          p_fator_especial: number;
+          p_fator_he: number;
+          p_intervalo: number;
+          p_modo_he: string;
+          p_saida: string;
+          p_status: string;
+          p_tipo_dia: string;
+          p_tolerancia: number;
+        };
+        Returns: Record<string, unknown>;
+      };
+      nucleo_minutos_previstos: {
+        Args: { p_cruza: boolean; p_fim: string; p_inicio: string; p_intervalo: number };
+        Returns: number;
+      };
+      nucleo_minutos_trabalhados: {
+        Args: { p_entrada: string; p_intervalo: number; p_saida: string };
+        Returns: number;
+      };
       operador_autorizado: {
         Args: { p_operation_id: string };
         Returns: boolean;

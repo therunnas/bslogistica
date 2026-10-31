@@ -112,6 +112,15 @@ export interface TimesheetEntry {
   /** Minutos de hora extra cobrados e tipo do dia (migration 030); ausentes antes dela. */
   billed_overtime_minutes?: number | null;
   day_kind_snapshot?: string | null;
+  /**
+   * Componentes do valor cobrado (migration 036); ausentes num banco sem ela. `calc_version` 2 =
+   * núcleo V2; nulo = legado. Lidos por `componentes-financeiros.ts`, nunca derivados aqui.
+   */
+  calc_version?: number | null;
+  billed_base_amount?: number | null;
+  billed_overtime_amount?: number | null;
+  billed_special_amount?: number | null;
+  additional_amount?: number | null;
 }
 
 export interface Invoice {
