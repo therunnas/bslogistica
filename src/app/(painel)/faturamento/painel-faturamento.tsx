@@ -44,13 +44,20 @@ import { CHAVE_DOS_ADICIONAIS, useAdicionais } from "@/lib/adicionais-dados";
 import { CHAVE_DOS_AJUSTES, useAjustesDeArredondamento } from "@/lib/regras-definitivas-dados";
 import { marginPct, round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
+import { competenciasDoMes, ehCompetencia } from "@/lib/fechamento/periodo";
 import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
 import { toast } from "@/lib/notificacoes";
 import { useClients, useInvoices, useOperations } from "@/lib/queries";
-import { useRegrasDaBs, useRegrasDefinitivas } from "@/lib/vigencias-dados";
+import {
+  useCompetenciaDeCobranca,
+  usePeriodoContratual,
+  useRegrasDaBs,
+  useRegrasDefinitivas,
+} from "@/lib/vigencias-dados";
+import { ROTULO_DA_FREQUENCIA } from "@/lib/vigencias-ui";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -70,6 +77,8 @@ export function PainelFaturamento() {
   const regrasBs = useRegrasDaBs();
   // Arredondamento acumulado (030): mesma função que gerar_fatura usa.
   const regrasDefinitivas = useRegrasDefinitivas();
+  // Período contratual (038): a fatura é uma competência inteira da frequência do cliente.
+  const periodoContratual = usePeriodoContratual();
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
 
@@ -78,6 +87,16 @@ export function PainelFaturamento() {
   const [end, setEnd] = useState(initial.end);
 
   const selectedClient = clientId || clients.data?.[0]?.id || "";
+
+  const competencia = useCompetenciaDeCobranca(selectedClient, start, periodoContratual);
+  const frequencia = competencia.data?.frequencia ?? null;
+  const competenciasDoMesDoInicio =
+    frequencia !== null && /^\d{4}-\d{2}-\d{2}$/.test(start)
+      ? competenciasDoMes(frequencia, Number(start.slice(0, 4)), Number(start.slice(5, 7)))
+      : [];
+  // Sem a 038 o banco aceita o período livre, como antes.
+  const periodoEhCompetencia =
+    !periodoContratual || (frequencia !== null && ehCompetencia(frequencia, start, end));
 
   /**
    * Mesma regra de elegibilidade da RPC `gerar_fatura`: cliente, período,
@@ -168,7 +187,10 @@ export function PainelFaturamento() {
   const ajustesProntos = !regrasDefinitivas || ajustes.isSuccess;
   const totalAFaturar = round2(totals.billed + totalAdicionais + totalAjustes);
   const semNadaParaGerar =
-    (!period.length && !adicionaisElegiveis.length) || !adicionaisProntos || !ajustesProntos;
+    (!period.length && !adicionaisElegiveis.length) ||
+    !adicionaisProntos ||
+    !ajustesProntos ||
+    !periodoEhCompetencia;
 
   // Diárias pelo componente (FIN-PR-03): adicional e horas especiais não entram aqui nem na HE.
   const dailiesValue = totals.dailyValue;
@@ -197,6 +219,10 @@ export function PainelFaturamento() {
 
       if (!adicionaisProntos) {
         throw new Error("Aguarde a leitura dos adicionais de serviço antes de gerar a fatura.");
+      }
+
+      if (!periodoEhCompetencia) {
+        throw new Error("Escolha uma competência inteira da frequência do cliente.");
       }
 
       const { data, error } = await criarClienteNavegador().rpc("gerar_fatura", {
@@ -367,6 +393,47 @@ export function PainelFaturamento() {
               className={INPUT_CLASS}
             />
           </div>
+
+          {periodoContratual ? (
+            <div className="flex flex-wrap items-center gap-2 md:col-span-3">
+              {competencia.isError ? (
+                <p className="text-sm text-destructive">
+                  Não foi possível ler a frequência de fechamento do cliente.
+                </p>
+              ) : frequencia === null ? (
+                <p className="text-sm text-muted-foreground">Lendo a frequência de fechamento…</p>
+              ) : (
+                <>
+                  <Badge variant="secondary">
+                    Fechamento {ROTULO_DA_FREQUENCIA[frequencia].toLowerCase()}
+                  </Badge>
+                  {competenciasDoMesDoInicio.map((c) => (
+                    <Button
+                      key={c.inicio}
+                      type="button"
+                      variant={c.inicio === start && c.fim === end ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 rounded-xl"
+                      onClick={() => {
+                        setStart(c.inicio);
+                        setEnd(c.fim);
+                      }}
+                    >
+                      {dateBR(c.inicio)} a {dateBR(c.fim)}
+                    </Button>
+                  ))}
+                  {!periodoEhCompetencia ? (
+                    <p className="w-full text-xs text-destructive">
+                      A fatura é uma competência inteira:{" "}
+                      {frequencia === "mensal"
+                        ? "do dia 1 ao último dia do mês."
+                        : "1 a 15 ou 16 ao último dia do mês."}
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -549,6 +616,7 @@ export function PainelFaturamento() {
               aguardando={adicionais.isPending && !adicionais.isFetching}
               carregando={adicionais.isLoading}
               erro={adicionais.isError}
+              periodoContratual={periodoContratual}
             />
           ) : null}
         </>

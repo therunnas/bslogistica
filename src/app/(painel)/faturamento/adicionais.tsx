@@ -36,17 +36,33 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ROTULO_DA_SITUACAO_DO_ADICIONAL,
   adicionalForaDoPeriodo,
+  janelaDeCobrancaDoAdicional,
   situacaoDoAdicional,
+  temCompetencia,
   validarAdicional,
   type Adicional,
 } from "@/lib/adicionais";
 import { useCancelarAdicional, useRegistrarAdicional } from "@/lib/adicionais-dados";
+import { competenciasDoMes, type FrequenciaDeFechamento } from "@/lib/fechamento/periodo";
 import { brl, dateBR } from "@/lib/format";
+import { useCompetenciaDeCobranca } from "@/lib/vigencias-dados";
+import { ROTULO_DA_FREQUENCIA } from "@/lib/vigencias-ui";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
 
 const SEM_OPERACAO = "__sem_operacao__";
+
+const MES_ISO = /^(\d{4})-(\d{2})$/;
+
+/** Competências do mês escolhido (`YYYY-MM`) na frequência do cliente; vazio se faltar algo. */
+function competenciasDaEscolha(frequencia: FrequenciaDeFechamento | null, mes: string) {
+  const m = MES_ISO.exec(mes);
+  if (frequencia === null || m === null) return [];
+  const numeroDoMes = Number(m[2]);
+  if (numeroDoMes < 1 || numeroDoMes > 12) return [];
+  return competenciasDoMes(frequencia, Number(m[1]), numeroDoMes);
+}
 
 export interface AdicionaisDoPeriodoProps {
   clienteId: string;
@@ -58,11 +74,14 @@ export interface AdicionaisDoPeriodoProps {
   aguardando: boolean;
   carregando: boolean;
   erro: boolean;
+  /** O banco tem a migration 038: o adicional nasce com a competência de cobrança escolhida. */
+  periodoContratual?: boolean;
 }
 
 /**
  * Adicionais de serviço do cliente (migration 029): valores extras do período, separados da
- * diária. Entram na fatura os não cancelados com o período inteiro dentro do período da fatura.
+ * diária. Entram na fatura os não cancelados com a janela de cobrança inteira dentro do período da
+ * fatura: a competência escolhida (038) ou, sem ela, o período de execução.
  */
 export function AdicionaisDoPeriodo({
   clienteId,
@@ -73,6 +92,7 @@ export function AdicionaisDoPeriodo({
   aguardando,
   carregando,
   erro,
+  periodoContratual = false,
 }: AdicionaisDoPeriodoProps) {
   const registrar = useRegistrarAdicional();
   const cancelar = useCancelarAdicional();
@@ -84,9 +104,22 @@ export function AdicionaisDoPeriodo({
   const [motivo, setMotivo] = useState("");
   const [referencia, setReferencia] = useState("");
   const [valor, setValor] = useState("");
+  // Competência de cobrança (038): o mês e, na quinzenal, qual das duas quinzenas.
+  const [mesCompetencia, setMesCompetencia] = useState(inicio.slice(0, 7));
+  const [indiceCompetencia, setIndiceCompetencia] = useState(0);
 
   const [cancelando, setCancelando] = useState<Adicional | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+
+  // A frequência é a do MÊS escolhido (pode mudar de um mês para outro): o banco informa.
+  const frequenciaDoMes = useCompetenciaDeCobranca(
+    clienteId,
+    `${mesCompetencia}-01`,
+    periodoContratual && novoOpen && MES_ISO.test(mesCompetencia),
+  );
+  const frequencia = frequenciaDoMes.data?.frequencia ?? null;
+  const competencias = competenciasDaEscolha(frequencia, mesCompetencia);
+  const competencia = competencias[Math.min(indiceCompetencia, competencias.length - 1)];
 
   const formulario = {
     clienteId,
@@ -96,13 +129,26 @@ export function AdicionaisDoPeriodo({
     motivo,
     referencia,
     valor,
+    ...(periodoContratual ? { competencia: competencia ?? { inicio: "", fim: "" } } : {}),
   };
-  const erros = validarAdicional(formulario);
+  const erros = [
+    ...(periodoContratual && frequenciaDoMes.isError
+      ? ["Não foi possível ler a frequência de fechamento do cliente neste mês."]
+      : periodoContratual && frequencia === null
+        ? ["Aguarde a frequência de fechamento do cliente."]
+        : []),
+    ...validarAdicional(formulario),
+  ];
 
-  // Todo adicional do cliente que toca o período, em qualquer situação.
-  const doPeriodo = adicionais.filter(
-    (a) => a.client_id === clienteId && a.period_start <= fim && a.period_end >= inicio,
-  );
+  // Todo adicional do cliente que toca o período (pela execução ou pela cobrança), em qualquer situação.
+  const doPeriodo = adicionais.filter((a) => {
+    const janela = janelaDeCobrancaDoAdicional(a);
+    return (
+      a.client_id === clienteId &&
+      ((a.period_start <= fim && a.period_end >= inicio) ||
+        (janela.inicio <= fim && janela.fim >= inicio))
+    );
+  });
   const nomeDaOperacao = (id: string | null) =>
     id === null ? "—" : (operacoes.find((o) => o.id === id)?.name ?? "—");
 
@@ -113,6 +159,8 @@ export function AdicionaisDoPeriodo({
     setMotivo("");
     setReferencia("");
     setValor("");
+    setMesCompetencia(inicio.slice(0, 7));
+    setIndiceCompetencia(Number(inicio.slice(8, 10)) > 15 ? 1 : 0);
     setNovoOpen(true);
   }
 
@@ -132,7 +180,9 @@ export function AdicionaisDoPeriodo({
 
               <p className="mt-1 text-xs text-muted-foreground">
                 Valores extras do período (etiquetagem, separação, contêiner…), separados da diária.
-                Entram na fatura os que estão inteiramente dentro do período.
+                {periodoContratual
+                  ? " Entram na fatura da competência de cobrança escolhida, mesmo executados em outra data."
+                  : " Entram na fatura os que estão inteiramente dentro do período."}
               </p>
             </div>
           </div>
@@ -166,7 +216,8 @@ export function AdicionaisDoPeriodo({
             <Table>
               <TableHeader>
                 <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
-                  <TableHead>Período</TableHead>
+                  <TableHead>{periodoContratual ? "Execução" : "Período"}</TableHead>
+                  {periodoContratual ? <TableHead>Competência</TableHead> : null}
                   <TableHead>Motivo · referência</TableHead>
                   <TableHead>Operação</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
@@ -188,6 +239,15 @@ export function AdicionaisDoPeriodo({
                           </p>
                         ) : null}
                       </TableCell>
+                      {periodoContratual ? (
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {temCompetencia(a) ? (
+                            `${dateBR(a.billing_period_start as string)} – ${dateBR(a.billing_period_end as string)}`
+                          ) : (
+                            <span className="text-muted-foreground">Pela execução</span>
+                          )}
+                        </TableCell>
+                      ) : null}
                       <TableCell className="max-w-[320px] text-sm">
                         {a.description}
                         {a.reference ? (
@@ -246,7 +306,9 @@ export function AdicionaisDoPeriodo({
           <div className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="adicional-inicio">Início do período</Label>
+                <Label htmlFor="adicional-inicio">
+                  {periodoContratual ? "Início da execução" : "Início do período"}
+                </Label>
                 <Input
                   id="adicional-inicio"
                   type="date"
@@ -256,7 +318,9 @@ export function AdicionaisDoPeriodo({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="adicional-fim">Fim do período</Label>
+                <Label htmlFor="adicional-fim">
+                  {periodoContratual ? "Fim da execução" : "Fim do período"}
+                </Label>
                 <Input
                   id="adicional-fim"
                   type="date"
@@ -266,6 +330,46 @@ export function AdicionaisDoPeriodo({
                 />
               </div>
             </div>
+
+            {periodoContratual ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="adicional-competencia-mes">Competência de cobrança (mês)</Label>
+                  <Input
+                    id="adicional-competencia-mes"
+                    type="month"
+                    value={mesCompetencia}
+                    onChange={(e) => setMesCompetencia(e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="adicional-competencia">
+                    {frequencia === null
+                      ? "Competência"
+                      : `Competência (${ROTULO_DA_FREQUENCIA[frequencia].toLowerCase()})`}
+                  </Label>
+                  <select
+                    id="adicional-competencia"
+                    value={String(
+                      Math.min(indiceCompetencia, Math.max(competencias.length - 1, 0)),
+                    )}
+                    onChange={(e) => setIndiceCompetencia(Number(e.target.value))}
+                    disabled={competencias.length === 0}
+                    className={`${INPUT_CLASS} w-full border px-3 text-sm`}
+                  >
+                    {competencias.map((c, i) => (
+                      <option key={c.inicio} value={String(i)}>
+                        {dateBR(c.inicio)} a {dateBR(c.fim)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-muted-foreground sm:col-span-2">
+                  A competência é quando o adicional é cobrado; pode ser antes da execução.
+                </p>
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label>Operação (opcional)</Label>

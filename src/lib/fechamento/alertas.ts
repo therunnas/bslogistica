@@ -13,7 +13,7 @@
  * Saem em ordem fixa, e só os que têm ocorrência.
  */
 
-import { diaDaSemana, ehMesInteiro, ehPeriodoDeFechamento } from "./periodo";
+import { diaDaSemana, ehCompetencia, ehMesInteiro, ehPeriodoDeFechamento } from "./periodo";
 import type {
   Alerta,
   CodigoDeAlerta,
@@ -102,13 +102,22 @@ export function detectarAlertas(
 
   const divergentes = conciliacao.filter((c) => !c.confere);
   // O Fechamento arredonda o período pedido de uma vez (como a fatura), mas o resumo do banco
-  // (Dashboard e Relatórios) soma o ajuste por quinzena INTEIRA. Fora de uma quinzena — o mês, ou
-  // um período personalizado — os dois diferem por construção. Só isso, e só no item do ajuste
-  // previsto, é diferença esperada: vira "atenção" e nunca corrige nenhum valor.
-  const ehQuinzena =
-    ehPeriodoDeFechamento(contexto.inicio, contexto.fim) &&
-    !ehMesInteiro(contexto.inicio, contexto.fim);
-  const previaDifereDeConstrucao = !ehQuinzena;
+  // (Dashboard e Relatórios) soma o ajuste por competência INTEIRA. Com a 038 a competência é a da
+  // frequência do cliente (quinzena ou mês); sem ela, a quinzena. Fora dela os dois diferem por
+  // construção. Só isso, e só no item do ajuste previsto, é diferença esperada: vira "atenção" e
+  // nunca corrige nenhum valor.
+  const frequencia = banco.frequencia;
+  const ehCompetenciaDoResumo =
+    frequencia !== undefined
+      ? ehCompetencia(frequencia, contexto.inicio, contexto.fim)
+      : ehPeriodoDeFechamento(contexto.inicio, contexto.fim) &&
+        !ehMesInteiro(contexto.inicio, contexto.fim);
+  const previaDifereDeConstrucao = !ehCompetenciaDoResumo;
+  // O que a fatura aceita: a competência (038) ou, antes dela, quinzena ou mês.
+  const faturavel =
+    frequencia !== undefined
+      ? ehCompetencia(frequencia, contexto.inicio, contexto.fim)
+      : ehPeriodoDeFechamento(contexto.inicio, contexto.fim);
   const divergenciaGrave = divergentes.filter(
     (c) => !(previaDifereDeConstrucao && c.codigo === "ajuste-previsto"),
   );
@@ -140,9 +149,7 @@ export function detectarAlertas(
   const doConjunto: Partial<Record<CodigoDeAlerta, number>> = {
     "divergencia-conciliacao": divergenciaGrave.length,
     "periodo-fora-de-fechamento":
-      banco.ajustesPrevistos.length > 0 && !ehPeriodoDeFechamento(contexto.inicio, contexto.fim)
-        ? banco.ajustesPrevistos.length
-        : 0,
+      banco.ajustesPrevistos.length > 0 && !faturavel ? banco.ajustesPrevistos.length : 0,
     "previa-por-quinzena": diferencaDePrevia.length,
     "compensacao-informativa": banco.saldoDeHoras.filter(
       (s) => s.minutosExcedentes > 0 && s.minutosFaltantes > 0,

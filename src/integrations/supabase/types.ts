@@ -38,6 +38,8 @@ export type Database = {
       billing_additionals: {
         Row: {
           amount: number;
+          billing_period_end: string | null;
+          billing_period_start: string | null;
           cancel_reason: string | null;
           canceled_at: string | null;
           canceled_by: string | null;
@@ -54,6 +56,8 @@ export type Database = {
         };
         Insert: {
           amount: number;
+          billing_period_end?: string | null;
+          billing_period_start?: string | null;
           cancel_reason?: string | null;
           canceled_at?: string | null;
           canceled_by?: string | null;
@@ -70,6 +74,8 @@ export type Database = {
         };
         Update: {
           amount?: number;
+          billing_period_end?: string | null;
+          billing_period_start?: string | null;
           cancel_reason?: string | null;
           canceled_at?: string | null;
           canceled_by?: string | null;
@@ -150,6 +156,7 @@ export type Database = {
       contract_terms: {
         Row: {
           active: boolean;
+          closing_period: string;
           contract_id: string;
           created_at: string;
           created_by: string | null;
@@ -170,6 +177,7 @@ export type Database = {
         };
         Insert: {
           active?: boolean;
+          closing_period?: string;
           contract_id: string;
           created_at?: string;
           created_by?: string | null;
@@ -190,6 +198,7 @@ export type Database = {
         };
         Update: {
           active?: boolean;
+          closing_period?: string;
           contract_id?: string;
           created_at?: string;
           created_by?: string | null;
@@ -1145,6 +1154,14 @@ export type Database = {
         Args: { p_additional_id: string; p_reason: string };
         Returns: undefined;
       };
+      competencia_de_cobranca: {
+        Args: { p_client_id: string; p_data: string };
+        Returns: {
+          fim: string;
+          frequencia: string;
+          inicio: string;
+        }[];
+      };
       componentes_do_lancamento: {
         Args: {
           p_adicional: number;
@@ -1162,6 +1179,7 @@ export type Database = {
         Args: { p_contract_id: string; p_work_date: string };
         Returns: {
           active: boolean;
+          closing_period: string;
           contract_id: string;
           created_at: string;
           created_by: string | null;
@@ -1273,6 +1291,7 @@ export type Database = {
       criar_contrato_com_vigencia: {
         Args: {
           p_client_id: string;
+          p_closing_period?: string;
           p_daily_rate: number;
           p_holiday_pay_factor?: number;
           p_name: string;
@@ -1598,6 +1617,8 @@ export type Database = {
       registrar_adicional: {
         Args: {
           p_amount: number;
+          p_billing_period_end?: string;
+          p_billing_period_start?: string;
           p_client_id: string;
           p_description: string;
           p_operation_id?: string;
@@ -1609,6 +1630,7 @@ export type Database = {
       };
       registrar_condicao_contrato: {
         Args: {
+          p_closing_period?: string;
           p_contract_id: string;
           p_daily_rate: number;
           p_encerrar_anterior?: boolean;

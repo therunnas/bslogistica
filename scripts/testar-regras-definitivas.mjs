@@ -644,9 +644,9 @@ const migrations = readdirSync("supabase/migrations")
   .filter((f) => f.endsWith(".sql"))
   .sort();
 verificar(
-  "G1. a 030 existe, a 037 (leitores pelos componentes, FIN-PR-03) é a última migration e a 019 continua ausente",
+  "G1. a 030 existe, a 038 (período contratual, FIN-PR-05) é a última migration e a 019 continua ausente",
   [migrations.includes(NOME), migrations.at(-1), migrations.some((m) => m.includes("_019_"))],
-  [true, "20261104120000_037_leitores_por_componentes.sql", false],
+  [true, "20261105120000_038_periodo_contratual.sql", false],
 );
 verificar(
   "G2. arredondamento só na COBRANÇA: o custo usa o excedente exato; o feriado só no custo",
@@ -1007,7 +1007,7 @@ verificar(
   );
   verificar(
     "I13. campos só aparecem com a 030, motor por vigência e contrato NOVO",
-    /camposDoCadastroInicialDeContrato\(\s*regrasDefinitivas && modoDeTaxa === "por-vigencia" && !contractForm\.id,?\s*\)/.test(
+    /camposDoCadastroInicialDeContrato\(\s*regrasDefinitivas && modoDeTaxa === "por-vigencia" && !contractForm\.id,?\s*(periodoContratual,?\s*)?\)/.test(
       tela,
     ),
     true,

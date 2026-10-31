@@ -703,7 +703,8 @@ declare
 begin
   -- Fatura gerada pelo caminho legitimo: admin em aal2, pela RPC de sempre.
   _r := pg_temp.medir('0a000000-0000-4000-8000-000000000003', 'aal2',
-    format('select (public.gerar_fatura(''0c000000-0000-4000-8000-000000000001''::uuid, %L::date, %L::date)).id::text', _dia, _dia));
+    -- FIN-PR-05 (038): a fatura é a competência inteira (1ª quinzena de setembro) que contém o dia.
+    format('select (public.gerar_fatura(''0c000000-0000-4000-8000-000000000001''::uuid, %L::date, %L::date)).id::text', '2026-09-01', _dia));
   perform pg_temp.registrar('G1. admin aal2 gera a fatura normalmente',
     'true', (_r not like 'erro %')::text);
 

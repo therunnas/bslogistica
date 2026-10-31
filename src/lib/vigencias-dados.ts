@@ -1,4 +1,5 @@
 import { decidirDisponibilidade } from "./fechamento/disponibilidade";
+import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./fechamento/periodo";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
@@ -11,6 +12,7 @@ import {
   interpretarEstadoDoMotor,
   interpretarRegrasDaBs,
   interpretarNucleoV2,
+  interpretarPeriodoContratual,
   interpretarRegrasDefinitivas,
   montarCadastroAtomico,
   montarRegistro,
@@ -168,6 +170,42 @@ export function useNucleoV2(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarNucleoV2(consulta.data.data, consulta.data.error);
+}
+
+/** O banco já tem a migration 038 (frequência no contrato e competência de cobrança)? */
+export function usePeriodoContratual(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarPeriodoContratual(consulta.data.data, consulta.data.error);
+}
+
+export interface CompetenciaDeCobranca {
+  frequencia: FrequenciaDeFechamento;
+  inicio: string;
+  fim: string;
+}
+
+/**
+ * Frequência do cliente no mês da data e a competência que a contém (`competencia_de_cobranca`,
+ * migration 038). Só consulta com o anúncio do banco: sem a 038 a RPC não existe.
+ */
+export function useCompetenciaDeCobranca(clienteId: string, data: string, habilitado: boolean) {
+  return useQuery({
+    queryKey: ["competencia_de_cobranca", clienteId, data],
+    enabled: habilitado && clienteId !== "" && /^\d{4}-\d{2}-\d{2}$/.test(data),
+    queryFn: async (): Promise<CompetenciaDeCobranca> => {
+      const { data: linhas, error } = await cliente().rpc("competencia_de_cobranca", {
+        p_client_id: clienteId,
+        p_data: data,
+      });
+      if (error) throw error;
+      const linha = Array.isArray(linhas) ? linhas[0] : null;
+      if (!linha || !ehFrequenciaDeFechamento(linha.frequencia)) {
+        throw new Error("Resposta inválida da competência de cobrança.");
+      }
+      return { frequencia: linha.frequencia, inicio: linha.inicio, fim: linha.fim };
+    },
+  });
 }
 
 export function useVersoes(tipo: TipoDeVigencia, entidadeId: string | null) {

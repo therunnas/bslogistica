@@ -457,8 +457,8 @@ select pg_temp.registrar('K2. adicionais: RLS ligada, só SELECT para authentica
   || '|' || has_table_privilege('service_role', 'public.billing_additionals', 'SELECT')::text
   || '|' || has_table_privilege('bslog_rpc_operacional', 'public.billing_additionals', 'SELECT')::text);
 select pg_temp.registrar('K3. RPCs novas: authenticated executa, anon não; internas sem EXECUTE de API', 'true|false|false|false',
-  has_function_privilege('authenticated', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid)', 'EXECUTE')::text
-  || '|' || has_function_privilege('anon', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid)', 'EXECUTE')::text
+  has_function_privilege('authenticated', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
+  || '|' || has_function_privilege('anon', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
   || '|' || has_function_privilege('authenticated', 'public.recusar_entrada_igual_saida()', 'EXECUTE')::text
   || '|' || has_function_privilege('authenticated', 'public.proteger_adicional()', 'EXECUTE')::text);
 select pg_temp.registrar('K4. o motor antigo (010) não foi alterado e gerar_fatura não cita o motor novo', '0|0',

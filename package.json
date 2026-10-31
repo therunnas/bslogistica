@@ -59,7 +59,8 @@
     "test:nucleo-isolamento": "node --experimental-strip-types scripts/testar-nucleo-isolamento.mjs",
     "test:integracao-v2": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-integracao-v2.mjs",
     "test:integracao-isolamento": "node --experimental-strip-types scripts/testar-integracao-isolamento.mjs",
-    "test:leitores-componentes": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-leitores-componentes.mjs"
+    "test:leitores-componentes": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-leitores-componentes.mjs",
+    "test:periodo-contratual": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-periodo-contratual.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

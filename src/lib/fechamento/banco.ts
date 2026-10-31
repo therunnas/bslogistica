@@ -23,6 +23,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { centavosDeNumeric } from "./centavos";
 import { ErroDeDadoDoFechamento } from "./erros";
 import { ErroDeLeituraDoFechamento, type FiltroDoFechamento } from "./leitura";
+import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./periodo";
 import type {
   AdicionalDoFechamento,
   AjusteAcumulado,
@@ -163,8 +164,30 @@ export function lerAdicionais(linhas: unknown): AdicionalDoFechamento[] {
       fim: texto(r["period_end"], `adicional ${i}: fim`),
       valorCentavos: centavosDeValor(r["valor"], `adicional ${i}: valor`),
       faturaId: textoOuNulo(r["invoice_id"], `adicional ${i}: fatura`),
+      // Só com a 038 (a consulta pede as colunas): sem elas a forma é a de antes.
+      ...("billing_period_start" in r
+        ? {
+            competenciaInicio: textoOuNulo(
+              r["billing_period_start"],
+              `adicional ${i}: competência`,
+            ),
+            competenciaFim: textoOuNulo(r["billing_period_end"], `adicional ${i}: competência`),
+          }
+        : {}),
     };
   });
+}
+
+/** A linha única de `competencia_de_cobranca` (migration 038): a frequência do cliente no mês. */
+export function lerFrequencia(linhas: unknown): FrequenciaDeFechamento {
+  if (!Array.isArray(linhas) || linhas.length !== 1) {
+    throw new ErroDeDadoDoFechamento("frequência de fechamento: esperada exatamente uma linha.");
+  }
+  const frequencia = registro(linhas[0], "frequência de fechamento")["frequencia"];
+  if (!ehFrequenciaDeFechamento(frequencia)) {
+    throw new ErroDeDadoDoFechamento("frequência de fechamento: valor desconhecido.");
+  }
+  return frequencia;
 }
 
 export function lerAjustesFaturados(linhas: unknown): AjusteFaturado[] {
@@ -181,21 +204,31 @@ export function lerAjustesFaturados(linhas: unknown): AjusteFaturado[] {
   });
 }
 
-/** O que `buscarDadosDoBanco` precisa de uma sessão: só as quatro leituras. */
+/** O que `buscarDadosDoBanco` precisa de uma sessão: só as leituras. */
 export interface FonteDoBanco {
   resumo(filtro: FiltroDoFechamento): Promise<unknown>;
   ajustesPrevistos(filtro: FiltroDoFechamento): Promise<unknown>;
   saldoDeHoras(filtro: FiltroDoFechamento): Promise<unknown>;
   adicionais(filtro: FiltroDoFechamento): Promise<unknown>;
   ajustesFaturados(filtro: FiltroDoFechamento): Promise<unknown>;
+  /** Só num banco com a migration 038 (`competencia_de_cobranca`). */
+  frequencia?(filtro: FiltroDoFechamento): Promise<unknown>;
 }
 
-/** As leituras reais, pelo cliente Supabase da sessão. Qualquer erro do banco sobe como erro. */
-export function criarFonteDoBancoSupabase(supabase: SupabaseClient<Database>): FonteDoBanco {
+/**
+ * As leituras reais, pelo cliente Supabase da sessão. Qualquer erro do banco sobe como erro.
+ * `periodoContratual` = o banco anunciou a 038: os adicionais entram pela competência de cobrança
+ * (o mesmo recorte do resumo) e a frequência do cliente é lida. Sem ela, nada disso é consultado:
+ * as colunas e a RPC não existem.
+ */
+export function criarFonteDoBancoSupabase(
+  supabase: SupabaseClient<Database>,
+  periodoContratual = false,
+): FonteDoBanco {
   const falha = (o: string, mensagem: string) =>
     new ErroDeLeituraDoFechamento("consulta", `Falha ao ler ${o}: ${mensagem}`);
 
-  return {
+  const fonte: FonteDoBanco = {
     async resumo({ clienteId, inicio, fim }) {
       const { data, error } = await supabase.rpc("resumo_financeiro_periodo", {
         p_inicio: inicio,
@@ -227,19 +260,27 @@ export function criarFonteDoBancoSupabase(supabase: SupabaseClient<Database>): F
     },
 
     async adicionais({ clienteId, inicio, fim }) {
-      // Mesmo recorte de `resumo_financeiro_periodo`: não cancelados, período inteiro dentro.
-      const { data, error, count } = await supabase
+      // Mesmo recorte de `resumo_financeiro_periodo`: não cancelados, janela de cobrança inteira
+      // dentro — a competência (038) ou, sem ela, a execução.
+      const colunas =
+        "id, description, reference, operation_id, period_start, period_end, invoice_id, valor:amount::text";
+      const base = supabase
         .from("billing_additionals")
         .select(
-          "id, description, reference, operation_id, period_start, period_end, invoice_id, valor:amount::text",
+          periodoContratual ? `${colunas}, billing_period_start, billing_period_end` : colunas,
           {
             count: "exact",
           },
         )
         .eq("client_id", clienteId)
-        .is("canceled_at", null)
-        .gte("period_start", inicio)
-        .lte("period_end", fim)
+        .is("canceled_at", null);
+      const recorte = periodoContratual
+        ? base.or(
+            `and(billing_period_start.not.is.null,billing_period_start.gte.${inicio},billing_period_end.lte.${fim}),` +
+              `and(billing_period_start.is.null,period_start.gte.${inicio},period_end.lte.${fim})`,
+          )
+        : base.gte("period_start", inicio).lte("period_end", fim);
+      const { data, error, count } = await recorte
         .order("period_start", { ascending: true })
         .order("id", { ascending: true })
         .limit(TETO_DE_LINHAS_AUXILIARES);
@@ -273,6 +314,18 @@ export function criarFonteDoBancoSupabase(supabase: SupabaseClient<Database>): F
       return data;
     },
   };
+
+  if (periodoContratual) {
+    fonte.frequencia = async ({ clienteId, inicio }) => {
+      const { data, error } = await supabase.rpc("competencia_de_cobranca", {
+        p_client_id: clienteId,
+        p_data: inicio,
+      });
+      if (error) throw falha("a frequência de fechamento", error.message);
+      return data;
+    };
+  }
+  return fonte;
 }
 
 /** Lê e valida as cinco fontes. Qualquer uma fora do formato derruba o carregamento. */
@@ -280,12 +333,13 @@ export async function buscarDadosDoBanco(
   fonte: FonteDoBanco,
   filtro: FiltroDoFechamento,
 ): Promise<DadosDoBanco> {
-  const [resumo, ajustes, saldo, adicionais, faturados] = await Promise.all([
+  const [resumo, ajustes, saldo, adicionais, faturados, frequencia] = await Promise.all([
     fonte.resumo(filtro),
     fonte.ajustesPrevistos(filtro),
     fonte.saldoDeHoras(filtro),
     fonte.adicionais(filtro),
     fonte.ajustesFaturados(filtro),
+    fonte.frequencia ? fonte.frequencia(filtro) : Promise.resolve(undefined),
   ]);
 
   return {
@@ -294,5 +348,6 @@ export async function buscarDadosDoBanco(
     saldoDeHoras: lerSaldoDeHoras(saldo),
     adicionais: lerAdicionais(adicionais),
     ajustesFaturados: lerAjustesFaturados(faturados),
+    ...(fonte.frequencia ? { frequencia: lerFrequencia(frequencia) } : {}),
   };
 }

@@ -2257,8 +2257,13 @@ begin
   execute 'set local role authenticated';
 
   begin
+    -- FIN-PR-05 (038): a fatura é uma competência inteira — a quinzena de hoje.
     _nova := public.gerar_fatura(
-      '33333333-3333-4333-8333-333333333333', current_date, current_date);
+      '33333333-3333-4333-8333-333333333333',
+      case when extract(day from current_date) <= 15 then date_trunc('month', current_date)::date
+           else date_trunc('month', current_date)::date + 15 end,
+      case when extract(day from current_date) <= 15 then date_trunc('month', current_date)::date + 14
+           else (date_trunc('month', current_date) + interval '1 month - 1 day')::date end);
     _e := 'gerou';
   exception when others then _e := 'erro ' || sqlstate; end;
   perform pg_temp.registrar('J58. gerar_fatura ainda vincula NULL -> invoice_id', 'gerou', _e);

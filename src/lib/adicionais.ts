@@ -1,9 +1,15 @@
 /**
- * Adicionais de serviço do período (C05-B8.10, migration 029).
+ * Adicionais de serviço do período (C05-B8.10, migration 029; competência na 038).
  *
  * Regra da BS: serviços adicionais (etiquetagem, separação, contêiner, truck ou carreta...) geram
  * valores extras no período SEM alterar a diária padrão e sem criar outra diária. Cada adicional
  * tem motivo, valor, referência, período, cliente e, opcionalmente, a operação.
+ *
+ * Com a migration 038 (FIN-PR-05) o adicional tem DOIS períodos: o de EXECUÇÃO (`period_*`) e a
+ * competência de COBRANÇA (`billing_period_*`), uma janela da frequência do cliente. Pode ser
+ * cobrado antes da execução (executado em novembro, cobrado na 2ª quinzena de outubro). Adicional
+ * sem competência (registrado antes da 038, ou num banco sem ela) segue a regra antiga: a execução
+ * inteira dentro da fatura.
  *
  * O banco é a barreira: `registrar_adicional` e `cancelar_adicional` (admin, trilha),
  * tabela sem escrita direta, adicional faturado imutável, e `gerar_fatura` que soma os adicionais
@@ -31,6 +37,9 @@ export interface Adicional {
   created_at: string;
   canceled_at: string | null;
   cancel_reason: string | null;
+  /** Migration 038; ausentes antes dela, nulos = sem competência (regra antiga). */
+  billing_period_start?: string | null;
+  billing_period_end?: string | null;
 }
 
 export interface FormularioDeAdicional {
@@ -42,6 +51,11 @@ export interface FormularioDeAdicional {
   referencia: string;
   /** Texto digitado, aceita vírgula decimal. */
   valor: string;
+  /**
+   * Competência de cobrança (038). Ausente = banco sem a 038: o registro é o de antes. Presente, é
+   * obrigatória e vem da escolha da tela (uma janela da frequência do cliente); o banco revalida.
+   */
+  competencia?: { inicio: string; fim: string };
 }
 
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -70,6 +84,14 @@ export function validarAdicional(f: FormularioDeAdicional): string[] {
   if (motivo.length > 500) erros.push("O motivo deve ter no máximo 500 caracteres.");
   if (f.referencia.trim().length > 200)
     erros.push("A referência deve ter no máximo 200 caracteres.");
+  if (f.competencia !== undefined) {
+    const c = f.competencia;
+    if (!dataValida(c.inicio) || !dataValida(c.fim) || c.fim < c.inicio) {
+      erros.push("Escolha a competência de cobrança.");
+    } else if (c.inicio.slice(0, 7) !== c.fim.slice(0, 7)) {
+      erros.push("A competência de cobrança fica dentro de um único mês.");
+    }
+  }
   const valor = lerValor(f.valor);
   if (valor === null || valor <= 0) {
     erros.push("Informe um valor maior que zero.");
@@ -95,6 +117,10 @@ export function montarRegistroDeAdicional(
     p_amount: lerValor(f.valor) as number,
     p_reference: f.referencia.trim() === "" ? null : f.referencia.trim(),
     p_operation_id: f.operacaoId === "" ? null : f.operacaoId,
+    // Só com a 038: num banco sem ela os parâmetros não existem.
+    ...(f.competencia !== undefined
+      ? { p_billing_period_start: f.competencia.inicio, p_billing_period_end: f.competencia.fim }
+      : {}),
   };
 }
 
@@ -112,10 +138,30 @@ export const ROTULO_DA_SITUACAO_DO_ADICIONAL: Readonly<Record<SituacaoDoAdiciona
   cancelado: "Cancelado",
 };
 
+/** O adicional tem competência de cobrança (038)? */
+export function temCompetencia(a: Adicional): boolean {
+  return (
+    typeof a.billing_period_start === "string" &&
+    a.billing_period_start !== "" &&
+    typeof a.billing_period_end === "string" &&
+    a.billing_period_end !== ""
+  );
+}
+
 /**
- * O mesmo critério de `gerar_fatura` (migration 029): do cliente, não cancelado, não faturado e
- * com o período INTEIRO dentro do período da fatura. Adicional que cruza o fim do período (ex.:
- * 10 a 20, fatura de 01 a 15) não entra nesta fatura.
+ * A janela que decide a cobrança: a competência (038) ou, sem ela, a execução (regra antiga). É o
+ * mesmo `coalesce(billing_period_*, period_*)` de `resumo_financeiro_periodo`.
+ */
+export function janelaDeCobrancaDoAdicional(a: Adicional): { inicio: string; fim: string } {
+  return temCompetencia(a)
+    ? { inicio: a.billing_period_start as string, fim: a.billing_period_end as string }
+    : { inicio: a.period_start, fim: a.period_end };
+}
+
+/**
+ * O mesmo critério de `gerar_fatura`: do cliente, não cancelado, não faturado e com a janela de
+ * cobrança INTEIRA dentro do período da fatura. Sem competência, a janela é a execução: adicional
+ * que cruza o fim do período (ex.: 10 a 20, fatura de 01 a 15) não entra nesta fatura.
  */
 export function adicionalElegivel(
   a: Adicional,
@@ -123,27 +169,29 @@ export function adicionalElegivel(
   inicio: string,
   fim: string,
 ): boolean {
+  const janela = janelaDeCobrancaDoAdicional(a);
   return (
     a.client_id === clienteId &&
     situacaoDoAdicional(a) === "a-faturar" &&
-    a.period_start >= inicio &&
-    a.period_end <= fim
+    janela.inicio >= inicio &&
+    janela.fim <= fim
   );
 }
 
-/** Adicional a faturar que toca o período mas não cabe nele: a tela avisa. */
+/** Adicional a faturar cuja janela de cobrança toca o período mas não cabe nele: a tela avisa. */
 export function adicionalForaDoPeriodo(
   a: Adicional,
   clienteId: string,
   inicio: string,
   fim: string,
 ): boolean {
+  const janela = janelaDeCobrancaDoAdicional(a);
   return (
     a.client_id === clienteId &&
     situacaoDoAdicional(a) === "a-faturar" &&
-    a.period_start <= fim &&
-    a.period_end >= inicio &&
-    !(a.period_start >= inicio && a.period_end <= fim)
+    janela.inicio <= fim &&
+    janela.fim >= inicio &&
+    !(janela.inicio >= inicio && janela.fim <= fim)
   );
 }
 

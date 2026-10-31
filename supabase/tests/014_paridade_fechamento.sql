@@ -254,16 +254,29 @@ $consolidado$;
 -- 471,09 faturado, 289,48 custo.
 -- ---------------------------------------------------------------------------
 
+-- FIN-PR-05 (038): `gerar_fatura` só aceita uma competência inteira. A fatura de um único dia é
+-- a fatura HISTÓRICA, emitida antes da 038 (que a preserva como está): para criá-la do jeito real,
+-- a validação da competência é desligada só durante esta chamada, dentro da transação, e
+-- restaurada logo depois (S1.0 confere). O resto da suíte usa a validação de verdade.
 do $fatura_um$
 declare
   _f public.invoices;
+  _validacao text := pg_get_functiondef('public.validar_periodo_de_cobranca(uuid, date, date)'::regprocedure);
 begin
+  execute $sem$create or replace function public.validar_periodo_de_cobranca(p_client_id uuid, p_inicio date, p_fim date)
+    returns text language sql stable set search_path = pg_catalog, public, pg_temp as $c$ select 'quinzenal'::text $c$$sem$;
+
   perform set_config('request.jwt.claims', json_build_object(
     'sub', '11111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2',
     'session_id', 'ec111111-1111-4111-8111-111111111111')::text, true);
   execute 'set local role authenticated';
 
   _f := public.gerar_fatura('33333333-3333-4333-8333-333333333333', '2026-03-01', '2026-03-01');
+
+  execute 'reset role';
+  execute _validacao;
+  perform pg_temp.registrar('S1.0 validação da competência restaurada', 'true',
+    (pg_get_functiondef('public.validar_periodo_de_cobranca(uuid, date, date)'::regprocedure) = _validacao)::text);
 
   perform pg_temp.registrar('S1.1 fatura 1: total_dailies',  '3.00',   _f.total_dailies::text);
   perform pg_temp.registrar('S1.2 fatura 1: total_overtime', '0.75',   _f.total_overtime::text);

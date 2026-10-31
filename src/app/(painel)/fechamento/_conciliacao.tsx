@@ -176,6 +176,12 @@ export function ConciliacaoDoFechamento({ dados }: { dados: FechamentoData }) {
                     <TableRow key={a.id} className="border-border">
                       <TableCell className="whitespace-nowrap text-sm">
                         {dateBR(a.inicio)} – {dateBR(a.fim)}
+                        {/* Competência de cobrança (038): pode ser diferente da execução. */}
+                        {a.competenciaInicio && a.competenciaFim ? (
+                          <p className="text-xs text-muted-foreground">
+                            Cobrança: {dateBR(a.competenciaInicio)} – {dateBR(a.competenciaFim)}
+                          </p>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-sm">
                         {a.descricao}

@@ -355,7 +355,8 @@ select pg_temp.registrar('X2. prévia 16–31/03: E1 32 -> 30 (ajuste negativo -
   'E1|32|30|-0.75;E3|46|60|5.25;E4 Dynamis|30|30|0.00',
   pg_temp.adm($q$select string_agg(colaborador || '|' || minutos_brutos || '|' || minutos_arredondados || '|' || ajuste, ';' order by colaborador)
                  from public.ajustes_de_arredondamento_acumulado('5c30c000-0000-4000-8000-0000000000c2', '2026-03-16', '2026-03-31')$q$));
-select pg_temp.registrar('X3. período fracionado (16–20/03) com hora extra acumulada: recusado (55000), nada faturado', 'erro 55000|0',
+-- FIN-PR-05 (038): o período fracionado é recusado antes, por não ser uma competência (22023).
+select pg_temp.registrar('X3. período fracionado (16–20/03) com hora extra acumulada: recusado (22023, competência), nada faturado', 'erro 22023|0',
   pg_temp.adm($q$select (public.gerar_fatura('5c30c000-0000-4000-8000-0000000000c2', '2026-03-16', '2026-03-20')).id::text$q$)
   || '|' || (select count(*)::text from public.timesheet_entries
               where invoice_id is not null and id in (pg_temp.id_e('51'), pg_temp.id_e('52'), pg_temp.id_e('53'), pg_temp.id_e('54'))));

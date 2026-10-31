@@ -31,6 +31,7 @@ import { brl, dateBR, num } from "@/lib/format";
 import {
   useAposentarVigencia,
   useEncerrarVigencia,
+  usePeriodoContratual,
   useRegistrarVigencia,
   useRegrasDaBs,
   useRegrasDefinitivas,
@@ -83,6 +84,10 @@ function valoresDaVersao(tipo: TipoDeVigencia, v: VersaoComValores): string {
       v["ot_rounding_mode"] === "acumulado" ? "arred. acumulado" : "arred. diário",
       sabado === null || sabado === undefined ? null : `sáb. ${num(Number(sabado), 1)} h`,
       feriado === null || feriado === undefined ? null : `feriado ×${num(Number(feriado), 2)}`,
+      // Frequência de fechamento só existe depois da migration 038.
+      "closing_period" in v
+        ? `fechamento ${v["closing_period"] === "mensal" ? "mensal" : "quinzenal"}`
+        : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -124,7 +129,8 @@ export function HistoricoDeVigencias({
   const aposentar = useAposentarVigencia(tipo);
   const regrasBs = useRegrasDaBs();
   const regrasDefinitivas = useRegrasDefinitivas();
-  const campos = camposDaVigencia(tipo, regrasBs, regrasDefinitivas);
+  const periodoContratual = usePeriodoContratual();
+  const campos = camposDaVigencia(tipo, regrasBs, regrasDefinitivas, periodoContratual);
   const hoje = hojeEmSaoPaulo();
   const liberado = podeRegistrarVigencia(estado);
 
@@ -150,6 +156,7 @@ export function HistoricoDeVigencias({
     fim: fimNova,
     regrasBs,
     regrasDefinitivas,
+    periodoContratual,
   });
   const classe = classificarInicio(inicio, hoje);
 
@@ -394,6 +401,7 @@ export function HistoricoDeVigencias({
                       fim: fimNova,
                       regrasBs,
                       regrasDefinitivas,
+                      periodoContratual,
                     },
                   },
                   { onSuccess: () => setNovaOpen(false) },

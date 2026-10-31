@@ -17,6 +17,8 @@
  * de `minutosExtras` e `margemPermil` por funções de `valores.ts`, na borda.
  */
 
+import type { FrequenciaDeFechamento } from "./periodo";
+
 export const VERSAO_DO_FECHAMENTO = 2 as const;
 
 /** Tipo do dia congelado no apontamento (`day_kind_snapshot`). `null` = anterior à 030 ou falta. */
@@ -208,6 +210,12 @@ export interface AdicionalDoFechamento {
   valorCentavos: number;
   /** `null` = ainda sem fatura. */
   faturaId: string | null;
+  /**
+   * Competência de cobrança (migration 038). Ausente = banco sem a 038; `null` = adicional sem
+   * competência (anterior à 038), que entra pela execução (`inicio`/`fim`).
+   */
+  competenciaInicio?: string | null;
+  competenciaFim?: string | null;
 }
 
 /** Linha de `saldo_de_horas_do_periodo`. INFORMATIVO: não altera nenhum valor. */
@@ -240,6 +248,11 @@ export interface DadosDoBanco {
   ajustesFaturados: AjusteFaturado[];
   adicionais: AdicionalDoFechamento[];
   saldoDeHoras: SaldoDeHoras[];
+  /**
+   * Frequência de fechamento do cliente no mês do início (migration 038). Ausente = banco sem a
+   * 038: os alertas de período seguem a regra de antes (quinzena ou mês).
+   */
+  frequencia?: FrequenciaDeFechamento;
 }
 
 /**

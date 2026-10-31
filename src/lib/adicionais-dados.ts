@@ -98,6 +98,12 @@ export function useRegistrarAdicional() {
         ...(params["p_operation_id"] !== null
           ? { p_operation_id: params["p_operation_id"] as string }
           : {}),
+        ...("p_billing_period_start" in params
+          ? {
+              p_billing_period_start: params["p_billing_period_start"] as string,
+              p_billing_period_end: params["p_billing_period_end"] as string,
+            }
+          : {}),
       });
       if (error) throw error;
     },
