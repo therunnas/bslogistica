@@ -180,7 +180,7 @@ const L06 = (inv) =>
     cobrados: 120,
     dia: "sabado",
     faturado: "165.00",
-    custo: "112.50",
+    custo: "187.50", // FIN-PR-02 (V2): sábado de 6 h paga 150,00 + 2 h × 18,75 (a 030: 112,50)
     inv,
   });
 const L07 = (inv) =>
@@ -364,9 +364,9 @@ igual(
     ajustePrevistoCentavos: -375,
     ajusteCentavos: -375,
     receitaCentavos: 84625,
-    custoCentavos: 55916,
-    resultadoCentavos: 28709,
-    margemPermil: 339,
+    custoCentavos: 63416,
+    resultadoCentavos: 21209,
+    margemPermil: 251,
     aFaturarCentavos: 84625,
     jaFaturadoCentavos: 0,
   },
@@ -397,9 +397,9 @@ verificar(
   "6000|69000",
 );
 verificar(
-  "A7. custo previsto 559,16 e cobrado dos lançamentos 750,00",
+  "A7. custo previsto 634,16 (V2) e cobrado dos lançamentos 750,00",
   `${antes.consolidado.custoCentavos}|${antes.consolidado.faturadoCentavos}`,
-  "55916|75000",
+  "63416|75000",
 );
 igual(
   "A8. ajuste previsto por colaborador: só E1 tem ajuste",
@@ -484,9 +484,9 @@ igual(
     ajustePrevistoCentavos: 0,
     ajusteCentavos: -375,
     receitaCentavos: 84625,
-    custoCentavos: 55916,
-    resultadoCentavos: 28709,
-    margemPermil: 339,
+    custoCentavos: 63416,
+    resultadoCentavos: 21209,
+    margemPermil: 251,
     aFaturarCentavos: 0,
     jaFaturadoCentavos: 84625,
   },
@@ -945,7 +945,7 @@ verificar(
   "75000,10000,-375,84625",
 );
 verificar(
-  "H7. resumo exportado: custo 55916, resultado 28709, margem 339, a faturar 84625, já faturado 0",
+  "H7. resumo exportado: custo 63416, resultado 21209, margem 251, a faturar 84625, já faturado 0",
   [
     indicadores["Custo previsto / Valor devido"],
     indicadores["Resultado"],
@@ -953,7 +953,7 @@ verificar(
     indicadores["A faturar"],
     indicadores["Já faturado"],
   ].join(","),
-  "55916,28709,339,84625,0",
+  "63416,21209,251,84625,0",
 );
 verificar(
   "H8. conferência com o banco: seis linhas 'Confere'",
@@ -1056,9 +1056,9 @@ verificar(
 
 const sql = fonteDoRepo("supabase/tests/029_fechamento_conciliacao.sql");
 for (const trecho of [
-  "'125.25|82.33|494|14|14|util;129.75|84.33|506|26|26|util;0.00|0.00|0|0|0|-;90.00|120.00|360|0|0|feriado;120.00|80.00|0|0|0|util;165.00|112.50|360|0|120|sabado;120.00|80.00|480|0|0|util'",
-  "'750.00|559.16|6'",
-  "'160|40'",
+  "'125.25|82.33|494|14|14|util;129.75|84.33|506|26|26|util;0.00|0.00|0|0|0|-;90.00|120.00|360|0|0|feriado;120.00|80.00|0|0|0|util;165.00|187.50|360|120|120|sabado;120.00|80.00|480|0|0|util'",
+  "'750.00|634.16|6'",
+  "'160|160'",
   "'60.00|690.00'",
   "'E1|40|30|15.00|11.25|-3.75;E2|120|120|45.00|45.00|0.00;E3|0|0|0.00|0.00|0.00'",
   "'750.00|100.00|0.00|-3.75|846.25|846.25|0.00|true'",
@@ -1066,7 +1066,7 @@ for (const trecho of [
   "'E1|3|40|0|40;E2|1|120|0|120;E3|1|0|120|-120'",
   "'E1|80|90|30.00|33.75|3.75'",
   "'-7.50'",
-  "'846.25|559.16|2.50'",
+  "'846.25|634.16|2.50'",
   "'690.00|60.00|-3.75|100.00'",
 ]) {
   verificar(
@@ -1313,9 +1313,9 @@ verificar(
   "750,00|100,00|-3,75|846,25",
 );
 verificar(
-  "K10. já faturado/a faturar do consolidado: 0,00 e 846,25; custo 559,16; resultado 287,09",
+  "K10. já faturado/a faturar do consolidado: 0,00 e 846,25; custo 634,16; resultado 212,09",
   `${csvAntes.at(-1)[8]}|${csvAntes.at(-1)[9]}|${csvAntes.at(-1)[7]}|${csvAntes.at(-1)[11]}`,
-  "0,00|846,25|559,16|287,09",
+  "0,00|846,25|634,16|212,09",
 );
 verificar(
   "K11. conciliado com o resumo exportado (XLSX/Resumo): mesma receita",

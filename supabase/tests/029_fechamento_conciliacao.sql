@@ -175,15 +175,17 @@ create temporary view _fechamento as
 -- Q. O que o Fechamento soma, contra os números calculados à mão
 -- ---------------------------------------------------------------------------
 
+-- FIN-PR-02 (V2): o sábado de 6 h paga a HE acima de 4 h e o custo-base não é proporcional: 150,00 + 2 h × 18,75 = 187,50
+-- (a 030 pagava 150 × 360/480 = 112,50 e nenhum excedente). Os demais lançamentos não mudam.
 select pg_temp.registrar('Q1. valores por lançamento (cobrado|custo|trabalhados|excedente do custo|minutos cobrados|tipo do dia), em ordem de data',
-  '125.25|82.33|494|14|14|util;129.75|84.33|506|26|26|util;0.00|0.00|0|0|0|-;90.00|120.00|360|0|0|feriado;120.00|80.00|0|0|0|util;165.00|112.50|360|0|120|sabado;120.00|80.00|480|0|0|util',
+  '125.25|82.33|494|14|14|util;129.75|84.33|506|26|26|util;0.00|0.00|0|0|0|-;90.00|120.00|360|0|0|feriado;120.00|80.00|0|0|0|util;165.00|187.50|360|120|120|sabado;120.00|80.00|480|0|0|util',
   (select string_agg(billed_amount || '|' || cost_amount || '|' || worked_minutes || '|' || overtime_minutes
                      || '|' || coalesce(billed_overtime_minutes::text, '-') || '|' || coalesce(day_kind_snapshot, '-'), ';' order by work_date)
      from _fechamento));
-select pg_temp.registrar('Q2. apontamentos: Σ cobrado dos lançamentos que não são falta = 750,00; custo = 559,16', '750.00|559.16|6',
+select pg_temp.registrar('Q2. apontamentos: Σ cobrado dos lançamentos que não são falta = 750,00; custo = 634,16 (V2: sábado pago a 187,50)', '750.00|634.16|6',
   (select sum(billed_amount)::text || '|' || sum(cost_amount)::text || '|' || count(*)::text from _fechamento where status <> 'absent'));
-select pg_temp.registrar('Q3. horas extras COBRADAS (minutos cobrados) 160 min e excedente do CUSTO 40 min: o sábado cobra 120 min e não gera excedente de custo',
-  '160|40',
+select pg_temp.registrar('Q3. horas extras COBRADAS (minutos cobrados) 160 min e excedente do CUSTO 160 min: o sábado (V2) cobra e paga 120 min acima de 4 h',
+  '160|160',
   (select sum(coalesce(billed_overtime_minutes, overtime_minutes))::text || '|' || sum(overtime_minutes)::text from _fechamento where status <> 'absent'));
 select pg_temp.registrar('Q4. decomposição: extra = Σ greatest(cobrado − taxa, 0) = 5,25 + 9,75 + 45,00 = 60,00; diária = 750,00 − 60,00 = 690,00 (a diária proporcional do feriado entra na diária)',
   '60.00|690.00',
@@ -210,7 +212,7 @@ select pg_temp.registrar('R2. resumo da quinzena: apontamentos 750,00 + adiciona
   '750.00|100.00|0.00|-3.75|846.25|846.25|0.00|true',
   pg_temp.adm($q$select receita_apontamentos || '|' || adicionais || '|' || ajuste_faturado || '|' || ajuste_previsto || '|' || receita_total || '|' || a_faturar || '|' || faturado || '|' || ajuste_aplicavel
                    from public.resumo_financeiro_periodo('2026-03-01', '2026-03-15', '5c40c000-0000-4000-8000-0000000000c1')$q$));
-select pg_temp.registrar('R3. o Fechamento soma o mesmo: apontamentos do recorte = apontamentos do resumo; custo 559,16; resultado 287,09', 'true|559.16|287.09',
+select pg_temp.registrar('R3. o Fechamento soma o mesmo: apontamentos do recorte = apontamentos do resumo; custo 634,16; resultado 212,09', 'true|634.16|212.09',
   ((select sum(billed_amount) from _fechamento where status <> 'absent')
      = pg_temp.adm($q$select receita_apontamentos::text from public.resumo_financeiro_periodo('2026-03-01', '2026-03-15', '5c40c000-0000-4000-8000-0000000000c1')$q$)::numeric)::text
   || '|' || (select sum(cost_amount)::text from _fechamento where status <> 'absent')
@@ -258,7 +260,7 @@ select pg_temp.registrar('M4. o resumo do mês soma as QUINZENAS (−3,75 + −3
 create temporary table _fat (id text);
 insert into _fat select pg_temp.adm($q$select (public.gerar_fatura('5c40c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15')).id::text$q$);
 
-select pg_temp.registrar('F1. fatura: total 846,25 (750,00 + adicional 100,00 − ajuste 3,75), custo 559,16, 2,50 h cobradas (160 − 10 min de ajuste)', '846.25|559.16|2.50',
+select pg_temp.registrar('F1. fatura: total 846,25 (750,00 + adicional 100,00 − ajuste 3,75), custo 634,16, 2,50 h cobradas (160 − 10 min de ajuste)', '846.25|634.16|2.50',
   (select total_amount::text || '|' || total_cost::text || '|' || total_overtime::text from public.invoices where id::text = (select id from _fat)));
 select pg_temp.registrar('F2. itens por tipo: diárias 690,00, horas extras 60,00, arredondamento −3,75, adicional 100,00 — a decomposição do Fechamento',
   '690.00|60.00|-3.75|100.00',

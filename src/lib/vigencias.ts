@@ -144,6 +144,8 @@ export interface EstadoDoMotor {
   regras_bs?: boolean;
   /** Migration 030 aplicada (arredondamento, saída antecipada cobrada, sábado, feriado). */
   regras_definitivas?: boolean;
+  /** Migration 036 aplicada: dia útil e sábado calculados pelo núcleo V2 (FIN-PR-02). */
+  nucleo_v2?: boolean;
 }
 
 export interface PendenciaDeImplantacao {

@@ -40,7 +40,13 @@ export const PARAMETROS_NEUTROS: ParametrosDeHoras = {
 };
 
 /** O que a prévia aplica com as regras definitivas; nulo = cobrança de antes. */
-export type HorasDaLinha = (ParametrosDeHoras & { tipoDoDia: TipoDoDia }) | null;
+export type HorasDaLinha =
+  | (ParametrosDeHoras & {
+      tipoDoDia: TipoDoDia;
+      /** Dia útil ou sábado com a 036 aplicada: a prévia usa o núcleo V2 (domingo e feriado, não). */
+      v2?: boolean;
+    })
+  | null;
 
 export interface RegrasDeCalculo {
   daily_rate: number;
@@ -135,6 +141,10 @@ export interface EntradaDaLinha {
   regrasBs?: boolean;
   /** O banco anunciou as regras definitivas (030, `regras_definitivas`). */
   regrasDefinitivas?: boolean;
+  /** O banco anunciou o núcleo V2 no motor (036, `nucleo_v2`). */
+  nucleoV2?: boolean;
+  /** A data trabalhada é domingo: segue a 030 (fora da V2 até o PR 09). */
+  domingo?: boolean;
   /** Tipo do dia da folha pelo calendário atual (linhas novas; e gravadas antes da 030). */
   tipoDoDia?: TipoDoDia;
   /** Parâmetros de horas de uma versão do contrato carregada; nulo = não carregada. */
@@ -142,6 +152,14 @@ export interface EntradaDaLinha {
 }
 
 const TIPOS_DO_DIA: readonly string[] = ["util", "sabado", "feriado"];
+
+/**
+ * A prévia desta linha usa o núcleo V2? Só com a 036 anunciada, em dia útil ou sábado, e nunca no
+ * domingo (que segue a 030 até o PR 09) nem no feriado.
+ */
+function usaV2(e: EntradaDaLinha, tipo: TipoDoDia): boolean {
+  return e.nucleoV2 === true && e.domingo !== true && (tipo === "util" || tipo === "sabado");
+}
 
 function tipoGravado(valor: string | null | undefined, padrao: TipoDoDia): TipoDoDia {
   return valor !== null && valor !== undefined && TIPOS_DO_DIA.includes(valor)
@@ -312,7 +330,12 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
           false,
         );
       }
-      horas = { ...parametros, tipoDoDia: tipoGravado(g.day_kind_snapshot, tipoDoDia) };
+      const tipo = tipoGravado(g.day_kind_snapshot, tipoDoDia);
+      horas = {
+        ...parametros,
+        tipoDoDia: tipo,
+        ...(e.nucleoV2 === true ? { v2: usaV2(e, tipo) } : {}),
+      };
     }
     const r = e.calcular({
       regras: c.regras,
@@ -343,7 +366,13 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
     plannedMinutes: e.plannedMinutes,
     custoHoraExtra: regrasBs ? (cond.custoHoraExtra ?? null) : null,
     custoProporcional: regrasBs,
-    horas: regrasDefinitivas ? { ...(cond.horas ?? PARAMETROS_NEUTROS), tipoDoDia } : null,
+    horas: regrasDefinitivas
+      ? {
+          ...(cond.horas ?? PARAMETROS_NEUTROS),
+          tipoDoDia,
+          ...(e.nucleoV2 === true ? { v2: usaV2(e, tipoDoDia) } : {}),
+        }
+      : null,
   });
   return {
     tipo: "previa",

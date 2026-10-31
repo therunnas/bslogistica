@@ -8,10 +8,12 @@
  * existentes com o corpo idêntico, nenhum uso por função ou gatilho) está na suíte SQL 035 e em
  * `scripts/comparar-catalogo-nucleo.sh`.
  *
- * ATENÇÃO À PRÓXIMA ETAPA: a FIN-PR-02 liga o núcleo ao motor de propósito. Os casos I1 e I2 vão
- * falhar então, e devem ser trocados pela nova fronteira de uso, não apagados.
+ * FIN-PR-02: o núcleo foi ligado ao motor de propósito (migration 036). Os casos I1 e I2 deixaram
+ * de dizer "ninguém usa" e passaram a fixar a FRONTEIRA DE USO: no TypeScript só `previa-v2.ts`
+ * (a prévia da tela) importa o núcleo; no SQL só a 036 (a derivação do motor) o chama. A suíte
+ * `test:integracao-isolamento` guarda o resto da ligação.
  *
- *   I  ninguém usa o núcleo (TypeScript e SQL)
+ *   I  a fronteira de uso do núcleo (TypeScript e SQL)
  *   M  a migration 035 é estritamente aditiva e pura
  *   S  o teste SQL versionado é exatamente o que o gerador produz
  *   N  o núcleo TypeScript não importa nada e não faz conta de dinheiro em ponto flutuante
@@ -61,28 +63,31 @@ console.log("I. Ninguém usa o núcleo nesta etapa");
 const usosTs = arquivosDe("src", [".ts", ".tsx"]).filter(
   (f) => f !== join("src", "lib", "nucleo-financeiro.ts") && /nucleo-financeiro/.test(fonte(f)),
 );
-verificar("I1. nenhum arquivo de src/ importa nucleo-financeiro", usosTs, []);
+verificar("I1. só a prévia (previa-v2.ts) importa nucleo-financeiro em src/", usosTs, [
+  join("src", "lib", "previa-v2.ts"),
+]);
 const migrations = readdirSync(join(raiz, "supabase/migrations"))
   .filter((f) => f.endsWith(".sql"))
   .sort();
 const outrasComNucleo = migrations.filter(
   (f) => f !== MIGRATION_DO_NUCLEO && /nucleo_/.test(fonte(`supabase/migrations/${f}`)),
 );
-verificar("I2. nenhuma outra migration menciona nucleo_*", outrasComNucleo, []);
+verificar("I2. só a 036 (integração ao motor) menciona nucleo_* além da 035", outrasComNucleo, [
+  "20261103120000_036_integracao_nucleo_v2.sql",
+]);
 
 // ---------------------------------------------------------------------------
 console.log("\nM. Migration 035: aditiva e pura");
 const sql = fonte(`supabase/migrations/${MIGRATION_DO_NUCLEO}`);
 const semComentarios = sql.replace(/--[^\n]*/g, "");
-const ultima = migrations[migrations.length - 1];
 verificar(
-  "M1. é a última migration, número 035, timestamp > 20261101120000 (034)",
+  "M1. a 035 existe uma vez, com timestamp > 20261101120000 (034) e < o da 036",
   [
-    ultima,
     /^(\d{14})_035_/.exec(MIGRATION_DO_NUCLEO)?.[1] > "20261101120000",
+    /^(\d{14})_035_/.exec(MIGRATION_DO_NUCLEO)?.[1] < "20261103120000",
     migrations.filter((f) => /_035_/.test(f)).length,
   ],
-  [MIGRATION_DO_NUCLEO, true, 1],
+  [true, true, 1],
 );
 
 // Os corpos das funções são retirados para olhar só os comandos de nível superior.

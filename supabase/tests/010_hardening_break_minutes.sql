@@ -552,7 +552,7 @@ begin
   -- para que qualquer OUTRA constraint continue fazendo este caso falhar. A da 029 (valor-hora
   -- da hora extra paga, positivo) também fica de fora pelo nome, e as duas da 030 (minutos cobrados
   -- e tipo do dia).
-  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022, a da 029 e as 2 da 030', '1',
+  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022, a da 029, as 2 da 030 e as 3 da 036', '1',
     (select count(*)::text from pg_constraint
       where conrelid = 'public.timesheet_entries'::regclass and contype = 'c'
         and conname not in ('timesheet_entries_terms_origin_valida',
@@ -562,7 +562,10 @@ begin
                             'timesheet_entries_planned_minutes_snapshot_nao_negativo',
                             'timesheet_entries_ot_hourly_cost_snapshot_positivo',
                             'timesheet_entries_minutos_cobrados_nao_negativos',
-                            'timesheet_entries_tipo_do_dia_valido')));
+                            'timesheet_entries_tipo_do_dia_valido',
+                            'timesheet_entries_calc_version_valida',
+                            'timesheet_entries_adicional_nao_negativo',
+                            'timesheet_entries_componentes_coerentes')));
 
   perform pg_temp.registrar('I4. um unico CHECK em shifts', '1',
     (select count(*)::text from pg_constraint

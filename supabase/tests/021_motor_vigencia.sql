@@ -446,7 +446,10 @@ select pg_temp.registrar('E1. OP-N em 10/02 (valor acordado v1 = 200, jornada 8,
   pg_temp.entrada('31', '10', '3') || '|' || pg_temp.linha('31'));
 select pg_temp.registrar('E1b. fixou valor_acordado, 200, 80, 8, 1, 10 e jornada 480', 'valor_acordado|200.00|80.00|8.00|1.00|10|480.00', pg_temp.fixado('31'));
 select pg_temp.registrar('E1c. referências: contrato não, valor acordado sim, custo sim', 'false/true/true', pg_temp.refs('31'));
-select pg_temp.registrar('E2. OP-N em 01/08 (v2 = 260), sem hora extra: 260,00 / 80,00', 'ok|260.00|80.00',
+-- FIN-PR-02: 01/08/2026 é SÁBADO. Pela V2 (referência de 4 h, divisor 8, HE também no pagamento), 8 h trabalhadas
+-- valem a diária de 260,00 mais 4 h de HE (260 ÷ 8 × 1 × 4 = 130,00) = 390,00; o custo, 80 + 4 × 10 = 120,00.
+-- Antes (030) o sábado seguia a jornada do turno e este lançamento não tinha hora extra (260,00 / 80,00).
+select pg_temp.registrar('E2. OP-N em 01/08 (v2 = 260), sábado de 8 h: 260,00 + 4 h de HE = 390,00 / 120,00 (V2)', 'ok|390.00|120.00',
   pg_temp.entrada('32', '11', '3', _out => '15:00') || '|' || pg_temp.valores('32'));
 update public.operations set agreed_amount = 999 where id = '5c10e000-0000-4000-8000-0000000000a6';
 select pg_temp.registrar('E3. reajustar a coluna antiga do valor acordado (999, pelo sistema) não altera o apontamento anterior', '250.00|100.00', pg_temp.valores('31'));

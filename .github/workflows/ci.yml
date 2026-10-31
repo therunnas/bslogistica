@@ -183,6 +183,12 @@ jobs:
       - name: Teste nucleo-isolamento
         run: npm run test:nucleo-isolamento
 
+      - name: Teste integracao-v2
+        run: npm run test:integracao-v2
+
+      - name: Teste integracao-isolamento
+        run: npm run test:integracao-isolamento
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.
