@@ -153,6 +153,9 @@ const ZERO = {
   minutosExtrasCobrados: 0,
   diariaCentavos: 0,
   extraCentavos: 0,
+  // FIN-PR-03: horas especiais e adicional diário entram no modelo (zero no legado e até os PRs 09/08).
+  especialCentavos: 0,
+  adicionalDiarioCentavos: 0,
   custoCentavos: 0,
   faturadoCentavos: 0,
   resultadoCentavos: 0,
@@ -1011,9 +1014,12 @@ const esperado = ouro.esperado;
   verificar("H2. linhas lidas", d.meta.linhasLidas, esperado.linhasLidas);
   verificar("H3. faltas", d.faltas, esperado.faltas);
   verificar("H4. substituições", d.substituicoes, esperado.substituicoes);
-  igual("H5. consolidado", d.consolidado, esperado.consolidado);
-  igual("H6. a faturar", d.aFaturar, esperado.aFaturar);
-  igual("H7. já faturado", d.jaFaturado, esperado.jaFaturado);
+  // A fixture ouro é anterior aos componentes (FIN-PR-03): no legado, horas especiais e adicional
+  // diário são zero, e o resto tem de bater exatamente.
+  const comComponentes = (v) => ({ ...v, especialCentavos: 0, adicionalDiarioCentavos: 0 });
+  igual("H5. consolidado", d.consolidado, comComponentes(esperado.consolidado));
+  igual("H6. a faturar", d.aFaturar, comComponentes(esperado.aFaturar));
+  igual("H7. já faturado", d.jaFaturado, comComponentes(esperado.jaFaturado));
   verificar(
     "H8. ordem dos colaboradores",
     d.colaboradores.map((c) => c.employeeId).join(","),
@@ -1033,9 +1039,9 @@ const esperado = ouro.esperado;
     verificar(`H13. ${c.employeeId}: função`, c.funcao, e.funcao);
     verificar(`H14. ${c.employeeId}: faltas`, c.faltas, e.faltas);
     verificar(`H15. ${c.employeeId}: substituições`, c.substituicoes, e.substituicoes);
-    igual(`H16. ${c.employeeId}: consolidado`, c.consolidado, e.consolidado);
-    igual(`H17. ${c.employeeId}: a faturar`, c.aFaturar, e.aFaturar);
-    igual(`H18. ${c.employeeId}: já faturado`, c.jaFaturado, e.jaFaturado);
+    igual(`H16. ${c.employeeId}: consolidado`, c.consolidado, comComponentes(e.consolidado));
+    igual(`H17. ${c.employeeId}: a faturar`, c.aFaturar, comComponentes(e.aFaturar));
+    igual(`H18. ${c.employeeId}: já faturado`, c.jaFaturado, comComponentes(e.jaFaturado));
   }
   verificar(
     "H19. todos os colaboradores esperados existem",

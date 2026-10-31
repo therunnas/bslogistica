@@ -60,7 +60,12 @@ export interface ClienteDoFechamento {
 export interface DependenciasDoCarregamento {
   /** Só o cliente pedido. `null` = não existe OU a sessão não o enxerga. */
   buscarCliente(clienteId: string): Promise<ClienteDoFechamento | null>;
-  criarFonte(filtro: FiltroDoFechamento): FonteDeLinhas;
+  criarFonte(filtro: FiltroDoFechamento, componentes?: boolean): FonteDeLinhas;
+  /**
+   * O banco tem os componentes do valor cobrado (migration 036, `nucleo_v2`)? Decide a consulta:
+   * sem a 036 as colunas não existem. Ausente = `false` (leitura legado, como antes).
+   */
+  lerComponentes?(): Promise<boolean>;
   /** As funções e tabelas do banco que completam o Fechamento (adicionais, ajuste acumulado…). */
   criarFonteDoBanco(): FonteDoBanco;
   agora(): Date;
@@ -97,8 +102,9 @@ export async function carregarFechamento(
   const cliente = await dependencias.buscarCliente(filtro.clienteId);
   if (cliente === null) throw new ErroDeClienteInacessivel();
 
+  const componentes = dependencias.lerComponentes ? await dependencias.lerComponentes() : false;
   const brutas = await lerFechamento(
-    dependencias.criarFonte(filtro),
+    dependencias.criarFonte(filtro, componentes),
     dependencias.opcoesDeLeitura ?? {},
   );
   const linhas = normalizarLinhas(brutas);
@@ -142,7 +148,24 @@ export function dependenciasComSupabase(
       }
       return data;
     },
-    criarFonte: (filtro) => criarFonteSupabase(supabase, filtro),
+    criarFonte: (filtro, componentes) => criarFonteSupabase(supabase, filtro, componentes === true),
+    async lerComponentes() {
+      // A mesma consulta oficial da disponibilidade. Falha aqui não vira "sem componentes": a
+      // leitura pararia de usar a fonte certa num banco que a tem.
+      const { data, error } = await supabase.rpc("estado_motor_vigencia");
+      if (error) {
+        throw new ErroDeLeituraDoFechamento(
+          "consulta",
+          `Falha ao verificar os componentes do valor cobrado: ${error.message}`,
+        );
+      }
+      return (
+        typeof data === "object" &&
+        data !== null &&
+        !Array.isArray(data) &&
+        (data as { nucleo_v2?: unknown }).nucleo_v2 === true
+      );
+    },
     criarFonteDoBanco: () => criarFonteDoBancoSupabase(supabase),
     agora: () => new Date(),
   };

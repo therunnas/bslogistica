@@ -16,7 +16,8 @@
  * `new Date("2026-03-01")` é meia-noite UTC e muda de dia no fuso do Brasil.
  */
 
-import { centavosDeNumeric, decomporLancamento } from "./centavos";
+import { ErroDeComponentes, componentesDoLancamento } from "../componentes-financeiros";
+import { centavosDeNumeric } from "./centavos";
 import { ErroDeDadoDoFechamento, ErroDeDadoFinanceiro } from "./erros";
 import type { LinhaBrutaDoFechamento } from "./leitura";
 import { ehDataCivil } from "./periodo";
@@ -121,10 +122,36 @@ export function normalizarLinha(bruta: LinhaBrutaDoFechamento): LinhaNormalizada
     bruta.taxa_da_diaria,
     `${rotulo}: taxa da diária`,
   );
-  const { diariaCentavos, extraCentavos } = decomporLancamento(
-    faturadoCentavos,
-    diariaSnapshotCentavos,
-  );
+  // Componentes do valor cobrado (FIN-PR-03): V2 lê os gravados; legado (ou banco sem a 036)
+  // decompõe pela regra de sempre. A regra mora em `componentes-financeiros.ts`, uma vez só.
+  const versao = bruta.calc_version;
+  if (versao !== undefined && versao !== null && versao !== 2) {
+    throw new ErroDeDadoDoFechamento(
+      `${rotulo}: versão de cálculo desconhecida (${String(versao)}).`,
+    );
+  }
+  const componenteOpcional = (valor: string | null | undefined, campo: string) =>
+    valor === null || valor === undefined
+      ? valor
+      : centavosNaoNegativos(valor, `${rotulo}: ${campo}`);
+  let componentes;
+  try {
+    componentes = componentesDoLancamento({
+      rotulo,
+      status: status as string,
+      cobradoCentavos: faturadoCentavos,
+      diariaSnapshotCentavos,
+      calcVersion: versao,
+      baseCentavos: componenteOpcional(bruta.base, "diária-base"),
+      extraCentavos: componenteOpcional(bruta.he, "hora extra"),
+      especialCentavos: componenteOpcional(bruta.especial, "horas especiais"),
+      adicionalCentavos: componenteOpcional(bruta.adicional_diario, "adicional diário"),
+    });
+  } catch (erro) {
+    if (erro instanceof ErroDeComponentes) throw new ErroDeDadoDoFechamento(erro.message);
+    throw erro;
+  }
+  const { diariaCentavos, extraCentavos } = componentes;
 
   const cobrados = bruta.billed_overtime_minutes;
   const minutosExtras = minutos(bruta.overtime_minutes, `${rotulo}: overtime_minutes`);
@@ -166,6 +193,9 @@ export function normalizarLinha(bruta: LinhaBrutaDoFechamento): LinhaNormalizada
     diariaSnapshotCentavos,
     diariaCentavos,
     extraCentavos,
+    especialCentavos: componentes.especialCentavos,
+    adicionalDiarioCentavos: componentes.adicionalCentavos,
+    versaoDoCalculo: versao === 2 ? 2 : null,
     invoiceId: textoOuNulo(bruta.invoice_id, `${rotulo}: invoice_id`),
   };
 }

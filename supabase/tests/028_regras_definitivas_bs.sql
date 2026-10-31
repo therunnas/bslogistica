@@ -315,9 +315,10 @@ select pg_temp.registrar('F6. fatura do cliente comum: sem item de ajuste, total
           || '|' || (select count(*) from public.invoice_items where invoice_id = i.id and description like 'Arredondamento%')::text
           || '|' || ((select sum(amount) from public.invoice_items where invoice_id = i.id) = i.total_amount)::text
      from public.invoices i where i.id::text = (select id from _fat where cliente = 'c1')));
+-- FIN-PR-03: itens lidos pelo TIPO; a descrição passou a nomear a tarifa.
 select pg_temp.registrar('F7. conciliação do cliente comum: diárias proporcionais entram no item de diárias e as extras pelos minutos cobrados', 'true',
-  (select ((select sum(amount) from public.invoice_items where invoice_id = i.id and description like '%— diárias')
-           + coalesce((select sum(amount) from public.invoice_items where invoice_id = i.id and description like '%— horas extras'), 0)
+  (select ((select sum(amount) from public.invoice_items where invoice_id = i.id and kind = 'diarias')
+           + coalesce((select sum(amount) from public.invoice_items where invoice_id = i.id and kind = 'horas_extras'), 0)
            = i.total_amount)::text
      from public.invoices i where i.id::text = (select id from _fat where cliente = 'c1')));
 

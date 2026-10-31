@@ -381,9 +381,10 @@ begin
 
   -- A decomposição diária/extra do Fechamento é a MESMA dos itens da fatura.
   perform pg_temp.registrar('S2.14 itens "diárias" somam a diária do Fechamento (fixture 550.30)', '550.30',
-    (select sum(amount) from public.invoice_items where invoice_id = _inv2 and description like '% — diárias')::text);
+    -- FIN-PR-03: os itens são lidos pelo TIPO; a descrição agora nomeia a tarifa (discriminação por preço).
+    (select sum(amount) from public.invoice_items where invoice_id = _inv2 and kind = 'diarias')::text);
   perform pg_temp.registrar('S2.15 itens "horas extras" somam o extra do Fechamento (fixture 56.25)', '56.25',
-    (select sum(amount) from public.invoice_items where invoice_id = _inv2 and description like '% — horas extras')::text);
+    (select sum(amount) from public.invoice_items where invoice_id = _inv2 and kind = 'horas_extras')::text);
   perform pg_temp.registrar('S2.16 itens fecham com o total da fatura', '606.55',
     (select sum(amount) from public.invoice_items where invoice_id = _inv2)::text);
 end;

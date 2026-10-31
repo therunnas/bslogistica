@@ -50,14 +50,14 @@ const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.ur
 // ---------------------------------------------------------------------------
 console.log("M. A migration 036");
 verificar(
-  "M1. é a última, número 036 uma só vez, timestamp > 035 (20261102120000); a 019 continua fora",
+  "M1. número 036 uma só vez, timestamp > 035 (20261102120000) e < 037 (20261104120000); a 019 continua fora",
   [
-    migrations.at(-1),
+    NOME.slice(0, 14) < "20261104120000",
     migrations.filter((f) => /_036_/.test(f)).length,
     NOME.slice(0, 14) > "20261102120000",
     migrations.some((f) => /_019_/.test(f)),
   ],
-  [NOME, 1, true, false],
+  [true, 1, true, false],
 );
 
 const semComentarios = sql.replace(/--[^\n]*/g, "");
