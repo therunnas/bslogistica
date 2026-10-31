@@ -1509,10 +1509,17 @@ select pg_temp.registrar('K7. o corpo não lê tabela, auth nem outra função d
   (select count(*)::text from _nucleo
     where prosrc ~* '\mauth\.' or prosrc ~* 'public\.(?!nucleo_)'
        or prosrc ~* '\m(select|insert|update|delete|perform|execute|copy|now|current_)\M'));
-select pg_temp.registrar('K8. nenhuma outra função chama o núcleo', '0',
-  (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+-- FIN-PR-02: a única função que chama o núcleo é o motor por vigência (migration 036). Antes da 036,
+-- nenhuma chamava. Este caso trocou "nenhuma" por "só a derivação do motor", sem abrir mais ninguém.
+-- Conta CHAMADAS ('nucleo_xxx('): a chave 'nucleo_v2' do estado do motor é texto, não chamada.
+select pg_temp.registrar('K8. só o motor por vigência chama o núcleo (nenhuma outra função, nenhum gatilho de leitura)', '',
+  (select coalesce(string_agg(p.proname, ',' order by p.proname) filter (where p.proname <> 'derivar_valores_por_vigencia'), '')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname not in ('pg_catalog', 'information_schema') and n.nspname not like 'pg\_temp\_%'
-      and p.proname not like 'nucleo\_%' and p.prosrc ~ 'nucleo_'));
+      and p.proname not like 'nucleo\_%' and p.prosrc ~ 'nucleo_[a-z_0-9]+\s*\('));
+select pg_temp.registrar('K8b. a derivação do motor chama nucleo_componentes_v2 (ligação da 036)', '1',
+  (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'derivar_valores_por_vigencia' and p.prosrc ~ 'nucleo_componentes_v2'));
 select pg_temp.registrar('K9. nenhum gatilho usa o núcleo', '0',
   (select count(*)::text from pg_trigger t join pg_proc p on p.oid = t.tgfoid
     where p.proname like 'nucleo\_%'));
@@ -1525,7 +1532,7 @@ select pg_temp.registrar('F. arredondar_minutos_extras (20261028120000_030)', '1
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'arredondar_minutos_extras'));
-select pg_temp.registrar('F. derivar_valores_por_vigencia (20261028120000_030)', '1|e1b44e45276f0aa6a93f5bcebf8863d9',
+select pg_temp.registrar('F. derivar_valores_por_vigencia (20261103120000_036)', '1|e3f0c688f8d1ad5e94bcc80d65625b72',
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'derivar_valores_por_vigencia'));

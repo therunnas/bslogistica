@@ -206,13 +206,15 @@ select pg_temp.registrar('D1. 14 min a mais (> tolerância 10): cobra 0 min (120
   pg_temp.entrada('01', '01', '1', '06:00', '15:14') || '|' || pg_temp.v('01'));
 select pg_temp.registrar('D2. 16 min a mais: cobra 30 min = 120 + 0,5 × 22,50 = 131,25; paga 16 min: 80 + 16/60 × 25 = 86,67', 'ok|131.25|86.67|496|16|30|util',
   pg_temp.entrada('02', '02', '1', '06:00', '15:16') || '|' || pg_temp.v('02'));
-select pg_temp.registrar('D3. 45 min a mais: cobra 30 min (131,25); paga 45 min: 80 + 18,75 = 98,75', 'ok|131.25|98.75|525|45|30|util',
+-- FIN-PR-02 (V2): 45 min de excedente passam a valer 60 min (a 030 arredondava o resto 45 para 30).
+select pg_temp.registrar('D3. 45 min a mais: cobra 60 min = 120 + 22,50 = 142,50 (V2: 45 vale a hora seguinte); paga 45 min: 80 + 18,75 = 98,75', 'ok|142.50|98.75|525|45|60|util',
   pg_temp.entrada('03', '03', '1', '06:00', '15:45') || '|' || pg_temp.v('03'));
 select pg_temp.registrar('D4. 46 min a mais: cobra 60 min = 142,50; paga 46 min: 80 + 19,17 = 99,17', 'ok|142.50|99.17|526|46|60|util',
   pg_temp.entrada('05', '05', '1', '06:00', '15:46') || '|' || pg_temp.v('05'));
 select pg_temp.registrar('D5. 8 min a mais (≤ tolerância): nada cobrado nem pago', 'ok|120.00|80.00|488|0|0|util',
   pg_temp.entrada('06', '01', '3', '06:00', '15:08') || '|' || pg_temp.v('06'));
-select pg_temp.registrar('D6. 1h15 a mais (75 min): cobra 60 min = 142,50 (residual 15 descartado)', 'ok|142.50|555|60',
+-- FIN-PR-02 (V2): o resto de 15 min passa a valer 30 min (a 030 descartava o resto 15).
+select pg_temp.registrar('D6. 1h15 a mais (75 min): cobra 90 min = 120 + 33,75 = 153,75 (V2: resto 15 vale 30)', 'ok|153.75|555|90',
   pg_temp.entrada('07', '14', '1', '06:00', '16:15') || '|' || split_part(pg_temp.v('07'), '|', 1) || '|' || split_part(pg_temp.v('07'), '|', 3) || '|' || split_part(pg_temp.v('07'), '|', 5));
 
 -- ---------------------------------------------------------------------------
@@ -232,9 +234,12 @@ select pg_temp.registrar('E4. corrigir a saída para o turno cheio volta à diá
 -- S. Sábado (K1: jornada de referência 4 h)
 -- ---------------------------------------------------------------------------
 
-select pg_temp.registrar('S1. sábado 6 h (06-12, sem intervalo): 2 h extras sobre a hora diária ÷ 8: 120 + 2 × 22,50 = 165,00; pagamento inalterado: 80 × 360/480 = 60,00', 'ok|165.00|60.00|360|0|120|sabado',
+-- FIN-PR-02 (V2): no sábado a HE também é paga acima de 4 h e o custo-base não é proporcional (a 030 pagava 80 × 360/480 = 60,00).
+-- Aqui o colaborador tem valor-hora acordado de 25,00: custo = 80,00 + 2 h × 25,00 = 130,00.
+select pg_temp.registrar('S1. sábado 6 h (06-12, sem intervalo): 2 h extras sobre a hora diária ÷ 8: 120 + 2 × 22,50 = 165,00; pagamento V2: 80 + 2 h × 25 = 130,00', 'ok|165.00|130.00|360|120|120|sabado',
   pg_temp.entrada('11', '06', '1', '06:00', '12:00', 0) || '|' || pg_temp.v('11'));
-select pg_temp.registrar('S2. sábado 3 h: cobrança proporcional à referência de 4 h: 120 × 180/240 = 90,00', 'ok|90.00|30.00|180|0|0|sabado',
+-- FIN-PR-02 (V2): até 4 h no sábado vale a DIÁRIA INTEIRA, cobrada e paga (a 030 era proporcional à referência: 90,00 / 30,00).
+select pg_temp.registrar('S2. sábado 3 h: diária inteira (V2): 120,00 cobrados e 80,00 pagos', 'ok|120.00|80.00|180|0|0|sabado',
   pg_temp.entrada('12', '06', '3', '06:00', '09:00', 0) || '|' || pg_temp.v('12'));
 select pg_temp.registrar('S3. sábado 4h16: 16 min a mais arredondados para 30: 120 + 11,25 = 131,25', 'ok|131.25|256|30|sabado',
   pg_temp.entrada('13', '06', '4', '06:00', '10:16', 0) || '|' || split_part(pg_temp.v('13'), '|', 1) || '|' || split_part(pg_temp.v('13'), '|', 3) || '|' || split_part(pg_temp.v('13'), '|', 5) || '|' || split_part(pg_temp.v('13'), '|', 6));
@@ -439,7 +444,8 @@ select pg_temp.registrar('V10. operacional e admin AAL1 não cadastram contrato 
 -- P. Preservação do histórico
 -- ---------------------------------------------------------------------------
 
-select pg_temp.registrar('P1. vigência nova de K1 (acumulado, sem sábado) a partir de 01/04 não muda o já precificado', '1|131.25|142.50',
+-- FIN-PR-02: o segundo valor é o do caso D6 (153,75 pela V2; era 142,50 na 030).
+select pg_temp.registrar('P1. vigência nova de K1 (acumulado, sem sábado) a partir de 01/04 não muda o já precificado', '1|131.25|153.75',
   pg_temp.adm($q$select count(*)::text from (select public.registrar_condicao_contrato('5c30d000-0000-4000-8000-0000000000d1', date '2026-04-01', 130, 8, 1.5, 10, 'Reajuste', null, true, 'acumulado')) x$q$)
   || '|' || split_part(pg_temp.v('02'), '|', 1) || '|' || split_part(pg_temp.v('07'), '|', 1));
 select pg_temp.registrar('P2. o apontamento legado do motor desligado continua como gravado', '120.00|80.00|-|-',

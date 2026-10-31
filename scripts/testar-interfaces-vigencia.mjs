@@ -1136,13 +1136,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. a 035 (núcleo financeiro puro, FIN-PR-01) é a última migration, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
+  "I1. a 036 (integração do núcleo V2, FIN-PR-02) é a última migration, a 035, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [40, "20261102120000_035_nucleo_financeiro_puro.sql", false],
+  [41, "20261103120000_036_integracao_nucleo_v2.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",

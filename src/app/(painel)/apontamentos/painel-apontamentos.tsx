@@ -58,15 +58,17 @@ import {
 } from "@/lib/apontamentos-salvar";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
+import { calcEntryComNucleo } from "@/lib/previa-v2";
 import { datasAtivas } from "@/lib/feriados";
 import { useFeriados } from "@/lib/regras-definitivas-dados";
 import {
   useEstadoDoMotor,
+  useNucleoV2,
   useRegrasDaBs,
   useRegrasDefinitivas,
   useTermosDoApontamento,
 } from "@/lib/vigencias-dados";
-import { parametrosDeHoras, resolverCondicaoDoDia, tipoDoDia } from "@/lib/vigencias-ui";
+import { ehDomingo, parametrosDeHoras, resolverCondicaoDoDia, tipoDoDia } from "@/lib/vigencias-ui";
 import { AvisoDoMotor } from "../_components/vigencias";
 import { brl, minutesToLabel, todayISO } from "@/lib/format";
 import { useContractRules } from "@/lib/ledger";
@@ -460,6 +462,9 @@ export function PainelApontamentos() {
   const regrasBs = useRegrasDaBs();
   // Regras definitivas (030): tipo do dia pelo calendário e parâmetros de horas da versão.
   const regrasDefinitivas = useRegrasDefinitivas();
+  // Núcleo V2 no motor (036): dia útil e sábado; o domingo segue a 030 até o PR 09.
+  const nucleoV2 = useNucleoV2();
+  const domingoDaFolha = ehDomingo(date);
   const feriados = useFeriados(regrasDefinitivas && estadoDoMotor.tag === "ligado");
   const tipoDaFolha = tipoDoDia(date, datasAtivas(feriados.data ?? []));
   const operacaoDaTela = operationList.find((item) => item.id === operationId) ?? null;
@@ -508,6 +513,8 @@ export function PainelApontamentos() {
       regrasBs,
       // Sem o calendário carregado, o tipo do dia de uma linha nova não é confiável: sem prévia nova.
       regrasDefinitivas: regrasDefinitivas && feriados.isSuccess,
+      nucleoV2,
+      domingo: domingoDaFolha,
       tipoDoDia: tipoDaFolha,
       parametrosDaVersao: (id) => {
         const versao = termos.termosContrato.find((termo) => termo.id === id);
@@ -521,7 +528,7 @@ export function PainelApontamentos() {
         custoProporcional,
         horas,
       }) =>
-        calcEntry({
+        calcEntryComNucleo({
           status: row.status,
           checkIn: row.checkIn || null,
           checkOut: row.checkOut || null,
@@ -531,6 +538,7 @@ export function PainelApontamentos() {
           employeeDailyCost: custoDiario,
           employeeOtHourCost: custoHoraExtra,
           proportionalCost: custoProporcional,
+          nucleoV2: horas?.v2 === true,
           ...(horas
             ? {
                 roundingMode: horas.modo,

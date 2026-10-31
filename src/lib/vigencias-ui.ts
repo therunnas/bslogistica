@@ -87,6 +87,28 @@ export function interpretarRegrasDefinitivas(data: unknown, erro: unknown): bool
 }
 
 /**
+ * Núcleo financeiro V2 ligado ao motor (migration 036, FIN-PR-02): dia útil e sábado calculados por
+ * `nucleo_componentes_v2`. O banco anuncia com `nucleo_v2 = true`; sem o anúncio a prévia segue a
+ * regra de antes, que é o que o banco sem a 036 calcula.
+ */
+export function interpretarNucleoV2(data: unknown, erro: unknown): boolean {
+  if (erro !== null && erro !== undefined) return false;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  return (data as { nucleo_v2?: unknown }).nucleo_v2 === true;
+}
+
+/**
+ * A data civil `YYYY-MM-DD` cai num domingo? O domingo continua "util" para `motor_tipo_do_dia`, mas
+ * fica FORA da V2 até o PR 09 e segue a regra da 030. Dia da semana pelo calendário UTC da própria
+ * data, igual em qualquer fuso.
+ */
+export function ehDomingo(data: string): boolean {
+  const [a, m, d] = data.split("-").map(Number);
+  if (!a || !m || !d) return false;
+  return new Date(Date.UTC(a, m - 1, d)).getUTCDay() === 0;
+}
+
+/**
  * Tipo do dia de uma data civil `YYYY-MM-DD`, pelo mesmo critério de `motor_tipo_do_dia()`:
  * feriado cadastrado tem precedência; sábado; o resto (domingo inclusive) é dia útil. Sem `Date`
  * local: o dia da semana sai do calendário UTC da própria data, igual em qualquer fuso.

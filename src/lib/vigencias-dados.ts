@@ -10,6 +10,7 @@ import { lerDivergencias, lerPendencias } from "@/lib/vigencias-implantacao";
 import {
   interpretarEstadoDoMotor,
   interpretarRegrasDaBs,
+  interpretarNucleoV2,
   interpretarRegrasDefinitivas,
   montarCadastroAtomico,
   montarRegistro,
@@ -160,6 +161,13 @@ export function useRegrasDefinitivas(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarRegrasDefinitivas(consulta.data.data, consulta.data.error);
+}
+
+/** O banco já tem a migration 036 (núcleo V2 no motor)? Mesma consulta do estado do motor. */
+export function useNucleoV2(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarNucleoV2(consulta.data.data, consulta.data.error);
 }
 
 export function useVersoes(tipo: TipoDeVigencia, entidadeId: string | null) {
