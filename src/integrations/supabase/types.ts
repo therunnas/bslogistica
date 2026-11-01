@@ -1810,7 +1810,12 @@ export type Database = {
         Returns: undefined;
       };
       tarifa_contrato_na_data: {
-        Args: { p_contract_id: string; p_data: string; p_job_function_id: string; p_shift_period: string };
+        Args: {
+          p_contract_id: string;
+          p_data: string;
+          p_job_function_id: string;
+          p_shift_period: string;
+        };
         Returns: {
           daily_rate: number;
           id: string;

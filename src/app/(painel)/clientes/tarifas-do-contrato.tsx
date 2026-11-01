@@ -75,7 +75,8 @@ export function TarifasDoContrato({
   const alterarResolucao = useAlterarResolucaoDeTarifas();
 
   const hoje = hojeEmSaoPaulo();
-  const lista: readonly TarifaDoContrato[] = tarifas.data ?? [];
+  const dados = tarifas.data;
+  const lista: readonly TarifaDoContrato[] = useMemo(() => dados ?? [], [dados]);
   const quadro = useMemo(
     () => montarQuadroDeTarifas(lista, funcoesDoQuadro(lista, funcoes), hoje),
     [lista, funcoes, hoje],

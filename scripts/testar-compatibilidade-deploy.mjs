@@ -28,6 +28,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 
 import { montarRegistroDeAdicional } from "../src/lib/adicionais.ts";
+import { montarCargaDaRpc } from "../src/lib/apontamentos-salvar.ts";
 import { carregarFechamento, dependenciasComSupabase } from "../src/lib/fechamento/carregar.ts";
 import { verificarDisponibilidade } from "../src/lib/fechamento/disponibilidade.ts";
 import { csvDoFechamento } from "../src/lib/fechamento/exportacao.ts";
@@ -42,12 +43,20 @@ import {
   interpretarFuncoesTurno,
   montarAlocacao,
 } from "../src/lib/funcoes.ts";
+import {
+  interpretarResolucaoDeTarifas,
+  interpretarSnapshotsDeFuncao,
+  interpretarTarifasPorFuncao,
+  montarRegistroDeTarifa,
+} from "../src/lib/tarifas.ts";
 import { interpretarPeriodoContratual, montarRegistro } from "../src/lib/vigencias-ui.ts";
 
 const cenario = process.argv[2] ?? "?";
 const esperaComponentes = process.argv[3] === "com-componentes";
 const esperaPeriodo = process.argv[4] === "com-periodo";
 const esperaFuncoes = process.argv[5] === "com-funcoes";
+const esperaSnapshots = process.argv[6] === "com-snap";
+const esperaTarifas = process.argv[7] === "com-tarifas";
 const { API_URL, ANON_KEY, SERVICE_ROLE_KEY, CONTAINER, BASE_URL } = process.env;
 if (!API_URL || !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(API_URL)) {
   console.error("API_URL ausente ou não local: este teste só roda contra o Supabase local.");
@@ -527,6 +536,234 @@ verificar(
   [depois.jaFaturado.faturadoCentavos, depois.aFaturar.faturadoCentavos],
   [somaCobrada, 0],
 );
+
+// ---------------------------------------------------------------------------
+// Q. Snapshots de função/período (040) e tarifas por função e período (041), pelo código do app
+// ---------------------------------------------------------------------------
+const estadoQ = await cliente.rpc("estado_motor_vigencia");
+verificar(
+  "Q1. capacidades anunciadas só nos bancos que as têm (snapshots 040; tarifas 041; resolução desligada)",
+  [
+    interpretarSnapshotsDeFuncao(estadoQ.data, estadoQ.error),
+    interpretarTarifasPorFuncao(estadoQ.data, estadoQ.error),
+    interpretarResolucaoDeTarifas(estadoQ.data, estadoQ.error),
+  ],
+  [esperaSnapshots, esperaTarifas, false],
+);
+const E = (n) => `5c39f000-0000-4000-8000-00000000000${n}`;
+const lerEntrada = async (emp, data) => {
+  const r = await cliente
+    .from("timesheet_entries")
+    .select("*")
+    .eq("employee_id", E(emp))
+    .eq("work_date", data)
+    .maybeSingle();
+  return r.data;
+};
+const salvarDia = (emp, data, funcaoId, saida = "15:00") => {
+  const linha = {
+    employeeId: E(emp),
+    entryId: undefined,
+    status: "present",
+    checkIn: "06:00",
+    checkOut: saida,
+    breakMinutes: 60,
+    notes: "",
+  };
+  return cliente.rpc("salvar_apontamento_admin", {
+    p_operation_id: "5c39e000-0000-4000-8000-0000000000a1",
+    p_shift_id: "5c39a000-0000-4000-8000-0000000000a1",
+    p_work_date: data,
+    p_linhas: montarCargaDaRpc(
+      [linha],
+      esperaSnapshots ? new Map([[E(emp), funcaoId ?? ""]]) : undefined,
+    ),
+  });
+};
+if (esperaFuncoes) {
+  const upd = await cliente
+    .from("shifts")
+    .update({ shift_period: "diurno" })
+    .eq("id", "5c39a000-0000-4000-8000-0000000000a1");
+  verificar(
+    "Q2. admin classifica o turno do fixture como diurno",
+    upd.error?.message ?? "ok",
+    "ok",
+  );
+}
+const catQ = esperaFuncoes
+  ? ((await cliente.from("job_functions").select("id, code")).data ?? [])
+  : [];
+const fid = (codigo) => catQ.find((f) => f.code === codigo)?.id ?? null;
+
+if (!esperaSnapshots) {
+  // Banco SEM os snapshots: o salvamento é o de antes e nenhuma coluna/RPC nova é usada.
+  const s0 = await salvarDia(1, "2026-03-17", null);
+  const e0 = await lerEntrada(1, "2026-03-17");
+  verificar(
+    "Q3. banco sem snapshots: salvar apontamento como sempre; a leitura não traz coluna de snapshot",
+    [s0.error?.message ?? "ok", "job_function_id_snapshot" in (e0 ?? {})],
+    ["ok", false],
+  );
+} else {
+  const s1 = await salvarDia(1, "2026-03-17", fid("operador"));
+  const e1 = await lerEntrada(1, "2026-03-17");
+  verificar(
+    "Q3. snapshots (040): função informada e período do turno gravados no lançamento",
+    [
+      s1.error?.message ?? "ok",
+      e1?.job_function_id_snapshot === fid("operador"),
+      e1?.job_function_source,
+      e1?.shift_period_snapshot,
+    ],
+    ["ok", true, "informada", "diurno"],
+  );
+  const antes = e1?.billed_amount;
+  const corr = await cliente.rpc("corrigir_snapshots_do_apontamento", {
+    p_entry_id: e1.id,
+    p_job_function_id: fid("conferente"),
+    p_atualizar_periodo: false,
+    p_reason: "Função conferida (compatibilidade)",
+  });
+  const e1b = await lerEntrada(1, "2026-03-17");
+  verificar(
+    "Q4. correção auditada de apontamento não faturado: função muda, valor NÃO muda (resolução desligada)",
+    [corr.error?.message ?? "ok", e1b?.job_function_source, e1b?.billed_amount === antes],
+    ["ok", "corrigida", true],
+  );
+  const direto = await cliente
+    .from("timesheet_entries")
+    .update({ shift_period_snapshot: "noturno" })
+    .eq("id", e1.id);
+  verificar(
+    "Q5. escrita direta no snapshot pelo PostgREST é recusada (42501)",
+    direto.error?.code,
+    "42501",
+  );
+}
+
+if (esperaTarifas) {
+  const KC = "5c39d000-0000-4000-8000-0000000000d1";
+  const novaTarifa = (fn, periodo, valor) =>
+    cliente.rpc("registrar_tarifa_contrato", {
+      ...montarRegistroDeTarifa({
+        contratoId: KC,
+        funcaoId: fid(fn),
+        periodo,
+        inicio: "2026-01-01",
+        valor,
+        motivo: "Tarifa de compatibilidade",
+      }),
+    });
+  const t1 = await novaTarifa("conferente", "diurno", "160,00");
+  const t2 = await novaTarifa("operador", "diurno", "120,00");
+  verificar(
+    "Q6. tarifas por função e período cadastradas pelo código do app",
+    [t1.error?.message ?? "ok", t2.error?.message ?? "ok"],
+    ["ok", "ok"],
+  );
+  const lista = await cliente.from("contract_rate_terms").select("*").eq("contract_id", KC);
+  verificar(
+    "Q7. tarifas lidas como a tela faz (select por contrato)",
+    lista.error?.message ?? lista.data.length,
+    2,
+  );
+  const naData = await cliente.rpc("tarifa_contrato_na_data", {
+    p_contract_id: KC,
+    p_job_function_id: fid("conferente"),
+    p_shift_period: "diurno",
+    p_data: "2026-03-18",
+  });
+  verificar(
+    "Q8. tarifa vigente na data lida pela RPC",
+    naData.error?.message ?? Number(naData.data?.[0]?.daily_rate),
+    160,
+  );
+
+  // Resolução DESLIGADA: cadastrar tarifa não muda preço (diária genérica 150).
+  const s3 = await salvarDia(3, "2026-03-18", fid("operador"));
+  const e3 = await lerEntrada(3, "2026-03-18");
+  verificar(
+    "Q9. resolução desligada: com tarifas cadastradas o preço continua a diária genérica (150,00) e sem ligação a tarifa",
+    [s3.error?.message ?? "ok", Number(e3?.billed_amount), e3?.contract_rate_terms_id ?? null],
+    ["ok", 150, null],
+  );
+  // LIGA (motor ligado + tarifa existente).
+  const liga = await cliente.rpc("alterar_resolucao_tarifas", {
+    p_ativar: true,
+    p_reason: "Ligada no teste de compatibilidade",
+  });
+  verificar("Q10. admin liga a resolução pelo código do app", liga.error?.message ?? "ok", "ok");
+  const estadoLigado = await cliente.rpc("estado_motor_vigencia");
+  verificar(
+    "Q11. o estado do motor passa a anunciar a resolução ligada",
+    interpretarResolucaoDeTarifas(estadoLigado.data, estadoLigado.error),
+    true,
+  );
+  const s4 = await salvarDia(4, "2026-03-19", fid("conferente"));
+  const e4 = await lerEntrada(4, "2026-03-19");
+  verificar(
+    "Q12. resolução ligada: conferente diurno = tarifa 160,00, ligado à versão de tarifa",
+    [s4.error?.message ?? "ok", Number(e4?.billed_amount), Boolean(e4?.contract_rate_terms_id)],
+    ["ok", 160, true],
+  );
+  const s5 = await salvarDia(5, "2026-03-19", null);
+  const s6 = await salvarDia(2, "2026-03-19", fid("auxiliar_producao"));
+  verificar(
+    "Q13. resolução ligada: sem função = pendente (55000); função sem tarifa = P0002; nada gravado",
+    [
+      s5.error?.code,
+      s6.error?.code,
+      (await lerEntrada(5, "2026-03-19")) === null,
+      (await lerEntrada(2, "2026-03-19")) === null,
+    ],
+    ["55000", "P0002", true, true],
+  );
+  const e1x = await lerEntrada(1, "2026-03-17");
+  verificar(
+    "Q14. o apontamento lançado antes de ligar NÃO foi recalculado (continua 150,00 pela diária genérica)",
+    [Number(e1x?.billed_amount), e1x?.contract_rate_terms_id ?? null],
+    [150, null],
+  );
+  const desliga = await cliente.rpc("alterar_resolucao_tarifas", {
+    p_ativar: false,
+    p_reason: "Desligada no teste de compatibilidade",
+  });
+  verificar("Q15. admin desliga a resolução", desliga.error?.message ?? "ok", "ok");
+}
+
+if (esperaSnapshots) {
+  // Concorrência: corrigir a função de um apontamento NÃO faturado enquanto a fatura do cliente é gerada.
+  const s7 = await salvarDia(2, "2026-03-20", fid("operador"));
+  const e7 = await lerEntrada(2, "2026-03-20");
+  const [corrida, fat] = await Promise.all([
+    cliente.rpc("corrigir_snapshots_do_apontamento", {
+      p_entry_id: e7.id,
+      p_job_function_id: fid("conferente"),
+      p_atualizar_periodo: false,
+      p_reason: "Corrida com o faturamento",
+    }),
+    cliente.rpc("gerar_fatura", {
+      _client_id: C,
+      _period_start: "2026-03-16",
+      _period_end: "2026-03-31",
+    }),
+  ]);
+  const e7b = await lerEntrada(2, "2026-03-20");
+  const corrigiu = !corrida.error;
+  verificar(
+    "Q16. concorrência correção × faturamento: a fatura é gerada; ou a correção entrou ANTES (função nova, faturada) ou foi recusada DEPOIS (55000, função antiga)",
+    [
+      s7.error?.message ?? "ok",
+      !fat.error,
+      Boolean(e7b?.invoice_id),
+      corrigiu
+        ? e7b?.job_function_id_snapshot === fid("conferente")
+        : corrida.error?.code === "55000" && e7b?.job_function_id_snapshot === fid("operador"),
+    ],
+    ["ok", true, true, true],
+  );
+}
 
 // ---------------------------------------------------------------------------
 // H. Rotas HTTP do Next, com a sessão em cookie
