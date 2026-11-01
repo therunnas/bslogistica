@@ -356,7 +356,9 @@ select pg_temp.registrar('F4. apontamento antigo sem campo novo: a tabela de apo
 select pg_temp.registrar('F5. nenhuma função financeira cita função nem período do turno', '0',
   (select count(*)::text from pg_proc
     where pronamespace = 'public'::regnamespace
-      and proname in ('derivar_valores_por_vigencia', 'derivar_valores_financeiros', 'gerar_fatura', 'ajustes_de_arredondamento_acumulado',
+      -- derivar_valores_por_vigencia fica de fora desde a 041: ela lê o snapshot SÓ com a resolução de
+    -- tarifas ligada (provado na suíte 041); desligada, o cálculo é o de antes.
+    and proname in ('derivar_valores_financeiros', 'gerar_fatura', 'ajustes_de_arredondamento_acumulado',
                       'resumo_financeiro_periodo', 'validar_fechamento_acumulado', 'nucleo_componentes_v2', 'componentes_do_lancamento',
                       'validar_periodo_de_cobranca', 'frequencia_de_fechamento', 'registrar_adicional', 'saldo_de_horas_do_periodo')
       and (prosrc ilike '%job_function%' or prosrc ilike '%shift_period%')));

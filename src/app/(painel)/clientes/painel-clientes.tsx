@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Building2,
   CalendarRange,
+  Coins,
   FileText,
   Pencil,
   Plus,
@@ -47,12 +48,17 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { brl, dateBR, num, todayISO } from "@/lib/format";
 import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
+import { TarifasDoContrato } from "./tarifas-do-contrato";
+import { useFuncoes } from "@/lib/funcoes-dados";
 import { FeriadosDoCalendario } from "./feriados";
 import {
   useCriarComVigencia,
   useEstadoDoMotor,
+  useFuncoesTurno,
   usePeriodoContratual,
   useRegrasDefinitivas,
+  useResolucaoDeTarifas,
+  useTarifasPorFuncao,
 } from "@/lib/vigencias-dados";
 import {
   camposDoCadastroInicialDeContrato,
@@ -81,7 +87,8 @@ const emptyContract = {
   name: "",
   daily_rate: 0,
   shift_hours: 8,
-  ot_factor: 1,
+  // Padrão comercial da BS: 1,5 = hora extra com 50% a mais. Contrato existente mantém o seu fator.
+  ot_factor: 1.5,
   ot_tolerance_min: 10,
   valid_from: todayISO(),
   valid_to: "",
@@ -111,6 +118,16 @@ export function PainelClientes() {
   // Calendário de feriados só existe com a migration 030 (o banco anuncia `regras_definitivas`).
   const regrasDefinitivas = useRegrasDefinitivas();
   const periodoContratual = usePeriodoContratual();
+  // Tarifas por função e período (migrations 039-041): só com a capacidade confirmada. Falha ao
+  // consultar NÃO é ausência: o estado desconhecido mostra a tela como está, sem esconder o erro.
+  const tarifasPorFuncao = useTarifasPorFuncao();
+  const resolucaoDeTarifas = useResolucaoDeTarifas();
+  const funcoesHabilitadas = useFuncoesTurno();
+  const funcoes = useFuncoes(funcoesHabilitadas && tarifasPorFuncao === "disponivel");
+  const [tarifasDoContrato, setTarifasDoContrato] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const diariaGenericaSemEfeito = tarifasPorFuncao === "disponivel" && resolucaoDeTarifas === true;
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");
 
@@ -503,7 +520,7 @@ export function PainelClientes() {
                       </TableHead>
 
                       <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Diária
+                        {tarifasPorFuncao === "disponivel" ? "Diária genérica" : "Diária"}
                       </TableHead>
 
                       <TableHead className="text-right text-xs font-semibold text-muted-foreground">
@@ -555,7 +572,13 @@ export function PainelClientes() {
                         </TableCell>
 
                         <TableCell className="text-right text-sm font-medium text-foreground">
-                          {brl(contract.daily_rate)}
+                          {diariaGenericaSemEfeito ? (
+                            <span className="text-xs font-normal text-muted-foreground">
+                              Por função (ver Tarifas)
+                            </span>
+                          ) : (
+                            brl(contract.daily_rate)
+                          )}
                         </TableCell>
 
                         <TableCell className="text-right text-sm text-muted-foreground">
@@ -577,6 +600,20 @@ export function PainelClientes() {
 
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
+                            {tarifasPorFuncao === "disponivel" && funcoesHabilitadas ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground"
+                                onClick={() =>
+                                  setTarifasDoContrato({ id: contract.id, name: contract.name })
+                                }
+                                aria-label={`Tarifas de ${contract.name}`}
+                              >
+                                <Coins className="h-4 w-4" />
+                              </Button>
+                            ) : null}
                             <Button
                               type="button"
                               variant="ghost"
@@ -839,23 +876,44 @@ export function PainelClientes() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Valor da diária (R$)</Label>
+            {diariaGenericaSemEfeito ? (
+              <div className="space-y-2">
+                <Label>Preço da diária</Label>
+                <p className="rounded-xl border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
+                  O preço agora vem da tarifa de cada função e período do turno. Use o botão Tarifas
+                  na lista de contratos. A diária genérica deste contrato não define mais o valor
+                  cobrado.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>
+                  {tarifasPorFuncao === "disponivel"
+                    ? "Diária genérica (R$)"
+                    : "Valor da diária (R$)"}
+                </Label>
 
-              <Input
-                type="number"
-                step="0.01"
-                value={contractForm.daily_rate}
-                disabled={taxaTravada}
-                onChange={(event) =>
-                  setContractForm({
-                    ...contractForm,
-                    daily_rate: Number(event.target.value),
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-            </div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={contractForm.daily_rate}
+                  disabled={taxaTravada}
+                  onChange={(event) =>
+                    setContractForm({
+                      ...contractForm,
+                      daily_rate: Number(event.target.value),
+                    })
+                  }
+                  className={INPUT_CLASS}
+                />
+                {tarifasPorFuncao === "disponivel" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Vale enquanto as tarifas por função e período não estiverem ligadas; depois, o
+                    preço vem da tarifa de cada função.
+                  </p>
+                ) : null}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Jornada da diária (horas)</Label>
@@ -873,6 +931,11 @@ export function PainelClientes() {
                 }
                 className={INPUT_CLASS}
               />
+              <p className="text-xs text-muted-foreground">
+                Dia útil e sábado seguem a regra fixa da BS: jornada de 8 horas (sábado com
+                referência de 4 horas). Este valor só vale para domingo e feriado, enquanto a regra
+                nova deles não chega.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -891,6 +954,7 @@ export function PainelClientes() {
                 }
                 className={INPUT_CLASS}
               />
+              <p className="text-xs text-muted-foreground">1,5 = hora extra com 50% a mais.</p>
             </div>
 
             <div className="space-y-2">
@@ -908,6 +972,10 @@ export function PainelClientes() {
                 }
                 className={INPUT_CLASS}
               />
+              <p className="text-xs text-muted-foreground">
+                Minutos de excesso que ainda não contam como hora extra. Passou disso, a hora extra
+                é arredondada em blocos de 15/45 minutos.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -1050,6 +1118,14 @@ export function PainelClientes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {tarifasPorFuncao === "disponivel" && funcoesHabilitadas ? (
+        <TarifasDoContrato
+          contrato={tarifasDoContrato}
+          aoFechar={() => setTarifasDoContrato(null)}
+          funcoes={funcoes.data ?? []}
+          resolucaoLigada={resolucaoDeTarifas}
+        />
+      ) : null}
     </div>
   );
 }

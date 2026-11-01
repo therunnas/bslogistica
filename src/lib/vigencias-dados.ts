@@ -1,6 +1,11 @@
 import { decidirDisponibilidade } from "./fechamento/disponibilidade";
 import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./fechamento/periodo";
 import { interpretarFuncoesTurno } from "./funcoes";
+import {
+  interpretarResolucaoDeTarifas,
+  interpretarSnapshotsDeFuncao,
+  interpretarTarifasPorFuncao,
+} from "./tarifas";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
@@ -182,6 +187,34 @@ export function useFuncoesTurno(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarFuncoesTurno(consulta.data.data, consulta.data.error);
+}
+
+/**
+ * Capacidades da 040/041 (snapshots de função e período; tarifas por função). Falha ao consultar NÃO
+ * é ausência de capacidade: o estado fica `desconhecido` e quem decide mostra o erro, não esconde.
+ */
+export type CapacidadeDeTarifas = "indisponivel" | "desconhecida" | "disponivel";
+
+export function useTarifasPorFuncao(): CapacidadeDeTarifas {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError) return "desconhecida";
+  if (!consulta.data) return "desconhecida";
+  if (consulta.data.error) return "desconhecida";
+  return interpretarTarifasPorFuncao(consulta.data.data, null) ? "disponivel" : "indisponivel";
+}
+
+/** A resolução por função e período está ligada (chave + motor)? Falha de leitura: `null`. */
+export function useResolucaoDeTarifas(): boolean | null {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data || consulta.data.error) return null;
+  return interpretarResolucaoDeTarifas(consulta.data.data, null);
+}
+
+/** O banco grava snapshots de função e período por apontamento (040)? */
+export function useSnapshotsDeFuncao(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarSnapshotsDeFuncao(consulta.data.data, consulta.data.error);
 }
 
 /** O banco já tem a migration 038 (frequência no contrato e competência de cobrança)? */

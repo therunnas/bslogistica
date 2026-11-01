@@ -355,7 +355,8 @@ select pg_temp.registrar('F2. E2 e E3 (mesmo horário, 02/03): mesmo valor com f
     where work_date = date '2026-03-02' and employee_id in ('5c40f000-0000-4000-8000-000000000002', '5c40f000-0000-4000-8000-000000000003')));
 select pg_temp.registrar('F3. o cálculo, a fatura e as leituras não conhecem os snapshots', '0',
   (select count(*)::text from pg_proc where pronamespace = 'public'::regnamespace
-    and proname in ('derivar_valores_por_vigencia', 'derivar_valores_financeiros', 'gerar_fatura', 'ajustes_de_arredondamento_acumulado',
+    -- derivar_valores_por_vigencia fica de fora desde a 041 (lê o snapshot só com a resolução ligada).
+    and proname in ('derivar_valores_financeiros', 'gerar_fatura', 'ajustes_de_arredondamento_acumulado',
                     'resumo_financeiro_periodo', 'nucleo_componentes_v2', 'componentes_do_lancamento', 'motor_fonte_do_dia')
     and (prosrc ilike '%job_function%' or prosrc ilike '%shift_period%')));
 select pg_temp.registrar('F4. a ordem de disparo: trava de colunas -> snapshots -> cálculos', 'true',

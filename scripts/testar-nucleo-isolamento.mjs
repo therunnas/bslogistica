@@ -80,6 +80,8 @@ verificar(
     "20261105120000_038_periodo_contratual.sql",
     "20261106120000_039_funcoes_e_periodo_do_turno.sql",
     "20261107120000_040_snapshots_funcao_periodo.sql",
+    // A 041 redefine o motor por vigência (que chama o núcleo) só para acrescentar a tarifa por função.
+    "20261108120000_041_tarifas_por_funcao_e_periodo.sql",
   ],
 );
 verificar(

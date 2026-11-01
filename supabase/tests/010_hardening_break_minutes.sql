@@ -411,8 +411,9 @@ begin
   -- RLS desde a criação — 19. A 029 acrescenta `billing_additionals` (adicionais de serviço),
   -- com RLS desde a criação — 20. A 030 acrescenta `financial_holidays` (calendário de feriados),
   -- com RLS desde a criação — 21. A 039 acrescenta `job_functions` (catálogo de funções), com RLS
-  -- desde a criação — 22.
-  perform pg_temp.registrar('F3. as 22 tabelas de public seguem com RLS ativa', '22',
+  -- desde a criação — 22. A 041 acrescenta `contract_rate_terms` (tarifas) e `pricing_settings` (chave da
+  -- resolução), ambas com RLS desde a criação — 24.
+  perform pg_temp.registrar('F3. as 24 tabelas de public seguem com RLS ativa', '24',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));

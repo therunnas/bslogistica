@@ -35,6 +35,7 @@ import {
   useRegistrarVigencia,
   useRegrasDaBs,
   useRegrasDefinitivas,
+  useResolucaoDeTarifas,
   useVersoes,
 } from "@/lib/vigencias-dados";
 import {
@@ -130,6 +131,9 @@ export function HistoricoDeVigencias({
   const regrasBs = useRegrasDaBs();
   const regrasDefinitivas = useRegrasDefinitivas();
   const periodoContratual = usePeriodoContratual();
+  // Com a resolução por função ligada (041) a diária genérica não define o preço: o campo some e o
+  // valor atual segue no envio, porque a RPC legada o exige.
+  const resolucaoDeTarifas = useResolucaoDeTarifas();
   const campos = camposDaVigencia(tipo, regrasBs, regrasDefinitivas, periodoContratual);
   const hoje = hojeEmSaoPaulo();
   const liberado = podeRegistrarVigencia(estado);
@@ -321,33 +325,35 @@ export function HistoricoDeVigencias({
               />
             </div>
 
-            {campos.map((campo) => (
-              <div key={campo.chave} className="space-y-2">
-                <Label htmlFor={`vigencia-${campo.chave}`}>{campo.rotulo}</Label>
-                {campo.tipo === "escolha" ? (
-                  <select
-                    id={`vigencia-${campo.chave}`}
-                    value={valores[campo.chave] || campo.padrao || ""}
-                    onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
-                    className={`${INPUT_CLASS} w-full border px-3 text-sm`}
-                  >
-                    {(campo.opcoes ?? []).map((opcao) => (
-                      <option key={opcao.valor} value={opcao.valor}>
-                        {opcao.rotulo}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input
-                    id={`vigencia-${campo.chave}`}
-                    inputMode="decimal"
-                    value={valores[campo.chave] ?? ""}
-                    onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
-                    className={INPUT_CLASS}
-                  />
-                )}
-              </div>
-            ))}
+            {campos
+              .filter((campo) => !(campo.ocultarComTarifas === true && resolucaoDeTarifas === true))
+              .map((campo) => (
+                <div key={campo.chave} className="space-y-2">
+                  <Label htmlFor={`vigencia-${campo.chave}`}>{campo.rotulo}</Label>
+                  {campo.tipo === "escolha" ? (
+                    <select
+                      id={`vigencia-${campo.chave}`}
+                      value={valores[campo.chave] || campo.padrao || ""}
+                      onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
+                      className={`${INPUT_CLASS} w-full border px-3 text-sm`}
+                    >
+                      {(campo.opcoes ?? []).map((opcao) => (
+                        <option key={opcao.valor} value={opcao.valor}>
+                          {opcao.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      id={`vigencia-${campo.chave}`}
+                      inputMode="decimal"
+                      value={valores[campo.chave] ?? ""}
+                      onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
+                      className={INPUT_CLASS}
+                    />
+                  )}
+                </div>
+              ))}
 
             <div className="space-y-2">
               <Label htmlFor="vigencia-motivo">Motivo do reajuste (obrigatório)</Label>
