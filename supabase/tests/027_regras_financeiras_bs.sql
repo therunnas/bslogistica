@@ -307,7 +307,9 @@ select pg_temp.registrar('F2. avulsa, hora extra (E2): 250 + 2 × 31,25 = 312,50
 
 create temporary table _adic (k text primary key, id text);
 insert into _adic values ('A1', pg_temp.adicional('c1', '2026-03-01', '2026-03-15', 'Etiquetagem de 2.000 volumes', '350', 'OS 123', 'a1'));
-insert into _adic values ('A2', pg_temp.adicional('c1', '2026-03-10', '2026-03-20', 'Separação de pedidos', '100'));
+-- FIN-PR-05 (038): execução que atravessa quinzenas exige a competência de cobrança (sem ela, a RPC
+-- recusa). A2 é cobrado na 2ª quinzena: continua fora da fatura da 1ª, que é o que H5 mede.
+insert into _adic values ('A2', pg_temp.adm($q$select public.registrar_adicional('5c29c000-0000-4000-8000-0000000000c1', '2026-03-10', '2026-03-20', 'Separação de pedidos', 100, null, null, '2026-03-16', '2026-03-31')::text$q$));
 insert into _adic values ('A3', pg_temp.adicional('c1', '2026-03-05', '2026-03-05', 'Contêiner 40 pés', '500', 'CNT-9'));
 insert into _adic values ('A4', pg_temp.adicional('c2', '2026-03-16', '2026-03-31', 'Carreta completa (serviço fechado)', '400', null, 'a4'));
 
@@ -350,7 +352,7 @@ select pg_temp.registrar('G7. trilha: 4 registros e 1 cancelamento, com ator, mo
 -- Elegível de C1 em 01-15/03: 11 (120/80), 13 (120/80), 21 (60/40), 24 (165/75), 25 (165/130),
 -- 27 (187,50/150), 31 (125/40), 32 (312,50/75) = receita 1.255,00, custo 670,00, 8 diárias
 -- (21 e 31 são saídas antecipadas: cobrança proporcional desde a 030).
--- Adicional dentro do período: só A1 (350). A2 cruza a quinzena; A3 está cancelado.
+-- Adicional dentro do período: só A1 (350). A2 é cobrado na 2ª quinzena; A3 está cancelado.
 create temporary table _fat (id text);
 insert into _fat select pg_temp.adm($q$select (public.gerar_fatura('5c29c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15')).id::text$q$);
 
@@ -369,7 +371,7 @@ select pg_temp.registrar('H3. conciliação: total = receita dos apontamentos + 
 select pg_temp.registrar('H4. o adicional não virou diária nem hora extra: itens de diárias somam 1.035,00 em 8 (extras 220,00 à parte)', '1035.00|8.00|220.00',
   (select sum(amount)::text || '|' || sum(quantity)::text from public.invoice_items where invoice_id::text = (select id from _fat) and kind = 'diarias')
   || '|' || (select sum(amount)::text from public.invoice_items where invoice_id::text = (select id from _fat) and kind = 'horas_extras'));
-select pg_temp.registrar('H5. A1 vinculado; A2 (cruza a quinzena) e A3 (cancelado) não', 'true|false|false',
+select pg_temp.registrar('H5. A1 vinculado; A2 (cobrado na 2ª quinzena) e A3 (cancelado) não', 'true|false|false',
   (select (invoice_id::text = (select id from _fat))::text from public.billing_additionals where id::text = (select id from _adic where k = 'A1'))
   || '|' || (select (invoice_id is not null)::text from public.billing_additionals where id::text = (select id from _adic where k = 'A2'))
   || '|' || (select (invoice_id is not null)::text from public.billing_additionals where id::text = (select id from _adic where k = 'A3')));

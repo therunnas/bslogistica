@@ -588,6 +588,18 @@ verificar(
   [true, true, true],
 );
 
+const ra038 = corpoDaFuncao(m038, "registrar_adicional");
+verificar(
+  "M8. registrar_adicional: sem competência grava a que contém a execução ou recusa (22023); nunca grava nula",
+  [
+    /else\s+-- Sem competência/.test(ra038),
+    /raise exception 'A execução de % a % não cabe numa competência %/.test(ra038),
+    /errcode = '22023'/.test(ra038.slice(ra038.indexOf("não cabe numa competência"))),
+    /v_cob_inicio, v_cob_fim\)\s+returning/.test(ra038),
+    /p_billing_period_start, p_billing_period_end\)\s+returning/.test(ra038),
+  ],
+  [true, true, true, true, false],
+);
 const runbook = ler("docs/runbooks/rollback-periodo-contratual.sql");
 const m036 = ler("supabase/migrations/20261103120000_036_integracao_nucleo_v2.sql");
 const m032 = ler("supabase/migrations/20261030120000_032_mfa_opcional.sql");

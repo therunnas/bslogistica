@@ -22,7 +22,8 @@
 --     separada do período de EXECUÇÃO (`period_start/end`). Pode ser cobrado antes da execução, e a
 --     execução pode cair fora da competência (executado em novembro, cobrado na 2ª quinzena de outubro).
 --     Adicional antigo (sem competência) mantém a regra de antes: execução inteira dentro da fatura.
---     Nada histórico é reinterpretado.
+--     Nada histórico é reinterpretado. Adicional NOVO sempre nasce com competência: a informada ou,
+--     sem ela, a que contém a execução inteira; execução que não cabe numa competência é recusada.
 --
 -- O QUE MUDA
 --   1. `contract_terms.closing_period` (default 'quinzenal'; nenhuma linha reescrita).
@@ -33,7 +34,8 @@
 --   5. `registrar_condicao_contrato` e `criar_contrato_com_vigencia` ganham `p_closing_period`
 --      (default NULL = herda a versão anterior do contrato, ou quinzenal); `corrigir_condicao_contrato`
 --      preserva a frequência da versão corrigida. As três conferem a regra acima.
---   6. `registrar_adicional` ganha `p_billing_period_start/end` (default NULL = regra antiga).
+--   6. `registrar_adicional` ganha `p_billing_period_start/end` (default NULL = a competência que
+--      contém a execução; se não houver, recusa 22023).
 --   7. `gerar_fatura` (corpo da 037): valida a competência e escolhe os adicionais pela competência.
 --   8. `resumo_financeiro_periodo` (corpo da 032): adicionais pela competência; ajuste previsto pelas
 --      competências da frequência de cada cliente.
@@ -556,6 +558,9 @@ declare
   v_descricao  text := btrim(coalesce(p_description, ''));
   v_referencia text := nullif(btrim(coalesce(p_reference, '')), '');
   v_novo       public.billing_additionals%rowtype;
+  v_freq       text;
+  v_cob_inicio date;
+  v_cob_fim    date;
 begin
   perform public.condicoes_exigir_admin();
 
@@ -598,6 +603,28 @@ begin
   -- A competência é uma janela inteira da frequência do cliente; a execução pode estar fora dela.
   if p_billing_period_start is not null then
     perform public.validar_periodo_de_cobranca(p_client_id, p_billing_period_start, p_billing_period_end);
+    v_cob_inicio := p_billing_period_start;
+    v_cob_fim := p_billing_period_end;
+  else
+    -- Sem competência (app anterior à 038 ou chamada direta): a competência é a que contém a
+    -- execução inteira. Execução que não cabe numa competência é recusada: gravada assim, nunca
+    -- caberia numa fatura (receita presa).
+    v_freq := public.frequencia_de_fechamento(p_client_id, p_period_start);
+    v_cob_inicio := date_trunc('month', p_period_start)::date;
+    v_cob_fim := (date_trunc('month', p_period_start) + interval '1 month - 1 day')::date;
+    if v_freq = 'quinzenal' then
+      if extract(day from p_period_start) > 15 then
+        v_cob_inicio := v_cob_inicio + 15;
+      else
+        v_cob_fim := v_cob_inicio + 14;
+      end if;
+    end if;
+    if p_period_end > v_cob_fim then
+      raise exception 'A execução de % a % não cabe numa competência % do cliente: informe a competência de cobrança.',
+        to_char(p_period_start, 'DD/MM/YYYY'), to_char(p_period_end, 'DD/MM/YYYY'), v_freq
+        using errcode = '22023',
+              hint = 'Informe p_billing_period_start e p_billing_period_end (uma quinzena ou o mês, conforme o contrato).';
+    end if;
   end if;
 
   insert into public.billing_additionals
@@ -605,7 +632,7 @@ begin
      billing_period_start, billing_period_end)
   values
     (p_client_id, p_operation_id, p_period_start, p_period_end, v_descricao, v_referencia, p_amount, auth.uid(),
-     p_billing_period_start, p_billing_period_end)
+     v_cob_inicio, v_cob_fim)
   returning * into v_novo;
 
   perform public.condicoes_auditar('adicional_registrado', 'adicional', v_novo.id, v_novo.id,
@@ -1113,7 +1140,7 @@ $privilegios$;
 comment on function public.registrar_condicao_contrato(uuid, date, numeric, numeric, numeric, integer, text, date, boolean, text, numeric, numeric, text) is
   'Admin AAL2. Registra versao das condicoes do contrato (diaria, jornada, fator, tolerancia, modo de arredondamento, jornada de sabado, fator de feriado e frequencia de fechamento), com motivo e trilha.';
 comment on function public.registrar_adicional(uuid, date, date, text, numeric, text, uuid, date, date) is
-  'Admin AAL2. Registra adicional de servico: periodo de EXECUCAO e, opcionalmente, competencia de COBRANCA (janela da frequencia do cliente). Trilha.';
+  'Admin AAL2. Registra adicional de servico: periodo de EXECUCAO e competencia de COBRANCA (janela da frequencia do cliente; sem ela, a que contem a execucao, ou recusa). Trilha.';
 comment on function public.competencia_de_cobranca(uuid, date) is
   'Admin (leitura). Frequencia de fechamento do cliente no mes da data e a competencia que contem a data.';
 comment on function public.janela_de_cobranca_valida(text, date, date) is

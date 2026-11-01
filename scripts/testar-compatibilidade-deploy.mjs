@@ -345,6 +345,38 @@ if (esperaPeriodo) {
     p_client_id: C,
     p_data: "2026-03-20",
   });
+  // App ANTIGO contra o banco 038: o cadastro de adicional não envia competência.
+  const antigo = (inicio, fim) =>
+    cliente.rpc("registrar_adicional", {
+      p_client_id: C,
+      p_period_start: inicio,
+      p_period_end: fim,
+      p_description: "Adicional do app antigo",
+      p_amount: 5,
+    });
+  const antigoDentro = await antigo("2026-03-20", "2026-03-21");
+  const gravado = await cliente
+    .from("billing_additionals")
+    .select("billing_period_start, billing_period_end")
+    .eq("id", antigoDentro.data);
+  verificar(
+    "P7b. 038 + app antigo: execução dentro de uma quinzena grava a competência automática",
+    [antigoDentro.error?.message ?? typeof antigoDentro.data, gravado.data?.[0]],
+    ["string", { billing_period_start: "2026-03-16", billing_period_end: "2026-03-31" }],
+  );
+  const antigoCruza = await antigo("2026-03-10", "2026-03-20");
+  verificar(
+    "P7c. 038 + app antigo: execução que atravessa quinzenas é recusada (22023), sem receita presa",
+    [
+      antigoCruza.error?.code,
+      Number(
+        psql(
+          `select count(*) from public.billing_additionals where client_id = '${C}' and period_start = date '2026-03-10';`,
+        ),
+      ),
+    ],
+    ["22023", 0],
+  );
   verificar(
     "P8. 038: competência de cobrança lida pela sessão do admin",
     competencia.error?.message ?? competencia.data,

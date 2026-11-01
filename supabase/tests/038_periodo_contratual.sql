@@ -112,6 +112,20 @@ begin
 end;
 $$;
 
+-- Como `adicional`, mas devolve também a competência gravada (ok|início|fim), ou o erro.
+create or replace function pg_temp.adicional_c(_k text, _cli text, _exec_ini date, _exec_fim date, _valor numeric,
+                                                _cob_ini date, _cob_fim date) returns text language plpgsql as $$
+declare _r text;
+begin
+  _r := pg_temp.adicional(_k, _cli, _exec_ini, _exec_fim, _valor, _cob_ini, _cob_fim);
+  if _r <> 'ok' then
+    return _r;
+  end if;
+  return 'ok|' || (select a.billing_period_start::text || '|' || a.billing_period_end::text
+                     from public.billing_additionals a where a.id = (select id from _ids where k = _k));
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Fixture
 -- ---------------------------------------------------------------------------
@@ -243,10 +257,28 @@ select pg_temp.registrar('A2. mesma competência da execução (1ª quinzena de 
   pg_temp.adicional('a2', 'c1', date '2026-03-05', date '2026-03-06', 30, date '2026-03-01', date '2026-03-15'));
 select pg_temp.registrar('A3. adicional que será cancelado (1ª quinzena de março)', 'ok',
   pg_temp.adicional('a3', 'c1', date '2026-03-05', date '2026-03-05', 20, date '2026-03-01', date '2026-03-15'));
-select pg_temp.registrar('A4. legado, sem competência, execução dentro da 2ª quinzena', 'ok',
-  pg_temp.adicional('a4', 'c1', date '2026-03-20', date '2026-03-25', 15, null, null));
-select pg_temp.registrar('A5. legado, sem competência, execução que cruza as quinzenas (10–20/03)', 'ok',
-  pg_temp.adicional('a5', 'c1', date '2026-03-10', date '2026-03-20', 12, null, null));
+select pg_temp.registrar('A4. sem competência, execução dentro da 2ª quinzena: grava a competência automática (16–31/03)',
+  'ok|2026-03-16|2026-03-31',
+  pg_temp.adicional_c('a4', 'c1', date '2026-03-20', date '2026-03-25', 15, null, null));
+select pg_temp.registrar('A5. sem competência, execução que atravessa as quinzenas (10–20/11): recusado (22023), nada gravado',
+  'erro 22023|0',
+  pg_temp.adicional('a5', 'c1', date '2026-11-10', date '2026-11-20', 12, null, null)
+  || '|' || (select count(*)::text from public.billing_additionals
+              where client_id = pg_temp.cli('c1') and period_start = date '2026-11-10'));
+select pg_temp.registrar('A5b. sem competência, execução dentro da 1ª quinzena (cliente sem contrato): grava 01–15/04',
+  'ok|2026-04-01|2026-04-15',
+  pg_temp.adicional_c('a5b', 'c5', date '2026-04-02', date '2026-04-03', 9, null, null));
+select pg_temp.registrar('A5c. CLI-MENSAL sem competência, execução de 10 a 20/04: grava o mês (01–30/04)',
+  'ok|2026-04-01|2026-04-30',
+  pg_temp.adicional_c('a5c', 'c2', date '2026-04-10', date '2026-04-20', 9, null, null));
+select pg_temp.registrar('A5d. CLI-MENSAL sem competência, execução atravessando o mês (25/04–05/05): recusado (22023)',
+  'erro 22023',
+  pg_temp.adicional('a5d', 'c2', date '2026-04-25', date '2026-05-05', 9, null, null));
+-- Adicionais HISTÓRICOS (gravados antes da 038, sem competência): linhas como a 029 gravava.
+insert into public.billing_additionals (id, client_id, period_start, period_end, description, amount) values
+  ('5c38ad00-0000-4000-8000-000000000001', pg_temp.cli('c1'), date '2026-03-21', date '2026-03-22', 'Histórico dentro da 2ª quinzena', 8),
+  ('5c38ad00-0000-4000-8000-000000000002', pg_temp.cli('c1'), date '2026-03-10', date '2026-03-20', 'Histórico que cruza as quinzenas', 12);
+insert into _ids values ('h1', '5c38ad00-0000-4000-8000-000000000001'), ('h2', '5c38ad00-0000-4000-8000-000000000002');
 select pg_temp.registrar('A6. CLI-MENSAL: competência do mês', 'ok',
   pg_temp.adicional('a6', 'c2', date '2026-03-10', date '2026-03-10', 25, date '2026-03-01', date '2026-03-31'));
 select pg_temp.registrar('A7. outro cliente (C05, sem contrato), mesma competência de C01', 'ok',
@@ -273,17 +305,20 @@ select pg_temp.registrar('Q1. C01: o mês inteiro é recusado (22023), nada é f
   || '|' || (select count(*)::text from public.invoices where client_id = pg_temp.cli('c1')));
 select pg_temp.registrar('Q2. C01: período parcial (02–10/03) recusado (22023)', 'erro 22023',
   pg_temp.fatura('c1', date '2026-03-02', date '2026-03-10'));
-select pg_temp.registrar('Q3. C01 1ª quinzena: 100 (lançamento) + 30 (A2); A3 cancelado e A5 (cruza) fora; Σ itens fecha',
+select pg_temp.registrar('Q3. C01 1ª quinzena: 100 (lançamento) + 30 (A2); A3 cancelado e H2 (histórico que cruza) fora; Σ itens fecha',
   '130.00|1|fecha', pg_temp.fatura('c1', date '2026-03-01', date '2026-03-15'));
-select pg_temp.registrar('Q4. C01 2ª quinzena: 100 + 15 (A4 legado, execução dentro); A5 continua fora',
-  '115.00|1|fecha', pg_temp.fatura('c1', date '2026-03-16', date '2026-03-31'));
+select pg_temp.registrar('Q4. C01 2ª quinzena: 100 + 15 (A4, competência automática) + 8 (H1 histórico, regra antiga); H2 continua fora',
+  '123.00|1|fecha', pg_temp.fatura('c1', date '2026-03-16', date '2026-03-31'));
 select pg_temp.registrar('Q5. faturar de novo a mesma competência: nada a faturar (P0002)', 'erro P0002',
   pg_temp.fatura('c1', date '2026-03-01', date '2026-03-15'));
-select pg_temp.registrar('Q6. situação dos adicionais: A2 e A4 faturados, A3 cancelado, A5 a faturar',
-  'a2:faturado|a3:cancelado|a4:faturado|a5:a faturar',
+select pg_temp.registrar('Q6. situação dos adicionais: A2, A4 e H1 faturados, A3 cancelado, H2 (histórico) a faturar e intacto',
+  'a2:faturado|a3:cancelado|a4:faturado|h1:faturado|h2:a faturar',
   (select string_agg(i.k || ':' || case when a.invoice_id is not null then 'faturado'
                                         when a.canceled_at is not null then 'cancelado' else 'a faturar' end, '|' order by i.k)
-     from _ids i join public.billing_additionals a on a.id = i.id where i.k in ('a2', 'a3', 'a4', 'a5')));
+     from _ids i join public.billing_additionals a on a.id = i.id where i.k in ('a2', 'a3', 'a4', 'h1', 'h2')));
+select pg_temp.registrar('Q7. históricos não foram reescritos: continuam sem competência', '0',
+  (select count(*)::text from public.billing_additionals
+    where id in ((select id from _ids where k = 'h1'), (select id from _ids where k = 'h2')) and billing_period_start is not null));
 
 -- ---------------------------------------------------------------------------
 -- A (cont.). Cobrança antes da execução e fatura só de adicional
@@ -410,8 +445,8 @@ select pg_temp.registrar('R2. C01 outubro conta o A1 (competência de outubro, e
   '50.00|0.00',
   pg_temp.adm($q$select adicionais::text from public.resumo_financeiro_periodo(date '2026-10-01', date '2026-10-31', pg_temp.cli('c1'))$q$)
   || '|' || pg_temp.adm($q$select adicionais::text from public.resumo_financeiro_periodo(date '2026-11-01', date '2026-11-30', pg_temp.cli('c1'))$q$));
-select pg_temp.registrar('R3. C01 março: adicionais faturados e a faturar (30 + 15 + 12 do legado que cruza = 57; o cancelado fora)',
-  '57.00|12.00',
+select pg_temp.registrar('R3. C01 março: adicionais faturados e a faturar (30 + 15 + 8 + 12 do histórico que cruza = 65; o cancelado fora)',
+  '65.00|12.00',
   pg_temp.adm($q$select adicionais::text || '|' || (a_faturar)::text
                  from public.resumo_financeiro_periodo(date '2026-03-01', date '2026-03-31', pg_temp.cli('c1'))$q$));
 
@@ -445,7 +480,7 @@ select pg_temp.registrar('S4. a frequência de uma versão não muda por UPDATE 
   || '|' || pg_temp.erro_de(format($q$update public.contract_terms set closing_period = 'mensal' where contract_id = %L$q$, (select id from _ids where k = 'kq'))));
 select pg_temp.registrar('S5. a competência de um adicional a faturar não muda por UPDATE (dono barrado)', 'erro 42501',
   pg_temp.erro_de(format($q$update public.billing_additionals set billing_period_start = date '2026-03-16', billing_period_end = date '2026-03-31' where id = %L$q$,
-    (select id from _ids where k = 'a5'))));
+    (select id from _ids where k = 'h2'))));
 select pg_temp.registrar('S6. CHECK: competência sem fim, invertida ou atravessando o mês é recusada na tabela (23514)', 'erro 23514|erro 23514|erro 23514',
   pg_temp.erro_de($q$insert into public.billing_additionals (client_id, period_start, period_end, description, amount, billing_period_start) values (pg_temp.cli('c1'), date '2026-03-01', date '2026-03-01', 'x', 1, date '2026-03-01')$q$)
   || '|' || pg_temp.erro_de($q$insert into public.billing_additionals (client_id, period_start, period_end, description, amount, billing_period_start, billing_period_end) values (pg_temp.cli('c1'), date '2026-03-01', date '2026-03-01', 'x', 1, date '2026-03-15', date '2026-03-01')$q$)
