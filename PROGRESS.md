@@ -12,7 +12,7 @@ Painel interno de gestão de mão de obra terceirizada: clientes e contratos,
 colaboradores, operações e turnos, apontamento de diárias e horas extras,
 faturamento por período e relatórios. Duas trilhas de uso:
 
-- **Admin** — login com MFA, cadastros, operações, turnos, equipe, apontamentos,
+- **Admin** — login com MFA opcional, cadastros, operações, turnos, equipe, apontamentos,
   faturamento, relatórios e administração de usuários.
 - **Operacional** — recebe convite, entra, vê **somente** as operações que lhe
   foram atribuídas, registra presença e horários, e **não** vê financeiro nem
@@ -23,14 +23,14 @@ faturamento por período e relatórios. Duas trilhas de uso:
 | Frente                                             | Entrega                                                                                              |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Migração para Next.js e reconstrução do Supabase   | Next.js 16 é a arquitetura definitiva; banco e Auth reconstruídos e validados                        |
-| MFA e enforcement de AAL2                          | TOTP obrigatório para o admin, na interface e no banco (11 policies RESTRICTIVE)                     |
+| MFA AUTH-01D.R1                                    | TOTP opcional; fator verificado exige TOTP no login, com piso de MFA no banco                        |
 | Recuperação de senha                               | confirmação deliberada (token não se consome em GET), prova HMAC e um único TOTP para contas com MFA |
 | Proteção financeira no banco (`010`, `011`, `014`) | valores derivados por trigger, lastro faturado imutável, `break_minutes` não negativo                |
 | Estado de MFA verificável pelo banco (`012`)       | `mfa_bloqueia_excecao_aal1()`                                                                        |
 | Superfície operacional (`013`, `015`)              | cinco RPCs, papel dedicado com grants por coluna, elegível em AAL1 sem MFA ou AAL2                   |
 | Interface operacional                              | camada de dados em `src/lib/operacional/`, papel e guards por rota, tela `/operacional`              |
 | Guard role-aware                                   | uma só decisão de acesso, em `lerAcesso()`                                                           |
-| Acesso direto restrito (`016`)                     | tabelas de negócio exigem `aal2` **e** `admin` pelo PostgREST                                        |
+| Acesso direto restrito (`016`, `032`, `034`)       | tabelas de negócio exigem `admin` e piso de MFA da conta pelo PostgREST                              |
 | Administração de usuários (`017`)                  | backend server-side, `admin_audit_log`, último admin protegido                                       |
 | Telas `/usuarios` e `/configuracoes`               | gestão de usuários e papéis; ativação/desativação de MFA conforme o papel                            |
 | Hardening de grants de `admin_audit_log` (`018`)   | menor privilégio na tabela de auditoria                                                              |
@@ -38,14 +38,14 @@ faturamento por período e relatórios. Duas trilhas de uso:
 | Cabeçalhos e CSP                                   | CSP com nonce em enforcement, fontes auto-hospedadas, contraste do login                             |
 | Dependências                                       | `npm audit` zerado                                                                                   |
 
-## Etapa atual — matriz E2E
+## Matriz E2E de acesso — pendente
 
 **Objetivo:** provar de ponta a ponta, com contas reais, a política de acesso por
 papel antes de existir o primeiro usuário `operacional`.
 
 A matriz aprovada cobre:
 
-- `admin` em AAL1 bloqueado · `admin` em AAL2 liberado;
+- `admin` sem fator em AAL1 liberado · com fator em AAL1 bloqueado · após TOTP em AAL2 liberado;
 - `operacional` sem MFA em AAL1 · `operacional` com fator verificado em AAL1
   **bloqueado** · `operacional` com MFA em AAL2;
 - conta sem papel · `admin` + `operacional`;
@@ -76,11 +76,50 @@ da matriz.
 
 ## Próximas etapas
 
-1. Concluir a matriz E2E acima.
-2. Criar as contas `operacional` definitivas, pelo fluxo de convite, e limpar os
-   dados fictícios antes da entrega.
-3. Acompanhar o uso real e priorizar os riscos abaixo conforme apareçam.
-4. Auditoria de segurança: **C03** é a próxima prioridade (não iniciada).
+O estado factual e suas limitações estão em [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
+PR #86 (FIN-PR-08) e PR #87 (correção documental de MFA) foram integrados.
+
+### Fase A — financeiro
+
+1. **FIN-PR-09 — próximo:** domingo e feriado ×2; ainda não implementado.
+2. FIN-PR-10: calendário nacional, SC e municípios definidos.
+3. FIN-PR-11: container como serviço avulso.
+4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
+   colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
+   efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título
+   “Fechamento – quinzena/mês”, ordem por colaborador/data e aba resumo por
+   colaborador. Não incluir custo, lucro ou margem. Preservar Faturamento,
+   Fechamento e Relatórios separados, sem quarta aba global de exportações.
+5. FIN-PR-13: testes integrados, HML e conciliação com R$ 35.118,12.
+
+### Fase B — ativação controlada
+
+Validar jornada contratual de 8h e exigir saída quando houver entrada; classificar
+turnos e funções das alocações; cadastrar tarifas padrão e diárias individuais;
+revisar adicionais entre competências; fazer backup e validar restauração.
+
+Antes da primeira migration em HML, executar integralmente, em uma execução,
+`scripts/testar-compatibilidade-deploy.sh` e confirmar PASS nos sete cenários
+originais de 034–042, ampliando para migrations seguintes. Aplicar migrations em
+HML somente com autorização específica, validar HML antes de Production e ativar
+a resolução comercial somente por decisão separada.
+
+### Fase C — segurança final
+
+Conferir Supabase, Vercel e GitHub; comprovar isolamento Preview/HML; promover
+ativação de MFA pelos admins; concluir matriz E2E e testes N3. Pentest em HML
+somente após FIN-PR-13 e com autorização escrita do cliente; corrigir achados.
+
+### Fase D — limpeza e entrega
+
+Revisar órfãos, resíduos de testes, branches antigas e documentação; criar contas
+operacionais definitivas somente após a matriz E2E; entregar o sistema.
+Colaboradores ou contratos referenciados por diárias individuais devem ser
+**desativados em vez de excluídos**.
+
+Revisão trabalhista com contador da BS é pendência futura não bloqueante: adicional
+noturno, intervalo intrajornada, limites de HE, domingo/feriado e CLT versus
+diaristas. O sistema calcula custo previsto, não folha de pagamento.
 
 ## Riscos e pendências abertos
 
@@ -151,7 +190,12 @@ Outros itens, de menor gravidade:
   não distingue bloqueio de ausência de dado; testes em Production provam menos
   do que parecem. Os testes SQL locais é que medem as proteções.
 
-### C05-B — vigências financeiras (banco em Production; interfaces ainda não publicadas)
+### C05-B — histórico de vigências financeiras em 23/10/2026
+
+**Histórico, não estado atual:** o conteúdo abaixo preserva o checkpoint de
+23/10/2026, inclusive pendências e nomes de guards da época. Para o estado e a
+política atuais, prevalecem o checkpoint em [Estado do projeto](docs/ESTADO_DO_PROJETO.md)
+e [Segurança](docs/SEGURANCA.md).
 
 **Situação em 23/10/2026** (fatos de Production em
 [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md), seção "Vigências financeiras"):
