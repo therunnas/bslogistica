@@ -160,7 +160,8 @@ implementar isso só no guard ou no frontend:** o enforcement do banco é o que 
   (INSERT de taxa legada exige vigência com o motor ligado) é independente e não
   deve ser removida numa reversão do MFA.
 - **Acesso direto também exige `admin`.** Uma RESTRICTIVE `*_exige_admin` por
-  tabela faz o acesso direto de `authenticated` exigir **`aal2` e `admin`**. O
+  tabela de negócio exige o papel `admin`, além do piso `mfa_cotidiano_ok()`:
+  AAL1 sem fator verificado ou AAL2 com fator verificado. O
   `operacional` lê zero linha de tabela de negócio pelo PostgREST, em qualquer
   nível: a RPC é a única porta dele.
 - **A CSP está em enforcement** (nonce por requisição, montada em `src/proxy.ts`).
