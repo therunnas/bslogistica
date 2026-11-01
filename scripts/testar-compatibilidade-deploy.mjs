@@ -49,6 +49,12 @@ import {
   interpretarTarifasPorFuncao,
   montarRegistroDeTarifa,
 } from "../src/lib/tarifas.ts";
+import {
+  interpretarBonusDiario,
+  interpretarDiariaIndividual,
+  montarBonus,
+  montarRegistroDeDiaria,
+} from "../src/lib/diaria-individual.ts";
 import { interpretarPeriodoContratual, montarRegistro } from "../src/lib/vigencias-ui.ts";
 
 const cenario = process.argv[2] ?? "?";
@@ -57,6 +63,7 @@ const esperaPeriodo = process.argv[4] === "com-periodo";
 const esperaFuncoes = process.argv[5] === "com-funcoes";
 const esperaSnapshots = process.argv[6] === "com-snap";
 const esperaTarifas = process.argv[7] === "com-tarifas";
+const esperaDiaria = process.argv[8] === "com-diaria";
 const { API_URL, ANON_KEY, SERVICE_ROLE_KEY, CONTAINER, BASE_URL } = process.env;
 if (!API_URL || !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(API_URL)) {
   console.error("API_URL ausente ou não local: este teste só roda contra o Supabase local.");
@@ -763,6 +770,244 @@ if (esperaSnapshots) {
     ],
     ["ok", true, true, true],
   );
+}
+
+// ---------------------------------------------------------------------------
+// S. Diária individual e adicional diário (042), pelo código do app
+// ---------------------------------------------------------------------------
+const estadoS = await cliente.rpc("estado_motor_vigencia");
+verificar(
+  "S1. capacidades anunciadas só no banco que as tem (diária individual e adicional diário)",
+  [
+    interpretarDiariaIndividual(estadoS.data, estadoS.error),
+    interpretarBonusDiario(estadoS.data, estadoS.error),
+  ],
+  [esperaDiaria, esperaDiaria],
+);
+if (!esperaDiaria) {
+  // Banco SEM a 042: a tabela e a RPC não existem e nada do app depende delas.
+  const tabela = await cliente.from("contract_employee_rates").select("id").limit(1);
+  const rpc = await cliente.rpc("definir_bonus_do_apontamento", {
+    p_entry_id: "5c39b000-0000-4000-8000-000000000001",
+    p_amount: 1,
+    p_reason: "x",
+  });
+  verificar(
+    "S2. banco sem a 042: a tabela e a RPC do adicional não existem (o app nem chega a chamá-las)",
+    [
+      Boolean(tabela.error),
+      Boolean(rpc.error),
+      "price_source" in ((await lerEntrada(1, "2026-03-17")) ?? {}),
+    ],
+    [true, true, false],
+  );
+} else {
+  const KS = "5c39d000-0000-4000-8000-0000000000d1";
+  const ind = await cliente.rpc("registrar_diaria_individual", {
+    ...montarRegistroDeDiaria({
+      contratoId: KS,
+      colaboradorId: E(1),
+      inicio: "2026-01-01",
+      valor: "260,00",
+      motivo: "Diária combinada (compatibilidade)",
+    }),
+  });
+  verificar(
+    "S2. diária individual registrada pelo código do app",
+    ind.error?.message ?? "ok",
+    "ok",
+  );
+  const lista = await cliente.from("contract_employee_rates").select("*").eq("contract_id", KS);
+  verificar(
+    "S3. diária lida como a tela faz (select por contrato)",
+    lista.error?.message ?? [
+      lista.data.length,
+      Number(lista.data[0].daily_rate),
+      lista.data[0].active,
+    ],
+    [1, 260, true],
+  );
+
+  // Resolução DESLIGADA: a individual cadastrada NÃO muda nenhum valor e o adicional é recusado.
+  const d1 = await salvarDia(1, "2026-04-06", fid("conferente"));
+  const d2 = await salvarDia(2, "2026-04-06", fid("conferente"));
+  const ed1 = await lerEntrada(1, "2026-04-06");
+  const ed2 = await lerEntrada(2, "2026-04-06");
+  verificar(
+    "S4. resolução desligada: com diária individual cadastrada o preço é o MESMO do colaborador sem ela (150,00, sem fonte)",
+    [
+      d1.error?.message ?? "ok",
+      d2.error?.message ?? "ok",
+      Number(ed1?.billed_amount),
+      Number(ed2?.billed_amount),
+      ed1?.price_source ?? null,
+      ed1?.contract_employee_rate_id ?? null,
+      Number(ed1?.additional_amount),
+    ],
+    ["ok", "ok", 150, 150, null, null, 0],
+  );
+  const b0 = await cliente.rpc("definir_bonus_do_apontamento", {
+    ...montarBonus({ entryId: ed1.id, valor: "30,00", motivo: "Acúmulo" }, false),
+  });
+  const ed1b = await lerEntrada(1, "2026-04-06");
+  verificar(
+    "S5. resolução desligada: o adicional diário é recusado (55000) e o lançamento fica como estava",
+    [b0.error?.code, Number(ed1b?.billed_amount), Number(ed1b?.additional_amount)],
+    ["55000", 150, 0],
+  );
+
+  // LIGA: a individual prevalece sobre a tarifa da função.
+  const liga = await cliente.rpc("alterar_resolucao_tarifas", {
+    p_ativar: true,
+    p_reason: "Ligada no teste S",
+  });
+  verificar("S6. admin liga a resolução", liga.error?.message ?? "ok", "ok");
+  await salvarDia(1, "2026-04-07", fid("conferente"));
+  await salvarDia(2, "2026-04-07", fid("conferente"));
+  const e17 = await lerEntrada(1, "2026-04-07");
+  const e27 = await lerEntrada(2, "2026-04-07");
+  verificar(
+    "S7. resolução ligada: E1 (individual) = 260,00 e E2 (sem individual, tarifa do conferente) = 160,00, cada um com sua fonte",
+    [
+      Number(e17?.billed_amount),
+      e17?.price_source,
+      Boolean(e17?.contract_employee_rate_id) && !e17?.contract_rate_terms_id,
+      Number(e27?.billed_amount),
+      e27?.price_source,
+      Boolean(e27?.contract_rate_terms_id) && !e27?.contract_employee_rate_id,
+    ],
+    [260, "individual", true, 160, "funcao_periodo", true],
+  );
+  await salvarDia(1, "2026-04-08", fid("conferente"), "16:00");
+  const e18 = await lerEntrada(1, "2026-04-08");
+  verificar(
+    "S8. HE sobre a diária individual: 260 + 1 h × 48,75 = 308,75 (base da HE = 260)",
+    [
+      Number(e18?.billed_amount),
+      Number(e18?.billed_overtime_amount),
+      Number(e18?.daily_rate_snapshot),
+    ],
+    [308.75, 48.75, 260],
+  );
+
+  // Adicional diário: separado da HE, sem duplicação, preservado em recálculo.
+  const b1 = await cliente.rpc("definir_bonus_do_apontamento", {
+    ...montarBonus({ entryId: e18.id, valor: "30,00", motivo: "Acúmulo de função" }, false),
+  });
+  const e18b = await lerEntrada(1, "2026-04-08");
+  verificar(
+    "S9. adicional de R$ 30 separado da HE: 260 + 48,75 + 30 = 338,75; a base da HE continua 260",
+    [
+      b1.error?.message ?? "ok",
+      Number(e18b?.billed_amount),
+      Number(e18b?.additional_amount),
+      Number(e18b?.billed_overtime_amount),
+      Number(e18b?.daily_rate_snapshot),
+    ],
+    ["ok", 338.75, 30, 48.75, 260],
+  );
+  const b2 = await cliente.rpc("definir_bonus_do_apontamento", {
+    ...montarBonus({ entryId: e18.id, valor: "30,00", motivo: "De novo" }, false),
+  });
+  verificar(
+    "S10. sem duplicação: segundo adicional sem confirmar é recusado (23505)",
+    b2.error?.code,
+    "23505",
+  );
+  await salvarDia(1, "2026-04-08", fid("conferente"), "17:00");
+  const e18c = await lerEntrada(1, "2026-04-08");
+  verificar(
+    "S11. salvar de novo o apontamento preserva o adicional e recalcula a HE só sobre a diária: 260 + 97,50 + 30 = 387,50",
+    [Number(e18c?.billed_amount), Number(e18c?.additional_amount)],
+    [387.5, 30],
+  );
+  const aud = await cliente
+    .from("financial_terms_audit")
+    .select("action")
+    .eq("action", "apontamento_bonus_definido");
+  verificar("S12. o adicional fica na trilha com motivo", aud.error?.message ?? aud.data.length, 1);
+
+  // Fechamento, CSV, XLSX e ledger com adicional presente (abril).
+  const filtrosS = { clienteId: C, inicio: "2026-04-01", fim: "2026-04-15" };
+  const depsS = dependenciasComSupabase(cliente);
+  const fecS = await carregarFechamento(filtrosS, depsS);
+  const cS = fecS.consolidado;
+  const somaAbril = Math.round(
+    Number(
+      psql(
+        `select coalesce(sum(billed_amount), 0) from public.timesheet_entries where work_date between date '2026-04-01' and date '2026-04-15' and status <> 'absent';`,
+      ),
+    ) * 100,
+  );
+  verificar(
+    "S13. Fechamento com adicional: faturado = Σ cobrado do banco e diária + HE + especial + adicional = faturado",
+    [
+      cS.faturadoCentavos,
+      cS.diariaCentavos + cS.extraCentavos + cS.especialCentavos + cS.adicionalDiarioCentavos,
+      cS.adicionalDiarioCentavos,
+    ],
+    [somaAbril, somaAbril, 3000],
+  );
+  const xlsxS = await gerarXlsxDoFechamento(fecS);
+  verificar(
+    "S14. CSV e XLSX gerados com o adicional presente",
+    [
+      csvDoFechamento(fecS, "colaborador").split("\r\n").length > 2,
+      xlsxS.subarray(0, 2).toString("latin1"),
+    ],
+    [true, "PK"],
+  );
+
+  // Concorrência: o adicional × o faturamento do cliente. Ou o adicional entra ANTES (faturado com
+  // ele) ou é recusado DEPOIS (55000); a fatura fecha em qualquer ordem.
+  const [corridaB, fatS] = await Promise.all([
+    cliente.rpc("definir_bonus_do_apontamento", {
+      ...montarBonus(
+        { entryId: e18.id, valor: "50,00", motivo: "Corrida com o faturamento" },
+        true,
+      ),
+    }),
+    cliente.rpc("gerar_fatura", {
+      _client_id: C,
+      _period_start: "2026-04-01",
+      _period_end: "2026-04-15",
+    }),
+  ]);
+  const e18d = await lerEntrada(1, "2026-04-08");
+  const fatura = await cliente
+    .from("invoices")
+    .select("id, total_amount")
+    .eq("id", fatS.data?.id ?? "");
+  const itens = await cliente
+    .from("invoice_items")
+    .select("amount, kind")
+    .eq("invoice_id", fatS.data?.id ?? "");
+  const soma = (itens.data ?? []).reduce((a, i) => a + Math.round(Number(i.amount) * 100), 0);
+  const adicionalDosItens = (itens.data ?? [])
+    .filter((i) => i.kind === "adicional_diario")
+    .reduce((a, i) => a + Math.round(Number(i.amount) * 100), 0);
+  verificar(
+    "S15. concorrência adicional × faturamento: fatura gerada, Σ itens = total, e o adicional faturado é o do lançamento (50 se entrou antes, 30 se foi recusado depois)",
+    [
+      !fatS.error,
+      soma === Math.round(Number(fatura.data?.[0]?.total_amount) * 100),
+      Boolean(e18d?.invoice_id),
+      corridaB.error
+        ? corridaB.error.code === "55000" && Number(e18d?.additional_amount) === 30
+        : Number(e18d?.additional_amount) === 50,
+      adicionalDosItens === Math.round(Number(e18d?.additional_amount) * 100) + 0,
+    ],
+    [true, true, true, true, true],
+  );
+  const depois = await cliente.rpc("definir_bonus_do_apontamento", {
+    ...montarBonus({ entryId: e18.id, valor: "1,00", motivo: "Depois da fatura" }, true),
+  });
+  verificar("S16. depois da fatura o adicional é recusado (55000)", depois.error?.code, "55000");
+  const desligaS = await cliente.rpc("alterar_resolucao_tarifas", {
+    p_ativar: false,
+    p_reason: "Desligada no teste S",
+  });
+  verificar("S17. admin desliga a resolução ao final", desligaS.error?.message ?? "ok", "ok");
 }
 
 // ---------------------------------------------------------------------------
