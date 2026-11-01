@@ -209,10 +209,11 @@ publicação.
 - Autorização em SQL usa `public.has_role()` e `public.is_staff()`.
   **`is_staff()` é verdadeira para qualquer papel atribuído**, não distingue
   `admin` de `operacional`; por isso não é a barreira entre os dois.
-- **MFA também é exigido no banco**, por classe. Desde a migration 032 as 9 tabelas
-  de uso cotidiano (`*_exige_aal2`) aceitam `mfa_cotidiano_ok()`; a ESCRITA em
-  `invoices`/`invoice_items` e as policies de auditoria, motor e acesso por operação
-  seguem pedindo `aal2` literal. Papel sozinho não distingue uma sessão AAL1 de uma
+- **O piso de MFA também vale no banco.** Desde a migration 032 as 9 tabelas
+  de uso cotidiano (`*_exige_aal2`) aceitam `mfa_cotidiano_ok()`; a 034 aplicou
+  o mesmo piso à escrita em `invoices`/`invoice_items` e às policies de auditoria,
+  motor e acesso por operação. Os nomes com `aal2` são históricos. Papel sozinho
+  não distingue uma sessão AAL1 de uma
   AAL2: quem tem fator verificado e só a senha continua sem alcançar os dados pelo
   PostgREST.
 - **Acesso direto exige o piso de MFA da conta E `admin`.** Uma RESTRICTIVE adicional
@@ -351,7 +352,7 @@ os testes asseveram isso na forma dos arquivos.
 
 Convidar, atribuir ou trocar papel, remover acesso e atribuir operações passam
 por `src/lib/admin-usuarios/`, **exclusivamente no servidor**, depois de
-`exigirAdminAal2()` (que reaproveita `lerAcesso()`).
+`exigirAdminAtor()` (que utiliza a decisão de `lerAcesso()`).
 
 - **`service_role` só no servidor**, instanciada em
   `src/integrations/supabase/admin.ts` e só depois dos controles de autorização.
