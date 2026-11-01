@@ -5,14 +5,88 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
-## Production
+## Checkpoint de 01/11/2026
+
+**Ambientes: último estado informado, não revalidado nesta sessão.** O Git confirma
+os PRs #86 e #87 na base `6b1edc3aa2a5894aa674ef22ed43f989551da966`; o
+PR #86 encerrou o FIN-PR-08 em `b38579075d2675918b24b97440ef546ea04ad27f`.
+Código versionado, validação de testes, publicação de aplicação, aplicação de
+migrations e ativação de funcionalidade são estados distintos.
+
+- Motor financeiro por vigência: ativo em Production desde 29/10/2026, conforme
+  informado. Resolução comercial de tarifas por função/colaborador: **desligada**.
+  São controles diferentes.
+- Migrations 032 (MFA opcional), 033 (integridade da taxa legada) e 034 (MFA
+  somente no login): aplicadas em Production, conforme informado. As migrations
+  035–042 estão versionadas, mas não aplicadas em HML ou Production, conforme
+  informado. A 042 é a última versionada nesta base, não uma afirmação sobre a
+  última aplicada em Production.
+- FIN-PR-01, 02, 03, 05, 06, 07 e 08 foram integrados; PR-04 foi absorvido pelo
+  PR-02. PR-09 é a próxima implementação financeira e está pendente.
+- SEC-DEP-01 foi integrado. A matriz E2E e a comprovação de isolamento real de
+  Preview/HML permanecem pendentes; riscos residuais estão em [Segurança](SEGURANCA.md).
+
+### Migrations financeiras versionadas
+
+| Migration | Escopo |
+| --- | --- |
+| 030 | Regras comerciais anteriores |
+| 035 | Núcleo financeiro puro V2 |
+| 036 | Integração do núcleo V2 |
+| 037 | Leitores por componentes |
+| 038 | Período contratual e competência |
+| 039 | Catálogo de funções e período do turno |
+| 040 | Snapshots de função e período |
+| 041 | Tarifas por função, período e vigência |
+| 042 | Diária individual e bônus diário |
+
+O repositório contém suítes para essas entregas; resultados históricos não
+comprovam execução nesta sessão. As migrações remotas e a ativação de preços não
+podem ser inferidas de código mergeado nem dos testes locais.
+
+### Regras financeiras e estágio
+
+- Dia útil: referência líquida de 8 horas e intervalo conforme turno; saída
+  antecipada proporcional; HE pela diária comercial dividida por 8 e multiplicada
+  por 1,5, com arredondamento diário 15/45 ou acumulado quando configurado.
+- Sábado: referência de cobrança de 4 horas, diária integral até a referência,
+  HE depois dela e divisor 8 para HE.
+- Domingo e feriado: regra comercial aprovada para o **FIN-PR-09, ainda não
+  implementada na integração**: sem diária-base; horas trabalhadas × diária
+  comercial resolvida ÷ 8 × 2; custo previsto separado também ×2; arredondamento
+  especial configurável, com minutos exatos por padrão. O núcleo puro já admite
+  dias especiais; os lançamentos seguem o cálculo legado até o PR-09.
+- Com resolução comercial ligada, a fonte é a diária individual vigente por
+  colaborador e contrato; na ausência, a tarifa padrão de contrato, função,
+  período e vigência; sem fonte válida, há erro. Operação sem contrato usa sua
+  fonte de valor acordado. Com resolução desligada preservam-se valores legados.
+- Função e período são snapshots; a HE usa a diária comercial resolvida. O bônus
+  diário por acúmulo é separado, somado uma vez, fora da base de HE, e registrado
+  por RPC administrativa com motivo e auditoria. A 042 recusa bônus em domingo e
+  feriado enquanto esses lançamentos permanecem no cálculo legado; a integração
+  de bônus nesses dias pertence ao PR-09.
+- Preço cobrado não é custo do colaborador. O sistema apresenta **custo previsto**,
+  não folha de pagamento; não se presume custo para o bônus.
+
+### Referência para conciliação futura
+
+A referência comercial informada para 01–15/09/2026 contém 141 lançamentos,
+14 colaboradores e total de R$ 35.118,12: R$ 33.050,00 em diárias e
+R$ 2.068,12 em HE. Não contém custos pagos. Diárias variam entre colaboradores
+mesmo na mesma função; a HE usa a diária individual da linha e não inclui bônus.
+A decisão comercial é diária individual por colaborador, contrato e vigência,
+sem criar funções fictícias. A conciliação pertence ao FIN-PR-13.
+
+## Production — referência de infraestrutura
+
+Último estado informado, não revalidado nesta sessão.
 
 | Item                  | Estado                                                                                                                                        |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | Aplicação             | publicada em `admin.bslogisticas.com.br`                                                                                                      |
 | Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                                                                             |
 | Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                                                                                      |
-| Migrations            | 33 registradas; a última é a `028` (C05-B, aplicada em 23/10/2026). A `029` existe só no repositório. Ver "Vigências financeiras", abaixo     |
+| Migrations            | Ver checkpoint acima; versão no Git não comprova aplicação remota. |
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                                                                           |
 | Usuário `operacional` | perfil homologado com uma conta existente que era admin e foi rebaixada; contas definitivas ainda não criadas ([PROGRESS.md](../PROGRESS.md)) |
 
@@ -26,7 +100,11 @@ ambientes" em [docs/SEGURANCA.md](SEGURANCA.md).
 O site institucional (`bslogisticas.com.br`) é outro projeto, em outro
 repositório, e não faz parte deste.
 
-## Vigências financeiras (C05-B)
+## Histórico de vigências financeiras — fotografia de 23/10/2026
+
+**Histórico, não estado atual:** as afirmações e pendências desta seção retratam
+o checkpoint de 23/10/2026 e foram superadas onde divergirem do checkpoint acima.
+A autorização e o MFA seguem as instruções atuais de [Segurança](SEGURANCA.md).
 
 Estado em 23/10/2026 (C05-B7.2). Quatro níveis que não se confundem: **implementado**
 (existe no código), **validado** (foi testado), **publicado** (está disponível aos
@@ -156,7 +234,7 @@ camada de dados e não tem relação com o TanStack Router.
 
 ## Módulos
 
-**Área administrativa** — só `admin`, em AAL2:
+**Área administrativa** — só `admin`, com o piso de MFA aplicável à conta:
 
 | Módulo               | Função                                                           |
 | -------------------- | ---------------------------------------------------------------- |
@@ -178,10 +256,12 @@ Mais: login, segundo fator, recuperação de senha, logout e renovação de sess
 
 ## Autenticação e papéis
 
-- Dois papéis: `admin` e `operacional`. `admin` exige MFA TOTP (AAL2); para
-  `operacional` o MFA é opcional, e uma conta que o ativa passa a exigi-lo.
-- O acesso direto às tabelas de negócio exige `admin` e `aal2`. O `operacional`
-  chega aos dados só por RPC.
+- Dois papéis: `admin` e `operacional`; TOTP é opcional para ambos. Sem fator
+  verificado, AAL1 respeita o papel; com fator, AAL1 é bloqueado até o TOTP no
+  login, e depois não há novo desafio por funcionalidade. Desativar o próprio
+  fator exige código novo na interface.
+- O acesso direto às tabelas de negócio exige `admin` e o piso
+  `mfa_cotidiano_ok()`. O `operacional` chega aos dados só pelas RPCs restritas.
 - O último admin é protegido por trigger, e as alterações de usuário e papel são
   auditadas em `admin_audit_log` (best-effort).
 
@@ -191,13 +271,18 @@ O modelo completo está em [SEGURANCA.md](SEGURANCA.md).
 
 - Identidade utilizável exigida pelo banco (C02, migration `020`, aplicada em
   18/10/2026): conta existente e não banida, e sessão do JWT viva.
-- RLS em todas as tabelas de `public`, com RESTRICTIVE de `aal2` e de `admin`.
+- RLS protege os dados; policies restritivas aplicam papel e piso de MFA.
+  Nomes históricos com `aal2` não implicam AAL2 obrigatório para todos.
+- Funções `SECURITY DEFINER` validam autorização internamente; cadastro público
+  permanece bloqueado. SEC-DEP-01 foi integrado.
 - Valores financeiros derivados por trigger; linha faturada imutável.
 - Content-Security-Policy com nonce, em enforcement, mais cabeçalhos de segurança
   (HSTS pela plataforma).
 - `service_role` usada só no servidor; segredos fora do Git e do bundle.
 
-## Testes e CI
+## Testes e CI — registro histórico
+
+Os números abaixo refletem a fotografia anterior e não foram revalidados nesta sessão.
 
 | Verificação                     | Estado                                                                                                               |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
