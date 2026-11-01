@@ -113,6 +113,10 @@ export interface TimesheetEntry {
   contract_terms_id?: string | null;
   operation_terms_id?: string | null;
   employee_cost_terms_id?: string | null;
+  /** Snapshots de função e período do dia (migration 040); ausentes antes dela, nulos = sem informação. */
+  job_function_id_snapshot?: string | null;
+  shift_period_snapshot?: "diurno" | "noturno" | null;
+  job_function_source?: "alocacao" | "informada" | "corrigida" | null;
   /** Valor-hora congelado da hora extra paga (migration 029); ausente antes dela. */
   ot_hourly_cost_snapshot?: number | null;
   /** Minutos de hora extra cobrados e tipo do dia (migration 030); ausentes antes dela. */

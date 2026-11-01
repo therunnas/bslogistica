@@ -916,6 +916,8 @@ export type Database = {
           employee_id: string;
           id: string;
           invoice_id: string | null;
+          job_function_id_snapshot: string | null;
+          job_function_source: string | null;
           notes: string | null;
           operation_id: string;
           operation_terms_id: string | null;
@@ -926,6 +928,7 @@ export type Database = {
           overtime_minutes: number;
           planned_minutes_snapshot: number | null;
           shift_hours_snapshot: number | null;
+          shift_period_snapshot: string | null;
           status: Database["public"]["Enums"]["attendance_status"];
           terms_origin: string | null;
           timesheet_id: string;
@@ -954,6 +957,8 @@ export type Database = {
           employee_id: string;
           id?: string;
           invoice_id?: string | null;
+          job_function_id_snapshot?: string | null;
+          job_function_source?: string | null;
           notes?: string | null;
           operation_id: string;
           operation_terms_id?: string | null;
@@ -964,6 +969,7 @@ export type Database = {
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
           shift_hours_snapshot?: number | null;
+          shift_period_snapshot?: string | null;
           status?: Database["public"]["Enums"]["attendance_status"];
           terms_origin?: string | null;
           timesheet_id: string;
@@ -992,6 +998,8 @@ export type Database = {
           employee_id?: string;
           id?: string;
           invoice_id?: string | null;
+          job_function_id_snapshot?: string | null;
+          job_function_source?: string | null;
           notes?: string | null;
           operation_id?: string;
           operation_terms_id?: string | null;
@@ -1002,6 +1010,7 @@ export type Database = {
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
           shift_hours_snapshot?: number | null;
+          shift_period_snapshot?: string | null;
           status?: Database["public"]["Enums"]["attendance_status"];
           terms_origin?: string | null;
           timesheet_id?: string;
@@ -1359,6 +1368,15 @@ export type Database = {
           p_valid_to: string;
         };
         Returns: string;
+      };
+      corrigir_snapshots_do_apontamento: {
+        Args: {
+          p_atualizar_periodo: boolean;
+          p_entry_id: string;
+          p_job_function_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
       };
       criar_funcao: {
         Args: { p_code?: string; p_name: string };

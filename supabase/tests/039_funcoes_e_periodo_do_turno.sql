@@ -348,10 +348,11 @@ select pg_temp.registrar('F2. E7 (com função, alocação e turno classificado)
      from public.timesheet_entries te where te.id in ('5c3bb200-0000-4000-8000-000000000007', '5c3bb200-0000-4000-8000-000000000008')));
 select pg_temp.registrar('F3. billed_amount e cost_amount preservados: diária 100 + 30 min cobrados (20 min arredondam para 30 pela regra 15/45 = 9,38); custo 80 + 20 min a 10/h (3,33)', '109.38|83.33',
   (select billed_amount::text || '|' || cost_amount::text from public.timesheet_entries where id = '5c3bb200-0000-4000-8000-000000000007'));
-select pg_temp.registrar('F4. apontamento antigo sem campo novo: a tabela de apontamentos não ganhou nenhuma coluna de função nem de período', '0',
+select pg_temp.registrar('F4. apontamento antigo sem campo novo: a tabela de apontamentos não ganhou coluna de função nem de período além dos três snapshots da 040 (que são nulos nos antigos)', '0',
   (select count(*)::text from information_schema.columns
     where table_schema = 'public' and table_name in ('timesheets', 'timesheet_entries', 'invoices', 'invoice_items')
-      and (column_name like '%job_function%' or column_name like '%shift_period%')));
+      and (column_name like '%job_function%' or column_name like '%shift_period%')
+      and column_name not in ('job_function_id_snapshot', 'shift_period_snapshot', 'job_function_source')));
 select pg_temp.registrar('F5. nenhuma função financeira cita função nem período do turno', '0',
   (select count(*)::text from pg_proc
     where pronamespace = 'public'::regnamespace
