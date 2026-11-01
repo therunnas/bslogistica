@@ -336,8 +336,11 @@ Dependências da ativação (ligar o motor da 025, não antes):
 - **Não** reintroduzir TanStack Start/Router, Vite, Nitro, Vinxi, Wrangler ou
   Lovable.
 - **Não** afrouxar as proteções financeiras das migrations `010`/`011`.
-- **Não** adicionar enforcement de AAL2 em `user_roles`, e **não** remover a
-  policy AAL2 global sem substituição segura.
+- **Não** adicionar bloqueio de MFA em `user_roles` que impeça o login. Não
+  remover policies restritivas sem substituição equivalente: preservar o piso
+  `mfa_cotidiano_ok()` e as exigências de papel aplicáveis, sem enfraquecer o
+  acesso administrativo nem ampliar o acesso operacional. MFA é opcional;
+  conta com fator verificado exige TOTP no login.
 - **Não** abrir a superfície do operador: nenhuma coluna financeira, `client_id`,
   documento ou telefone no retorno das RPCs; nenhum campo novo no JSON de escrita
   sem decisão de produto; nenhuma RPC de exclusão; nenhum `EXECUTE` dos helpers
