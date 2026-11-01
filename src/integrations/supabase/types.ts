@@ -601,6 +601,54 @@ export type Database = {
           },
         ];
       };
+      contract_employee_rates: {
+        Row: {
+          active: boolean;
+          contract_id: string;
+          created_at: string;
+          created_by: string | null;
+          daily_rate: number;
+          employee_id: string;
+          id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          contract_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          daily_rate: number;
+          employee_id: string;
+          id?: string;
+          origin: string;
+          reason: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          valid_from: string;
+          valid_to?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          contract_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          daily_rate?: number;
+          employee_id?: string;
+          id?: string;
+          origin?: string;
+          reason?: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          valid_from?: string;
+          valid_to?: string | null;
+        };
+        Relationships: [];
+      };
       contract_rate_terms: {
         Row: {
           active: boolean;
@@ -984,6 +1032,7 @@ export type Database = {
           calc_version: number | null;
           check_in: string | null;
           check_out: string | null;
+          contract_employee_rate_id: string | null;
           contract_rate_terms_id: string | null;
           contract_terms_id: string | null;
           cost_amount: number;
@@ -1006,6 +1055,7 @@ export type Database = {
           ot_tolerance_snapshot: number | null;
           overtime_minutes: number;
           planned_minutes_snapshot: number | null;
+          price_source: string | null;
           shift_hours_snapshot: number | null;
           shift_period_snapshot: string | null;
           status: Database["public"]["Enums"]["attendance_status"];
@@ -1026,6 +1076,7 @@ export type Database = {
           calc_version?: number | null;
           check_in?: string | null;
           check_out?: string | null;
+          contract_employee_rate_id?: string | null;
           contract_rate_terms_id?: string | null;
           contract_terms_id?: string | null;
           cost_amount?: number;
@@ -1048,6 +1099,7 @@ export type Database = {
           ot_tolerance_snapshot?: number | null;
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
+          price_source?: string | null;
           shift_hours_snapshot?: number | null;
           shift_period_snapshot?: string | null;
           status?: Database["public"]["Enums"]["attendance_status"];
@@ -1068,6 +1120,7 @@ export type Database = {
           calc_version?: number | null;
           check_in?: string | null;
           check_out?: string | null;
+          contract_employee_rate_id?: string | null;
           contract_rate_terms_id?: string | null;
           contract_terms_id?: string | null;
           cost_amount?: number;
@@ -1090,6 +1143,7 @@ export type Database = {
           ot_tolerance_snapshot?: number | null;
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
+          price_source?: string | null;
           shift_hours_snapshot?: number | null;
           shift_period_snapshot?: string | null;
           status?: Database["public"]["Enums"]["attendance_status"];
@@ -1322,6 +1376,10 @@ export type Database = {
         };
         Returns: Record<string, unknown>;
       };
+      aposentar_diaria_individual: {
+        Args: { p_rate_id: string; p_reason: string };
+        Returns: undefined;
+      };
       aposentar_tarifa_contrato: {
         Args: { p_rate_id: string; p_reason: string };
         Returns: undefined;
@@ -1467,6 +1525,16 @@ export type Database = {
         };
         Returns: Json;
       };
+      corrigir_diaria_individual: {
+        Args: {
+          p_daily_rate: number;
+          p_rate_id: string;
+          p_reason: string;
+          p_valid_from: string;
+          p_valid_to: string;
+        };
+        Returns: string;
+      };
       corrigir_tarifa_contrato: {
         Args: {
           p_daily_rate: number;
@@ -1476,6 +1544,28 @@ export type Database = {
           p_valid_to: string;
         };
         Returns: string;
+      };
+      definir_bonus_do_apontamento: {
+        Args: {
+          p_amount: number;
+          p_entry_id: string;
+          p_reason: string;
+          p_substituir?: boolean;
+        };
+        Returns: Json;
+      };
+      diaria_individual_na_data: {
+        Args: { p_contract_id: string; p_data: string; p_employee_id: string };
+        Returns: {
+          daily_rate: number;
+          id: string;
+          valid_from: string;
+          valid_to: string | null;
+        }[];
+      };
+      encerrar_diaria_individual: {
+        Args: { p_rate_id: string; p_reason: string; p_valid_to: string };
+        Returns: undefined;
       };
       encerrar_tarifa_contrato: {
         Args: { p_rate_id: string; p_reason: string; p_valid_to: string };
@@ -1791,6 +1881,18 @@ export type Database = {
       provision_bslog_user: {
         Args: { _email: string; _metadata?: Json; _user_id: string };
         Returns: undefined;
+      };
+      registrar_diaria_individual: {
+        Args: {
+          p_contract_id: string;
+          p_daily_rate: number;
+          p_employee_id: string;
+          p_encerrar_anterior?: boolean;
+          p_reason: string;
+          p_valid_from: string;
+          p_valid_to?: string;
+        };
+        Returns: string;
       };
       registrar_tarifa_contrato: {
         Args: {

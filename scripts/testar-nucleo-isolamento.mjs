@@ -82,6 +82,8 @@ verificar(
     "20261107120000_040_snapshots_funcao_periodo.sql",
     // A 041 redefine o motor por vigência (que chama o núcleo) só para acrescentar a tarifa por função.
     "20261108120000_041_tarifas_por_funcao_e_periodo.sql",
+    // A 042 redefine o motor por vigência (que chama o núcleo) para a diária individual e o adicional diário.
+    "20261109120000_042_diaria_individual_e_bonus.sql",
   ],
 );
 verificar(

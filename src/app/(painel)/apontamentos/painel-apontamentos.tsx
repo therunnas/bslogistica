@@ -73,8 +73,12 @@ import {
   SeletorDeFuncaoDoDia,
   SnapshotDoApontamento,
 } from "./funcao-do-dia";
+import { AdicionalDiarioDialog, PrecoDoApontamento } from "./preco-do-dia";
+import { motivoSemBonus } from "@/lib/diaria-individual";
 import { useFuncoes } from "@/lib/funcoes-dados";
 import {
+  useBonusDiario,
+  useDiariaIndividual,
   useEstadoDoMotor,
   useFuncoesTurno,
   useNucleoV2,
@@ -290,6 +294,14 @@ export function PainelApontamentos() {
   // anúncio do banco: sem ele, nenhuma chave nova vai no salvamento nem aparece na tela.
   const snapshotsDeFuncao = useSnapshotsDeFuncao() && funcoesHabilitadas;
   const resolucaoLigada = useResolucaoDeTarifas() === true;
+  // Diária individual e adicional diário (042): só com o anúncio do banco.
+  const diariaIndividual = useDiariaIndividual() === "disponivel";
+  const bonusDiario = useBonusDiario();
+  const [adicionando, setAdicionando] = useState<{
+    id: string;
+    colaborador: string;
+    adicionalAtual: number;
+  } | null>(null);
   const [funcoesDoDia, setFuncoesDoDia] = useState<Record<string, string>>({});
   const [corrigindo, setCorrigindo] = useState<{
     id: string;
@@ -1325,6 +1337,22 @@ export function PainelApontamentos() {
                                 />
                               ) : null
                             ) : null}
+
+                            {diariaIndividual && gravado && gravado.status !== "absent" ? (
+                              <PrecoDoApontamento
+                                apontamento={gravado}
+                                podeDefinirAdicional={
+                                  motivoSemBonus(gravado, bonusDiario, resolucaoLigada) === null
+                                }
+                                onDefinirAdicional={() =>
+                                  setAdicionando({
+                                    id: gravado.id,
+                                    colaborador: employee?.name ?? "",
+                                    adicionalAtual: Number(gravado.additional_amount ?? 0),
+                                  })
+                                }
+                              />
+                            ) : null}
                           </div>
                         </div>
                       </TableCell>
@@ -1441,6 +1469,10 @@ export function PainelApontamentos() {
           </div>
         </CardContent>
       </Card>
+
+      {diariaIndividual ? (
+        <AdicionalDiarioDialog entrada={adicionando} aoFechar={() => setAdicionando(null)} />
+      ) : null}
 
       {snapshotsDeFuncao ? (
         <CorrigirApontamentoDialog

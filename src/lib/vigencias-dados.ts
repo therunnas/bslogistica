@@ -1,3 +1,4 @@
+import { interpretarBonusDiario, interpretarDiariaIndividual } from "./diaria-individual";
 import { decidirDisponibilidade } from "./fechamento/disponibilidade";
 import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./fechamento/periodo";
 import { interpretarFuncoesTurno } from "./funcoes";
@@ -208,6 +209,20 @@ export function useResolucaoDeTarifas(): boolean | null {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data || consulta.data.error) return null;
   return interpretarResolucaoDeTarifas(consulta.data.data, null);
+}
+
+/** O banco tem a diária individual por colaborador e contrato (042)? */
+export function useDiariaIndividual(): CapacidadeDeTarifas {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data || consulta.data.error) return "desconhecida";
+  return interpretarDiariaIndividual(consulta.data.data, null) ? "disponivel" : "indisponivel";
+}
+
+/** O banco tem o adicional diário (042)? */
+export function useBonusDiario(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarBonusDiario(consulta.data.data, consulta.data.error);
 }
 
 /** O banco grava snapshots de função e período por apontamento (040)? */

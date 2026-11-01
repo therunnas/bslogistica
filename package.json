@@ -62,7 +62,8 @@
     "test:leitores-componentes": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-leitores-componentes.mjs",
     "test:periodo-contratual": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-periodo-contratual.mjs",
     "test:funcoes-turno": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-funcoes-turno.mjs",
-    "test:snapshots-tarifas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-snapshots-tarifas.mjs"
+    "test:snapshots-tarifas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-snapshots-tarifas.mjs",
+    "test:diaria-individual-bonus": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-diaria-individual-bonus.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

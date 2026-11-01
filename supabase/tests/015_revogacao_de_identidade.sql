@@ -789,13 +789,14 @@ $bloco_h$;
 -- (billing_additionals, adicionais de serviço) e as 2 policies e a tabela da 030
 -- (financial_holidays, calendário de feriados) e as 2 policies e a tabela da 039
 -- (job_functions, catálogo de funções) e as 4 policies e as 2 tabelas da 041
--- (contract_rate_terms e pricing_settings); sem elas aplicadas, H-F1 a H-F7 divergem.
+-- (contract_rate_terms e pricing_settings) e as 2 policies e a tabela da 042 (contract_employee_rates,
+-- diária individual); sem elas aplicadas, H-F1 a H-F7 divergem.
 do $bloco_h_forma$
 declare _n int; _sobra int;
 begin
-  perform pg_temp.registrar('H-F1. public tem 76 policies', '76',
+  perform pg_temp.registrar('H-F1. public tem 78 policies', '78',
     (select count(*)::text from pg_policies where schemaname = 'public'));
-  perform pg_temp.registrar('H-F2. 39 RESTRICTIVE e 37 PERMISSIVE', '39/37',
+  perform pg_temp.registrar('H-F2. 40 RESTRICTIVE e 38 PERMISSIVE', '40/38',
     (select count(*) filter (where permissive = 'RESTRICTIVE') || '/' || count(*) filter (where permissive = 'PERMISSIVE')
        from pg_policies where schemaname = 'public'));
 
@@ -861,6 +862,8 @@ begin
       ('profiles', 'profiles_update_own', 'PERMISSIVE', 'UPDATE'),
       ('shifts', 'shifts_delete_admin', 'PERMISSIVE', 'DELETE'),
       ('shifts', 'shifts_exige_aal2', 'RESTRICTIVE', 'ALL'),
+      ('contract_employee_rates', 'contract_employee_rates_exige_mfa', 'RESTRICTIVE', 'SELECT'),
+      ('contract_employee_rates', 'contract_employee_rates_leitura_admin', 'PERMISSIVE', 'SELECT'),
       ('contract_rate_terms', 'contract_rate_terms_exige_mfa', 'RESTRICTIVE', 'SELECT'),
       ('contract_rate_terms', 'contract_rate_terms_leitura_admin', 'PERMISSIVE', 'SELECT'),
       ('job_functions', 'job_functions_exige_mfa', 'RESTRICTIVE', 'ALL'),
@@ -888,18 +891,18 @@ begin
     into _n;
   perform pg_temp.registrar('H-F3. inventario de policies identico ao anterior (tabela, nome, tipo, comando)', '0', _n::text);
 
-  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated', '76',
+  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated', '78',
     (select count(*)::text from pg_policies
       where schemaname = 'public' and roles = array['authenticated']::name[]));
 
-  perform pg_temp.registrar('H-F5. as 24 tabelas seguem com RLS ligada', '24',
+  perform pg_temp.registrar('H-F5. as 25 tabelas seguem com RLS ligada', '25',
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relrowsecurity));
   perform pg_temp.registrar('H-F6. e nenhuma passou a FORCE RLS', '0',
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relforcerowsecurity));
 
-  perform pg_temp.registrar('H-F7. 53 policies seguem chamando has_role()/is_staff()', '53',
+  perform pg_temp.registrar('H-F7. 54 policies seguem chamando has_role()/is_staff()', '54',
     (select count(*)::text from pg_policies
       where schemaname = 'public'
         and (coalesce(qual, '') || coalesce(with_check, '')) ~ '(has_role|is_staff)\('));

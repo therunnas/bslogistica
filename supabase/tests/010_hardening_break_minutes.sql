@@ -412,8 +412,9 @@ begin
   -- com RLS desde a criação — 20. A 030 acrescenta `financial_holidays` (calendário de feriados),
   -- com RLS desde a criação — 21. A 039 acrescenta `job_functions` (catálogo de funções), com RLS
   -- desde a criação — 22. A 041 acrescenta `contract_rate_terms` (tarifas) e `pricing_settings` (chave da
-  -- resolução), ambas com RLS desde a criação — 24.
-  perform pg_temp.registrar('F3. as 24 tabelas de public seguem com RLS ativa', '24',
+  -- resolução), ambas com RLS desde a criação — 24. A 042 acrescenta `contract_employee_rates` (diária
+  -- individual), com RLS desde a criação — 25.
+  perform pg_temp.registrar('F3. as 25 tabelas de public seguem com RLS ativa', '25',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -558,7 +559,7 @@ begin
   -- para que qualquer OUTRA constraint continue fazendo este caso falhar. A da 029 (valor-hora
   -- da hora extra paga, positivo) também fica de fora pelo nome, e as duas da 030 (minutos cobrados
   -- e tipo do dia).
-  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022, a da 029, as 2 da 030, as 3 da 036 e as 3 da 040', '1',
+  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022, a da 029, as 2 da 030, as 3 da 036, as 3 da 040 e as 2 da 042', '1',
     (select count(*)::text from pg_constraint
       where conrelid = 'public.timesheet_entries'::regclass and contype = 'c'
         and conname not in ('timesheet_entries_terms_origin_valida',
@@ -574,7 +575,9 @@ begin
                             'timesheet_entries_componentes_coerentes',
                             'timesheet_entries_periodo_snapshot_valido',
                             'timesheet_entries_funcao_origem_valida',
-                            'timesheet_entries_funcao_com_origem')));
+                            'timesheet_entries_funcao_com_origem',
+                            'timesheet_entries_fonte_do_preco_valida',
+                            'timesheet_entries_fonte_do_preco_coerente')));
 
   -- O da 014 (pausa não negativa) e o da 039 (período diurno/noturno).
   perform pg_temp.registrar('I4. dois CHECKs em shifts', '2',

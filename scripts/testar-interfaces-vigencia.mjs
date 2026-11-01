@@ -1136,13 +1136,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. a 041 (tarifas por função e período, FIN-PR-07) é a última migration, a 040, a 039, a 038, a 037, a 035, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
+  "I1. a 042 (diária individual e adicional diário, FIN-PR-08) é a última migration, a 041, a 040, a 039, a 038, a 037, a 035, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [46, "20261108120000_041_tarifas_por_funcao_e_periodo.sql", false],
+  [47, "20261109120000_042_diaria_individual_e_bonus.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",

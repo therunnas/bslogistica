@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# Compatibilidade de deploy (FIN-PR-03, 05, 06 e 07): o app desta branch contra o banco LOCAL
+# Compatibilidade de deploy (FIN-PR-03, 05, 06, 07 e 08): o app desta branch contra o banco LOCAL
 #   1) até a 034 — o banco de Production hoje (sem 035 em diante);
 #   2) até a 037 — leitores pelos componentes, sem o período contratual;
 #   3) até a 038 — período contratual e janela de cobrança;
 #   4) até a 039 — catálogo de funções e período do turno;
 #   5) até a 040 — snapshots de função e período por apontamento;
-#   6) até a 041 — tarifas por função e período (resolução desligada e, no fim, ligada).
+#   6) até a 041 — tarifas por função e período (resolução desligada e, no fim, ligada);
+#   7) até a 042 — diária individual e adicional diário (resolução desligada = valores iguais;
+#      ligada: a individual prevalece, HE sobre ela, adicional separado, faturamento concorrente).
 #
 # NUNCA toca Production nem homologação: Supabase local descartável (`supabase start`,
 # `db reset --local`) e um `next start` local apontado para ele. Cria uma conta de admin SÓ no Auth
 # local, que some no reset seguinte. Não roda na CI (precisa de Docker).
 #
-# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 041)
+# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 042)
 
 set -euo pipefail
 
@@ -43,38 +45,43 @@ for _ in $(seq 1 60); do curl -s -o /dev/null "http://127.0.0.1:$porta/login" &&
 export BASE_URL="http://127.0.0.1:$porta"
 
 rodar() {
-  node --experimental-strip-types --import ./scripts/_resolver-compat.mjs scripts/testar-compatibilidade-deploy.mjs "$1" "$2" "$3" "$4" "$5" "$6"
+  node --experimental-strip-types --import ./scripts/_resolver-compat.mjs scripts/testar-compatibilidade-deploy.mjs "$1" "$2" "$3" "$4" "$5" "$6" "$7"
 }
 
 echo ""
 echo "=== Cenário 1: banco até a 034 (como Production hoje, sem 035 em diante) ==="
 supa db reset --local --version 20261101120000 >/dev/null 2>&1
-rodar "banco-034" "sem-componentes" "sem-periodo" "sem-funcoes" "sem-snap" "sem-tarifas"
+rodar "banco-034" "sem-componentes" "sem-periodo" "sem-funcoes" "sem-snap" "sem-tarifas" "sem-diaria"
 
 echo ""
 echo "=== Cenário 2: banco até a 037 (sem o período contratual) ==="
 supa db reset --local --version 20261104120000 >/dev/null 2>&1
-rodar "banco-037" "com-componentes" "sem-periodo" "sem-funcoes" "sem-snap" "sem-tarifas"
+rodar "banco-037" "com-componentes" "sem-periodo" "sem-funcoes" "sem-snap" "sem-tarifas" "sem-diaria"
 
 echo ""
 echo "=== Cenário 3: banco até a 038 (sem funções e período do turno) ==="
 supa db reset --local --version 20261105120000 >/dev/null 2>&1
-rodar "banco-038" "com-componentes" "com-periodo" "sem-funcoes" "sem-snap" "sem-tarifas"
+rodar "banco-038" "com-componentes" "com-periodo" "sem-funcoes" "sem-snap" "sem-tarifas" "sem-diaria"
 
 echo ""
 echo "=== Cenário 4: banco até a 039 (funções e período do turno, sem snapshots) ==="
 supa db reset --local --version 20261106120000 >/dev/null 2>&1
-rodar "banco-039" "com-componentes" "com-periodo" "com-funcoes" "sem-snap" "sem-tarifas"
+rodar "banco-039" "com-componentes" "com-periodo" "com-funcoes" "sem-snap" "sem-tarifas" "sem-diaria"
 
 echo ""
 echo "=== Cenário 5: banco até a 040 (snapshots de função e período) ==="
 supa db reset --local --version 20261107120000 >/dev/null 2>&1
-rodar "banco-040" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "sem-tarifas"
+rodar "banco-040" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "sem-tarifas" "sem-diaria"
 
 echo ""
 echo "=== Cenário 6: banco até a 041 (tarifas por função; resolução desligada e depois ligada) ==="
+supa db reset --local --version 20261108120000 >/dev/null 2>&1
+rodar "banco-041" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "sem-diaria"
+
+echo ""
+echo "=== Cenário 7: banco até a 042 (diária individual e adicional diário) ==="
 supa db reset --local >/dev/null 2>&1
-rodar "banco-041" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas"
+rodar "banco-042" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
 
 if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   echo "FALHOU: o servidor Next registrou erro:" >&2
@@ -82,4 +89,4 @@ if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   exit 1
 fi
 echo ""
-echo "PASS: o app desta branch funciona com o banco de Production de hoje (034), com os bancos até a 037, 038, 039, 040 e 041 (resolução desligada e ligada)."
+echo "PASS: o app desta branch funciona com o banco de Production de hoje (034), com os bancos até a 037, 038, 039, 040, 041 e 042 (resolução desligada e ligada, com e sem diária individual)."
