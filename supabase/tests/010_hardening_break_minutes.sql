@@ -410,8 +410,9 @@ begin
   -- A 025 acrescenta `financial_engine_settings` (a chave do motor por vigência), também com
   -- RLS desde a criação — 19. A 029 acrescenta `billing_additionals` (adicionais de serviço),
   -- com RLS desde a criação — 20. A 030 acrescenta `financial_holidays` (calendário de feriados),
-  -- com RLS desde a criação — 21.
-  perform pg_temp.registrar('F3. as 21 tabelas de public seguem com RLS ativa', '21',
+  -- com RLS desde a criação — 21. A 039 acrescenta `job_functions` (catálogo de funções), com RLS
+  -- desde a criação — 22.
+  perform pg_temp.registrar('F3. as 22 tabelas de public seguem com RLS ativa', '22',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -539,9 +540,11 @@ begin
 
   -- Os 4 originais de shifts seguem intactos. A 024 acrescenta o congelamento de jornada de
   -- turno usado, criado DESABILITADO (a lista conta o trigger, esteja habilitado ou não).
-  perform pg_temp.registrar('I2. os 5 triggers de shifts, intactos (um deles dormente)',
+  -- A 039 acrescenta o gatilho que registra quem classificou o período do turno (cadastro puro).
+  perform pg_temp.registrar('I2. os 6 triggers de shifts, intactos (um deles dormente)',
     'trg_shifts_bloqueia_delete_usado, trg_shifts_bloqueia_fontes, '
-    'trg_shifts_bloqueia_mover_referenciado, trg_shifts_congela_jornada_usada, trg_shifts_updated',
+    'trg_shifts_bloqueia_mover_referenciado, trg_shifts_classificacao, '
+    'trg_shifts_congela_jornada_usada, trg_shifts_updated',
     (select string_agg(t.tgname, ', ' order by t.tgname)
        from pg_trigger t join pg_class c on c.oid = t.tgrelid
       where not t.tgisinternal and c.relname = 'shifts'
@@ -567,7 +570,8 @@ begin
                             'timesheet_entries_adicional_nao_negativo',
                             'timesheet_entries_componentes_coerentes')));
 
-  perform pg_temp.registrar('I4. um unico CHECK em shifts', '1',
+  -- O da 014 (pausa não negativa) e o da 039 (período diurno/noturno).
+  perform pg_temp.registrar('I4. dois CHECKs em shifts', '2',
     (select count(*)::text from pg_constraint
       where conrelid = 'public.shifts'::regclass and contype = 'c'));
 

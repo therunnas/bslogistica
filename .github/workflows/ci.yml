@@ -195,6 +195,9 @@ jobs:
       - name: Teste periodo-contratual
         run: npm run test:periodo-contratual
 
+      - name: Teste funcoes-turno
+        run: npm run test:funcoes-turno
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

@@ -1,5 +1,6 @@
 import { decidirDisponibilidade } from "./fechamento/disponibilidade";
 import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./fechamento/periodo";
+import { interpretarFuncoesTurno } from "./funcoes";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
@@ -170,6 +171,17 @@ export function useNucleoV2(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarNucleoV2(consulta.data.data, consulta.data.error);
+}
+
+/**
+ * O banco já tem a migration 039 (catálogo de funções e período do turno)? Mesma consulta do estado
+ * do motor, mesmo padrão de anúncio das migrations anteriores. Carregando, erro ou banco anterior:
+ * `false`, e a tela não lê nem envia nada de função ou período.
+ */
+export function useFuncoesTurno(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarFuncoesTurno(consulta.data.data, consulta.data.error);
 }
 
 /** O banco já tem a migration 038 (frequência no contrato e competência de cobrança)? */

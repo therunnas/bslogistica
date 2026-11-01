@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   BadgeDollarSign,
   BriefcaseBusiness,
+  ListChecks,
   Pencil,
   Phone,
   Plus,
@@ -47,7 +48,21 @@ import {
 
 import { brl } from "@/lib/format";
 import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
-import { useCriarComVigencia, useEstadoDoMotor, useRegrasDaBs } from "@/lib/vigencias-dados";
+import { CatalogoDeFuncoes } from "./catalogo-de-funcoes";
+import { useFuncoes } from "@/lib/funcoes-dados";
+import {
+  camposDeFuncaoDoColaborador,
+  nomeDaFuncao,
+  opcoesDeFuncao,
+  pendentesDeFuncao,
+  SEM_FUNCAO,
+} from "@/lib/funcoes";
+import {
+  useCriarComVigencia,
+  useEstadoDoMotor,
+  useFuncoesTurno,
+  useRegrasDaBs,
+} from "@/lib/vigencias-dados";
 import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { useEmployees } from "@/lib/queries";
@@ -60,6 +75,7 @@ const empty = {
   name: "",
   doc: "",
   role: "",
+  job_function_id: "",
   phone: "",
   daily_cost: 0,
   status: "active" as StatusColaborador,
@@ -80,6 +96,11 @@ export function PainelColaboradores() {
   const modoDeCusto = modoDeEdicaoDeTaxa(estadoDoMotor);
   const regrasBs = useRegrasDaBs();
   const remove = useDeleteRow("employees");
+  // Catálogo de funções (migration 039): só com o anúncio do banco.
+  const funcoesHabilitadas = useFuncoesTurno();
+  const funcoes = useFuncoes(funcoesHabilitadas);
+  const catalogo = funcoes.data ?? [];
+  const [catalogoOpen, setCatalogoOpen] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<typeof empty>(empty);
@@ -104,6 +125,7 @@ export function PainelColaboradores() {
       name: employee.name,
       doc: employee.doc ?? "",
       role: employee.role ?? "",
+      job_function_id: employee.job_function_id ?? "",
       phone: employee.phone ?? "",
       daily_cost: Number(employee.daily_cost),
       status: employee.status === "inactive" ? "inactive" : "active",
@@ -117,6 +139,10 @@ export function PainelColaboradores() {
   const custoTravado =
     modoDeCusto !== "direta" && (Boolean(form.id) || modoDeCusto === "bloqueada");
 
+  // A função padrão se grava no próprio colaborador. No cadastro novo com o motor ligado o cadastro
+  // passa pela RPC atômica do custo (que não conhece a função): a função se escolhe depois de salvar.
+  const funcaoNoFormulario = funcoesHabilitadas && (Boolean(form.id) || modoDeCusto === "direta");
+
   function submit() {
     const payload: Record<string, unknown> = {
       name: form.name,
@@ -124,6 +150,7 @@ export function PainelColaboradores() {
       role: form.role || null,
       phone: form.phone || null,
       status: form.status,
+      ...camposDeFuncaoDoColaborador(form.job_function_id || null, funcaoNoFormulario),
     };
 
     if (modoDeCusto === "direta" || (!form.id && modoDeCusto === "por-vigencia")) {
@@ -168,19 +195,37 @@ export function PainelColaboradores() {
         title="Colaboradores"
         description="Gerencie a equipe disponível para alocação, funções, contatos e custo operacional por diária."
         action={
-          <Button
-            className="h-10 rounded-xl"
-            disabled={modoDeCusto === "bloqueada"}
-            onClick={() => {
-              setForm(empty);
-              setInicioDoCusto(hojeEmSaoPaulo());
-              setHoraExtraDoCusto("");
-              setOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Novo colaborador
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {funcoesHabilitadas ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-xl"
+                onClick={() => setCatalogoOpen(true)}
+              >
+                <ListChecks className="h-4 w-4" aria-hidden />
+                Funções
+                {pendentesDeFuncao(data).length > 0 ? (
+                  <Badge variant="secondary" className="ml-1">
+                    {pendentesDeFuncao(data).length}
+                  </Badge>
+                ) : null}
+              </Button>
+            ) : null}
+            <Button
+              className="h-10 rounded-xl"
+              disabled={modoDeCusto === "bloqueada"}
+              onClick={() => {
+                setForm(empty);
+                setInicioDoCusto(hojeEmSaoPaulo());
+                setHoraExtraDoCusto("");
+                setOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Novo colaborador
+            </Button>
+          </div>
         }
       />
 
@@ -300,6 +345,15 @@ export function PainelColaboradores() {
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
+                        {funcoesHabilitadas && employee.job_function_id ? (
+                          <Badge variant="secondary" className="mt-1">
+                            {nomeDaFuncao(catalogo, employee.job_function_id)}
+                          </Badge>
+                        ) : funcoesHabilitadas && pendentesDeFuncao([employee]).length > 0 ? (
+                          <Badge variant="outline" className="mt-1">
+                            Revisar função
+                          </Badge>
+                        ) : null}
                       </TableCell>
 
                       <TableCell className="text-sm text-muted-foreground">
@@ -406,6 +460,42 @@ export function PainelColaboradores() {
                 className={INPUT_CLASS}
               />
             </div>
+
+            {funcaoNoFormulario ? (
+              <div className="space-y-2">
+                <Label htmlFor="employee-job-function">Função padrão</Label>
+
+                <Select
+                  value={form.job_function_id === "" ? SEM_FUNCAO : form.job_function_id}
+                  onValueChange={(value) =>
+                    setForm({ ...form, job_function_id: value === SEM_FUNCAO ? "" : value })
+                  }
+                >
+                  <SelectTrigger id="employee-job-function" className={SELECT_CLASS}>
+                    <SelectValue />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    <SelectItem value={SEM_FUNCAO}>Sem função definida</SelectItem>
+                    {opcoesDeFuncao(catalogo, form.job_function_id || null).map((funcao) => (
+                      <SelectItem key={funcao.id} value={funcao.id}>
+                        {funcao.name}
+                        {funcao.active ? "" : " (inativa)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <p className="text-xs text-muted-foreground">
+                  A função padrão não obriga a mesma função em todas as operações. O texto do campo
+                  acima é preservado.
+                </p>
+              </div>
+            ) : funcoesHabilitadas ? (
+              <p className="text-xs text-muted-foreground">
+                A função padrão se escolhe depois de salvar o colaborador.
+              </p>
+            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="employee-doc">Documento</Label>
@@ -568,6 +658,17 @@ export function PainelColaboradores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {funcoesHabilitadas ? (
+        <CatalogoDeFuncoes
+          aberto={catalogoOpen}
+          aoMudar={setCatalogoOpen}
+          funcoes={catalogo}
+          colaboradores={data}
+          carregando={funcoes.isLoading}
+          erro={funcoes.isError}
+        />
+      ) : null}
     </div>
   );
 }
