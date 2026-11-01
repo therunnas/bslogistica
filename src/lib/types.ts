@@ -36,6 +36,8 @@ export interface Employee {
   phone: string | null;
   daily_cost: number;
   status: RecordStatus;
+  /** Função padrão (migration 039); ausente antes dela, nulo = sem função definida. */
+  job_function_id?: string | null;
 }
 
 export interface Operation {
@@ -60,6 +62,8 @@ export interface Shift {
   break_minutes: number;
   crosses_midnight: boolean;
   status: RecordStatus;
+  /** Período do turno (migration 039); ausente antes dela, nulo = não classificado. */
+  shift_period?: "diurno" | "noturno" | null;
 }
 
 export interface TeamMember {
@@ -68,6 +72,8 @@ export interface TeamMember {
   shift_id: string | null;
   employee_id: string;
   active: boolean;
+  /** Função na alocação (migration 039); ausente antes dela, nulo = sem função. */
+  job_function_id?: string | null;
 }
 
 export interface Timesheet {

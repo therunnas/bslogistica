@@ -356,6 +356,7 @@ export type Database = {
           daily_cost: number;
           doc: string | null;
           id: string;
+          job_function_id: string | null;
           name: string;
           phone: string | null;
           role: string | null;
@@ -367,6 +368,7 @@ export type Database = {
           daily_cost?: number;
           doc?: string | null;
           id?: string;
+          job_function_id?: string | null;
           name: string;
           phone?: string | null;
           role?: string | null;
@@ -378,6 +380,7 @@ export type Database = {
           daily_cost?: number;
           doc?: string | null;
           id?: string;
+          job_function_id?: string | null;
           name?: string;
           phone?: string | null;
           role?: string | null;
@@ -598,12 +601,47 @@ export type Database = {
           },
         ];
       };
+      job_functions: {
+        Row: {
+          active: boolean;
+          code: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          name: string;
+          name_key: string | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          code: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          code?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
       operation_team: {
         Row: {
           active: boolean;
           created_at: string;
           employee_id: string;
           id: string;
+          job_function_id: string | null;
           operation_id: string;
           shift_id: string | null;
         };
@@ -612,6 +650,7 @@ export type Database = {
           created_at?: string;
           employee_id: string;
           id?: string;
+          job_function_id?: string | null;
           operation_id: string;
           shift_id?: string | null;
         };
@@ -620,6 +659,7 @@ export type Database = {
           created_at?: string;
           employee_id?: string;
           id?: string;
+          job_function_id?: string | null;
           operation_id?: string;
           shift_id?: string | null;
         };
@@ -807,6 +847,9 @@ export type Database = {
           id: string;
           name: string;
           operation_id: string;
+          shift_period: string | null;
+          shift_period_set_at: string | null;
+          shift_period_set_by: string | null;
           start_time: string;
           status: Database["public"]["Enums"]["record_status"];
           updated_at: string;
@@ -819,6 +862,9 @@ export type Database = {
           id?: string;
           name: string;
           operation_id: string;
+          shift_period?: string | null;
+          shift_period_set_at?: string | null;
+          shift_period_set_by?: string | null;
           start_time: string;
           status?: Database["public"]["Enums"]["record_status"];
           updated_at?: string;
@@ -831,6 +877,9 @@ export type Database = {
           id?: string;
           name?: string;
           operation_id?: string;
+          shift_period?: string | null;
+          shift_period_set_at?: string | null;
+          shift_period_set_by?: string | null;
           start_time?: string;
           status?: Database["public"]["Enums"]["record_status"];
           updated_at?: string;
@@ -1124,6 +1173,10 @@ export type Database = {
           valor_hora: number;
         }[];
       };
+      alterar_situacao_funcao: {
+        Args: { p_active: boolean; p_id: string };
+        Returns: undefined;
+      };
       alterar_motor_vigencia: {
         Args: {
           p_aceitar_pendencias?: boolean;
@@ -1305,6 +1358,10 @@ export type Database = {
           p_valid_from: string;
           p_valid_to: string;
         };
+        Returns: string;
+      };
+      criar_funcao: {
+        Args: { p_code?: string; p_name: string };
         Returns: string;
       };
       criar_operacao_com_vigencia: {
@@ -1613,6 +1670,14 @@ export type Database = {
       provision_bslog_user: {
         Args: { _email: string; _metadata?: Json; _user_id: string };
         Returns: undefined;
+      };
+      renomear_funcao: {
+        Args: { p_id: string; p_name: string };
+        Returns: undefined;
+      };
+      vincular_funcoes_exatas: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
       };
       registrar_adicional: {
         Args: {

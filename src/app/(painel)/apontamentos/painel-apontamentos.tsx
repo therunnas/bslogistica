@@ -61,8 +61,11 @@ import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamento
 import { calcEntryComNucleo } from "@/lib/previa-v2";
 import { datasAtivas } from "@/lib/feriados";
 import { useFeriados } from "@/lib/regras-definitivas-dados";
+import { funcaoEfetiva, nomeDaFuncao, periodoDoTurno, ROTULO_DO_PERIODO } from "@/lib/funcoes";
+import { useFuncoes } from "@/lib/funcoes-dados";
 import {
   useEstadoDoMotor,
+  useFuncoesTurno,
   useNucleoV2,
   useRegrasDaBs,
   useRegrasDefinitivas,
@@ -267,6 +270,9 @@ export function PainelApontamentos() {
   const shifts = useShifts();
   const employees = useEmployees();
   const team = useTeam();
+  // Função e período (migration 039): exibição INFORMATIVA, fora de qualquer cálculo.
+  const funcoesHabilitadas = useFuncoesTurno();
+  const funcoes = useFuncoes(funcoesHabilitadas);
   const timesheets = useTimesheets();
   const entries = useEntries();
 
@@ -1031,6 +1037,9 @@ export function PainelApontamentos() {
                 {operationShifts.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.name} ({item.start_time.slice(0, 5)}–{item.end_time.slice(0, 5)})
+                    {funcoesHabilitadas && periodoDoTurno(item) !== null
+                      ? ` · ${ROTULO_DO_PERIODO[periodoDoTurno(item) as "diurno" | "noturno"]}`
+                      : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1219,6 +1228,18 @@ export function PainelApontamentos() {
 
                             <p className="mt-0.5 text-xs text-muted-foreground">
                               {employee?.role ?? "Colaborador"}
+                              {funcoesHabilitadas
+                                ? (() => {
+                                    const { funcaoId } = funcaoEfetiva(
+                                      teamMembers.find((m) => m.employee_id === row.employeeId) ??
+                                        null,
+                                      employee ?? null,
+                                    );
+                                    return funcaoId === null
+                                      ? ""
+                                      : ` · ${nomeDaFuncao(funcoes.data ?? [], funcaoId)}`;
+                                  })()
+                                : ""}
                             </p>
                           </div>
                         </div>

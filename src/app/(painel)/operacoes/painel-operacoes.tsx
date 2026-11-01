@@ -67,7 +67,21 @@ import {
 import type { Operation, Shift } from "@/lib/types";
 import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
 import { MENSAGEM_TURNO_PROTEGIDO } from "@/lib/erros-banco";
-import { useCriarComVigencia, useEstadoDoMotor } from "@/lib/vigencias-dados";
+import {
+  camposDePeriodoDoTurno,
+  ehPeriodoDoTurno,
+  funcaoInicialDaAlocacao,
+  montarAlocacao,
+  opcoesDeFuncao,
+  periodoDoTurno,
+  PERIODOS_DO_TURNO,
+  ROTULO_DO_PERIODO,
+  SEM_FUNCAO,
+  SEM_PERIODO,
+  validarPeriodoDoTurno,
+} from "@/lib/funcoes";
+import { useFuncoes } from "@/lib/funcoes-dados";
+import { useCriarComVigencia, useEstadoDoMotor, useFuncoesTurno } from "@/lib/vigencias-dados";
 import {
   hojeEmSaoPaulo,
   jornadaDoTurnoProtegida,
@@ -98,6 +112,7 @@ const emptyShift = {
   break_minutes: 60,
   crosses_midnight: false,
   status: "active",
+  shift_period: "",
 };
 
 const INPUT_CLASS =
@@ -115,6 +130,10 @@ export function PainelOperacoes() {
   const shifts = useShifts();
   const employees = useEmployees();
   const team = useTeam();
+  // Funções e período do turno (migration 039): só com o anúncio do banco.
+  const funcoesHabilitadas = useFuncoesTurno();
+  const funcoes = useFuncoes(funcoesHabilitadas);
+  const catalogo = funcoes.data ?? [];
 
   const saveOperation = useSaveRow("operations");
   const criarOperacaoComVigencia = useCriarComVigencia("operacao", ["operations"]);
@@ -146,12 +165,34 @@ export function PainelOperacoes() {
    * recarregada para mostrar quem pegou o colaborador primeiro.
    */
   const alocarEquipe = useMutation({
-    mutationFn: async (v: { employeeId: string; shiftId: string | null; vinculoId?: string }) => {
+    mutationFn: async (v: {
+      employeeId: string;
+      shiftId: string | null;
+      vinculoId?: string;
+      /** Função da alocação: no INSERT, a herdada do colaborador; no UPDATE de função, a escolhida. */
+      funcaoId?: string | null;
+      soFuncao?: boolean;
+    }) => {
       if (!teamOpen) {
         throw new Error("Nenhuma operação selecionada.");
       }
 
       const cliente = criarClienteNavegador();
+
+      if (v.vinculoId && v.soFuncao) {
+        // Só a função da alocação muda (turno e vínculo intactos). Nada recalcula.
+        const { error, count } = await cliente
+          .from("operation_team")
+          .update({ job_function_id: v.funcaoId ?? null }, { count: "exact" })
+          .eq("id", v.vinculoId);
+
+        if (error) {
+          throw error;
+        }
+
+        exigirLinhaAfetada(count, "mudar a função do colaborador");
+        return;
+      }
 
       if (v.vinculoId) {
         const { error, count } = await cliente
@@ -174,12 +215,16 @@ export function PainelOperacoes() {
         return;
       }
 
-      const { error } = await cliente.from("operation_team").insert({
-        operation_id: teamOpen.id,
-        employee_id: v.employeeId,
-        shift_id: v.shiftId,
-        active: true,
-      });
+      // A função vai explícita (herdada do colaborador, alterável depois); sem a 039, o INSERT é o de antes.
+      const { error } = await cliente
+        .from("operation_team")
+        .insert(
+          montarAlocacao(
+            { operationId: teamOpen.id, employeeId: v.employeeId, shiftId: v.shiftId },
+            v.funcaoId ?? null,
+            funcoesHabilitadas,
+          ),
+        );
 
       if (error) {
         throw error;
@@ -483,16 +528,22 @@ export function PainelOperacoes() {
       break_minutes: shift.break_minutes,
       crosses_midnight: shift.crosses_midnight,
       status: shift.status,
+      shift_period: periodoDoTurno(shift) ?? "",
     });
 
     setShiftOpen(true);
   }
+
+  const periodoEscolhido = ehPeriodoDoTurno(shiftForm.shift_period) ? shiftForm.shift_period : null;
+  const errosDoPeriodo = validarPeriodoDoTurno(periodoEscolhido, !shiftForm.id, funcoesHabilitadas);
 
   function submitShift() {
     const payload: Record<string, unknown> = {
       operation_id: shiftForm.operation_id,
       name: shiftForm.name,
       status: shiftForm.status,
+      // Classificação diurno/noturno: dado de cadastro, sem relação com a jornada protegida.
+      ...camposDePeriodoDoTurno(periodoEscolhido, funcoesHabilitadas),
     };
 
     // Turno com apontamento e jornada protegida: só nome e status seguem (o histórico não muda).
@@ -737,6 +788,20 @@ export function PainelOperacoes() {
                                 <span className="text-sm font-medium text-foreground">
                                   {shift.name}
                                 </span>
+
+                                {funcoesHabilitadas ? (
+                                  periodoDoTurno(shift) !== null ? (
+                                    <Badge variant="secondary">
+                                      {
+                                        ROTULO_DO_PERIODO[
+                                          periodoDoTurno(shift) as "diurno" | "noturno"
+                                        ]
+                                      }
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline">Sem classificação</Badge>
+                                  )
+                                ) : null}
                               </div>
                             </TableCell>
 
@@ -1121,6 +1186,46 @@ export function PainelOperacoes() {
               />
             </div>
 
+            {funcoesHabilitadas ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="shift-period">Período do turno</Label>
+
+                <Select
+                  value={shiftForm.shift_period === "" ? SEM_PERIODO : shiftForm.shift_period}
+                  onValueChange={(value) =>
+                    setShiftForm({ ...shiftForm, shift_period: value === SEM_PERIODO ? "" : value })
+                  }
+                >
+                  <SelectTrigger id="shift-period" className={SELECT_CLASS}>
+                    <SelectValue />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {shiftForm.id ? (
+                      <SelectItem value={SEM_PERIODO}>Não classificado</SelectItem>
+                    ) : (
+                      <SelectItem value={SEM_PERIODO} disabled>
+                        Escolha o período
+                      </SelectItem>
+                    )}
+                    {PERIODOS_DO_TURNO.map((periodo) => (
+                      <SelectItem key={periodo.valor} value={periodo.valor}>
+                        {periodo.rotulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <p className="text-xs text-muted-foreground">
+                  É uma classificação de cadastro, escolhida por você: virar a meia-noite não define
+                  o período. Não altera horário, jornada nem cálculo.
+                </p>
+                {errosDoPeriodo.length > 0 ? (
+                  <p className="text-xs text-destructive">{errosDoPeriodo[0]}</p>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="flex items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 sm:mt-7">
               <Checkbox
                 id="crosses"
@@ -1152,7 +1257,8 @@ export function PainelOperacoes() {
                 className="mt-3 rounded-xl"
                 onClick={() => {
                   const atual = (shifts.data ?? []).find((item) => item.id === shiftForm.id);
-                  if (atual) setShiftForm(novoTurnoAPartir(atual));
+                  // O turno novo não herda a classificação: o período é escolhido de novo.
+                  if (atual) setShiftForm({ ...novoTurnoAPartir(atual), shift_period: "" });
                 }}
               >
                 Criar novo turno a partir deste
@@ -1174,7 +1280,7 @@ export function PainelOperacoes() {
               type="button"
               className="rounded-xl"
               onClick={submitShift}
-              disabled={!shiftForm.name}
+              disabled={!shiftForm.name || errosDoPeriodo.length > 0}
             >
               Salvar turno
             </Button>
@@ -1309,72 +1415,111 @@ export function PainelOperacoes() {
                       ) : null}
                     </div>
 
-                    <div className="flex w-full min-w-0 items-center gap-2 sm:w-[22rem] sm:shrink-0">
-                      {situacao === "outra" ? (
-                        <div className="min-w-0 text-xs text-muted-foreground">
-                          <Badge variant="outline" className="mr-1 border-border bg-secondary/50">
-                            Indisponível
-                          </Badge>
+                    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-[22rem] sm:shrink-0">
+                      <div className="flex w-full min-w-0 items-center gap-2">
+                        {situacao === "outra" ? (
+                          <div className="min-w-0 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="mr-1 border-border bg-secondary/50">
+                              Indisponível
+                            </Badge>
 
-                          <span className="break-words">
-                            Alocado em {operationName(alocacao?.operation_id)} ·{" "}
-                            {shiftLabel(alocacao?.shift_id ?? null)}
-                          </span>
-                        </div>
-                      ) : (
-                        <>
-                          <Select
-                            value={
-                              situacao === "aqui" ? (alocacao?.shift_id ?? "sem-turno") : "nenhum"
-                            }
-                            onValueChange={(value) =>
-                              alocarEquipe.mutate({
-                                employeeId: employee.id,
-                                shiftId: value === "sem-turno" ? null : value,
-                                ...(alocacao
-                                  ? {
-                                      vinculoId: alocacao.id,
-                                    }
-                                  : {}),
-                              })
-                            }
-                          >
-                            <SelectTrigger className="min-w-0 flex-1 rounded-xl">
-                              <SelectValue placeholder="Selecionar turno" />
-                            </SelectTrigger>
-
-                            <SelectContent>
-                              {situacao === "disponivel" ? (
-                                <SelectItem value="nenhum" disabled>
-                                  Selecionar turno
-                                </SelectItem>
-                              ) : null}
-
-                              {equipeGrupos.map((grupo) => (
-                                <SelectItem
-                                  key={`opt-${grupo.id ?? "sem-turno"}`}
-                                  value={grupo.id ?? "sem-turno"}
-                                >
-                                  {grupo.nome}
-                                  {grupo.id ? ` · ${grupo.horario}` : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-
-                          {situacao === "aqui" && alocacao ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="shrink-0 rounded-xl"
-                              onClick={() => desalocarEquipe.mutate(alocacao.id)}
+                            <span className="break-words">
+                              Alocado em {operationName(alocacao?.operation_id)} ·{" "}
+                              {shiftLabel(alocacao?.shift_id ?? null)}
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <Select
+                              value={
+                                situacao === "aqui" ? (alocacao?.shift_id ?? "sem-turno") : "nenhum"
+                              }
+                              onValueChange={(value) =>
+                                alocarEquipe.mutate({
+                                  employeeId: employee.id,
+                                  shiftId: value === "sem-turno" ? null : value,
+                                  ...(alocacao
+                                    ? {
+                                        vinculoId: alocacao.id,
+                                      }
+                                    : {
+                                        // Alocação NOVA: herda a função padrão do colaborador (explícita no INSERT).
+                                        funcaoId: funcaoInicialDaAlocacao(employee, catalogo),
+                                      }),
+                                })
+                              }
                             >
-                              Desalocar
-                            </Button>
-                          ) : null}
-                        </>
-                      )}
+                              <SelectTrigger className="min-w-0 flex-1 rounded-xl">
+                                <SelectValue placeholder="Selecionar turno" />
+                              </SelectTrigger>
+
+                              <SelectContent>
+                                {situacao === "disponivel" ? (
+                                  <SelectItem value="nenhum" disabled>
+                                    Selecionar turno
+                                  </SelectItem>
+                                ) : null}
+
+                                {equipeGrupos.map((grupo) => (
+                                  <SelectItem
+                                    key={`opt-${grupo.id ?? "sem-turno"}`}
+                                    value={grupo.id ?? "sem-turno"}
+                                  >
+                                    {grupo.nome}
+                                    {grupo.id ? ` · ${grupo.horario}` : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            {situacao === "aqui" && alocacao ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="shrink-0 rounded-xl"
+                                onClick={() => desalocarEquipe.mutate(alocacao.id)}
+                              >
+                                Desalocar
+                              </Button>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+
+                      {funcoesHabilitadas && situacao === "aqui" && alocacao ? (
+                        <Select
+                          value={alocacao.job_function_id ?? SEM_FUNCAO}
+                          onValueChange={(value) =>
+                            alocarEquipe.mutate({
+                              employeeId: employee.id,
+                              shiftId: alocacao.shift_id,
+                              vinculoId: alocacao.id,
+                              soFuncao: true,
+                              funcaoId: value === SEM_FUNCAO ? null : value,
+                            })
+                          }
+                        >
+                          <SelectTrigger
+                            className="min-w-0 rounded-xl"
+                            aria-label={`Função de ${employee.name} nesta operação`}
+                          >
+                            <SelectValue placeholder="Função nesta operação" />
+                          </SelectTrigger>
+
+                          <SelectContent>
+                            <SelectItem value={SEM_FUNCAO}>Sem função definida</SelectItem>
+                            {opcoesDeFuncao(catalogo, alocacao.job_function_id ?? null).map(
+                              (funcao) => (
+                                <SelectItem key={funcao.id} value={funcao.id}>
+                                  {funcao.name}
+                                  {funcao.active ? "" : " (inativa)"}
+                                </SelectItem>
+                              ),
+                            )}
+                          </SelectContent>
+                        </Select>
+                      ) : null}
                     </div>
                   </div>
                 ))

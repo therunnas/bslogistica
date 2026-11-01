@@ -617,7 +617,7 @@ select pg_temp.registrar('V3. as 7 funções SECURITY DEFINER novas são do post
                         'valor_acordado_operacao_na_data', 'exigir_valor_acordado_operacao_na_data', 'condicoes_encerrar_operacao_interno')));
 select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 = 14, todos habilitados', '14',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'));
-select pg_temp.registrar('V5. shifts: 4 triggers originais habilitados + o congelamento DESABILITADO', '4|1',
+select pg_temp.registrar('V5. shifts: 4 triggers originais + o da classificação do turno (039) habilitados + o congelamento DESABILITADO', '5|1',
   (select count(*) filter (where tgenabled = 'O')::text || '|' || count(*) filter (where tgenabled = 'D')::text from pg_trigger where tgrelid = 'public.shifts'::regclass and not tgisinternal));
 select pg_temp.registrar('V6. a derivação financeira e gerar_fatura não citam as versões', '0',
   (select count(*)::text from pg_proc where pronamespace = 'public'::regnamespace and proname in ('derivar_valores_financeiros', 'gerar_fatura')

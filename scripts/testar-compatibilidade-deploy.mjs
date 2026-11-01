@@ -36,11 +36,18 @@ import { lerTabelaPaginada } from "../src/lib/paginacao.ts";
 import { montarLinhas } from "../src/lib/ledger-estado.ts";
 import { lerResumoFinanceiro } from "../src/lib/resumo-financeiro.ts";
 import { LEITURAS } from "../src/lib/queries.ts";
+import {
+  camposDeFuncaoDoColaborador,
+  camposDePeriodoDoTurno,
+  interpretarFuncoesTurno,
+  montarAlocacao,
+} from "../src/lib/funcoes.ts";
 import { interpretarPeriodoContratual, montarRegistro } from "../src/lib/vigencias-ui.ts";
 
 const cenario = process.argv[2] ?? "?";
 const esperaComponentes = process.argv[3] === "com-componentes";
 const esperaPeriodo = process.argv[4] === "com-periodo";
+const esperaFuncoes = process.argv[5] === "com-funcoes";
 const { API_URL, ANON_KEY, SERVICE_ROLE_KEY, CONTAINER, BASE_URL } = process.env;
 if (!API_URL || !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(API_URL)) {
   console.error("API_URL ausente ou não local: este teste só roda contra o Supabase local.");
@@ -385,6 +392,103 @@ if (esperaPeriodo) {
 }
 
 // ---------------------------------------------------------------------------
+// K. Funções e período do turno (FIN-PR-06), pelo código do app
+// ---------------------------------------------------------------------------
+const estadoFuncoes = await cliente.rpc("estado_motor_vigencia");
+const funcoesHabilitadas = interpretarFuncoesTurno(estadoFuncoes.data, estadoFuncoes.error);
+verificar(
+  "K1. capacidade `funcoes_turno` anunciada só no banco com a 039",
+  funcoesHabilitadas,
+  esperaFuncoes,
+);
+const E6 = "5c39f000-0000-4000-8000-000000000006";
+const OP = "5c39e000-0000-4000-8000-0000000000a1";
+const TURNO = "5c39a000-0000-4000-8000-0000000000a1";
+let funcaoId = null;
+if (funcoesHabilitadas) {
+  const catalogo = await cliente
+    .from("job_functions")
+    .select("id, code, name, active")
+    .order("name");
+  verificar(
+    "K2. catálogo lido pela sessão do admin (4 funções iniciais)",
+    catalogo.error?.message ?? catalogo.data.map((f) => f.code).sort(),
+    ["administrativo", "auxiliar_producao", "conferente", "operador"],
+  );
+  funcaoId = catalogo.data?.find((f) => f.code === "conferente")?.id ?? null;
+  const nova = await cliente.rpc("criar_funcao", { p_name: "Motorista de empilhadeira" });
+  verificar("K3. nova função pela RPC do admin", nova.error?.message ?? typeof nova.data, "string");
+} else {
+  const ausente = await cliente.from("job_functions").select("id").limit(1);
+  verificar(
+    "K2. banco sem a 039: a tabela não existe e a tela nem a consulta",
+    Boolean(ausente.error),
+    true,
+  );
+}
+// O colaborador é salvo como a tela faz: sem a capacidade, o payload é o de antes (sem coluna nova).
+const payloadColaborador = {
+  role: "Conferente",
+  ...camposDeFuncaoDoColaborador(funcaoId, funcoesHabilitadas),
+};
+const salvouColaborador = await cliente.from("employees").update(payloadColaborador).eq("id", E6);
+verificar(
+  "K4. salvar colaborador: com a 039 grava a função padrão; sem ela, o payload não leva coluna nova",
+  [salvouColaborador.error?.message ?? "ok", "job_function_id" in payloadColaborador],
+  ["ok", esperaFuncoes],
+);
+const alocou = await cliente
+  .from("operation_team")
+  .insert(
+    montarAlocacao(
+      { operationId: OP, employeeId: E6, shiftId: TURNO },
+      funcaoId,
+      funcoesHabilitadas,
+    ),
+  );
+verificar(
+  "K5. alocar colaborador (função herdada explícita só com a 039)",
+  alocou.error?.message ?? "ok",
+  "ok",
+);
+const turnoNovo = await cliente
+  .from("shifts")
+  .insert({
+    operation_id: OP,
+    name: "TN",
+    start_time: "22:00:00",
+    end_time: "06:00:00",
+    break_minutes: 60,
+    crosses_midnight: true,
+    ...camposDePeriodoDoTurno("noturno", funcoesHabilitadas),
+  })
+  .select("*")
+  .single();
+verificar(
+  "K6. turno novo (noturno só com a 039); leitura select(*) traz a coluna só no banco novo",
+  [
+    turnoNovo.error?.message ?? "ok",
+    "shift_period" in (turnoNovo.data ?? {}),
+    turnoNovo.data?.shift_period ?? null,
+  ],
+  ["ok", esperaFuncoes, esperaFuncoes ? "noturno" : null],
+);
+const turnoHistorico = await cliente.from("shifts").select("*").eq("id", TURNO).single();
+verificar(
+  "K7. turno histórico segue sem classificação e com o mesmo horário",
+  [turnoHistorico.data?.shift_period ?? null, turnoHistorico.data?.start_time],
+  [null, "06:00:00"],
+);
+const somaDepois = Math.round(
+  Number(
+    psql(
+      `select coalesce(sum(billed_amount), 0) from public.timesheet_entries where status <> 'absent';`,
+    ),
+  ) * 100,
+);
+verificar("K8. nenhum valor financeiro mudou com as mudanças cadastrais", somaDepois, somaCobrada);
+
+// ---------------------------------------------------------------------------
 // G. Faturar (duas chamadas concorrentes) e reler
 // ---------------------------------------------------------------------------
 const chamada = () =>
@@ -475,6 +579,8 @@ if (BASE_URL) {
     "/dashboard",
     "/apontamentos",
     "/clientes",
+    "/colaboradores",
+    "/operacoes",
   ]) {
     const resp = await fetch(`${BASE_URL}${pagina}`, { headers: { cookie }, redirect: "manual" });
     const html = await resp.text();
