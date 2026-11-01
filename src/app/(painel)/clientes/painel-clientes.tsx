@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Building2,
   CalendarRange,
@@ -57,6 +57,7 @@ import {
   useFuncoesTurno,
   usePeriodoContratual,
   useRegrasDefinitivas,
+  useDiariaIndividual,
   useResolucaoDeTarifas,
   useTarifasPorFuncao,
 } from "@/lib/vigencias-dados";
@@ -67,7 +68,7 @@ import {
   PARAMETROS_030_INICIAIS,
 } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
-import { useClients, useContracts, useOperations } from "@/lib/queries";
+import { useClients, useContracts, useEmployees, useOperations } from "@/lib/queries";
 import type { Client, Contract } from "@/lib/types";
 
 const emptyClient = {
@@ -122,6 +123,13 @@ export function PainelClientes() {
   // consultar NÃO é ausência: o estado desconhecido mostra a tela como está, sem esconder o erro.
   const tarifasPorFuncao = useTarifasPorFuncao();
   const resolucaoDeTarifas = useResolucaoDeTarifas();
+  // Diária individual por colaborador (042): só com a capacidade confirmada.
+  const diariaIndividual = useDiariaIndividual();
+  const colaboradores = useEmployees();
+  const colaboradoresDoContrato = useMemo(
+    () => (colaboradores.data ?? []).map((c) => ({ id: c.id, name: c.name })),
+    [colaboradores.data],
+  );
   const funcoesHabilitadas = useFuncoesTurno();
   const funcoes = useFuncoes(funcoesHabilitadas && tarifasPorFuncao === "disponivel");
   const [tarifasDoContrato, setTarifasDoContrato] = useState<{ id: string; name: string } | null>(
@@ -1124,6 +1132,8 @@ export function PainelClientes() {
           aoFechar={() => setTarifasDoContrato(null)}
           funcoes={funcoes.data ?? []}
           resolucaoLigada={resolucaoDeTarifas}
+          diariaIndividual={diariaIndividual === "disponivel"}
+          colaboradores={colaboradoresDoContrato}
         />
       ) : null}
     </div>

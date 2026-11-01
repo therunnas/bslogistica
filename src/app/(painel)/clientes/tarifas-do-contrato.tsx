@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
+import { DiariasIndividuais } from "./diarias-individuais";
+
 import { brl } from "@/lib/format";
 import { nomeDaFuncao, type FuncaoDoCatalogo } from "@/lib/funcoes";
 import {
@@ -53,6 +55,9 @@ export interface TarifasDoContratoProps {
   funcoes: readonly FuncaoDoCatalogo[];
   /** A resolução por função e período está ligada? `null` = a leitura do estado falhou. */
   resolucaoLigada: boolean | null;
+  /** O banco tem a diária individual por colaborador (042)? Sem ela a seção nem aparece. */
+  diariaIndividual?: boolean;
+  colaboradores?: readonly { id: string; name: string }[];
 }
 
 const ROTULO_DO_PERIODO = { diurno: "Diurno", noturno: "Noturno" } as const;
@@ -68,6 +73,8 @@ export function TarifasDoContrato({
   aoFechar,
   funcoes,
   resolucaoLigada,
+  diariaIndividual = false,
+  colaboradores = [],
 }: TarifasDoContratoProps) {
   const contratoId = contrato?.id ?? "";
   const tarifas = useTarifasDoContrato(contratoId, contrato !== null);
@@ -316,6 +323,14 @@ export function TarifasDoContrato({
               </Button>
             </div>
           </form>
+        ) : null}
+
+        {diariaIndividual && contrato !== null ? (
+          <DiariasIndividuais
+            contratoId={contrato.id}
+            colaboradores={colaboradores}
+            resolucaoLigada={resolucaoLigada}
+          />
         ) : null}
 
         <DialogFooter>

@@ -13,6 +13,7 @@
  *   R  runbook devolve os corpos vigentes antes da 042 e RECUSA se houver dado
  *   F  o código financeiro do app não conhece diária individual nem fonte de preço
  *   B  reconciliação sintética: 14 colaboradores, uma diária fixa cada, HE sobre a diária da linha
+ *   C  telas (Contratos e Apontamentos), capacidade anunciada pelo banco e CI
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -720,6 +721,100 @@ verificar(
     return [porLinha, comFuncaoUnica, porLinha - comFuncaoUnica];
   })(),
   [328500, 324000, 4500],
+);
+
+// ---------------------------------------------------------------------------
+console.log("\nC. Telas, capacidade e CI");
+const tarifasTela = ler("src/app/(painel)/clientes/tarifas-do-contrato.tsx");
+const diariasTela = ler("src/app/(painel)/clientes/diarias-individuais.tsx");
+const clientesTela = ler("src/app/(painel)/clientes/painel-clientes.tsx");
+const apontTela = ler("src/app/(painel)/apontamentos/painel-apontamentos.tsx");
+const precoTela = ler("src/app/(painel)/apontamentos/preco-do-dia.tsx");
+const dadosVig = ler("src/lib/vigencias-dados.ts");
+verificar(
+  "C1. Contratos: a seção só aparece com a capacidade confirmada e com contrato aberto",
+  [
+    /diariaIndividual = false/.test(tarifasTela),
+    /diariaIndividual && contrato !== null \? \(\s*<DiariasIndividuais/.test(tarifasTela),
+    /diariaIndividual=\{diariaIndividual === "disponivel"\}/.test(clientesTela),
+  ],
+  [true, true, true],
+);
+verificar(
+  "C2. Contratos: distingue a diária individual da tarifa da função, diz que não é custo e não inventa valor",
+  [
+    /Prevalece sobre a tarifa da função/.test(diariasTela),
+    /Não é o custo do colaborador/.test(diariasTela),
+    /Sem diária individual hoje: vale a tarifa da função/.test(diariasTela),
+    /cadastrar diária individual não\s+muda nenhum valor/.test(diariasTela),
+    /Motivo \(obrigatório\)/.test(diariasTela),
+  ],
+  [true, true, true, true, true],
+);
+verificar(
+  "C3. Contratos: grava só pela RPC (versão nova com encerramento da anterior), nunca por tabela",
+  [
+    /useRegistrarDiariaIndividual/.test(diariasTela),
+    /\.from\("contract_employee_rates"\)\s*\.(insert|update|delete|upsert)/.test(
+      ler("src/lib/diaria-individual-dados.ts"),
+    ),
+    /p_encerrar_anterior: true/.test(ler("src/lib/diaria-individual-dados.ts")),
+  ],
+  [true, false, true],
+);
+verificar(
+  "C4. Apontamentos: o preço do dia só aparece com a capacidade e para lançamento gravado e não falta",
+  [
+    /const diariaIndividual = useDiariaIndividual\(\) === "disponivel"/.test(apontTela),
+    /diariaIndividual && gravado && gravado\.status !== "absent"/.test(apontTela),
+    /<AdicionalDiarioDialog/.test(apontTela),
+  ],
+  [true, true, true],
+);
+verificar(
+  "C5. Apontamentos: o adicional só é oferecido quando a pré-checagem passa e o texto diz que não entra na hora extra",
+  [
+    /motivoSemBonus\(gravado, bonusDiario, resolucaoLigada\) === null/.test(apontTela),
+    /TEXTO_DO_BONUS/.test(precoTela),
+    /Confirmo a substituição/.test(precoTela),
+    /substituir: jaTem && substituir/.test(precoTela),
+  ],
+  [true, true, true, true],
+);
+verificar(
+  "C6. as telas novas não calculam preço, não usam armazenamento do navegador nem chave",
+  [
+    ...[
+      "src/app/(painel)/clientes/diarias-individuais.tsx",
+      "src/app/(painel)/apontamentos/preco-do-dia.tsx",
+    ].map((f) =>
+      /localStorage|sessionStorage|service_role|Math\.round|toFixed|\* 1\.5|\/ 8/.test(ler(f)),
+    ),
+  ],
+  [false, false],
+);
+verificar(
+  "C7. capacidade: falha de consulta é 'desconhecida' (não 'indisponível') e o adicional falha fechado",
+  [
+    /export function useDiariaIndividual\(\): CapacidadeDeTarifas \{\s*const consulta = useConsultaDoMotor\(\);\s*if \(consulta\.isError \|\| !consulta\.data \|\| consulta\.data\.error\) return "desconhecida";/.test(
+      dadosVig,
+    ),
+    /export function useBonusDiario\(\): boolean \{\s*const consulta = useConsultaDoMotor\(\);\s*if \(consulta\.isError \|\| !consulta\.data\) return false;/.test(
+      dadosVig,
+    ),
+  ],
+  [true, true],
+);
+const pacote = JSON.parse(ler("package.json"));
+const ci = ler(".github/workflows/ci.yml");
+verificar(
+  "C8. o script existe, o CI executa a suíte e conserva a anterior",
+  [
+    typeof pacote.scripts["test:diaria-individual-bonus"],
+    /npm run test:diaria-individual-bonus/.test(ci),
+    /npm run test:snapshots-tarifas/.test(ci),
+  ],
+  ["string", true, true],
 );
 
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);
