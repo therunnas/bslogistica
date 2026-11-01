@@ -433,7 +433,12 @@ begin
 
   begin
     perform public.gerar_fatura(
-      '33333333-3333-4333-8333-333333333333'::uuid, current_date - 1, current_date + 1);
+      '33333333-3333-4333-8333-333333333333'::uuid,
+      -- FIN-PR-05 (038): a fatura é uma competência inteira — a quinzena de hoje (cliente sem contrato).
+      case when extract(day from current_date) <= 15 then date_trunc('month', current_date)::date
+           else date_trunc('month', current_date)::date + 15 end,
+      case when extract(day from current_date) <= 15 then date_trunc('month', current_date)::date + 14
+           else (date_trunc('month', current_date) + interval '1 month - 1 day')::date end);
     _estado := 'gerou a fatura';
   exception
     when insufficient_privilege then _estado := '42501';
@@ -455,7 +460,12 @@ begin
 
   begin
     _fatura := public.gerar_fatura(
-      '33333333-3333-4333-8333-333333333333'::uuid, current_date - 1, current_date + 1);
+      '33333333-3333-4333-8333-333333333333'::uuid,
+      -- FIN-PR-05 (038): a fatura é uma competência inteira — a quinzena de hoje (cliente sem contrato).
+      case when extract(day from current_date) <= 15 then date_trunc('month', current_date)::date
+           else date_trunc('month', current_date)::date + 15 end,
+      case when extract(day from current_date) <= 15 then date_trunc('month', current_date)::date + 14
+           else (date_trunc('month', current_date) + interval '1 month - 1 day')::date end);
     _estado := case when _fatura.id is not null then 'gerou a fatura' else 'retorno vazio' end;
   exception when others then _estado := 'erro ' || sqlstate || ': ' || sqlerrm;
   end;

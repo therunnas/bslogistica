@@ -219,7 +219,8 @@ export function diaDaSemana(data: string): number {
 /**
  * Se o período é um período de fechamento INTEIRO: 1–15, 16–último dia ou o mês.
  * É a mesma condição que `validar_fechamento_acumulado` exige para faturar hora
- * extra com arredondamento acumulado — aqui só para avisar antes da fatura.
+ * extra com arredondamento acumulado — aqui só para avisar antes da fatura. Com a
+ * migration 038, a fatura exige a competência da frequência (`ehCompetencia`).
  */
 export function ehPeriodoDeFechamento(inicio: string, fim: string): boolean {
   if (!ehDataCivil(inicio) || !ehDataCivil(fim) || inicio > fim) return false;
@@ -240,4 +241,53 @@ export function ehMesInteiro(inicio: string, fim: string): boolean {
   const [anoI, mesI, diaI] = desmontar(inicio);
   const [anoF, mesF, diaF] = desmontar(fim);
   return anoI === anoF && mesI === mesF && diaI === 1 && diaF === diasDoMes(anoI, mesI);
+}
+
+/**
+ * Frequência de fechamento do contrato (migration 038, `contract_terms.closing_period`). Define a
+ * competência de cobrança: quinzenal = 1–15 e 16–último dia; mensal = 1–último dia.
+ */
+export type FrequenciaDeFechamento = "quinzenal" | "mensal";
+
+export function ehFrequenciaDeFechamento(valor: unknown): valor is FrequenciaDeFechamento {
+  return valor === "quinzenal" || valor === "mensal";
+}
+
+/**
+ * O período é UMA competência inteira da frequência? Espelho de `janela_de_cobranca_valida`
+ * (migration 038): é o que `gerar_fatura` aceita.
+ */
+export function ehCompetencia(
+  frequencia: FrequenciaDeFechamento,
+  inicio: string,
+  fim: string,
+): boolean {
+  if (!ehDataCivil(inicio) || !ehDataCivil(fim) || inicio > fim) return false;
+  const [anoI, mesI, diaI] = desmontar(inicio);
+  const [anoF, mesF, diaF] = desmontar(fim);
+  if (anoI !== anoF || mesI !== mesF) return false;
+  const ultimo = diasDoMes(anoI, mesI);
+  if (frequencia === "mensal") return diaI === 1 && diaF === ultimo;
+  return (diaI === 1 && diaF === 15) || (diaI === 16 && diaF === ultimo);
+}
+
+/** A competência da frequência que contém a data (a mesma de `competencia_de_cobranca`). */
+export function competenciaQueContem(frequencia: FrequenciaDeFechamento, data: string): Periodo {
+  if (!ehDataCivil(data)) {
+    throw new ErroDeDadoDoFechamento(`período: "${data}" não é uma data civil.`);
+  }
+  const [ano, mes, dia] = desmontar(data);
+  if (frequencia === "mensal") return mesInteiro(ano, mes);
+  return dia <= 15 ? primeiraQuinzena(ano, mes) : segundaQuinzena(ano, mes);
+}
+
+/** As competências do mês, em ordem: duas quinzenas ou o mês. */
+export function competenciasDoMes(
+  frequencia: FrequenciaDeFechamento,
+  ano: number,
+  mes: number,
+): Periodo[] {
+  return frequencia === "mensal"
+    ? [mesInteiro(ano, mes)]
+    : [primeiraQuinzena(ano, mes), segundaQuinzena(ano, mes)];
 }

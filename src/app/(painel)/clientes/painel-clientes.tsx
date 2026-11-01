@@ -48,7 +48,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { brl, dateBR, num, todayISO } from "@/lib/format";
 import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
 import { FeriadosDoCalendario } from "./feriados";
-import { useCriarComVigencia, useEstadoDoMotor, useRegrasDefinitivas } from "@/lib/vigencias-dados";
+import {
+  useCriarComVigencia,
+  useEstadoDoMotor,
+  usePeriodoContratual,
+  useRegrasDefinitivas,
+} from "@/lib/vigencias-dados";
 import {
   camposDoCadastroInicialDeContrato,
   errosDosParametros030,
@@ -105,6 +110,7 @@ export function PainelClientes() {
   const estadoDoMotor = useEstadoDoMotor();
   // Calendário de feriados só existe com a migration 030 (o banco anuncia `regras_definitivas`).
   const regrasDefinitivas = useRegrasDefinitivas();
+  const periodoContratual = usePeriodoContratual();
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");
 
@@ -132,13 +138,18 @@ export function PainelClientes() {
     modoDeTaxa !== "direta" && (Boolean(contractForm.id) || modoDeTaxa === "bloqueada");
 
   // Contrato novo passa pela RPC atômica (motor por vigência): ela aceita e grava os parâmetros da
-  // 030 na vigência inicial. Com o motor desligado ou sem a 030, os campos não existem.
+  // 030 (e a frequência da 038) na vigência inicial. Com o motor desligado ou sem a 030, os campos
+  // não existem; sem a 038, a frequência não é mostrada nem enviada.
   const camposDa030 = camposDoCadastroInicialDeContrato(
     regrasDefinitivas && modoDeTaxa === "por-vigencia" && !contractForm.id,
+    periodoContratual,
   );
   const errosDa030 =
     camposDa030.length > 0
-      ? errosDosParametros030({ ...parametros030, shift_hours: String(contractForm.shift_hours) })
+      ? errosDosParametros030(
+          { ...parametros030, shift_hours: String(contractForm.shift_hours) },
+          periodoContratual,
+        )
       : [];
 
   const totalClientes = clients.data?.length ?? 0;
@@ -244,6 +255,7 @@ export function PainelClientes() {
             },
             encerrarAnterior: false,
             regrasDefinitivas: camposDa030.length > 0,
+            periodoContratual: camposDa030.length > 0 && periodoContratual,
           },
         },
         { onSuccess: () => setContractOpen(false) },

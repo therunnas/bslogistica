@@ -88,8 +88,9 @@ insert into public.operations (id, client_id, contract_id, name) values
 -- folhas abertas, apontamentos, e só depois o fechamento (a folha fechada não aceita escrita)
 insert into public.timesheets (id, operation_id, shift_id, work_date, status) values
   ('5c70b000-0000-4000-8000-000000000001', '5c70e000-0000-4000-8000-0000000000a1', null, '2026-03-02', 'open'),
-  ('5c70b000-0000-4000-8000-000000000002', '5c70e000-0000-4000-8000-0000000000a1', null, '2026-03-03', 'open'),
-  ('5c70b000-0000-4000-8000-000000000003', '5c70e000-0000-4000-8000-0000000000a3', null, '2026-03-04', 'open');
+  -- FIN-PR-05 (038): as folhas abertas ficam na 2ª quinzena, fora da competência que F5 fatura.
+  ('5c70b000-0000-4000-8000-000000000002', '5c70e000-0000-4000-8000-0000000000a1', null, '2026-03-17', 'open'),
+  ('5c70b000-0000-4000-8000-000000000003', '5c70e000-0000-4000-8000-0000000000a3', null, '2026-03-18', 'open');
 insert into public.timesheet_entries (id, timesheet_id, employee_id, status, check_in, check_out, break_minutes) values
   ('5c70b100-0000-4000-8000-000000000001', '5c70b000-0000-4000-8000-000000000001', '5c70f000-0000-4000-8000-000000000001', 'present', '06:00', '15:00', 60),
   ('5c70b100-0000-4000-8000-000000000002', '5c70b000-0000-4000-8000-000000000002', '5c70f000-0000-4000-8000-000000000002', 'present', '06:00', '15:00', 60),
@@ -109,7 +110,7 @@ select pg_temp.registrar('F3. nem move o apontamento da folha fechada para uma a
 select pg_temp.registrar('F4. folha aberta segue editável (1 linha)', '1',
   pg_temp.adm($q$with u as (update public.timesheet_entries set check_out = '16:00' where id = '5c70b100-0000-4000-8000-000000000002' returning 1) select count(*)::text from u$q$));
 select pg_temp.registrar('F5. gerar_fatura grava o vínculo da fatura mesmo em folha FECHADA', 'ok',
-  case when pg_temp.adm($q$select (public.gerar_fatura('5c70c000-0000-4000-8000-0000000000c1', '2026-03-02', '2026-03-02')).total_amount::text$q$) ~ '^[0-9.]+$' then 'ok' else 'falhou' end);
+  case when pg_temp.adm($q$select (public.gerar_fatura('5c70c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15')).total_amount::text$q$) ~ '^[0-9.]+$' then 'ok' else 'falhou' end);
 select pg_temp.registrar('F6. o apontamento da folha fechada ficou vinculado à fatura', '1',
   (select count(invoice_id)::text from public.timesheet_entries where id = '5c70b100-0000-4000-8000-000000000001'));
 
@@ -174,8 +175,8 @@ select pg_temp.registrar('A5b. exatamente uma folha e uma linha', '1|1',
   (select count(*)::text from public.timesheets where work_date = '2026-05-04') || '|' || (select count(*)::text from public.timesheet_entries where work_date = '2026-05-04'));
 
 -- A faturar a folha de 01/04 e testar a linha faturada dentro do lote
-select pg_temp.registrar('A6. gerar_fatura de 01/04 (E1 presente) funciona sobre o que o RPC gravou', 'ok',
-  case when pg_temp.adm($q$select (public.gerar_fatura('5c70c000-0000-4000-8000-0000000000c1', '2026-04-01', '2026-04-01')).total_amount::text$q$) ~ '^[0-9.]+$' then 'ok' else 'falhou' end);
+select pg_temp.registrar('A6. gerar_fatura de 01–15/04 (E1 presente em 01/04) funciona sobre o que o RPC gravou', 'ok',
+  case when pg_temp.adm($q$select (public.gerar_fatura('5c70c000-0000-4000-8000-0000000000c1', '2026-04-01', '2026-04-15')).total_amount::text$q$) ~ '^[0-9.]+$' then 'ok' else 'falhou' end);
 select pg_temp.registrar('A7. linha faturada no lote: erro 42501 e NADA do lote persiste (E3 segue falta)', 'erro 42501|absent',
   pg_temp.adm($q$select public.salvar_apontamento_admin('5c70e000-0000-4000-8000-0000000000a4', null, date '2026-04-01', '[{"employee_id":"5c70f000-0000-4000-8000-000000000003","status":"present","check_in":"06:00:00","check_out":"15:00:00","break_minutes":60},{"employee_id":"5c70f000-0000-4000-8000-000000000001","status":"present","check_in":"06:00:00","check_out":"18:00:00","break_minutes":60}]'::jsonb)::text$q$)
   || '|' || (select status::text from public.timesheet_entries where employee_id = '5c70f000-0000-4000-8000-000000000003' and work_date = '2026-04-01'));

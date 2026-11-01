@@ -72,9 +72,20 @@ const migrations = readdirSync(join(raiz, "supabase/migrations"))
 const outrasComNucleo = migrations.filter(
   (f) => f !== MIGRATION_DO_NUCLEO && /nucleo_/.test(fonte(`supabase/migrations/${f}`)),
 );
-verificar("I2. só a 036 (integração ao motor) menciona nucleo_* além da 035", outrasComNucleo, [
-  "20261103120000_036_integracao_nucleo_v2.sql",
-]);
+verificar(
+  "I2. só a 036 (integração ao motor) menciona nucleo_* além da 035 — e a 038, só a chave anunciada",
+  outrasComNucleo,
+  ["20261103120000_036_integracao_nucleo_v2.sql", "20261105120000_038_periodo_contratual.sql"],
+);
+verificar(
+  "I2b. a 038 só cita nucleo_ na chave 'nucleo_v2' de estado_motor_vigencia (nenhuma função do núcleo)",
+  [
+    ...fonte("supabase/migrations/20261105120000_038_periodo_contratual.sql").matchAll(
+      /nucleo_[a-z0-9_]*/g,
+    ),
+  ].map((m) => m[0]),
+  ["nucleo_v2"],
+);
 
 // ---------------------------------------------------------------------------
 console.log("\nM. Migration 035: aditiva e pura");

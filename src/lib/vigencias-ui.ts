@@ -18,6 +18,7 @@
 
 import type { CondicaoDoDia, ParametrosDeHoras } from "./apontamentos-financeiro";
 import type { TipoDoDia } from "./billing";
+import type { FrequenciaDeFechamento } from "./fechamento/periodo";
 import type {
   ParametrosRegistrarCondicaoContrato,
   ParametrosRegistrarCustoColaborador,
@@ -95,6 +96,17 @@ export function interpretarNucleoV2(data: unknown, erro: unknown): boolean {
   if (erro !== null && erro !== undefined) return false;
   if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
   return (data as { nucleo_v2?: unknown }).nucleo_v2 === true;
+}
+
+/**
+ * Período contratual (migration 038, FIN-PR-05): frequência de fechamento no contrato e competência
+ * de cobrança dos adicionais. O banco anuncia com `periodo_contratual = true`; sem o anúncio a tela
+ * não mostra nem envia nada disso (o banco antigo não tem as colunas nem os parâmetros).
+ */
+export function interpretarPeriodoContratual(data: unknown, erro: unknown): boolean {
+  if (erro !== null && erro !== undefined) return false;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  return (data as { periodo_contratual?: unknown }).periodo_contratual === true;
 }
 
 /**
@@ -268,7 +280,9 @@ export interface CampoDeVigencia {
   requerRegrasBs?: boolean;
   /** Só existe com a migration 030 aplicada (`regras_definitivas`). */
   requerRegrasDefinitivas?: boolean;
-  /** Campo de escolha: valores aceitos e o padrão (enviado quando vazio). */
+  /** Só existe com a migration 038 aplicada (`periodo_contratual`). */
+  requerPeriodoContratual?: boolean;
+  /** Campo de escolha: valores aceitos e o padrão (enviado quando vazio; opcional vazio não vai). */
   opcoes?: readonly { valor: string; rotulo: string }[];
   padrao?: string;
 }
@@ -277,6 +291,22 @@ export const OPCOES_DE_ARREDONDAMENTO: readonly { valor: string; rotulo: string 
   { valor: "diario", rotulo: "Diário (no próprio dia)" },
   { valor: "acumulado", rotulo: "Acumulado no período (no fechamento)" },
 ];
+
+/**
+ * Frequência de fechamento (038). Vazio = não enviar: a nova versão herda a frequência da anterior
+ * do contrato (ou quinzenal, sem anterior). Mudar a frequência só vale a partir do dia 1 de um mês
+ * sem fatura; o banco recusa o resto.
+ */
+export const OPCOES_DE_FREQUENCIA: readonly { valor: string; rotulo: string }[] = [
+  { valor: "", rotulo: "Manter a frequência atual" },
+  { valor: "quinzenal", rotulo: "Quinzenal (1 a 15 e 16 ao último dia)" },
+  { valor: "mensal", rotulo: "Mensal (1 ao último dia)" },
+];
+
+export const ROTULO_DA_FREQUENCIA: Readonly<Record<FrequenciaDeFechamento, string>> = {
+  quinzenal: "Quinzenal",
+  mensal: "Mensal",
+};
 
 export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoDeVigencia[]>> = {
   contrato: [
@@ -318,6 +348,16 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
       tipo: "fator",
       opcional: true,
       requerRegrasDefinitivas: true,
+    },
+    {
+      chave: "closing_period",
+      param: "p_closing_period",
+      rotulo: "Frequência de fechamento e faturamento",
+      tipo: "escolha",
+      opcoes: OPCOES_DE_FREQUENCIA,
+      padrao: "",
+      opcional: true,
+      requerPeriodoContratual: true,
     },
   ],
   colaborador: [
@@ -365,39 +405,53 @@ export interface FormularioDeVigencia {
   regrasBs?: boolean;
   /** O banco anunciou a migration 030: os campos `requerRegrasDefinitivas` valem. */
   regrasDefinitivas?: boolean;
+  /** O banco anunciou a migration 038: os campos `requerPeriodoContratual` valem. */
+  periodoContratual?: boolean;
 }
 
-/** Campos que a tela mostra, valida e envia: os da 029/030 só com o anúncio do banco. */
+/** Campos que a tela mostra, valida e envia: os da 029/030/038 só com o anúncio do banco. */
 export function camposDaVigencia(
   tipo: TipoDeVigencia,
   regrasBs: boolean,
   regrasDefinitivas = false,
+  periodoContratual = false,
 ): readonly CampoDeVigencia[] {
   return CAMPOS_DA_VIGENCIA[tipo].filter(
     (campo) =>
       (regrasBs || campo.requerRegrasBs !== true) &&
-      (regrasDefinitivas || campo.requerRegrasDefinitivas !== true),
+      (regrasDefinitivas || campo.requerRegrasDefinitivas !== true) &&
+      (periodoContratual || campo.requerPeriodoContratual !== true),
   );
 }
 
 /**
- * Parâmetros da migration 030 que o CADASTRO INICIAL do contrato também define (os mesmos campos
- * da nova vigência): vazios sem o anúncio do banco (`regras_definitivas`). Só valem quando o
+ * Parâmetros da migration 030 (e a frequência da 038) que o CADASTRO INICIAL do contrato também
+ * define (os mesmos campos da nova vigência): vazios sem o anúncio do banco. Só valem quando o
  * cadastro passa pela RPC atômica (motor por vigência); a edição tradicional não os tem.
  */
 export function camposDoCadastroInicialDeContrato(
   regrasDefinitivas: boolean,
+  periodoContratual = false,
 ): readonly CampoDeVigencia[] {
-  return camposDaVigencia("contrato", false, regrasDefinitivas).filter(
-    (campo) => campo.requerRegrasDefinitivas === true,
+  return camposDaVigencia(
+    "contrato",
+    false,
+    regrasDefinitivas,
+    regrasDefinitivas && periodoContratual,
+  ).filter(
+    (campo) => campo.requerRegrasDefinitivas === true || campo.requerPeriodoContratual === true,
   );
 }
 
-/** Valores iniciais dos campos acima: arredondamento diário (padrão do banco), sem sábado nem feriado. */
+/**
+ * Valores iniciais dos campos acima: arredondamento diário (padrão do banco), sem sábado nem
+ * feriado e frequência quinzenal (o padrão da BS).
+ */
 export const PARAMETROS_030_INICIAIS: Readonly<Record<string, string>> = {
   ot_rounding_mode: "diario",
   saturday_shift_hours: "",
   holiday_pay_factor: "",
+  closing_period: "quinzenal",
 };
 
 /**
@@ -405,14 +459,18 @@ export const PARAMETROS_030_INICIAIS: Readonly<Record<string, string>> = {
  * jornada de sábado não passa da jornada do contrato; o fator de feriado é 1 ou mais). Só os
  * erros desses campos: o resto do formulário segue com a validação que já tinha.
  */
-export function errosDosParametros030(valores: Readonly<Record<string, string>>): string[] {
-  const rotulos = camposDoCadastroInicialDeContrato(true).map((c) => c.rotulo);
+export function errosDosParametros030(
+  valores: Readonly<Record<string, string>>,
+  periodoContratual = false,
+): string[] {
+  const rotulos = camposDoCadastroInicialDeContrato(true, periodoContratual).map((c) => c.rotulo);
   return validarNovaVigencia("contrato", {
     inicio: "2000-01-01",
     motivo: "Cadastro inicial do contrato",
     valores,
     encerrarAnterior: false,
     regrasDefinitivas: true,
+    periodoContratual,
   }).filter((mensagem) => rotulos.some((r) => mensagem.startsWith(`${r}:`)));
 }
 
@@ -449,7 +507,12 @@ export function validarNovaVigencia(tipo: TipoDeVigencia, f: FormularioDeVigenci
       erros.push("O fim da vigência deve ser posterior ao início.");
     }
   }
-  for (const campo of camposDaVigencia(tipo, f.regrasBs === true, f.regrasDefinitivas === true)) {
+  for (const campo of camposDaVigencia(
+    tipo,
+    f.regrasBs === true,
+    f.regrasDefinitivas === true,
+    f.periodoContratual === true,
+  )) {
     const texto = f.valores[campo.chave] ?? "";
     if (campo.tipo === "escolha") {
       const valor = texto.trim() === "" ? (campo.padrao ?? "") : texto.trim();
@@ -513,10 +576,18 @@ export function montarRegistro(
     p_valid_to: (f.fim ?? "").trim() === "" ? null : (f.fim as string).trim(),
     p_encerrar_anterior: f.encerrarAnterior,
   };
-  for (const campo of camposDaVigencia(tipo, f.regrasBs === true, f.regrasDefinitivas === true)) {
+  for (const campo of camposDaVigencia(
+    tipo,
+    f.regrasBs === true,
+    f.regrasDefinitivas === true,
+    f.periodoContratual === true,
+  )) {
     const texto = f.valores[campo.chave] ?? "";
     if (campo.tipo === "escolha") {
-      params[campo.param] = texto.trim() === "" ? (campo.padrao ?? "") : texto.trim();
+      const valor = texto.trim() === "" ? (campo.padrao ?? "") : texto.trim();
+      // Escolha opcional vazia não vai: o banco aplica o padrão dele (a frequência herda a anterior).
+      if (campo.opcional === true && valor === "") continue;
+      params[campo.param] = valor;
       continue;
     }
     if (campo.opcional === true && texto.trim() === "") continue;
@@ -573,6 +644,8 @@ export function montarCadastroAtomico(
         ...("p_holiday_pay_factor" in v
           ? { p_holiday_pay_factor: v["p_holiday_pay_factor"] as number }
           : {}),
+        // Só com a 038 (e o anúncio do banco) e escolhida.
+        ...("p_closing_period" in v ? { p_closing_period: v["p_closing_period"] as string } : {}),
       },
     };
   }
@@ -673,6 +746,8 @@ export interface TermoDeContrato extends VersaoBase {
   ot_rounding_mode?: string | null;
   saturday_shift_hours?: number | string | null;
   holiday_pay_factor?: number | string | null;
+  /** Migration 038; ausente antes dela (= quinzenal). */
+  closing_period?: string | null;
 }
 
 const numeroOpcional = (v: unknown): number | null =>

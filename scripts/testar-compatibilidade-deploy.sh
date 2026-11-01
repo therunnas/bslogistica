@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Compatibilidade de deploy dos leitores (FIN-PR-03): o app desta branch contra o banco LOCAL
-#   1) até a 034 — o banco de Production hoje (sem 035, 036 e 037);
-#   2) até a 037 — o banco depois da etapa controlada de migrations.
+# Compatibilidade de deploy (FIN-PR-03 e FIN-PR-05): o app desta branch contra o banco LOCAL
+#   1) até a 034 — o banco de Production hoje (sem 035 em diante);
+#   2) até a 037 — leitores pelos componentes, sem o período contratual;
+#   3) até a 038 — período contratual e janela de cobrança.
 #
 # NUNCA toca Production nem homologação: Supabase local descartável (`supabase start`,
 # `db reset --local`) e um `next start` local apontado para ele. Cria uma conta de admin SÓ no Auth
 # local, que some no reset seguinte. Não roda na CI (precisa de Docker).
 #
-# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 037)
+# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 038)
 
 set -euo pipefail
 
@@ -39,18 +40,23 @@ for _ in $(seq 1 60); do curl -s -o /dev/null "http://127.0.0.1:$porta/login" &&
 export BASE_URL="http://127.0.0.1:$porta"
 
 rodar() {
-  node --experimental-strip-types --import ./scripts/_resolver-compat.mjs scripts/testar-compatibilidade-deploy.mjs "$1" "$2"
+  node --experimental-strip-types --import ./scripts/_resolver-compat.mjs scripts/testar-compatibilidade-deploy.mjs "$1" "$2" "$3"
 }
 
 echo ""
-echo "=== Cenário 1: banco até a 034 (como Production hoje, sem 035/036/037) ==="
+echo "=== Cenário 1: banco até a 034 (como Production hoje, sem 035 em diante) ==="
 supa db reset --local --version 20261101120000 >/dev/null 2>&1
-rodar "banco-034" "sem-componentes"
+rodar "banco-034" "sem-componentes" "sem-periodo"
 
 echo ""
-echo "=== Cenário 2: banco até a 037 ==="
+echo "=== Cenário 2: banco até a 037 (sem o período contratual) ==="
+supa db reset --local --version 20261104120000 >/dev/null 2>&1
+rodar "banco-037" "com-componentes" "sem-periodo"
+
+echo ""
+echo "=== Cenário 3: banco até a 038 ==="
 supa db reset --local >/dev/null 2>&1
-rodar "banco-037" "com-componentes"
+rodar "banco-038" "com-componentes" "com-periodo"
 
 if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   echo "FALHOU: o servidor Next registrou erro:" >&2
@@ -58,4 +64,4 @@ if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   exit 1
 fi
 echo ""
-echo "PASS: o app desta branch funciona com o banco de Production de hoje (034) e com o banco até a 037."
+echo "PASS: o app desta branch funciona com o banco de Production de hoje (034), com o banco até a 037 e com o banco até a 038."

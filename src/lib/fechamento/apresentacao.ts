@@ -138,9 +138,9 @@ export function textoDoAlerta(alerta: Alerta): string {
     case "hora-extra-acumulada-tardia":
       return `${lancamentos} com hora extra lançada depois de uma fatura do mesmo colaborador com arredondamento acumulado. O banco recusa faturar o restante do período; não há regra comercial definida para esse caso.`;
     case "periodo-fora-de-fechamento":
-      return `Há arredondamento acumulado de hora extra, mas o período não é uma quinzena (1–15 ou 16–fim) nem o mês inteiro. A fatura só aceita esses períodos; use um deles para fechar.`;
+      return `Há arredondamento acumulado de hora extra, mas o período não é uma competência de fechamento do cliente (quinzena 1–15 ou 16–fim, ou o mês inteiro no contrato mensal). A fatura só aceita a competência; use-a para fechar.`;
     case "previa-por-quinzena":
-      return `O arredondamento acumulado deste período é calculado de uma vez (como a fatura). Dashboard e Relatórios somam o ajuste por quinzena inteira, então o valor previsto lá é diferente. Vale o da fatura.`;
+      return `O arredondamento acumulado deste período é calculado de uma vez (como a fatura). Dashboard e Relatórios somam o ajuste por competência inteira do cliente, então o valor previsto lá é diferente. Vale o da fatura.`;
     case "feriado-cobranca-pendente":
       return `${lancamentos} em feriado. O pagamento segue o fator de feriado do contrato; a cobrança do cliente no feriado não foi alterada, porque a regra comercial não está confirmada.`;
     case "domingo-regra-pendente":

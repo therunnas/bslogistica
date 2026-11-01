@@ -1,17 +1,20 @@
 /**
- * Compatibilidade de deploy dos leitores (FIN-PR-03) — contra o Supabase LOCAL descartável.
+ * Compatibilidade de deploy (FIN-PR-03 e FIN-PR-05) — contra o Supabase LOCAL descartável.
  *
- * COMO RODAR: `bash scripts/testar-compatibilidade-deploy.sh` (sobe o banco local, reseta em dois
+ * COMO RODAR: `bash scripts/testar-compatibilidade-deploy.sh` (sobe o banco local, reseta em três
  * cenários e chama este arquivo). Não roda na CI: precisa do Docker. NUNCA aponta para HML nem
  * Production: a URL vem de `supabase status` local e é recusada se não for 127.0.0.1/localhost.
  *
- * POR QUE EXISTE. A Vercel publica a main sozinha, e as migrations 035/036/037 NÃO estão em
- * Production. O app deste PR precisa funcionar com o banco de Production de hoje (até a 034) e
- * com o banco novo. Este teste roda o CÓDIGO REAL do app nos dois:
+ * POR QUE EXISTE. A Vercel publica a main sozinha, e as migrations 035 em diante NÃO estão em
+ * Production. O app deste PR precisa funcionar com o banco de Production de hoje (até a 034), com o
+ * banco até a 037 e com o banco até a 038. Este teste roda o CÓDIGO REAL do app nos três:
  *
  *   F  Fechamento: disponibilidade, carregamento (a mesma função das rotas), CSV e XLSX
  *   L  Faturamento, Relatórios e Dashboard: o ledger (leitura paginada + montarLinhas) e o resumo
- *   G  gerar_fatura pela sessão do admin; Fechamento de novo depois de faturar
+ *   P  período contratual: capacidade anunciada, nova condição de contrato e adicional pelo código
+ *      do app (com competência só no banco com a 038), leitura dos adicionais
+ *   G  gerar_fatura pela sessão do admin, duas chamadas CONCORRENTES (só uma fatura); Fechamento de
+ *      novo depois de faturar
  *   H  as rotas HTTP do Next (`/api/fechamento`, `/api/fechamento/xlsx`) e as páginas, com a sessão
  *      de verdade em cookie (se `BASE_URL` for informado)
  *
@@ -24,6 +27,7 @@ import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 
+import { montarRegistroDeAdicional } from "../src/lib/adicionais.ts";
 import { carregarFechamento, dependenciasComSupabase } from "../src/lib/fechamento/carregar.ts";
 import { verificarDisponibilidade } from "../src/lib/fechamento/disponibilidade.ts";
 import { csvDoFechamento } from "../src/lib/fechamento/exportacao.ts";
@@ -32,9 +36,11 @@ import { lerTabelaPaginada } from "../src/lib/paginacao.ts";
 import { montarLinhas } from "../src/lib/ledger-estado.ts";
 import { lerResumoFinanceiro } from "../src/lib/resumo-financeiro.ts";
 import { LEITURAS } from "../src/lib/queries.ts";
+import { interpretarPeriodoContratual, montarRegistro } from "../src/lib/vigencias-ui.ts";
 
 const cenario = process.argv[2] ?? "?";
 const esperaComponentes = process.argv[3] === "com-componentes";
+const esperaPeriodo = process.argv[4] === "com-periodo";
 const { API_URL, ANON_KEY, SERVICE_ROLE_KEY, CONTAINER, BASE_URL } = process.env;
 if (!API_URL || !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(API_URL)) {
   console.error("API_URL ausente ou não local: este teste só roda contra o Supabase local.");
@@ -232,17 +238,171 @@ verificar(
 );
 
 // ---------------------------------------------------------------------------
-// G. Faturar e reler
+// P. Período contratual (FIN-PR-05), pelo código do app
 // ---------------------------------------------------------------------------
-const fatura = await cliente.rpc("gerar_fatura", {
-  _client_id: C,
-  _period_start: "2026-03-01",
-  _period_end: "2026-03-15",
+const estado = await cliente.rpc("estado_motor_vigencia");
+const periodoContratual = interpretarPeriodoContratual(estado.data, estado.error);
+verificar(
+  "P1. capacidade `periodo_contratual` anunciada só no banco com a 038",
+  periodoContratual,
+  esperaPeriodo,
+);
+verificar(
+  "P2. Fechamento: a decisão do recorte dos adicionais vem do banco",
+  await deps.lerPeriodoContratual(),
+  esperaPeriodo,
+);
+// Nova condição de contrato como a tela monta (frequência vazia = não enviada).
+const condicao = montarRegistro("contrato", "5c39d000-0000-4000-8000-0000000000d1", {
+  inicio: "2026-06-01",
+  motivo: "Reajuste de compatibilidade",
+  valores: {
+    daily_rate: "150",
+    shift_hours: "8",
+    ot_factor: "1.5",
+    ot_tolerance_min: "10",
+    closing_period: "",
+  },
+  encerrarAnterior: true,
+  regrasBs: true,
+  regrasDefinitivas: true,
+  periodoContratual,
+});
+const registrouCondicao = await cliente.rpc(condicao.rpc, condicao.params);
+verificar(
+  "P3. nova condição de contrato pela RPC, com os parâmetros que a tela envia",
+  [
+    registrouCondicao.error?.message ?? typeof registrouCondicao.data,
+    "p_closing_period" in condicao.params,
+  ],
+  ["string", false],
+);
+// Adicional como a tela monta: com a 038, executado em 20/03 e cobrado na 1ª quinzena; sem ela, a
+// execução dentro da 1ª quinzena (regra antiga).
+const ADICIONAL_CENTAVOS = 1234;
+const formAdicional = {
+  clienteId: C,
+  operacaoId: "",
+  inicio: esperaPeriodo ? "2026-03-20" : "2026-03-05",
+  fim: esperaPeriodo ? "2026-03-20" : "2026-03-06",
+  motivo: "Etiquetagem sintética",
+  referencia: "",
+  valor: "12,34",
+  ...(periodoContratual ? { competencia: { inicio: "2026-03-01", fim: "2026-03-15" } } : {}),
+};
+const paramsAdicional = montarRegistroDeAdicional(formAdicional);
+const registrouAdicional = await cliente.rpc("registrar_adicional", {
+  p_client_id: paramsAdicional.p_client_id,
+  p_period_start: paramsAdicional.p_period_start,
+  p_period_end: paramsAdicional.p_period_end,
+  p_description: paramsAdicional.p_description,
+  p_amount: paramsAdicional.p_amount,
+  ...("p_billing_period_start" in paramsAdicional
+    ? {
+        p_billing_period_start: paramsAdicional.p_billing_period_start,
+        p_billing_period_end: paramsAdicional.p_billing_period_end,
+      }
+    : {}),
 });
 verificar(
-  "G1. gerar_fatura pela sessão do admin",
-  fatura.error?.message ?? typeof fatura.data?.id,
-  "string",
+  "P4. adicional pela RPC (Serviços adicionais), com competência só no banco com a 038",
+  [
+    registrouAdicional.error?.message ?? typeof registrouAdicional.data,
+    "p_billing_period_start" in paramsAdicional,
+  ],
+  ["string", esperaPeriodo],
+);
+const listaAdicionais = await cliente.from("billing_additionals").select("*").eq("client_id", C);
+verificar(
+  "P5. leitura dos adicionais como a tela faz (select *)",
+  [
+    listaAdicionais.error?.message ?? listaAdicionais.data.length,
+    "billing_period_start" in (listaAdicionais.data?.[0] ?? {}),
+  ],
+  [1, esperaPeriodo],
+);
+const comAdicional = await carregarFechamento(filtros, dependenciasComSupabase(cliente));
+verificar(
+  "P6. Fechamento da 1ª quinzena traz o adicional (pela competência na 038, pela execução antes)",
+  [
+    comAdicional.adicionais.map((a) => a.valorCentavos),
+    comAdicional.adicionais[0]?.competenciaInicio ?? null,
+  ],
+  [[ADICIONAL_CENTAVOS], esperaPeriodo ? "2026-03-01" : null],
+);
+if (esperaPeriodo) {
+  const mes = await cliente.rpc("gerar_fatura", {
+    _client_id: C,
+    _period_start: "2026-03-01",
+    _period_end: "2026-03-31",
+  });
+  verificar(
+    "P7. 038: o mês inteiro num contrato quinzenal é recusado (22023)",
+    mes.error?.code,
+    "22023",
+  );
+  const competencia = await cliente.rpc("competencia_de_cobranca", {
+    p_client_id: C,
+    p_data: "2026-03-20",
+  });
+  // App ANTIGO contra o banco 038: o cadastro de adicional não envia competência.
+  const antigo = (inicio, fim) =>
+    cliente.rpc("registrar_adicional", {
+      p_client_id: C,
+      p_period_start: inicio,
+      p_period_end: fim,
+      p_description: "Adicional do app antigo",
+      p_amount: 5,
+    });
+  const antigoDentro = await antigo("2026-03-20", "2026-03-21");
+  const gravado = await cliente
+    .from("billing_additionals")
+    .select("billing_period_start, billing_period_end")
+    .eq("id", antigoDentro.data);
+  verificar(
+    "P7b. 038 + app antigo: execução dentro de uma quinzena grava a competência automática",
+    [antigoDentro.error?.message ?? typeof antigoDentro.data, gravado.data?.[0]],
+    ["string", { billing_period_start: "2026-03-16", billing_period_end: "2026-03-31" }],
+  );
+  const antigoCruza = await antigo("2026-03-10", "2026-03-20");
+  verificar(
+    "P7c. 038 + app antigo: execução que atravessa quinzenas é recusada (22023), sem receita presa",
+    [
+      antigoCruza.error?.code,
+      Number(
+        psql(
+          `select count(*) from public.billing_additionals where client_id = '${C}' and period_start = date '2026-03-10';`,
+        ),
+      ),
+    ],
+    ["22023", 0],
+  );
+  verificar(
+    "P8. 038: competência de cobrança lida pela sessão do admin",
+    competencia.error?.message ?? competencia.data,
+    [{ frequencia: "quinzenal", inicio: "2026-03-16", fim: "2026-03-31" }],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// G. Faturar (duas chamadas concorrentes) e reler
+// ---------------------------------------------------------------------------
+const chamada = () =>
+  cliente.rpc("gerar_fatura", {
+    _client_id: C,
+    _period_start: "2026-03-01",
+    _period_end: "2026-03-15",
+  });
+const concorrentes = await Promise.all([chamada(), chamada()]);
+const fatura = concorrentes.find((c) => !c.error) ?? concorrentes[0];
+verificar(
+  "G1. gerar_fatura pela sessão do admin: duas chamadas concorrentes, UMA fatura; a outra não acha nada (P0002)",
+  [
+    concorrentes.filter((c) => !c.error && typeof c.data?.id === "string").length,
+    concorrentes.filter((c) => c.error?.code === "P0002").length,
+    Number(psql(`select count(*) from public.invoices where client_id = '${C}';`)),
+  ],
+  [1, 1, 1],
 );
 const itens = Number(
   psql(
@@ -253,9 +413,9 @@ const total = Number(
   psql(`select total_amount from public.invoices where id = '${fatura.data?.id}';`),
 );
 verificar(
-  "G2. Σ itens = total da fatura = Σ cobrado",
+  "G2. Σ itens = total da fatura = Σ cobrado + adicional",
   [centavos(itens), centavos(total)],
-  [somaCobrada, somaCobrada],
+  [somaCobrada + ADICIONAL_CENTAVOS, somaCobrada + ADICIONAL_CENTAVOS],
 );
 const depois = await carregarFechamento(filtros, dependenciasComSupabase(cliente));
 verificar(
@@ -314,6 +474,7 @@ if (BASE_URL) {
     "/relatorios",
     "/dashboard",
     "/apontamentos",
+    "/clientes",
   ]) {
     const resp = await fetch(`${BASE_URL}${pagina}`, { headers: { cookie }, redirect: "manual" });
     const html = await resp.text();

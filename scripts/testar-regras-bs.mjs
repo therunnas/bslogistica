@@ -446,7 +446,9 @@ verificar(
   [
     ["daily_cost"],
     ["daily_cost", "ot_hourly_cost"],
-    CAMPOS_DA_VIGENCIA.contrato.filter((c) => c.requerRegrasDefinitivas !== true).length,
+    CAMPOS_DA_VIGENCIA.contrato.filter(
+      (c) => c.requerRegrasDefinitivas !== true && c.requerPeriodoContratual !== true,
+    ).length,
   ],
 );
 const FORM = {

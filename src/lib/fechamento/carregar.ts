@@ -66,8 +66,13 @@ export interface DependenciasDoCarregamento {
    * sem a 036 as colunas não existem. Ausente = `false` (leitura legado, como antes).
    */
   lerComponentes?(): Promise<boolean>;
+  /**
+   * O banco tem o período contratual (migration 038, `periodo_contratual`)? Decide o recorte dos
+   * adicionais (pela competência) e a leitura da frequência. Ausente = `false` (como antes).
+   */
+  lerPeriodoContratual?(): Promise<boolean>;
   /** As funções e tabelas do banco que completam o Fechamento (adicionais, ajuste acumulado…). */
-  criarFonteDoBanco(): FonteDoBanco;
+  criarFonteDoBanco(periodoContratual?: boolean): FonteDoBanco;
   agora(): Date;
   opcoesDeLeitura?: OpcoesDeLeitura;
 }
@@ -108,7 +113,10 @@ export async function carregarFechamento(
     dependencias.opcoesDeLeitura ?? {},
   );
   const linhas = normalizarLinhas(brutas);
-  const banco = await buscarDadosDoBanco(dependencias.criarFonteDoBanco(), filtro);
+  const periodoContratual = dependencias.lerPeriodoContratual
+    ? await dependencias.lerPeriodoContratual()
+    : false;
+  const banco = await buscarDadosDoBanco(dependencias.criarFonteDoBanco(periodoContratual), filtro);
 
   return agregarFechamento(linhas, {
     clienteId: filtro.clienteId,
@@ -166,7 +174,24 @@ export function dependenciasComSupabase(
         (data as { nucleo_v2?: unknown }).nucleo_v2 === true
       );
     },
-    criarFonteDoBanco: () => criarFonteDoBancoSupabase(supabase),
+    async lerPeriodoContratual() {
+      // Mesma consulta oficial; falha aqui não vira "sem período contratual" (o recorte mudaria).
+      const { data, error } = await supabase.rpc("estado_motor_vigencia");
+      if (error) {
+        throw new ErroDeLeituraDoFechamento(
+          "consulta",
+          `Falha ao verificar o período contratual: ${error.message}`,
+        );
+      }
+      return (
+        typeof data === "object" &&
+        data !== null &&
+        !Array.isArray(data) &&
+        (data as { periodo_contratual?: unknown }).periodo_contratual === true
+      );
+    },
+    criarFonteDoBanco: (periodoContratual) =>
+      criarFonteDoBancoSupabase(supabase, periodoContratual === true),
     agora: () => new Date(),
   };
 }

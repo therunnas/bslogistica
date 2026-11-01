@@ -466,14 +466,15 @@ const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.ur
 const NOME = "20261104120000_037_leitores_por_componentes.sql";
 const m037 = ler(`supabase/migrations/${NOME}`);
 verificar(
-  "M1. é a última, número 037 uma vez, timestamp > 036 (20261103120000); 019 fora",
+  "M1. número 037 uma vez, timestamp > 036 (20261103120000), seguida só pela 038 (FIN-PR-05); 019 fora",
   [
+    migrations.at(-2),
     migrations.at(-1),
     migrations.filter((f) => /_037_/.test(f)).length,
     NOME.slice(0, 14) > "20261103120000",
     migrations.some((f) => /_019_/.test(f)),
   ],
-  [NOME, 1, true, false],
+  [NOME, "20261105120000_038_periodo_contratual.sql", 1, true, false],
 );
 const semCorpos = m037
   .replace(/--[^\n]*/g, "")
