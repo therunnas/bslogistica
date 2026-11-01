@@ -601,6 +601,57 @@ export type Database = {
           },
         ];
       };
+      contract_rate_terms: {
+        Row: {
+          active: boolean;
+          contract_id: string;
+          created_at: string;
+          created_by: string | null;
+          daily_rate: number;
+          id: string;
+          job_function_id: string;
+          origin: string;
+          reason: string;
+          replaced_by: string | null;
+          retired_at: string | null;
+          shift_period: string;
+          valid_from: string;
+          valid_to: string | null;
+        };
+        Insert: {
+          active?: boolean;
+          contract_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          daily_rate: number;
+          id?: string;
+          job_function_id: string;
+          origin: string;
+          reason: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          shift_period: string;
+          valid_from: string;
+          valid_to?: string | null;
+        };
+        Update: {
+          active?: boolean;
+          contract_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          daily_rate?: number;
+          id?: string;
+          job_function_id?: string;
+          origin?: string;
+          reason?: string;
+          replaced_by?: string | null;
+          retired_at?: string | null;
+          shift_period?: string;
+          valid_from?: string;
+          valid_to?: string | null;
+        };
+        Relationships: [];
+      };
       job_functions: {
         Row: {
           active: boolean;
@@ -632,6 +683,33 @@ export type Database = {
           name?: string;
           updated_at?: string;
           updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      pricing_settings: {
+        Row: {
+          ativada_em: string | null;
+          changed_at: string;
+          changed_by: string | null;
+          id: boolean;
+          reason: string | null;
+          tarifas_por_funcao: boolean;
+        };
+        Insert: {
+          ativada_em?: string | null;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: boolean;
+          reason?: string | null;
+          tarifas_por_funcao?: boolean;
+        };
+        Update: {
+          ativada_em?: string | null;
+          changed_at?: string;
+          changed_by?: string | null;
+          id?: boolean;
+          reason?: string | null;
+          tarifas_por_funcao?: boolean;
         };
         Relationships: [];
       };
@@ -906,6 +984,7 @@ export type Database = {
           calc_version: number | null;
           check_in: string | null;
           check_out: string | null;
+          contract_rate_terms_id: string | null;
           contract_terms_id: string | null;
           cost_amount: number;
           created_at: string;
@@ -916,6 +995,8 @@ export type Database = {
           employee_id: string;
           id: string;
           invoice_id: string | null;
+          job_function_id_snapshot: string | null;
+          job_function_source: string | null;
           notes: string | null;
           operation_id: string;
           operation_terms_id: string | null;
@@ -926,6 +1007,7 @@ export type Database = {
           overtime_minutes: number;
           planned_minutes_snapshot: number | null;
           shift_hours_snapshot: number | null;
+          shift_period_snapshot: string | null;
           status: Database["public"]["Enums"]["attendance_status"];
           terms_origin: string | null;
           timesheet_id: string;
@@ -944,6 +1026,7 @@ export type Database = {
           calc_version?: number | null;
           check_in?: string | null;
           check_out?: string | null;
+          contract_rate_terms_id?: string | null;
           contract_terms_id?: string | null;
           cost_amount?: number;
           created_at?: string;
@@ -954,6 +1037,8 @@ export type Database = {
           employee_id: string;
           id?: string;
           invoice_id?: string | null;
+          job_function_id_snapshot?: string | null;
+          job_function_source?: string | null;
           notes?: string | null;
           operation_id: string;
           operation_terms_id?: string | null;
@@ -964,6 +1049,7 @@ export type Database = {
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
           shift_hours_snapshot?: number | null;
+          shift_period_snapshot?: string | null;
           status?: Database["public"]["Enums"]["attendance_status"];
           terms_origin?: string | null;
           timesheet_id: string;
@@ -982,6 +1068,7 @@ export type Database = {
           calc_version?: number | null;
           check_in?: string | null;
           check_out?: string | null;
+          contract_rate_terms_id?: string | null;
           contract_terms_id?: string | null;
           cost_amount?: number;
           created_at?: string;
@@ -992,6 +1079,8 @@ export type Database = {
           employee_id?: string;
           id?: string;
           invoice_id?: string | null;
+          job_function_id_snapshot?: string | null;
+          job_function_source?: string | null;
           notes?: string | null;
           operation_id?: string;
           operation_terms_id?: string | null;
@@ -1002,6 +1091,7 @@ export type Database = {
           overtime_minutes?: number;
           planned_minutes_snapshot?: number | null;
           shift_hours_snapshot?: number | null;
+          shift_period_snapshot?: string | null;
           status?: Database["public"]["Enums"]["attendance_status"];
           terms_origin?: string | null;
           timesheet_id?: string;
@@ -1177,6 +1267,10 @@ export type Database = {
         Args: { p_active: boolean; p_id: string };
         Returns: undefined;
       };
+      alterar_resolucao_tarifas: {
+        Args: { p_aceitar_contratos_sem_tarifa?: boolean; p_ativar: boolean; p_reason: string };
+        Returns: Json;
+      };
       alterar_motor_vigencia: {
         Args: {
           p_aceitar_pendencias?: boolean;
@@ -1227,6 +1321,10 @@ export type Database = {
           p_status: string;
         };
         Returns: Record<string, unknown>;
+      };
+      aposentar_tarifa_contrato: {
+        Args: { p_rate_id: string; p_reason: string };
+        Returns: undefined;
       };
       condicao_contrato_na_data: {
         Args: { p_contract_id: string; p_work_date: string };
@@ -1359,6 +1457,29 @@ export type Database = {
           p_valid_to: string;
         };
         Returns: string;
+      };
+      corrigir_snapshots_do_apontamento: {
+        Args: {
+          p_atualizar_periodo: boolean;
+          p_entry_id: string;
+          p_job_function_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      corrigir_tarifa_contrato: {
+        Args: {
+          p_daily_rate: number;
+          p_rate_id: string;
+          p_reason: string;
+          p_valid_from: string;
+          p_valid_to: string;
+        };
+        Returns: string;
+      };
+      encerrar_tarifa_contrato: {
+        Args: { p_rate_id: string; p_reason: string; p_valid_to: string };
+        Returns: undefined;
       };
       criar_funcao: {
         Args: { p_code?: string; p_name: string };
@@ -1671,9 +1792,36 @@ export type Database = {
         Args: { _email: string; _metadata?: Json; _user_id: string };
         Returns: undefined;
       };
+      registrar_tarifa_contrato: {
+        Args: {
+          p_contract_id: string;
+          p_daily_rate: number;
+          p_encerrar_anterior?: boolean;
+          p_job_function_id: string;
+          p_reason: string;
+          p_shift_period: string;
+          p_valid_from: string;
+          p_valid_to?: string;
+        };
+        Returns: string;
+      };
       renomear_funcao: {
         Args: { p_id: string; p_name: string };
         Returns: undefined;
+      };
+      tarifa_contrato_na_data: {
+        Args: {
+          p_contract_id: string;
+          p_data: string;
+          p_job_function_id: string;
+          p_shift_period: string;
+        };
+        Returns: {
+          daily_rate: number;
+          id: string;
+          valid_from: string;
+          valid_to: string | null;
+        }[];
       };
       vincular_funcoes_exatas: {
         Args: Record<PropertyKey, never>;

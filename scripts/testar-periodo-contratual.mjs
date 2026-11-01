@@ -483,15 +483,15 @@ const NOME = "20261105120000_038_periodo_contratual.sql";
 const m038 = ler(`supabase/migrations/${NOME}`);
 const m037 = ler("supabase/migrations/20261104120000_037_leitores_por_componentes.sql");
 verificar(
-  "M1. número 038 uma vez, timestamp > 037 (20261104120000), seguida só pela 039 (FIN-PR-06); 019 fora",
+  "M1. número 038 uma vez, timestamp > 037 (20261104120000), entre a 037 e a 039 na sequência; 019 fora",
   [
-    migrations.at(-2),
-    migrations.at(-1),
     migrations.filter((f) => /_038_/.test(f)).length,
     NOME.slice(0, 14) > "20261104120000",
     migrations.some((f) => /_019_/.test(f)),
+    migrations[migrations.indexOf(NOME) - 1]?.includes("_037_"),
+    migrations[migrations.indexOf(NOME) + 1]?.includes("_039_"),
   ],
-  [NOME, "20261106120000_039_funcoes_e_periodo_do_turno.sql", 1, true, false],
+  [1, true, false, true, true],
 );
 const semComentarios = m038.replace(/--[^\n]*/g, "");
 // Comandos da própria migration, fora dos corpos de função (que só rodam quando chamados).

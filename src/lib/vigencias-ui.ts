@@ -282,14 +282,22 @@ export interface CampoDeVigencia {
   requerRegrasDefinitivas?: boolean;
   /** Só existe com a migration 038 aplicada (`periodo_contratual`). */
   requerPeriodoContratual?: boolean;
+  /**
+   * Com a resolução por função e período LIGADA (041) o campo não define o preço: a tela o esconde e
+   * mantém o valor atual no envio (a RPC legada o exige). Desligada, aparece normalmente.
+   */
+  ocultarComTarifas?: boolean;
   /** Campo de escolha: valores aceitos e o padrão (enviado quando vazio; opcional vazio não vai). */
   opcoes?: readonly { valor: string; rotulo: string }[];
   padrao?: string;
 }
 
 export const OPCOES_DE_ARREDONDAMENTO: readonly { valor: string; rotulo: string }[] = [
-  { valor: "diario", rotulo: "Diário (no próprio dia)" },
-  { valor: "acumulado", rotulo: "Acumulado no período (no fechamento)" },
+  { valor: "diario", rotulo: "Por dia (padrão)" },
+  {
+    valor: "acumulado",
+    rotulo: "Somando a quinzena (só para clientes que acumulam as horas extras)",
+  },
 ];
 
 /**
@@ -315,6 +323,7 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
       param: "p_daily_rate",
       rotulo: "Valor da diária (R$)",
       tipo: "dinheiro",
+      ocultarComTarifas: true,
     },
     { chave: "shift_hours", param: "p_shift_hours", rotulo: "Jornada (horas)", tipo: "horas" },
     { chave: "ot_factor", param: "p_ot_factor", rotulo: "Fator de hora extra", tipo: "fator" },

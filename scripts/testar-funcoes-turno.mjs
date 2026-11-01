@@ -264,14 +264,15 @@ const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.ur
 const NOME = "20261106120000_039_funcoes_e_periodo_do_turno.sql";
 const m039 = ler(`supabase/migrations/${NOME}`);
 verificar(
-  "M1. é a última, número 039 uma vez, timestamp > 038 (20261105120000); 019 fora",
+  "M1. número 039 uma vez, timestamp > 038 (20261105120000), entre a 038 e a 040 na sequência; 019 fora",
   [
-    migrations.at(-1),
     migrations.filter((f) => /_039_/.test(f)).length,
     NOME.slice(0, 14) > "20261105120000",
     migrations.some((f) => /_019_/.test(f)),
+    migrations[migrations.indexOf(NOME) - 1]?.includes("_038_"),
+    migrations[migrations.indexOf(NOME) + 1]?.includes("_040_"),
   ],
-  [NOME, 1, true, false],
+  [1, true, false, true, true],
 );
 const semComentarios = m039.replace(/--[^\n]*/g, "");
 const comandos = semComentarios.replace(/\$(\w*)\$[\s\S]*?\$\1\$/g, "");

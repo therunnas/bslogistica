@@ -411,8 +411,9 @@ begin
   -- RLS desde a criação — 19. A 029 acrescenta `billing_additionals` (adicionais de serviço),
   -- com RLS desde a criação — 20. A 030 acrescenta `financial_holidays` (calendário de feriados),
   -- com RLS desde a criação — 21. A 039 acrescenta `job_functions` (catálogo de funções), com RLS
-  -- desde a criação — 22.
-  perform pg_temp.registrar('F3. as 22 tabelas de public seguem com RLS ativa', '22',
+  -- desde a criação — 22. A 041 acrescenta `contract_rate_terms` (tarifas) e `pricing_settings` (chave da
+  -- resolução), ambas com RLS desde a criação — 24.
+  perform pg_temp.registrar('F3. as 24 tabelas de public seguem com RLS ativa', '24',
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -522,7 +523,8 @@ begin
   -- acrescenta o motor por vigência, criado DESABILITADO (a lista conta o trigger, esteja
   -- habilitado ou não): são 13. A 029 acrescenta a recusa de entrada igual à saída: são 14. A 031 acrescenta a recusa de
   -- escrita em folha fechada: são 15.
-  perform pg_temp.registrar('I1. os 15 triggers de timesheet_entries, intactos (um deles dormente; a 031 acrescenta o da folha fechada)',
+  -- A 040 acrescenta o gatilho que grava os snapshots de função e período (sem tocar em valor): são 16.
+  perform pg_temp.registrar('I1. os 16 triggers de timesheet_entries, intactos (um deles dormente; a 031 acrescenta o da folha fechada, a 040 o dos snapshots)',
     'trg_timesheet_entries_ancora_folha, trg_timesheet_entries_bloqueia_condicoes, '
     'trg_timesheet_entries_bloqueia_condicoes_operacao, '
     'trg_timesheet_entries_bloqueia_delete_faturado, '
@@ -530,7 +532,8 @@ begin
     'trg_timesheet_entries_bloqueia_folha_fechada, '
     'trg_timesheet_entries_bloqueia_horario_igual, '
     'trg_timesheet_entries_bloqueia_truncate, trg_timesheet_entries_bloqueia_vinculo_direto, '
-    'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_calculo_financeiro, '
+    'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_bz_snapshots_funcao_periodo, '
+    'trg_timesheet_entries_calculo_financeiro, '
     'trg_timesheet_entries_calculo_vigencia, '
     'trg_timesheet_entries_chave, trg_timesheet_entries_updated',
     (select string_agg(t.tgname, ', ' order by t.tgname)
@@ -555,7 +558,7 @@ begin
   -- para que qualquer OUTRA constraint continue fazendo este caso falhar. A da 029 (valor-hora
   -- da hora extra paga, positivo) também fica de fora pelo nome, e as duas da 030 (minutos cobrados
   -- e tipo do dia).
-  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022, a da 029, as 2 da 030 e as 3 da 036', '1',
+  perform pg_temp.registrar('I3. um unico CHECK em timesheet_entries, fora as 5 da 022, a da 029, as 2 da 030, as 3 da 036 e as 3 da 040', '1',
     (select count(*)::text from pg_constraint
       where conrelid = 'public.timesheet_entries'::regclass and contype = 'c'
         and conname not in ('timesheet_entries_terms_origin_valida',
@@ -568,7 +571,10 @@ begin
                             'timesheet_entries_tipo_do_dia_valido',
                             'timesheet_entries_calc_version_valida',
                             'timesheet_entries_adicional_nao_negativo',
-                            'timesheet_entries_componentes_coerentes')));
+                            'timesheet_entries_componentes_coerentes',
+                            'timesheet_entries_periodo_snapshot_valido',
+                            'timesheet_entries_funcao_origem_valida',
+                            'timesheet_entries_funcao_com_origem')));
 
   -- O da 014 (pausa não negativa) e o da 039 (período diurno/noturno).
   perform pg_temp.registrar('I4. dois CHECKs em shifts', '2',

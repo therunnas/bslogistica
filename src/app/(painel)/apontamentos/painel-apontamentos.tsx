@@ -61,7 +61,18 @@ import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamento
 import { calcEntryComNucleo } from "@/lib/previa-v2";
 import { datasAtivas } from "@/lib/feriados";
 import { useFeriados } from "@/lib/regras-definitivas-dados";
-import { funcaoEfetiva, nomeDaFuncao, periodoDoTurno, ROTULO_DO_PERIODO } from "@/lib/funcoes";
+import {
+  funcaoInicialDaAlocacao,
+  periodoDoTurno,
+  ROTULO_DO_PERIODO,
+  funcaoEfetiva,
+  nomeDaFuncao,
+} from "@/lib/funcoes";
+import {
+  CorrigirApontamentoDialog,
+  SeletorDeFuncaoDoDia,
+  SnapshotDoApontamento,
+} from "./funcao-do-dia";
 import { useFuncoes } from "@/lib/funcoes-dados";
 import {
   useEstadoDoMotor,
@@ -69,6 +80,8 @@ import {
   useNucleoV2,
   useRegrasDaBs,
   useRegrasDefinitivas,
+  useResolucaoDeTarifas,
+  useSnapshotsDeFuncao,
   useTermosDoApontamento,
 } from "@/lib/vigencias-dados";
 import { ehDomingo, parametrosDeHoras, resolverCondicaoDoDia, tipoDoDia } from "@/lib/vigencias-ui";
@@ -273,6 +286,16 @@ export function PainelApontamentos() {
   // Função e período (migration 039): exibição INFORMATIVA, fora de qualquer cálculo.
   const funcoesHabilitadas = useFuncoesTurno();
   const funcoes = useFuncoes(funcoesHabilitadas);
+  // Snapshots de função e período por apontamento (040) e resolução por função (041). Só com o
+  // anúncio do banco: sem ele, nenhuma chave nova vai no salvamento nem aparece na tela.
+  const snapshotsDeFuncao = useSnapshotsDeFuncao() && funcoesHabilitadas;
+  const resolucaoLigada = useResolucaoDeTarifas() === true;
+  const [funcoesDoDia, setFuncoesDoDia] = useState<Record<string, string>>({});
+  const [corrigindo, setCorrigindo] = useState<{
+    id: string;
+    colaborador: string;
+    funcaoId: string | null;
+  } | null>(null);
   const timesheets = useTimesheets();
   const entries = useEntries();
 
@@ -481,6 +504,27 @@ export function PainelApontamentos() {
     colaboradores: useMemo(() => linhas.map((row) => row.employeeId), [linhas]),
   });
 
+  // Função do dia de uma linha NOVA: a escolhida na tela ou, sem escolha, a sugestão (função da
+  // alocação ou, na falta dela, a padrão do colaborador, só se ativa). O administrador confere.
+  const chaveDaFuncao = (employeeId: string) => `${contextKey}|${employeeId}`;
+  const funcaoDaLinha = (employeeId: string): string => {
+    const escolhida = funcoesDoDia[chaveDaFuncao(employeeId)];
+    if (escolhida !== undefined) return escolhida;
+    const colaborador = employeeMap.get(employeeId);
+    const alocacao = teamMembers.find((m) => m.employee_id === employeeId) ?? null;
+    return (
+      funcaoInicialDaAlocacao(
+        { job_function_id: alocacao?.job_function_id ?? null },
+        funcoes.data ?? [],
+      ) ??
+      funcaoInicialDaAlocacao(
+        { job_function_id: colaborador?.job_function_id ?? null },
+        funcoes.data ?? [],
+      ) ??
+      ""
+    );
+  };
+
   const computed = linhas.map((row) => {
     const employee = employeeMap.get(row.employeeId);
 
@@ -571,6 +615,7 @@ export function PainelApontamentos() {
       employee,
       calc,
       valor,
+      gravado,
     };
   });
 
@@ -728,7 +773,12 @@ export function PainelApontamentos() {
         p_operation_id: operationId,
         ...(turnoId ? { p_shift_id: turnoId } : {}),
         p_work_date: date,
-        p_linhas: montarCargaDaRpc(linhasDoLote),
+        p_linhas: montarCargaDaRpc(
+          linhasDoLote,
+          snapshotsDeFuncao
+            ? new Map(linhasDoLote.map((l) => [l.employeeId, funcaoDaLinha(l.employeeId)]))
+            : undefined,
+        ),
       });
 
       if (error && error.code === CODIGO_DA_RPC_AUSENTE) {
@@ -1212,7 +1262,7 @@ export function PainelApontamentos() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  computed.map(({ row, employee, calc, valor }) => (
+                  computed.map(({ row, employee, calc, valor, gravado }) => (
                     <TableRow
                       key={row.employeeId}
                       className="border-border transition-colors hover:bg-secondary/20"
@@ -1241,6 +1291,40 @@ export function PainelApontamentos() {
                                   })()
                                 : ""}
                             </p>
+
+                            {snapshotsDeFuncao ? (
+                              gravado ? (
+                                <SnapshotDoApontamento
+                                  catalogo={funcoes.data ?? []}
+                                  funcaoId={gravado.job_function_id_snapshot ?? null}
+                                  periodo={gravado.shift_period_snapshot ?? null}
+                                  origem={gravado.job_function_source ?? null}
+                                  resolucaoLigada={resolucaoLigada && gravado.status !== "absent"}
+                                  corrigivel={gravado.status !== "absent" && !gravado.invoice_id}
+                                  onCorrigir={() =>
+                                    setCorrigindo({
+                                      id: gravado.id,
+                                      colaborador: employee?.name ?? "",
+                                      funcaoId: gravado.job_function_id_snapshot ?? null,
+                                    })
+                                  }
+                                />
+                              ) : row.status !== "absent" ? (
+                                <SeletorDeFuncaoDoDia
+                                  catalogo={funcoes.data ?? []}
+                                  valor={funcaoDaLinha(row.employeeId)}
+                                  onChange={(id) =>
+                                    setFuncoesDoDia({
+                                      ...funcoesDoDia,
+                                      [chaveDaFuncao(row.employeeId)]: id,
+                                    })
+                                  }
+                                  periodo={shift ? periodoDoTurno(shift) : null}
+                                  resolucaoLigada={resolucaoLigada}
+                                  nomeDoColaborador={employee?.name ?? ""}
+                                />
+                              ) : null
+                            ) : null}
                           </div>
                         </div>
                       </TableCell>
@@ -1357,6 +1441,14 @@ export function PainelApontamentos() {
           </div>
         </CardContent>
       </Card>
+
+      {snapshotsDeFuncao ? (
+        <CorrigirApontamentoDialog
+          entrada={corrigindo}
+          aoFechar={() => setCorrigindo(null)}
+          catalogo={funcoes.data ?? []}
+        />
+      ) : null}
     </div>
   );
 }

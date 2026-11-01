@@ -73,23 +73,27 @@ const outrasComNucleo = migrations.filter(
   (f) => f !== MIGRATION_DO_NUCLEO && /nucleo_/.test(fonte(`supabase/migrations/${f}`)),
 );
 verificar(
-  "I2. só a 036 (integração ao motor) menciona nucleo_* além da 035 — a 038 e a 039, só a chave anunciada",
+  "I2. só a 036 (integração ao motor) menciona nucleo_* além da 035 — a 038, a 039 e a 040, só a chave anunciada",
   outrasComNucleo,
   [
     "20261103120000_036_integracao_nucleo_v2.sql",
     "20261105120000_038_periodo_contratual.sql",
     "20261106120000_039_funcoes_e_periodo_do_turno.sql",
+    "20261107120000_040_snapshots_funcao_periodo.sql",
+    // A 041 redefine o motor por vigência (que chama o núcleo) só para acrescentar a tarifa por função.
+    "20261108120000_041_tarifas_por_funcao_e_periodo.sql",
   ],
 );
 verificar(
-  "I2b. a 038 e a 039 só citam nucleo_ na chave 'nucleo_v2' de estado_motor_vigencia (nenhuma função do núcleo)",
+  "I2b. a 038, a 039 e a 040 só citam nucleo_ na chave 'nucleo_v2' de estado_motor_vigencia (nenhuma função do núcleo)",
   [
     "20261105120000_038_periodo_contratual.sql",
     "20261106120000_039_funcoes_e_periodo_do_turno.sql",
+    "20261107120000_040_snapshots_funcao_periodo.sql",
   ].map((f) =>
     [...fonte(`supabase/migrations/${f}`).matchAll(/nucleo_[a-z0-9_]*/g)].map((m) => m[0]),
   ),
-  [["nucleo_v2"], ["nucleo_v2"]],
+  [["nucleo_v2"], ["nucleo_v2"], ["nucleo_v2"]],
 );
 
 // ---------------------------------------------------------------------------

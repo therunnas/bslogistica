@@ -215,9 +215,19 @@ export function assinaturasSalvas(
  * Carga da RPC `salvar_apontamento_admin`: só as colunas editáveis, sem id, sem folha, sem
  * contexto. A folha e a identidade da linha (colaborador na folha) são do banco.
  */
-export function montarCargaDaRpc(linhas: readonly LinhaDoApontamento[]) {
+export function montarCargaDaRpc(
+  linhas: readonly LinhaDoApontamento[],
+  /**
+   * Função trabalhada (FIN-PR-07), por colaborador, só para linhas NOVAS e só quando o banco grava
+   * snapshots de função (migration 040). Sem o mapa o payload é o de antes: o banco antigo não tem a
+   * coluna e a RPC antiga ignoraria a chave. Linha existente nunca leva a função: corrigir é a RPC
+   * própria, com motivo.
+   */
+  funcoesDoDia?: ReadonlyMap<string, string>,
+) {
   return linhas.map((linha) => {
     const ausente = linha.status === "absent";
+    const funcao = funcoesDoDia?.get(linha.employeeId);
     return {
       employee_id: linha.employeeId,
       status: linha.status,
@@ -225,6 +235,9 @@ export function montarCargaDaRpc(linhas: readonly LinhaDoApontamento[]) {
       check_out: ausente || !linha.checkOut ? null : `${soHoraEMinuto(linha.checkOut)}:00`,
       break_minutes: intervaloNormalizado(linha.breakMinutes),
       notes: linha.notes || null,
+      ...(funcao !== undefined && funcao !== "" && !ausente && linha.entryId === undefined
+        ? { job_function_id: funcao }
+        : {}),
     };
   });
 }
