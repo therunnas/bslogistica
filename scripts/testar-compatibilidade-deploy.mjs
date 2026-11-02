@@ -1010,6 +1010,103 @@ if (!esperaDiaria) {
   verificar("S17. admin desliga a resolução ao final", desligaS.error?.message ?? "ok", "ok");
 }
 
+// FIN-PR-09: o cenário novo exercita o mesmo app com domingo V2 e corrida bônus/fatura.
+if (cenario === "banco-043") {
+  const liga = await cliente.rpc("alterar_resolucao_tarifas", {
+    p_ativar: true,
+    p_reason: "ESPECIAL_TESTE",
+  });
+  verificar("E1. liga somente na fixture local", liga.error?.message ?? "ok", "ok");
+  const salvo = await salvarDia(1, "2026-05-03", fid("conferente"), "08:00");
+  const especial = await lerEntrada(1, "2026-05-03");
+  verificar(
+    "E2. domingo V2 pelo app, 60 minutos, individual 260 e custo 100",
+    [
+      salvo.error?.message ?? "ok",
+      especial?.calc_version,
+      especial?.day_kind_snapshot,
+      Number(especial?.billed_base_amount),
+      Number(especial?.billed_overtime_amount),
+      Number(especial?.billed_special_amount),
+      Number(especial?.billed_amount),
+      Number(especial?.cost_amount),
+    ],
+    ["ok", 2, "domingo", 0, 0, 65, 65, 25],
+  );
+  const bonus = await cliente.rpc("definir_bonus_do_apontamento", {
+    p_entry_id: especial.id,
+    p_amount: 30,
+    p_reason: "BONUS_ESPECIAL_TESTE",
+  });
+  verificar("E3. bônus no domingo", bonus.error?.message ?? "ok", "ok");
+  const fechamento = await carregarFechamento(
+    { clienteId: C, inicio: "2026-05-01", fim: "2026-05-15" },
+    dependenciasComSupabase(cliente),
+  );
+  verificar(
+    "E4. Fechamento soma especial e bônus uma vez",
+    [
+      fechamento.consolidado.faturadoCentavos,
+      fechamento.consolidado.especialCentavos,
+      fechamento.consolidado.adicionalDiarioCentavos,
+    ],
+    [9500, 6500, 3000],
+  );
+  const xlsx = await gerarXlsxDoFechamento(fechamento);
+  verificar(
+    "E5. CSV/XLSX com domingo",
+    [
+      csvDoFechamento(fechamento, "colaborador").includes("65"),
+      xlsx.subarray(0, 2).toString("latin1"),
+    ],
+    [true, "PK"],
+  );
+  const [b, f] = await Promise.all([
+    cliente.rpc("definir_bonus_do_apontamento", {
+      p_entry_id: especial.id,
+      p_amount: 50,
+      p_reason: "CORRIDA_ESPECIAL_TESTE",
+      p_substituir: true,
+    }),
+    cliente.rpc("gerar_fatura", {
+      _client_id: C,
+      _period_start: "2026-05-01",
+      _period_end: "2026-05-15",
+    }),
+  ]);
+  const e = await lerEntrada(1, "2026-05-03");
+  const itens = await cliente
+    .from("invoice_items")
+    .select("amount,kind")
+    .eq("invoice_id", f.data?.id ?? "");
+  const soma = (itens.data ?? []).reduce((n, i) => n + Math.round(Number(i.amount) * 100), 0);
+  verificar(
+    "E6. corrida especial bônus/fatura preserva lastro e soma",
+    [
+      f.error?.message ?? "ok",
+      soma,
+      Math.round(Number(e.billed_amount) * 100),
+      b.error
+        ? b.error.code === "55000" && Number(e.additional_amount) === 30
+        : Number(e.additional_amount) === 50,
+      Boolean(e.invoice_id),
+      (itens.data ?? []).filter((i) => i.kind === "horas_especiais").length,
+      (itens.data ?? []).filter((i) => i.kind === "adicional_diario").length,
+    ],
+    ["ok", Math.round(Number(f.data?.total_amount) * 100), soma, true, true, 1, 1],
+  );
+  const dupla = await cliente.rpc("gerar_fatura", {
+    _client_id: C,
+    _period_start: "2026-05-01",
+    _period_end: "2026-05-15",
+  });
+  verificar("E7. fatura duplicada recusada", Boolean(dupla.error), true);
+  await cliente.rpc("alterar_resolucao_tarifas", {
+    p_ativar: false,
+    p_reason: "OFF_FINAL_ESPECIAL",
+  });
+}
+
 // ---------------------------------------------------------------------------
 // H. Rotas HTTP do Next, com a sessão em cookie
 // ---------------------------------------------------------------------------

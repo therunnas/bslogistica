@@ -404,13 +404,22 @@ select pg_temp.registrar('B11. valor inválido (negativo, 3 casas, sem motivo): 
   || '|' || pg_temp.adm(format($q$select (public.definir_bonus_do_apontamento(%L, 10, '  '))::text$q$, pg_temp.id_de('3', date '2026-03-31')))
   || '|' || pg_temp.adm($q$select (public.definir_bonus_do_apontamento(gen_random_uuid(), 10, 'x'))::text$q$)
   || '|' || pg_temp.adm(format($q$select (public.definir_bonus_do_apontamento(%L, 10, 'Falta'))::text$q$, pg_temp.id_de('2', date '2026-03-11'))));
--- Domingo: regra anterior, sem adicional (calc_version <> 2)
+-- Banco 042: domingo legado; 043: regra especial V2 com a mesma diária resolvida.
 select pg_temp.salvar('s1', 'a1', 'a1', date '2026-03-08', '1', '15:00');
-select pg_temp.registrar('B12. domingo segue a regra anterior (030), sem componentes V2: usa a diária resolvida (260,00, fonte individual), additional 0, e não aceita adicional diário (55000); o ×2 é do FIN-PR-09',
-  '260.00|nulo|individual|0.00|erro 55000',
-  (select concat_ws('|', te.billed_amount, coalesce(te.calc_version::text, 'nulo'), te.price_source, te.additional_amount)
-     from public.timesheet_entries te where te.id = pg_temp.id_de('1', date '2026-03-08'))
-  || '|' || pg_temp.adm(format($q$select (public.definir_bonus_do_apontamento(%L, 10, 'Domingo'))::text$q$, pg_temp.id_de('1', date '2026-03-08'))));
+do $$ begin
+  if pg_temp.adm($q$select (public.estado_motor_vigencia()->>'dias_especiais_v2')$q$) = 'true' then
+    perform pg_temp.registrar('B12. domingo V2 após a 043: individual 260, especial 520, base/HE zero, custo 160',
+      '520.00|2|individual|0.00|0.00|0.00|520.00|160.00',
+      (select concat_ws('|',billed_amount,calc_version,price_source,additional_amount,billed_base_amount,billed_overtime_amount,billed_special_amount,cost_amount)
+       from public.timesheet_entries where id=pg_temp.id_de('1',date '2026-03-08')));
+  else
+    perform pg_temp.registrar('B12. banco 042 mantém domingo legado e recusa bônus',
+      '260.00|nulo|individual|0.00|erro 55000',
+      (select concat_ws('|',billed_amount,coalesce(calc_version::text,'nulo'),price_source,additional_amount)
+       from public.timesheet_entries where id=pg_temp.id_de('1',date '2026-03-08'))
+      || '|' || pg_temp.adm(format($q$select public.definir_bonus_do_apontamento(%L,10,'Domingo')::text$q$,pg_temp.id_de('1',date '2026-03-08'))));
+  end if;
+end; $$;
 
 -- ---------------------------------------------------------------------------
 -- U. Diária individual usada não se edita; a não usada, sim

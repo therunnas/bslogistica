@@ -84,6 +84,8 @@ verificar(
     "20261108120000_041_tarifas_por_funcao_e_periodo.sql",
     // A 042 redefine o motor por vigência (que chama o núcleo) para a diária individual e o adicional diário.
     "20261109120000_042_diaria_individual_e_bonus.sql",
+    // A 043 integra os dias especiais ao mesmo núcleo, condicionado à resolução ON.
+    "20261110120000_043_dias_especiais_v2.sql",
   ],
 );
 verificar(

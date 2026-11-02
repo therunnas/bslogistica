@@ -259,6 +259,7 @@ export function montarBonus(
 }
 
 export interface ApontamentoParaResumo {
+  billed_special_amount?: number | string | null;
   daily_rate_snapshot?: number | string | null;
   billed_overtime_amount?: number | string | null;
   additional_amount?: number | string | null;
@@ -270,6 +271,7 @@ export interface ResumoDoDia {
   /** Diária usada como base da hora extra (a resolvida pelo banco). */
   diaria: number;
   horaExtra: number;
+  especial: number;
   adicional: number;
   total: number;
   fonte: string;
@@ -282,6 +284,7 @@ export function resumoDoDia(a: ApontamentoParaResumo): ResumoDoDia {
   return {
     diaria: num(a.daily_rate_snapshot),
     horaExtra: num(a.billed_overtime_amount),
+    especial: num(a.billed_special_amount),
     adicional: num(a.additional_amount),
     total: num(a.billed_amount),
     fonte: rotuloDaFonte(a.price_source),

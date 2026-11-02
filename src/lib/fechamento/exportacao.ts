@@ -131,26 +131,59 @@ function celulasFinanceiras(
   ];
 }
 
-export function tabelaPorColaborador(dados: FechamentoData): TabelaExportada {
+type ComponentesExportados = Pick<Valores, "especialCentavos" | "adicionalDiarioCentavos">;
+
+/** Acrescenta os componentes já gravados, mantendo o formato legado quando ambos são zero. */
+function incluirComponentes(
+  tabela: TabelaExportada,
+  linhas: readonly ComponentesExportados[],
+  total: ComponentesExportados,
+): TabelaExportada {
+  if (total.especialCentavos === 0 && total.adicionalDiarioCentavos === 0) return tabela;
+  const valores = (v: ComponentesExportados) => [v.especialCentavos, v.adicionalDiarioCentavos];
   return {
-    colunas: POR_COLABORADOR,
-    linhas: dados.colaboradores.map((c) => [
-      c.nome,
-      c.funcao,
-      ...celulasFinanceiras(c.consolidado, c.aFaturar, c.jaFaturado, c.ajusteAcumuladoCentavos),
-    ]),
-    totais: [
-      ROTULO_DO_TOTAL,
-      null,
-      ...celulasFinanceiras(
-        dados.consolidado,
-        dados.aFaturar,
-        dados.jaFaturado,
-        dados.financeiro.ajustePrevistoCentavos,
-      ),
+    ...tabela,
+    colunas: [
+      ...tabela.colunas,
+      { titulo: "Horas especiais", tipo: "moeda", largura: 20 },
+      { titulo: "Adicional diário", tipo: "moeda", largura: 20 },
     ],
-    consolidado: linhasDoConsolidado(dados),
+    linhas: tabela.linhas.map((linha, i) => {
+      const componentes = linhas[i];
+      if (!componentes) throw new Error("Componentes ausentes na linha da exportação.");
+      return [...linha, ...valores(componentes)];
+    }),
+    totais: tabela.totais === null ? null : [...tabela.totais, ...valores(total)],
+    ...(tabela.consolidado
+      ? { consolidado: tabela.consolidado.map((linha) => [...linha, null, null]) }
+      : {}),
   };
+}
+
+export function tabelaPorColaborador(dados: FechamentoData): TabelaExportada {
+  return incluirComponentes(
+    {
+      colunas: POR_COLABORADOR,
+      linhas: dados.colaboradores.map((c) => [
+        c.nome,
+        c.funcao,
+        ...celulasFinanceiras(c.consolidado, c.aFaturar, c.jaFaturado, c.ajusteAcumuladoCentavos),
+      ]),
+      totais: [
+        ROTULO_DO_TOTAL,
+        null,
+        ...celulasFinanceiras(
+          dados.consolidado,
+          dados.aFaturar,
+          dados.jaFaturado,
+          dados.financeiro.ajustePrevistoCentavos,
+        ),
+      ],
+      consolidado: linhasDoConsolidado(dados),
+    },
+    dados.colaboradores.map((c) => c.consolidado),
+    dados.consolidado,
+  );
 }
 
 /**
@@ -181,28 +214,32 @@ function linhasDoConsolidado(dados: FechamentoData): ValorExportado[][] {
 }
 
 export function tabelaDetalhamentoDiario(dados: FechamentoData): TabelaExportada {
-  return {
-    colunas: DETALHAMENTO,
-    linhas: dados.detalhes.map((d) => [
-      d.workDate,
-      d.colaborador,
-      d.funcao,
-      d.operacao,
-      d.turno,
-      ROTULO_DO_STATUS[d.status],
-      d.tipoDoDia === null ? null : ROTULO_DO_TIPO_DO_DIA[d.tipoDoDia],
-      centesimosDeHora(d.minutosTrabalhados),
-      centesimosDeHora(d.minutosExtras),
-      centesimosDeHora(d.minutosExtrasCobrados),
-      d.diariaCentavos,
-      d.extraCentavos,
-      d.faturadoCentavos,
-      d.custoCentavos,
-      ROTULO_DA_SITUACAO_DE_FATURAMENTO[d.situacaoDeFaturamento],
-      ROTULO_DA_FOLHA[d.situacaoDaFolha],
-    ]),
-    totais: null,
-  };
+  return incluirComponentes(
+    {
+      colunas: DETALHAMENTO,
+      linhas: dados.detalhes.map((d) => [
+        d.workDate,
+        d.colaborador,
+        d.funcao,
+        d.operacao,
+        d.turno,
+        ROTULO_DO_STATUS[d.status],
+        d.tipoDoDia === null ? null : ROTULO_DO_TIPO_DO_DIA[d.tipoDoDia],
+        centesimosDeHora(d.minutosTrabalhados),
+        centesimosDeHora(d.minutosExtras),
+        centesimosDeHora(d.minutosExtrasCobrados),
+        d.diariaCentavos,
+        d.extraCentavos,
+        d.faturadoCentavos,
+        d.custoCentavos,
+        ROTULO_DA_SITUACAO_DE_FATURAMENTO[d.situacaoDeFaturamento],
+        ROTULO_DA_FOLHA[d.situacaoDaFolha],
+      ]),
+      totais: null,
+    },
+    dados.detalhes,
+    dados.consolidado,
+  );
 }
 
 /** Uma linha do resumo: rótulo, tipo e valor na escala do tipo. */

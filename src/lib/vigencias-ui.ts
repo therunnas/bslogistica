@@ -98,6 +98,14 @@ export function interpretarNucleoV2(data: unknown, erro: unknown): boolean {
   return (data as { nucleo_v2?: unknown }).nucleo_v2 === true;
 }
 
+/** Dias especiais da 043 só são elegíveis com resolução ON comprovada. */
+export function interpretarDiasEspeciaisV2(data: unknown, erro: unknown): boolean {
+  if (erro !== null && erro !== undefined) return false;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  const r = data as { dias_especiais_v2?: unknown; resolucao_tarifas?: unknown };
+  return r.dias_especiais_v2 === true && r.resolucao_tarifas === true;
+}
+
 /**
  * Período contratual (migration 038, FIN-PR-05): frequência de fechamento no contrato e competência
  * de cobrança dos adicionais. O banco anuncia com `periodo_contratual = true`; sem o anúncio a tela

@@ -186,6 +186,16 @@ export function DetalheDiario({ dados }: { dados: FechamentoData }) {
                     <TableCell className={CELULA_NUMERICA}>{moeda(linha.extraCentavos)}</TableCell>
                     <TableCell className={cn(CELULA_NUMERICA, "font-semibold text-foreground")}>
                       {moeda(linha.faturadoCentavos)}
+                      {linha.especialCentavos > 0 ? (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          Horas especiais: {moeda(linha.especialCentavos)}
+                        </span>
+                      ) : null}
+                      {linha.adicionalDiarioCentavos > 0 ? (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          Adicional diário: {moeda(linha.adicionalDiarioCentavos)}
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className={CELULA_NUMERICA}>{moeda(linha.custoCentavos)}</TableCell>
 
