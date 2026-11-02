@@ -193,6 +193,8 @@ export function agregarFechamento(
       tipoDoDia: linha.tipoDoDia,
       diariaCentavos: linha.diariaCentavos,
       extraCentavos: linha.extraCentavos,
+      especialCentavos: linha.especialCentavos,
+      adicionalDiarioCentavos: linha.adicionalDiarioCentavos,
       faturadoCentavos: linha.faturadoCentavos,
       custoCentavos: linha.custoCentavos,
       situacaoDeFaturamento: faturada ? "jaFaturado" : "aFaturar",

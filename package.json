@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:dias-especiais": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-dias-especiais.mjs",
     "test:cookies-supabase": "node --experimental-strip-types scripts/testar-cookies-supabase.mjs",
     "test:mfa": "node --experimental-strip-types scripts/testar-mfa.mjs",
     "format": "prettier --write .",

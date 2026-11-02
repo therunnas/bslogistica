@@ -139,8 +139,14 @@ export function detectarAlertas(
     "hora-extra-acumulada-tardia": horaExtraAcumuladaTardia(financeiras, banco),
     "periodo-fora-de-fechamento": [],
     "previa-por-quinzena": [],
-    "feriado-cobranca-pendente": financeiras.filter((linha) => linha.tipoDoDia === "feriado"),
-    "domingo-regra-pendente": financeiras.filter((linha) => diaDaSemana(linha.workDate) === 0),
+    "feriado-cobranca-pendente": financeiras.filter(
+      (linha) => linha.tipoDoDia === "feriado" && linha.versaoDoCalculo !== 2,
+    ),
+    "domingo-regra-pendente": financeiras.filter(
+      (linha) =>
+        diaDaSemana(linha.workDate) === 0 &&
+        !(linha.versaoDoCalculo === 2 && ["domingo", "feriado"].includes(linha.tipoDoDia ?? "")),
+    ),
     "compensacao-informativa": [],
     falta: linhas.filter((linha) => linha.status === "absent"),
   };

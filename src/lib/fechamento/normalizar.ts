@@ -34,7 +34,7 @@ import {
 const STATUS_DO_LANCAMENTO: readonly StatusDoLancamento[] = ["present", "absent", "replacement"];
 const STATUS_DA_FOLHA: readonly StatusDaFolha[] = ["open", "closed"];
 
-const TIPOS_DO_DIA: readonly TipoDoDia[] = ["util", "sabado", "feriado"];
+const TIPOS_DO_DIA: readonly TipoDoDia[] = ["util", "sabado", "domingo", "feriado"];
 
 const FORMATO_DE_HORA = /^\d{2}:\d{2}(:\d{2})?$/;
 

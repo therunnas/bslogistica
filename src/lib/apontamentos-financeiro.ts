@@ -143,6 +143,8 @@ export interface EntradaDaLinha {
   regrasDefinitivas?: boolean;
   /** O banco anunciou o núcleo V2 no motor (036, `nucleo_v2`). */
   nucleoV2?: boolean;
+  /** A 043 e a resolução ON foram confirmadas; prévia especial aguarda o banco. */
+  diasEspeciaisV2?: boolean;
   /** A data trabalhada é domingo: segue a 030 (fora da V2 até o PR 09). */
   domingo?: boolean;
   /** Tipo do dia da folha pelo calendário atual (linhas novas; e gravadas antes da 030). */
@@ -289,6 +291,14 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
   const regrasBs = e.regrasBs === true;
   const regrasDefinitivas = regrasBs && e.regrasDefinitivas === true;
   const tipoDoDia: TipoDoDia = e.tipoDoDia ?? "util";
+  const especialV2 =
+    e.diasEspeciaisV2 === true &&
+    (e.domingo === true ||
+      tipoDoDia === "feriado" ||
+      e.gravado?.day_kind_snapshot === "domingo" ||
+      e.gravado?.day_kind_snapshot === "feriado");
+  const avisoEspecial =
+    "Prévia indisponível: o banco calcula as horas especiais e o bônus ao salvar.";
 
   // Legado (presença/reposição sem origem de preço) não vira falta: o banco recusa com 55000
   // qualquer edição motriz, inclusive esta, e perderia as outras linhas do salvamento.
@@ -315,6 +325,7 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
         true,
       );
     }
+    if (especialV2) return INDISPONIVEL(avisoEspecial, false);
     let horas: HorasDaLinha = null;
     if (regrasDefinitivas) {
       const id = g.contract_terms_id;
@@ -360,6 +371,7 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
   const cond = e.condicaoDoDia;
   if (!cond) return INDISPONIVEL("Consultando a vigência da data trabalhada…", true);
   if (!cond.ok) return INDISPONIVEL(cond.motivo, true);
+  if (especialV2) return INDISPONIVEL(avisoEspecial, false);
   const r = e.calcular({
     regras: cond.regras,
     custoDiario: cond.custoDiario,

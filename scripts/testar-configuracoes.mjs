@@ -462,17 +462,17 @@ verificar(
   true,
 );
 verificar(
-  "G10. conjunto de migrations contém 47 arquivos, até a 042 (diária individual e adicional diário, FIN-PR-08), a 041 (tarifas por função e período, FIN-PR-07), a 040 (snapshots de função e período por apontamento, FIN-PR-07), a 039 (catálogo de funções e período do turno, FIN-PR-06), a 038 (período contratual e janela de cobrança, FIN-PR-05), a 037 (leitores pelos componentes, FIN-PR-03), a 036 (integração do núcleo V2 ao motor, FIN-PR-02), a 035 (núcleo financeiro puro, FIN-PR-01), a 034 (MFA protege só o login, AUTH-01D.R1), a 033 (taxas legadas exigem vigência com o motor ligado, AUTH-01C.1), a 032 (MFA opcional, AUTH-01B) e, antes dela, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
+  "G10. conjunto de migrations contém 48 arquivos, até a 043 (dias especiais V2, FIN-PR-09), a 042 (diária individual e adicional diário, FIN-PR-08), a 041 (tarifas por função e período, FIN-PR-07), a 040 (snapshots de função e período por apontamento, FIN-PR-07), a 039 (catálogo de funções e período do turno, FIN-PR-06), a 038 (período contratual e janela de cobrança, FIN-PR-05), a 037 (leitores pelos componentes, FIN-PR-03), a 036 (integração do núcleo V2 ao motor, FIN-PR-02), a 035 (núcleo financeiro puro, FIN-PR-01), a 034 (MFA protege só o login, AUTH-01D.R1), a 033 (taxas legadas exigem vigência com o motor ligado, AUTH-01C.1), a 032 (MFA opcional, AUTH-01B) e, antes dela, até a 031 (integridade da folha, C06/C07; local, ainda não aplicada) e, antes dela, até a 030 (a 025 é o motor por vigência; a 026, o cadastro atômico, C05-B5.1; a 027, a ativação que recusa divergência, C05-B5.5; a 028, o contrato da operação protegido, C05-B5.6; a 029, as regras financeiras da BS, C05-B8.10; a 030, as regras definitivas, C05-B8.15)",
   readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).length,
-  47,
+  48,
 );
 verificar(
-  "G10b. a migration mais recente é a 042 (diária individual e adicional diário, FIN-PR-08)",
+  "G10b. a migration mais recente é a 043 (dias especiais V2, FIN-PR-09)",
   readdirSync("supabase/migrations")
     .filter((f) => f.endsWith(".sql"))
     .sort()
     .at(-1)
-    .includes("_042_"),
+    .includes("_043_"),
   true,
 );
 

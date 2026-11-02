@@ -155,6 +155,16 @@ export function TabelaPorColaborador({ dados }: { dados: FechamentoData }) {
                     </TableCell>
                     <TableCell className={cn(CELULA_NUMERICA, "font-semibold text-foreground")}>
                       {moeda(c.consolidado.faturadoCentavos)}
+                      {c.consolidado.especialCentavos > 0 ? (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          Horas especiais: {moeda(c.consolidado.especialCentavos)}
+                        </span>
+                      ) : null}
+                      {c.consolidado.adicionalDiarioCentavos > 0 ? (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          Adicional diário: {moeda(c.consolidado.adicionalDiarioCentavos)}
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className={CELULA_NUMERICA}>
                       {moeda(c.consolidado.resultadoCentavos)}
@@ -197,6 +207,16 @@ export function TabelaPorColaborador({ dados }: { dados: FechamentoData }) {
                 </TableCell>
                 <TableCell className={CELULA_NUMERICA}>
                   {moeda(dados.consolidado.faturadoCentavos)}
+                  {dados.consolidado.especialCentavos > 0 ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Horas especiais: {moeda(dados.consolidado.especialCentavos)}
+                    </span>
+                  ) : null}
+                  {dados.consolidado.adicionalDiarioCentavos > 0 ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Adicional diário: {moeda(dados.consolidado.adicionalDiarioCentavos)}
+                    </span>
+                  ) : null}
                 </TableCell>
                 <TableCell className={CELULA_NUMERICA}>
                   {moeda(dados.consolidado.resultadoCentavos)}

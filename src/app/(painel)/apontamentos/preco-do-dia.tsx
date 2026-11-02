@@ -47,8 +47,9 @@ export function PrecoDoApontamento({
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span>
-        Diária aplicada: {brl(r.diaria)} · {r.fonte}
+        Diária de referência: {brl(r.diaria)} · {r.fonte}
       </span>
+      {r.especial > 0 ? <span>Horas especiais: {brl(r.especial)}</span> : null}
       {r.horaExtra > 0 ? <span>Hora extra: {brl(r.horaExtra)}</span> : null}
       {r.adicional > 0 ? <span>Adicional diário: {brl(r.adicional)}</span> : null}
       <span className="font-medium text-foreground">Total cobrado: {brl(r.total)}</span>

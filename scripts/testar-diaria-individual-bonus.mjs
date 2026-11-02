@@ -288,6 +288,7 @@ verificar(
   {
     diaria: 260,
     horaExtra: 48.75,
+    especial: 0,
     adicional: 30,
     total: 338.75,
     fonte: "Diária individual do colaborador",
@@ -301,11 +302,11 @@ const N042 = "20261109120000_042_diaria_individual_e_bonus.sql";
 const m041 = ler(`supabase/migrations/${N041}`);
 const m042 = ler(`supabase/migrations/${N042}`);
 verificar(
-  "M1. 042 uma vez, logo depois da 041; 019 fora",
+  "M1. 042 uma vez, logo depois da 041 e antes da 043; 019 fora",
   [
     migrations.filter((f) => /_042_/.test(f)).length,
     migrations[migrations.indexOf(N041) + 1] === N042,
-    migrations.at(-1) === N042,
+    migrations[migrations.indexOf(N042) + 1] === "20261110120000_043_dias_especiais_v2.sql",
     migrations.some((f) => /_019_/.test(f)),
   ],
   [1, true, true, false],

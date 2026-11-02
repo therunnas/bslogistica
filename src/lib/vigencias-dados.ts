@@ -19,6 +19,7 @@ import {
   interpretarEstadoDoMotor,
   interpretarRegrasDaBs,
   interpretarNucleoV2,
+  interpretarDiasEspeciaisV2,
   interpretarPeriodoContratual,
   interpretarRegrasDefinitivas,
   montarCadastroAtomico,
@@ -177,6 +178,13 @@ export function useNucleoV2(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarNucleoV2(consulta.data.data, consulta.data.error);
+}
+
+/** Mesma consulta de capacidades; sem consultar coluna ou RPC nova. */
+export function useDiasEspeciaisV2(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return false;
+  return interpretarDiasEspeciaisV2(consulta.data.data, consulta.data.error);
 }
 
 /**
