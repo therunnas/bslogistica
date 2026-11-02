@@ -1,3 +1,5 @@
+import type { Json } from "@/integrations/supabase/types";
+
 export type RecordStatus = "active" | "inactive";
 export type OperationType = "fixed" | "spot";
 export type TimesheetStatus = "open" | "closed";
@@ -86,6 +88,8 @@ export interface Timesheet {
 }
 
 export interface TimesheetEntry {
+  /** Proveniência territorial da precificação, somente leitura; ausente antes da 044. */
+  readonly territorial_calendar_snapshot?: Json | null;
   id: string;
   timesheet_id: string;
   employee_id: string;

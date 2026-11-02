@@ -60,6 +60,8 @@ import { mensagemDoErro } from "@/lib/erros-banco";
 import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
 import { calcEntryComNucleo } from "@/lib/previa-v2";
 import { datasAtivas } from "@/lib/feriados";
+import { calendarioCongeladoNaData } from "@/lib/calendario-territorial";
+import { useCalendarioDaOperacao } from "@/lib/calendario-dados";
 import { useFeriados } from "@/lib/regras-definitivas-dados";
 import {
   funcaoInicialDaAlocacao,
@@ -73,11 +75,13 @@ import {
   SeletorDeFuncaoDoDia,
   SnapshotDoApontamento,
 } from "./funcao-do-dia";
+import { SnapshotCalendarioDoApontamento } from "../_components/calendario-territorial";
 import { AdicionalDiarioDialog, PrecoDoApontamento } from "./preco-do-dia";
 import { motivoSemBonus } from "@/lib/diaria-individual";
 import { useFuncoes } from "@/lib/funcoes-dados";
 import {
   useBonusDiario,
+  useRegimeDoCalendario,
   useDiariaIndividual,
   useEstadoDoMotor,
   useFuncoesTurno,
@@ -509,7 +513,54 @@ export function PainelApontamentos() {
   const diasEspeciaisV2 = useDiasEspeciaisV2();
   const domingoDaFolha = ehDomingo(date);
   const feriados = useFeriados(regrasDefinitivas && estadoDoMotor.tag === "ligado");
-  const tipoDaFolha = tipoDoDia(date, datasAtivas(feriados.data ?? []));
+  const regimeDoCalendario = useRegimeDoCalendario();
+  const precisaDoCalendarioAtual = linhas.some((row) => {
+    const gravado = existingEntries.find((entry) => entry.employee_id === row.employeeId);
+    return (
+      row.status !== "absent" &&
+      (!gravado || gravado.status === "absent") &&
+      !calendarioCongeladoNaData(gravado?.territorial_calendar_snapshot, date)
+    );
+  });
+  const consultarCalendarioAtual =
+    regimeDoCalendario === "territorial" && estadoDoMotor.tag === "ligado";
+  const contextoCalendario = useCalendarioDaOperacao(
+    operationId,
+    date,
+    consultarCalendarioAtual && precisaDoCalendarioAtual,
+  );
+  const calendarioLegado = {
+    estado: feriados.isError
+      ? ("erro" as const)
+      : feriados.isSuccess
+        ? ("pronto" as const)
+        : ("carregando" as const),
+    tipoDoDia: tipoDoDia(date, datasAtivas(feriados.data ?? [])),
+  };
+  const tipoDaFolha =
+    regimeDoCalendario === "territorial" && contextoCalendario.data?.status === "confirmado"
+      ? contextoCalendario.data.day_kind === "feriado"
+        ? "feriado"
+        : tipoDoDia(date, [])
+      : tipoDoDia(date, datasAtivas(feriados.data ?? []));
+  const estadoDoCalendario =
+    regimeDoCalendario === "desconhecido"
+      ? "carregando"
+      : regimeDoCalendario === "territorial"
+        ? contextoCalendario.isError
+          ? "erro"
+          : !contextoCalendario.isSuccess
+            ? "carregando"
+            : contextoCalendario.data.status === "confirmado"
+              ? "pronto"
+              : contextoCalendario.data.status
+        : regrasDefinitivas
+          ? feriados.isError
+            ? "erro"
+            : feriados.isSuccess
+              ? "pronto"
+              : "carregando"
+          : "pronto";
   const operacaoDaTela = operationList.find((item) => item.id === operationId) ?? null;
   const termos = useTermosDoApontamento({
     habilitado: estadoDoMotor.tag === "ligado" && Boolean(operationId),
@@ -543,6 +594,10 @@ export function PainelApontamentos() {
     const employee = employeeMap.get(row.employeeId);
 
     const gravado = existingEntries.find((entry) => entry.employee_id === row.employeeId) ?? null;
+    const calendarioCongelado = calendarioCongeladoNaData(
+      gravado?.territorial_calendar_snapshot,
+      date,
+    );
 
     let condicaoDoDia: CondicaoDoDia | null = null;
     if (estadoDoMotor.tag === "ligado") {
@@ -574,17 +629,23 @@ export function PainelApontamentos() {
       custoDoCadastro: Number(employee?.daily_cost ?? 0),
       condicaoDoDia,
       plannedMinutes,
-      regrasBs,
       // Sem o calendário carregado, o tipo do dia de uma linha nova não é confiável: sem prévia nova.
-      regrasDefinitivas: regrasDefinitivas && feriados.isSuccess,
+      regrasDefinitivas,
+      estadoDoCalendario: calendarioCongelado ? "pronto" : estadoDoCalendario,
+      calendarioLegado,
       nucleoV2,
       diasEspeciaisV2,
       domingo: domingoDaFolha,
-      tipoDoDia: tipoDaFolha,
+      tipoDoDia: calendarioCongelado
+        ? calendarioCongelado.day_kind === "domingo"
+          ? "util"
+          : calendarioCongelado.day_kind
+        : tipoDaFolha,
       parametrosDaVersao: (id) => {
         const versao = termos.termosContrato.find((termo) => termo.id === id);
         return versao ? parametrosDeHoras(versao) : null;
       },
+      regrasBs,
       calcular: ({
         regras,
         custoDiario,
@@ -1340,6 +1401,12 @@ export function PainelApontamentos() {
                                 />
                               ) : null
                             ) : null}
+
+                            {gravado && (
+                              <SnapshotCalendarioDoApontamento
+                                valor={gravado.territorial_calendar_snapshot}
+                              />
+                            )}
 
                             {diariaIndividual && gravado && gravado.status !== "absent" ? (
                               <PrecoDoApontamento

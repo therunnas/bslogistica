@@ -1,5 +1,7 @@
 "use client";
 
+import { useCalendarioTerritorial } from "@/lib/vigencias-dados";
+import { CalendarioTerritorial } from "../_components/calendario-territorial";
 import { useState } from "react";
 import { CalendarX2, Plus } from "lucide-react";
 
@@ -43,6 +45,19 @@ const INPUT_CLASS =
  * Apontamento já precificado mantém o tipo do dia congelado.
  */
 export function FeriadosDoCalendario() {
+  const capacidade = useCalendarioTerritorial();
+  if (capacidade === "disponivel") return <CalendarioTerritorial />;
+  if (capacidade === "desconhecida") {
+    return (
+      <p className="mt-6 text-sm text-muted-foreground">
+        Verificando a disponibilidade do calendário. Se a consulta falhar, tente recarregar.
+      </p>
+    );
+  }
+  return <FeriadosLegados />;
+}
+
+function FeriadosLegados() {
   const feriados = useFeriados(true);
   const ativos = datasAtivas(feriados.data ?? []);
   const registrar = useRegistrarFeriado(ativos);

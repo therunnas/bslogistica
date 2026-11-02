@@ -14,6 +14,15 @@ export interface Feriado {
   holiday_date: string;
   name: string;
   active: boolean;
+  territory_scope?: string;
+  state_code?: string | null;
+  municipality_code?: string | null;
+  legal_act?: string | null;
+  official_url?: string | null;
+  verification_status?: string;
+  holiday_kind?: string;
+  is_movable?: boolean;
+  client_confirmed?: boolean;
   reason: string;
   created_at: string;
   retired_at: string | null;
@@ -53,5 +62,7 @@ export function montarRegistroDeFeriado(
 
 /** Datas dos feriados ATIVOS, para o tipo do dia da prévia. */
 export function datasAtivas(lista: readonly Feriado[]): string[] {
-  return lista.filter((f) => f.active).map((f) => f.holiday_date);
+  return lista
+    .filter((f) => f.active && (!f.territory_scope || f.territory_scope === "legado"))
+    .map((f) => f.holiday_date);
 }
