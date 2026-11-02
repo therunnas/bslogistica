@@ -41,6 +41,7 @@ migrations e ativação de funcionalidade são estados distintos.
 | 041       | Tarifas por função, período e vigência |
 | 042       | Diária individual e bônus diário       |
 | 043       | Dias especiais V2 (PR #89 mergeado)    |
+| 044       | Calendário territorial (nesta branch)  |
 
 O repositório contém suítes para essas entregas; resultados históricos não
 comprovam execução nesta sessão. As migrações remotas e a ativação de preços não
@@ -120,6 +121,30 @@ Desenvolvimento e testes exclusivamente locais, seguido de commits, push e PR
 Draft. Sem autorização para merge, Ready for Review, deploy, HML, Production,
 ativação de tarifas ou carga remota. Migrations 001–043 permanecem intactas.
 O estado mutável permanece centralizado neste documento; PROGRESS aponta para cá.
+
+A migration `20261111120000_044_calendario_territorial.sql` está implementada na
+branch `feat/fin-pr-10-calendario-nacional`, sem aplicação remota. O primeiro
+commit, `4edb43e40182811ce1b6f805bdcf82a2af68aa81`, contém somente este documento e
+PROGRESS. O modelo usa `financial_holidays`, catálogo IBGE, local de execução
+vigenciado e cobertura oficial anual por âmbito. Novas presenças ON sem local ou
+cobertura confirmados são recusadas; OFF conserva o caminho anterior. Não houve
+carga real de calendário, backfill ou ativação de preços.
+
+Validação local desta etapa: 45 suítes SQL no schema 044 e todas as 57 suítes
+Node passaram; lint, TypeScript, Prettier nos formatos suportados e build também.
+Paridade financeira OFF exata 042/043 e 043/044, catálogo e rollback permitido e
+bloqueado foram comprovados na instância descartável exclusiva. Compatibilidade
+034, 037, 038, 039, 040, 041, 042, 043 e 044 aprovada: 541 asserções, zero falhas.
+Entrega em PR Draft para revisão independente, sem Ready for Review ou merge.
+
+Contratos, guardas e reprodução em
+[calendario-territorial.md](financeiro/calendario-territorial.md); pesquisa oficial,
+datas e pendências em
+[calendario-fontes-oficiais.md](financeiro/calendario-fontes-oficiais.md). Fontes
+municipais ainda exigem conferência do cliente e da legislação aplicável; anos
+sem calendário anual confirmado permanecem pendentes. A regra de turnos mistos
+não foi ativada: classificações distintas são bloqueadas com 55000 até decisão
+comercial explícita sobre segmentos e horários do intervalo.
 
 Regras confirmadas para esta etapa:
 
