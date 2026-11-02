@@ -142,14 +142,14 @@ save('catalogo-diff.json', changes)
 allowed = {'column:contract_terms.special_rounding_mode',
            'constraint:contract_terms.contract_terms_arredondamento_especial_valido',
            'constraint:timesheet_entries.timesheet_entries_tipo_do_dia_valido'}
-functions = ['derivar_valores_por_vigencia', 'estado_motor_vigencia', 'corrigir_condicao_contrato', 'registrar_condicao_contrato_especial']
+functions = ['derivar_valores_por_vigencia', 'estado_motor_vigencia', 'corrigir_condicao_contrato', 'registrar_condicao_contrato_especial', 'registrar_condicao_contrato']
 for k in changes:
     if k in allowed or (k.startswith('function:') and any(k.startswith('function:' + f + '(') for f in functions)):
         continue
     if k.startswith('dependency:') and ('contract_terms_arredondamento_especial_valido' in k or 'registrar_condicao_contrato_especial' in k):
         continue
     raise AssertionError('Mudança inesperada no catálogo: ' + k)
-print('PASS: catálogo altera apenas coluna, domínio, classificador e quatro funções previstas; RLS/grants/owners antigos intactos', flush=True)
+print('PASS: catálogo altera apenas coluna, domínio, classificador e cinco funções previstas; RLS/grants/owners antigos intactos', flush=True)
 file(ROLLBACK)
 equal(base, catalog(), 'rollback permitido restaura catálogo exato 042')
 equal(reference, data(), 'rollback permitido preserva dados, snapshots, bônus e faturas')

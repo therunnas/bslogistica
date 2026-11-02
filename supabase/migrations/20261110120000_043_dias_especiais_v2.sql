@@ -21,6 +21,107 @@ alter table public.timesheet_entries
   add constraint timesheet_entries_tipo_do_dia_valido
     check (day_kind_snapshot is null or day_kind_snapshot in ('util', 'sabado', 'domingo', 'feriado'));
 
+create or replace function public.registrar_condicao_contrato(
+  p_contract_id          uuid,
+  p_valid_from           date,
+  p_daily_rate           numeric,
+  p_shift_hours          numeric,
+  p_ot_factor            numeric,
+  p_ot_tolerance_min     integer,
+  p_reason               text,
+  p_valid_to             date    default null,
+  p_encerrar_anterior    boolean default false,
+  p_ot_rounding_mode     text    default 'diario',
+  p_saturday_shift_hours numeric default null,
+  p_holiday_pay_factor   numeric default null,
+  p_closing_period       text    default null
+) returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v_motivo text;
+  v_aberta public.contract_terms%rowtype;
+  v_novo   public.contract_terms%rowtype;
+  v_freq   text;
+  v_especial text;
+begin
+  perform public.condicoes_exigir_admin();
+  v_motivo := public.condicoes_validar_motivo(p_reason);
+
+  if p_contract_id is null or p_valid_from is null or p_daily_rate is null or p_shift_hours is null
+     or p_ot_factor is null or p_ot_tolerance_min is null then
+    raise exception 'Contrato, início da vigência e as quatro condições são obrigatórios.' using errcode = '22023';
+  end if;
+  if p_daily_rate <> round(p_daily_rate, 2) or p_shift_hours <> round(p_shift_hours, 2)
+     or p_ot_factor <> round(p_ot_factor, 2) then
+    raise exception 'Diária, jornada e fator aceitam no máximo duas casas decimais.' using errcode = '22023';
+  end if;
+  if p_valid_to is not null and p_valid_to <= p_valid_from then
+    raise exception 'A data final deve ser posterior ao início da vigência.' using errcode = '22023';
+  end if;
+  perform public.condicoes_validar_parametros_de_horas(p_ot_rounding_mode, p_saturday_shift_hours,
+    p_holiday_pay_factor, p_shift_hours);
+  if p_closing_period is not null and p_closing_period not in ('quinzenal', 'mensal') then
+    raise exception 'Frequência de fechamento inválida: use quinzenal ou mensal.' using errcode = '22023';
+  end if;
+  if not exists (select 1 from public.contracts where id = p_contract_id) then
+    raise exception 'Contrato não encontrado.' using errcode = 'P0002';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('condicoes_contrato:' || p_contract_id::text, 0));
+
+  -- Sem frequência informada: herda a da versão anterior deste contrato (ou quinzenal).
+  v_freq := coalesce(p_closing_period,
+    (select ct.closing_period from public.contract_terms ct
+      where ct.contract_id = p_contract_id and ct.active and ct.valid_from < p_valid_from
+      order by ct.valid_from desc limit 1),
+    'quinzenal');
+
+  -- R1: a assinatura antiga não escolhe modo; herda a versão ativa imediatamente anterior.
+  v_especial := coalesce(
+    (select ct.special_rounding_mode from public.contract_terms ct
+      where ct.contract_id = p_contract_id and ct.active and ct.valid_from < p_valid_from
+      order by ct.valid_from desc limit 1),
+    'minutos');
+
+  if coalesce(p_encerrar_anterior, false) then
+    select * into v_aberta
+      from public.contract_terms
+     where contract_id = p_contract_id and active and valid_to is null
+     for update;
+    if found and v_aberta.valid_from < p_valid_from then
+      perform public.condicoes_encerrar_contrato_interno(v_aberta.id, p_valid_from, v_motivo);
+    end if;
+  end if;
+
+  begin
+    insert into public.contract_terms
+      (contract_id, valid_from, valid_to, daily_rate, shift_hours, ot_factor, ot_tolerance_min,
+       ot_rounding_mode, saturday_shift_hours, holiday_pay_factor, closing_period, special_rounding_mode, origin, reason, created_by)
+    values
+      (p_contract_id, p_valid_from, p_valid_to, p_daily_rate, p_shift_hours, p_ot_factor, p_ot_tolerance_min,
+       p_ot_rounding_mode, p_saturday_shift_hours, p_holiday_pay_factor, v_freq, v_especial, 'informada', v_motivo, auth.uid())
+    returning * into v_novo;
+  exception when exclusion_violation then
+    raise exception 'A vigência informada se sobrepõe a outra versão ativa deste contrato.'
+      using errcode = '23P01',
+            hint = 'Encerre a versão anterior, informe a data final ou use p_encerrar_anterior.';
+  end;
+
+  perform public.periodo_contratual_conferir(v_novo.id, date_trunc('month', p_valid_from)::date,
+    case when p_valid_to is null then null
+         else (date_trunc('month', p_valid_to - 1) + interval '1 month')::date end);
+
+  perform public.condicoes_auditar('contrato_condicao_registrada', 'contrato', p_contract_id, v_novo.id,
+    null, to_jsonb(v_novo) || jsonb_build_object(
+      'retroativa', p_valid_from < (now() at time zone 'America/Sao_Paulo')::date), v_motivo);
+
+  return v_novo.id;
+end;
+$$;
+
 create function public.registrar_condicao_contrato_especial(
   p_contract_id          uuid,
   p_valid_from           date,
@@ -341,6 +442,15 @@ begin
       new.contract_employee_rate_id := old.contract_employee_rate_id;
       new.price_source            := old.price_source;
       return new;
+    end if;
+
+    -- R3: a edição exige recálculo. OFF não pode converter um especial V2 nem apagar seu bônus.
+    -- O retorno anterior mantém intactas as edições sem mudança financeira.
+    if old.invoice_id is null and old.calc_version = 2
+       and old.day_kind_snapshot in ('domingo', 'feriado')
+       and not public.resolucao_de_tarifas_ativa() then
+      raise exception 'Este lançamento foi calculado pelo V2 de dias especiais. A resolução de tarifas precisa estar ligada para editar horários, intervalo, status, colaborador ou condições financeiras.'
+        using errcode = '55000';
     end if;
   end if;
 
