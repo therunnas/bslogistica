@@ -28,17 +28,18 @@ migrations e ativação de funcionalidade são estados distintos.
 
 ### Migrations financeiras versionadas
 
-| Migration | Escopo |
-| --- | --- |
-| 030 | Regras comerciais anteriores |
-| 035 | Núcleo financeiro puro V2 |
-| 036 | Integração do núcleo V2 |
-| 037 | Leitores por componentes |
-| 038 | Período contratual e competência |
-| 039 | Catálogo de funções e período do turno |
-| 040 | Snapshots de função e período |
-| 041 | Tarifas por função, período e vigência |
-| 042 | Diária individual e bônus diário |
+| Migration | Escopo                                 |
+| --------- | -------------------------------------- |
+| 030       | Regras comerciais anteriores           |
+| 035       | Núcleo financeiro puro V2              |
+| 036       | Integração do núcleo V2                |
+| 037       | Leitores por componentes               |
+| 038       | Período contratual e competência       |
+| 039       | Catálogo de funções e período do turno |
+| 040       | Snapshots de função e período          |
+| 041       | Tarifas por função, período e vigência |
+| 042       | Diária individual e bônus diário       |
+| 043       | Dias especiais V2 (nesta branch)       |
 
 O repositório contém suítes para essas entregas; resultados históricos não
 comprovam execução nesta sessão. As migrações remotas e a ativação de preços não
@@ -68,6 +69,48 @@ podem ser inferidas de código mergeado nem dos testes locais.
 - Preço cobrado não é custo do colaborador. O sistema apresenta **custo previsto**,
   não folha de pagamento; não se presume custo para o bônus.
 
+### FIN-PR-09 — implementação local em revisão
+
+A migration `20261110120000_043_dias_especiais_v2.sql` integra domingo/feriado ao
+núcleo 035 somente com resolução comercial ligada. OFF conserva a 042; instalar
+não recalcula lançamentos nem ativa tarifas. O classificador histórico permanece.
+O componente especial substitui base e HE; o bônus permanece separado, sem fator
+nem custo fictício. Prévia de dia especial elegível aguarda o banco ao salvar,
+sem exibir o cálculo legado como estimativa da regra nova. Apontamentos e
+Fechamento mostram especial e bônus separados. CSV/XLSX acrescentam esses
+componentes quando há valor, mantendo as colunas anteriores nas mesmas posições
+e preservando o formato quando ambos são zero. Não é a exportação específica
+de cliente do FIN-PR-12. Preço individual, tarifa padrão e custo mantêm vigências
+independentes; operação sem contrato usa valor acordado e minutos exatos.
+
+`contract_terms.special_rounding_mode` é imutável na versão: `minutos` (default)
+ou `meia_hora_15_45` (fronteiras do núcleo: 15 inclui meia hora, 45 inclui hora
+inteira). Só a cobrança arredonda; o custo usa minutos efetivos. A nova RPC
+`registrar_condicao_contrato_especial` espelha os parâmetros da RPC antiga e
+acrescenta `p_special_rounding_mode`; registra uma versão com motivo e auditoria.
+As assinaturas antigas permanecem; a correção contratual preserva o modo da
+versão corrigida. Trocar modo exige nova vigência. A configuração não tem nova
+interface nesta etapa.
+
+Provas locais reproduzíveis: suíte `supabase/tests/043_dias_especiais_v2.sql`,
+`npm run test:dias-especiais` e
+`python3 scripts/testar-dias-especiais-local.py /private/tmp/bs-fin09-local-<id>`.
+O último exige uma instância exclusiva recém-criada, com workdir, `project_id`,
+volume e rede correspondentes; recusa vínculo remoto. Executa resets **locais**
+até a 042, compara catálogo, dados OFF e ensaia rollback permitido/bloqueado.
+Normaliza UUIDs técnicos por chaves lógicas e timestamps voláteis; preserva
+valores, minutos, fontes e classificação. A coluna nova é excluída da comparação
+com a 042. Evidências ficam na pasta temporária da instância, fora do Git.
+Os runners SQL/deploy devem executar em cópia isolada do código, com configuração
+temporária própria; nunca sobre volumes anteriores associados ao `project_id`
+versionado. CLI fixado em 2.117.0 para reprodução; nenhuma dependência do app nova.
+
+Rollback: [rollback-dias-especiais-v2.sql](runbooks/rollback-dias-especiais-v2.sql).
+Recusa uso especial V2 ou configuração incompatível, inclusive auditada; não
+apaga bônus, snapshots, tarifas, lastro ou trilha. Nenhuma aplicação remota desta
+migration é autorizada por esta implementação. Resultado final das execuções e
+limitações devem constar no PR Draft, antes da revisão independente.
+
 ### Referência para conciliação futura
 
 A referência comercial informada para 01–15/09/2026 contém 141 lançamentos,
@@ -86,7 +129,7 @@ sem criar funções fictícias. A conciliação pertence ao FIN-PR-13.
 | Aplicação             | publicada em `admin.bslogisticas.com.br`                                                                                                      |
 | Hospedagem            | Vercel, projeto `bs-logistica-sistema`, deploy a partir de `main`                                                                             |
 | Banco e Auth          | Supabase, projeto `ehkduqokntemtmqzdrbd`                                                                                                      |
-| Migrations            | Ver checkpoint acima; versão no Git não comprova aplicação remota. |
+| Migrations            | Ver checkpoint acima; versão no Git não comprova aplicação remota.                                                                            |
 | Cadastro público      | bloqueado (`disable_signup = true`)                                                                                                           |
 | Usuário `operacional` | perfil homologado com uma conta existente que era admin e foi rebaixada; contas definitivas ainda não criadas ([PROGRESS.md](../PROGRESS.md)) |
 

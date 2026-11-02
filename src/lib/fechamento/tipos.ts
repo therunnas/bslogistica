@@ -22,11 +22,12 @@ import type { FrequenciaDeFechamento } from "./periodo";
 export const VERSAO_DO_FECHAMENTO = 2 as const;
 
 /** Tipo do dia congelado no apontamento (`day_kind_snapshot`). `null` = anterior à 030 ou falta. */
-export type TipoDoDia = "util" | "sabado" | "feriado";
+export type TipoDoDia = "util" | "sabado" | "domingo" | "feriado";
 
 export const ROTULO_DO_TIPO_DO_DIA: Record<TipoDoDia, string> = {
   util: "Dia comum",
   sabado: "Sábado",
+  domingo: "Domingo",
   feriado: "Feriado",
 };
 
@@ -128,6 +129,8 @@ export interface LinhaDetalhe {
   tipoDoDia: TipoDoDia | null;
   diariaCentavos: number;
   extraCentavos: number;
+  especialCentavos: number;
+  adicionalDiarioCentavos: number;
   faturadoCentavos: number;
   custoCentavos: number;
   situacaoDeFaturamento: SituacaoDeFaturamento;

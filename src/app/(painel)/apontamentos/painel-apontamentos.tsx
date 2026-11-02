@@ -82,6 +82,7 @@ import {
   useEstadoDoMotor,
   useFuncoesTurno,
   useNucleoV2,
+  useDiasEspeciaisV2,
   useRegrasDaBs,
   useRegrasDefinitivas,
   useResolucaoDeTarifas,
@@ -505,6 +506,7 @@ export function PainelApontamentos() {
   const regrasDefinitivas = useRegrasDefinitivas();
   // Núcleo V2 no motor (036): dia útil e sábado; o domingo segue a 030 até o PR 09.
   const nucleoV2 = useNucleoV2();
+  const diasEspeciaisV2 = useDiasEspeciaisV2();
   const domingoDaFolha = ehDomingo(date);
   const feriados = useFeriados(regrasDefinitivas && estadoDoMotor.tag === "ligado");
   const tipoDaFolha = tipoDoDia(date, datasAtivas(feriados.data ?? []));
@@ -576,6 +578,7 @@ export function PainelApontamentos() {
       // Sem o calendário carregado, o tipo do dia de uma linha nova não é confiável: sem prévia nova.
       regrasDefinitivas: regrasDefinitivas && feriados.isSuccess,
       nucleoV2,
+      diasEspeciaisV2,
       domingo: domingoDaFolha,
       tipoDoDia: tipoDaFolha,
       parametrosDaVersao: (id) => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roda as 30 suítes de supabase/tests/ contra um Supabase LOCAL descartável.
+# Roda todas as suítes de supabase/tests/ contra um Supabase LOCAL descartável.
 #
 # NUNCA toca Production: usa só `supabase start`/`db reset --local` (nenhum
 # `--linked`, nenhum `db push`/`db pull`), e executa os arquivos via `psql`
@@ -23,10 +23,10 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 echo "Subindo Supabase local..."
-env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@latest start >/dev/null
+env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null
 
 echo "Aplicando as migrations do zero (supabase db reset --local)..."
-env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@latest db reset --local
+env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 db reset --local
 
 # O container local segue a convenção supabase_db_<project_id>. Resolve o
 # project_id do config.toml DESTE repositório e monta o nome exato — nunca um
@@ -70,4 +70,4 @@ if [ -n "$falhou" ]; then
 fi
 
 echo ""
-echo "30/30 PASS."
+echo "PASS: todas as suítes SQL locais."

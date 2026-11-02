@@ -81,7 +81,10 @@ PR #86 (FIN-PR-08) e PR #87 (correção documental de MFA) foram integrados.
 
 ### Fase A — financeiro
 
-1. **FIN-PR-09 — próximo:** domingo e feriado ×2; ainda não implementado.
+1. **FIN-PR-09 — revisão:** domingo/feriado ×2 na migration 043,
+   condicionado à resolução comercial ON; OFF preserva a 042. Entrega por PR Draft;
+   revisão independente pendente; sem aplicação remota, ativação ou merge. Detalhes e
+   reprodução em [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-09--implementação-local-em-revisão).
 2. FIN-PR-10: calendário nacional, SC e municípios definidos.
 3. FIN-PR-11: container como serviço avulso.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
