@@ -73,7 +73,7 @@ const outrasComNucleo = migrations.filter(
   (f) => f !== MIGRATION_DO_NUCLEO && /nucleo_/.test(fonte(`supabase/migrations/${f}`)),
 );
 verificar(
-  "I2. só a 036 (integração ao motor) menciona nucleo_* além da 035 — a 038, a 039 e a 040, só a chave anunciada",
+  "I2. integrações conhecidas 036–044 mencionam nucleo_* além da 035 — a 038, a 039 e a 040, só a chave anunciada",
   outrasComNucleo,
   [
     "20261103120000_036_integracao_nucleo_v2.sql",
@@ -86,6 +86,8 @@ verificar(
     "20261109120000_042_diaria_individual_e_bonus.sql",
     // A 043 integra os dias especiais ao mesmo núcleo, condicionado à resolução ON.
     "20261110120000_043_dias_especiais_v2.sql",
+    // A 044 mantém o mesmo núcleo financeiro e acrescenta o contexto territorial.
+    "20261111120000_044_calendario_territorial.sql",
   ],
 );
 verificar(

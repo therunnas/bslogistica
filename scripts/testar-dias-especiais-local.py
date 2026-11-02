@@ -7,14 +7,14 @@ import difflib
 import json
 from pathlib import Path
 import re
-import subprocess
+from _executar_local import run_local
 import sys
 
 SOURCE = Path(__file__).resolve().parent.parent
 LOCAL = Path(sys.argv[1]).resolve()
 PROJECT = LOCAL.name
-if not str(LOCAL).startswith('/private/tmp/bs-fin09-local-'):
-    raise SystemExit('Workdir descartável FIN09 obrigatório')
+if not str(LOCAL).startswith(('/private/tmp/bs-fin09-local-', '/private/tmp/bs-fin10-local-')):
+    raise SystemExit('Workdir descartável FIN09/FIN10 obrigatório')
 CONFIG = (LOCAL / 'supabase/config.toml').read_text()
 if re.search(r'^project_id\s*=\s*"([^"]+)"', CONFIG, re.M)[1] != PROJECT:
     raise SystemExit('project_id diverge da execução isolada')
@@ -25,8 +25,11 @@ EVIDENCE = LOCAL / 'fin09-evidence'
 EVIDENCE.mkdir(exist_ok=True)
 
 
-def command(args, sql=None, check=True):
-    r = subprocess.run(args, input=sql, text=True, capture_output=True)
+COMMAND_TIMEOUT = 120
+
+
+def command(args, sql=None, check=True, timeout=None, env=None):
+    r = run_local(args, input=sql, timeout=COMMAND_TIMEOUT if timeout is None else timeout, env=env)
     if check and r.returncode:
         raise RuntimeError(r.stderr[-2500:])
     return r
@@ -64,8 +67,10 @@ def reset042():
     import os
     env = dict(os.environ)
     env.pop('SUPABASE_ACCESS_TOKEN', None)
-    r = subprocess.run(['supabase', 'db', 'reset', '--local', '--version', '20261109120000',
-                        '--workdir', str(LOCAL)], text=True, capture_output=True, env=env)
+    env.pop('SUPABASE_PROJECT_ID', None)
+    r = command(['env', '-u', 'SUPABASE_ACCESS_TOKEN', 'npx', '--yes', 'supabase@2.117.0',
+                 'db', 'reset', '--local', '--version', '20261109120000',
+                 '--workdir', str(LOCAL)], check=False, timeout=300, env=env)
     (EVIDENCE / 'reset042.log').write_text(r.stdout + r.stderr)
     if r.returncode:
         raise RuntimeError('Reset local falhou; ver log no diretório de evidências')
@@ -127,6 +132,41 @@ def equal(a, b, label):
     print('PASS:', label, flush=True)
 
 
+def compare_catalog(base, new):
+    allowed = {'column:contract_terms.special_rounding_mode',
+               'constraint:contract_terms.contract_terms_arredondamento_especial_valido',
+               'constraint:timesheet_entries.timesheet_entries_tipo_do_dia_valido'}
+    bodies = {'function:derivar_valores_por_vigencia()', 'function:estado_motor_vigencia()',
+              'function:corrigir_condicao_contrato(uuid,date,date,numeric,numeric,numeric,integer,text,text,numeric,numeric)',
+              'function:registrar_condicao_contrato(uuid,date,numeric,numeric,numeric,integer,text,date,boolean,text,numeric,numeric,text)'}
+    special = 'function:registrar_condicao_contrato_especial(uuid,date,numeric,numeric,numeric,integer,text,date,boolean,text,numeric,numeric,text,text)'
+    for key in sorted(base.keys() | new.keys()):
+        before, after = base.get(key), new.get(key)
+        if before == after:
+            continue
+        if key.startswith('function:'):
+            if before is None and key == special:
+                expected = {'owner': 'postgres', 'acl': ['authenticated=X/postgres', 'postgres=X/postgres'],
+                            'security_definer': True, 'config': ['search_path=pg_catalog, public, pg_temp']}
+                for field, value in expected.items():
+                    if after.get(field) != value:
+                        raise AssertionError('Mudança inesperada no catálogo: ' + key + ' campo ' + field)
+                continue
+            if before is None or after is None:
+                raise AssertionError('Assinatura inesperada no catálogo: ' + key)
+            # A permissão para mudar o corpo nunca permite alterar privilégios.
+            for field in (before.keys() | after.keys()) - {'def'}:
+                if before.get(field) != after.get(field):
+                    raise AssertionError('Mudança inesperada no catálogo: ' + key + ' campo ' + field)
+            if key in bodies:
+                continue
+        elif key in allowed:
+            continue
+        elif key.startswith('dependency:') and ('contract_terms_arredondamento_especial_valido' in key or 'registrar_condicao_contrato_especial' in key):
+            continue
+        raise AssertionError('Mudança inesperada no catálogo: ' + key)
+
+
 reset042()
 file('scripts/fixtures/fin09/off.sql')
 base = catalog()
@@ -139,16 +179,7 @@ new = catalog()
 save('catalogo-043.json', new)
 changes = {k: {'before': base.get(k), 'after': new.get(k)} for k in base.keys() | new.keys() if base.get(k) != new.get(k)}
 save('catalogo-diff.json', changes)
-allowed = {'column:contract_terms.special_rounding_mode',
-           'constraint:contract_terms.contract_terms_arredondamento_especial_valido',
-           'constraint:timesheet_entries.timesheet_entries_tipo_do_dia_valido'}
-functions = ['derivar_valores_por_vigencia', 'estado_motor_vigencia', 'corrigir_condicao_contrato', 'registrar_condicao_contrato_especial', 'registrar_condicao_contrato']
-for k in changes:
-    if k in allowed or (k.startswith('function:') and any(k.startswith('function:' + f + '(') for f in functions)):
-        continue
-    if k.startswith('dependency:') and ('contract_terms_arredondamento_especial_valido' in k or 'registrar_condicao_contrato_especial' in k):
-        continue
-    raise AssertionError('Mudança inesperada no catálogo: ' + k)
+compare_catalog(base, new)
 print('PASS: catálogo altera apenas coluna, domínio, classificador e cinco funções previstas; RLS/grants/owners antigos intactos', flush=True)
 file(ROLLBACK)
 equal(base, catalog(), 'rollback permitido restaura catálogo exato 042')

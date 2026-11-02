@@ -15,7 +15,7 @@ end;
 $$;
 
 create or replace function pg_temp.medir_como(_papel text, _claims jsonb, _sql text) returns text language plpgsql as $$
-declare _r text;
+declare _r text; _linhas bigint;
 begin
   perform set_config('request.jwt.claims', _claims::text, true);
   execute format('set local role %I', _papel);
@@ -24,10 +24,14 @@ begin
       execute _sql into _r;
     else
       execute _sql;
+      get diagnostics _linhas = row_count;
+      if lower(ltrim(_sql)) ~ '^update' and _linhas <> 1 then
+        raise exception 'Fixture OFF: UPDATE esperado em exatamente uma linha, obtido %', _linhas;
+      end if;
     end if;
   exception when others then
     set local role postgres;
-    return 'erro ' || sqlstate;
+    return 'erro ' || sqlstate || ': ' || sqlerrm;
   end;
   set local role postgres;
   return coalesce(_r, 'nulo');
@@ -56,8 +60,15 @@ end;
 $$;
 create temporary table _exec (k text primary key, r text) on commit drop;
 grant all on _exec to authenticated;
-create or replace function pg_temp.exec(_k text, _sql text) returns void language sql as $$
-  insert into _exec values (_k, pg_temp.adm(_sql))
+create or replace function pg_temp.exec(_k text, _sql text) returns void language plpgsql as $$
+declare _resultado text;
+begin
+  _resultado := pg_temp.adm(_sql);
+  if _resultado like 'erro %' then
+    raise exception 'Fixture OFF: preparação % falhou: %', _k, _resultado;
+  end if;
+  insert into _exec values (_k, _resultado);
+end;
 $$;
 create or replace function pg_temp.r(_k text) returns text language sql as $$
   select r from _exec where k = _k
@@ -144,10 +155,10 @@ $$;
 
 
 
-select pg_temp.adm(format($q$select public.registrar_diaria_individual('5c42d000-0000-4000-8000-0000000000d1',%L,'2026-01-01',260,'INDIVIDUAL_OFF_TESTE')$q$,pg_temp.emp('1')));
-select pg_temp.adm(format($q$select public.registrar_tarifa_contrato('5c42d000-0000-4000-8000-0000000000d1',%L,'diurno','2026-01-01',250,'PADRAO_OFF_TESTE')$q$,pg_temp.fn('conferente')));
-select pg_temp.adm($q$select public.registrar_feriado('2026-03-09','FERIADO_OFF_TESTE','FERIADO_OFF_TESTE')$q$);
-select pg_temp.adm($q$select public.registrar_feriado('2026-03-23','FERIADO_OFF_TESTE','FERIADO_OFF_TESTE')$q$);
+select pg_temp.exec('diaria-off', format($q$select public.registrar_diaria_individual('5c42d000-0000-4000-8000-0000000000d1',%L,'2026-01-01',260,'INDIVIDUAL_OFF_TESTE')$q$,pg_temp.emp('1')));
+select pg_temp.exec('tarifa-off', format($q$select public.registrar_tarifa_contrato('5c42d000-0000-4000-8000-0000000000d1',%L,'diurno','2026-01-01',250,'PADRAO_OFF_TESTE')$q$,pg_temp.fn('conferente')));
+select pg_temp.exec('feriado-off-09', $q$select public.registrar_feriado('2026-03-09','FERIADO_OFF_TESTE','FERIADO_OFF_TESTE')$q$);
+select pg_temp.exec('feriado-off-23', $q$select public.registrar_feriado('2026-03-23','FERIADO_OFF_TESTE','FERIADO_OFF_TESTE')$q$);
 do $$
 declare d date; e text; saida text; status text;
 begin
@@ -164,5 +175,5 @@ do $$ begin
  if pg_temp.r('fatura-off') !~ '^[0-9a-f-]{36}$' then raise exception 'Fatura OFF não gerou: %',pg_temp.r('fatura-off'); end if;
 end; $$;
 -- Motriz autorizada em não faturado: deve usar os mesmos snapshots nos dois schemas.
-select pg_temp.adm(format($q$update public.timesheet_entries set check_out='09:00' where id=%L$q$,pg_temp.id_de('1','2026-03-22')));
+select pg_temp.exec('motriz-off', format($q$update public.timesheet_entries set check_out='09:00' where id=%L$q$,pg_temp.id_de('1','2026-03-22')));
 commit;

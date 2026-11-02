@@ -790,13 +790,16 @@ $bloco_h$;
 -- (financial_holidays, calendário de feriados) e as 2 policies e a tabela da 039
 -- (job_functions, catálogo de funções) e as 4 policies e as 2 tabelas da 041
 -- (contract_rate_terms e pricing_settings) e as 2 policies e a tabela da 042 (contract_employee_rates,
--- diária individual); sem elas aplicadas, H-F1 a H-F7 divergem.
+-- diária individual). A 044 acrescenta três tabelas territoriais e três policies de leitura
+-- administrativa; a expectativa condicional conserva o inventário completo do banco 043.
 do $bloco_h_forma$
 declare _n int; _sobra int;
 begin
-  perform pg_temp.registrar('H-F1. public tem 78 policies', '78',
+  perform pg_temp.registrar('H-F1. public conserva o total exato de policies esperado para o schema',
+    case when to_regclass('public.municipality_catalog') is null then '78' else '81' end,
     (select count(*)::text from pg_policies where schemaname = 'public'));
-  perform pg_temp.registrar('H-F2. 40 RESTRICTIVE e 38 PERMISSIVE', '40/38',
+  perform pg_temp.registrar('H-F2. 40 RESTRICTIVE e 38 PERMISSIVE; a 044 acrescenta três PERMISSIVE',
+    case when to_regclass('public.municipality_catalog') is null then '40/38' else '40/41' end,
     (select count(*) filter (where permissive = 'RESTRICTIVE') || '/' || count(*) filter (where permissive = 'PERMISSIVE')
        from pg_policies where schemaname = 'public'));
 
@@ -883,6 +886,13 @@ begin
       ('user_operation_access', 'user_operation_access_admin', 'PERMISSIVE', 'ALL'),
       ('user_operation_access', 'user_operation_access_somente_admin_aal2', 'RESTRICTIVE', 'ALL'),
       ('user_roles', 'user_roles_select_own', 'PERMISSIVE', 'SELECT')
+    union all
+    select * from (values
+      ('municipality_catalog', 'municipality_catalog_leitura_admin', 'PERMISSIVE', 'SELECT'),
+      ('operation_location_terms', 'operation_location_terms_leitura_admin', 'PERMISSIVE', 'SELECT'),
+      ('financial_calendar_coverage', 'financial_calendar_coverage_leitura_admin', 'PERMISSIVE', 'SELECT')
+    ) territorial(tablename,policyname,permissive,cmd)
+    where to_regclass('public.municipality_catalog') is not null
   ), atual as (
     select tablename, policyname, permissive, cmd from pg_policies where schemaname = 'public'
   )
@@ -891,18 +901,28 @@ begin
     into _n;
   perform pg_temp.registrar('H-F3. inventario de policies identico ao anterior (tabela, nome, tipo, comando)', '0', _n::text);
 
-  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated', '78',
+  perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated',
+    case when to_regclass('public.municipality_catalog') is null then '78' else '81' end,
     (select count(*)::text from pg_policies
       where schemaname = 'public' and roles = array['authenticated']::name[]));
 
-  perform pg_temp.registrar('H-F5. as 25 tabelas seguem com RLS ligada', '25',
+  perform pg_temp.registrar('H-F5. todas as tabelas seguem com RLS ligada',
+    case when to_regclass('public.municipality_catalog') is null then '25' else '28' end,
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relrowsecurity));
+  if to_regclass('public.municipality_catalog') is not null then
+    perform pg_temp.registrar('H-F5b. as três tabelas territoriais da 044 têm RLS ativa',
+      'financial_calendar_coverage, municipality_catalog, operation_location_terms',
+      (select string_agg(c.relname, ', ' order by c.relname) from pg_class c
+        where c.relnamespace='public'::regnamespace and c.relkind='r' and c.relrowsecurity
+          and c.relname in ('municipality_catalog','operation_location_terms','financial_calendar_coverage')));
+  end if;
   perform pg_temp.registrar('H-F6. e nenhuma passou a FORCE RLS', '0',
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relforcerowsecurity));
 
-  perform pg_temp.registrar('H-F7. 54 policies seguem chamando has_role()/is_staff()', '54',
+  perform pg_temp.registrar('H-F7. policies antigas e três leituras territoriais da 044 usam has_role()/is_staff()',
+    case when to_regclass('public.municipality_catalog') is null then '54' else '57' end,
     (select count(*)::text from pg_policies
       where schemaname = 'public'
         and (coalesce(qual, '') || coalesce(with_check, '')) ~ '(has_role|is_staff)\('));

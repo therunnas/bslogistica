@@ -16,17 +16,22 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-if ! docker info >/dev/null 2>&1; then
+# Ambiente do processo não pode sobrepor a identidade do config.toml isolado.
+unset SUPABASE_PROJECT_ID
+
+local_command() { python3 scripts/_executar_local.py "$@"; }
+
+if ! local_command 30 docker info >/dev/null 2>&1; then
   echo "Docker não está disponível (daemon não respondeu a 'docker info')." >&2
   echo "Inicie o Docker Desktop e rode este script de novo." >&2
   exit 1
 fi
 
 echo "Subindo Supabase local..."
-env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null
+local_command 300 env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null
 
 echo "Aplicando as migrations do zero (supabase db reset --local)..."
-env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 db reset --local
+local_command 300 env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 db reset --local
 
 # O container local segue a convenção supabase_db_<project_id>. Resolve o
 # project_id do config.toml DESTE repositório e monta o nome exato — nunca um
@@ -41,7 +46,7 @@ if [ -z "$project_id" ]; then
 fi
 
 container="supabase_db_${project_id}"
-estado=$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null || true)
+estado=$(local_command 30 docker inspect --format '{{.State.Running}}' "$container")
 if [ "$estado" != "true" ]; then
   echo "O container $container não existe ou não está rodando." >&2
   echo "Confira 'supabase start' e 'docker ps' — este script não usa outro container." >&2
@@ -55,7 +60,7 @@ for arquivo in supabase/tests/*.sql; do
   nome=$(basename "$arquivo")
   echo ""
   echo "=== $nome ==="
-  if ! docker exec -i "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q < "$arquivo"; then
+  if ! local_command 180 docker exec -i "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q < "$arquivo"; then
     echo "FALHOU: $nome" >&2
     falhou="$nome"
     break

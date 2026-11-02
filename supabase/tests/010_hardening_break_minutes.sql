@@ -413,11 +413,20 @@ begin
   -- com RLS desde a criação — 21. A 039 acrescenta `job_functions` (catálogo de funções), com RLS
   -- desde a criação — 22. A 041 acrescenta `contract_rate_terms` (tarifas) e `pricing_settings` (chave da
   -- resolução), ambas com RLS desde a criação — 24. A 042 acrescenta `contract_employee_rates` (diária
-  -- individual), com RLS desde a criação — 25.
-  perform pg_temp.registrar('F3. as 25 tabelas de public seguem com RLS ativa', '25',
+  -- individual), com RLS desde a criação — 25. A 044 acrescenta município, local da operação
+  -- e cobertura anual, todas com RLS desde a criação — 28. O banco 043 continua exigindo 25.
+  perform pg_temp.registrar('F3. todas as tabelas de public seguem com RLS ativa',
+    case when to_regclass('public.municipality_catalog') is null then '25' else '28' end,
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
+  if to_regclass('public.municipality_catalog') is not null then
+    perform pg_temp.registrar('F3b. as três tabelas territoriais da 044 têm RLS ativa',
+      'financial_calendar_coverage, municipality_catalog, operation_location_terms',
+      (select string_agg(c.relname, ', ' order by c.relname) from pg_class c
+        where c.relnamespace='public'::regnamespace and c.relkind='r' and c.relrowsecurity
+          and c.relname in ('municipality_catalog','operation_location_terms','financial_calendar_coverage')));
+  end if;
 end;
 $bloco_f$;
 
@@ -525,8 +534,12 @@ begin
   -- habilitado ou não): são 13. A 029 acrescenta a recusa de entrada igual à saída: são 14. A 031 acrescenta a recusa de
   -- escrita em folha fechada: são 15.
   -- A 040 acrescenta o gatilho que grava os snapshots de função e período (sem tocar em valor): são 16.
-  perform pg_temp.registrar('I1. os 16 triggers de timesheet_entries, intactos (um deles dormente; a 031 acrescenta o da folha fechada, a 040 o dos snapshots)',
-    'trg_timesheet_entries_ancora_folha, trg_timesheet_entries_bloqueia_condicoes, '
+  -- A 044 acrescenta somente o snapshot territorial: 17 no banco 044, os 16 originais no 043.
+  perform pg_temp.registrar('I1. lista exata de triggers de timesheet_entries preserva todos os anteriores e o snapshot territorial da 044 quando instalada',
+    'trg_timesheet_entries_ancora_folha, ' ||
+    case when to_regclass('public.municipality_catalog') is null then ''
+      else 'trg_timesheet_entries_ba_snapshot_territorial, ' end ||
+    'trg_timesheet_entries_bloqueia_condicoes, '
     'trg_timesheet_entries_bloqueia_condicoes_operacao, '
     'trg_timesheet_entries_bloqueia_delete_faturado, '
     'trg_timesheet_entries_bloqueia_desvinculo, trg_timesheet_entries_bloqueia_edicao_faturada, '
