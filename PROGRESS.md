@@ -77,15 +77,19 @@ da matriz.
 ## Próximas etapas
 
 O estado factual e suas limitações estão em [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
-PR #86 (FIN-PR-08) e PR #87 (correção documental de MFA) foram integrados.
+O checkpoint de integração do FIN-PR-09, a situação das migrations e da resolução
+comercial estão centralizados nesse documento.
 
 ### Fase A — financeiro
 
-1. **FIN-PR-09 — revisão:** domingo/feriado ×2 na migration 043,
-   condicionado à resolução comercial ON; OFF preserva a 042. Entrega por PR Draft;
-   revisão independente pendente; sem aplicação remota, ativação ou merge. Detalhes e
-   reprodução em [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-09--implementação-local-em-revisão).
-2. FIN-PR-10: calendário nacional, SC e municípios definidos.
+1. **FIN-PR-09 — concluído no Git:** domingo/feriado ×2 e correções R1 integrados;
+   [checkpoint e limites de implantação](docs/ESTADO_DO_PROJETO.md#fin-pr-09--mergeado).
+2. **FIN-PR-10 — em andamento:** calendário nacional e territorial expansível,
+   local real da execução, cobertura oficial e proteção do histórico. Regras
+   confirmadas, prioridade inicial e limites de autorização em
+   [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-em-andamento).
+   Primeiro commit exclusivo de estado; depois inspeção, RED/GREEN, validações
+   locais e entrega em PR Draft para revisão independente.
 3. FIN-PR-11: container como serviço avulso.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
