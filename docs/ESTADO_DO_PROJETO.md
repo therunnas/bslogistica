@@ -130,12 +130,35 @@ vigenciado e cobertura oficial anual por âmbito. Novas presenças ON sem local 
 cobertura confirmados são recusadas; OFF conserva o caminho anterior. Não houve
 carga real de calendário, backfill ou ativação de preços.
 
-Validação local desta etapa: 45 suítes SQL no schema 044 e todas as 57 suítes
-Node passaram; lint, TypeScript, Prettier nos formatos suportados e build também.
+Validação local repetida no FIN-PR-10/R1: 45 suítes SQL no schema 044 e todas
+as 57 suítes Node passaram; lint, TypeScript, Prettier nos formatos suportados e
+build também. A suíte 044 contém 255 asserções, incluindo 52 específicas de R1;
+a renderização comportamental da interface cobre 17 casos.
 Paridade financeira OFF exata 042/043 e 043/044, catálogo e rollback permitido e
 bloqueado foram comprovados na instância descartável exclusiva. Compatibilidade
 034, 037, 038, 039, 040, 041, 042, 043 e 044 aprovada: 541 asserções, zero falhas.
 Entrega em PR Draft para revisão independente, sem Ready for Review ou merge.
+
+Na revisão R1 do PR #90, o cadastro escolhe a interface pelo regime financeiro
+confirmado e pela capacidade: OFF mantém calendário/RPCs legados; ON com 044 usa
+territorial; estado desconhecido não libera cadastro. Brasília/DF mantém o código
+IBGE `5300108` e os mesmos campos de vínculo/snapshot, sem município jurídico.
+O âmbito `distrital` exige UF DF, sem código municipal; o calendário do DF exige
+coberturas nacional e distrital, sem terceira cobertura municipal fictícia.
+As demais UFs mantêm as três coberturas. Nenhuma data distrital foi inferida.
+
+RED/GREEN registrados para OFF e DF. A matriz distrital confirma admin sem fator
+em AAL1 e admin com fator em AAL2; recusa MFA pendente, operacional, sem papel,
+anon e sessão inválida sem escrita/auditoria residual. Sobreposição com domingo
+cobra ×2 uma vez; fatura e snapshots permanecem imutáveis após aposentadoria de
+feriado/cobertura. O corpo da derivação financeira e os pins de MD5 não mudaram
+em R1. As duas referências de Ilhota esclarecem a alteração do Anexo Único do
+Decreto 14/2026 pelo Decreto 235/2026, sem mudar datas ou classificações.
+
+Os ensaios R1 reutilizaram somente a instância descartável exclusiva FIN10 após
+revalidar labels, volume, rede e fixtures sintéticos. Nenhuma ação em banco
+remoto. PR #90 permanece Draft para revisão independente. Resultados da CI devem
+ser conferidos no HEAD remoto do PR. Sem Ready for Review ou merge.
 
 Contratos, guardas e reprodução em
 [calendario-territorial.md](financeiro/calendario-territorial.md); pesquisa oficial,

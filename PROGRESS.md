@@ -84,13 +84,11 @@ comercial estão centralizados nesse documento.
 
 1. **FIN-PR-09 — concluído no Git:** domingo/feriado ×2 e correções R1 integrados;
    [checkpoint e limites de implantação](docs/ESTADO_DO_PROJETO.md#fin-pr-09--mergeado).
-2. **FIN-PR-10 — validação local concluída:** calendário nacional e territorial
-   expansível, local real da execução, cobertura oficial e proteção do histórico.
-   Resultados, prioridade inicial, pendências de calendário/turnos mistos e limites
-   de autorização em
+2. **FIN-PR-10 — Desenvolvimento / Testes:** calendário nacional e territorial
+   expansível, local real da execução, cobertura oficial e proteção do histórico,
+   antes do FIN-PR-11. Resultados de validação, pendências e limites de autorização
+   ficam exclusivamente em
    [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-em-andamento).
-   Entrega em PR Draft; aguardar revisão independente. Sem autorização de merge,
-   Ready for Review, implantação remota ou início do FIN-PR-11.
 3. FIN-PR-11: container como serviço avulso.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
