@@ -670,6 +670,14 @@ select pg_temp.assert_eq('R1 DF aposentadoria não reprecifica fatura nem snapsh
 select pg_temp.assert_eq('R1 DF alteração de horário faturado recusada',pg_temp.adm($q$update public.timesheet_entries set check_out='08:00' where operation_id='5c42e000-0000-4000-8000-0000000000b1' and work_date='2026-10-11'$q$),'erro 42501');
 select pg_temp.assert_eq('R1 DF alteração de snapshot faturado recusada',pg_temp.adm($q$update public.timesheet_entries set territorial_calendar_snapshot='{}' where operation_id='5c42e000-0000-4000-8000-0000000000b1' and work_date='2026-10-11'$q$),'erro 42501');
 
+-- R2: encerrar vigência aberta não pode deixar snapshot posterior sem lastro.
+create temporary table _r2_antes as select (select jsonb_agg(to_jsonb(t) order by id) from public.operation_location_terms t) locais, (select jsonb_agg(to_jsonb(t) order by id) from public.timesheet_entries t) apontamentos, (select count(*) from public.financial_terms_audit) auditorias;
+select pg_temp.assert_eq('R2 snapshot posterior impede encerrar vigência aberta',
+ pg_temp.adm($q$select public.registrar_local_operacao('5c42e000-0000-4000-8000-0000000000b1','5300108','2026-10-06','R2_FIXTURE_SINTETICA',true,'2026-10-10')$q$),'erro 55000');
+select pg_temp.assert_eq('R2 recusa preserva vigências, snapshots e auditoria',
+ (select (locais=(select jsonb_agg(to_jsonb(t) order by id) from public.operation_location_terms t) and apontamentos=(select jsonb_agg(to_jsonb(t) order by id) from public.timesheet_entries t) and auditorias=(select count(*) from public.financial_terms_audit))::text from _r2_antes),'true');
+select pg_temp.assert_ok('R2 período limitado sem snapshots é permitido',pg_temp.adm($q$select public.registrar_local_operacao('5c42e000-0000-4000-8000-0000000000a4','4208203','2026-10-06','R2_FIXTURE_SINTETICA',true,'2026-10-10')$q$));
+select pg_temp.assert_ok('R2 período aberto sem snapshots é permitido',pg_temp.adm($q$select public.registrar_local_operacao('5c42e000-0000-4000-8000-0000000000a5','4208203','2026-10-06','R2_FIXTURE_SINTETICA',true,null)$q$));
 select pg_temp.assert_eq('84 todos os preparos declarativos passaram',
  (select count(*)::text from _resultado where situacao='FAIL'),'0');
 rollback;

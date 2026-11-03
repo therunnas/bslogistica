@@ -206,6 +206,10 @@ begin
  if coalesce(p_encerrar_anterior,false) then
   select * into anterior from public.operation_location_terms where operation_id=p_operation_id and valid_to is null for update;
   if found and anterior.valid_from<p_valid_from then
+   if p_valid_to is not null and exists(select 1 from public.timesheet_entries te join public.timesheets ts on ts.id=te.timesheet_id
+      where ts.operation_id=p_operation_id and te.territorial_calendar_snapshot is not null and ts.work_date>=p_valid_to) then
+    raise exception 'Há apontamentos com local congelado após o período; encerrar a vigência anterior alteraria o histórico.' using errcode='55000';
+   end if;
    update public.operation_location_terms set valid_to=p_valid_from where id=anterior.id;
    perform public.condicoes_auditar('local_operacao_encerrado','operacao',p_operation_id,anterior.id,to_jsonb(anterior),jsonb_build_object('valid_to',p_valid_from),motivo);
   end if;
