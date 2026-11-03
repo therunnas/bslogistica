@@ -79,6 +79,44 @@ const f = {
   tipo: "feriado",
   movel: false,
 };
+// CF, art. 32: DF tem calendário distrital; Brasília continua como identidade IBGE do local.
+const distrital = { ...f, ambito: "distrital", uf: "DF", municipio: "" };
+assert.deepEqual(c.validarTerritorio(distrital), []);
+assert.ok(c.validarTerritorio({ ...distrital, uf: "SC" }).length);
+assert.ok(c.validarTerritorio({ ...distrital, municipio: "5300108" }).length);
+assert.ok(c.validarTerritorio({ ...distrital, ambito: "estadual" }).length);
+assert.ok(c.validarTerritorio({ ...distrital, ambito: "municipal", municipio: "5300108" }).length);
+assert.deepEqual(c.validarFeriadoTerritorial(distrital), []);
+assert.deepEqual(c.validarCoberturaTerritorial({ ...distrital, confirmado: false }, 2026), []);
+assert.deepEqual(c.dadosTerritoriais(distrital), {
+  territory_scope: "distrital",
+  state_code: "DF",
+  municipality_code: null,
+  legal_act: "Lei 10.607",
+  official_url: "https://www.planalto.gov.br/lei",
+  client_confirmed: true,
+});
+assert.deepEqual(
+  c.interpretarMunicipios(
+    [
+      {
+        id: 5300108,
+        nome: "Brasília",
+        microrregiao: { mesorregiao: { UF: { sigla: "DF" } } },
+      },
+    ],
+    "DF",
+  ),
+  [
+    {
+      codigo: "5300108",
+      nome: "Brasília",
+      uf: "DF",
+      fonteUrl: "https://servicodados.ibge.gov.br/api/v1/localidades/municipios/5300108",
+    },
+  ],
+);
+console.log("PASS DF: 9 asserções de âmbito distrital exclusivo e identidade IBGE Brasília.");
 assert.deepEqual(c.validarFeriadoTerritorial(f), []);
 for (const alteracao of [
   { data: "2026-02-30" },
@@ -190,6 +228,25 @@ const snapshot = {
   },
 };
 assert.deepEqual(c.lerSnapshotCalendario(snapshot), snapshot);
+const snapshotDF = {
+  ...snapshot,
+  location: {
+    ...snapshot.location,
+    municipality_code: "5300108",
+    municipality_name: "Brasília",
+    state_code: "DF",
+  },
+  days: [
+    {
+      ...snapshot.days[0],
+      municipality_code: "5300108",
+      state_code: "DF",
+      coverage_ids: [uid, uid],
+    },
+  ],
+};
+assert.deepEqual(c.lerSnapshotCalendario(snapshotDF), snapshotDF);
+console.log("PASS DF: snapshot preserva Brasília/5300108 com duas coberturas.");
 assert.equal(c.lerSnapshotCalendario(null), null);
 assert.equal(c.lerSnapshotCalendario({ ...snapshot, version: 2 }), null);
 assert.equal(
@@ -363,3 +420,5 @@ assert.equal(
 console.log(
   "PASS calendário atual só em captura; falta zero; presença043 usa classificação congelada/030.",
 );
+
+await import("./test-calendario-interface-r1.mjs");

@@ -7,7 +7,8 @@ não confirma aplicação remota nem autoriza ativação comercial.
 ## Identidade, evidência e cobertura
 
 `financial_holidays` permanece a única fonte de ocorrências. O âmbito é nacional,
-estadual ou municipal, com UF/código IBGE coerentes, norma, URL oficial, status de
+estadual, municipal ou distrital (exclusivo do DF), com UF/código IBGE coerentes,
+norma, URL oficial, status de
 verificação, tipo de ocorrência e indicação de móvel. Cada data móvel é ocorrência
 anual explícita: não se calcula Páscoa, não se replica feriado no próximo ano e
 ponto facultativo nunca integra o especial automaticamente. Cadastros anteriores
@@ -21,11 +22,19 @@ carrega municípios ou feriados reais. As fontes e pendências de 2026–2028 es
 [calendario-fontes-oficiais.md](calendario-fontes-oficiais.md).
 
 `financial_calendar_coverage` registra conferência anual por âmbito. O calendário
-só é confirmado com coberturas nacional, estadual e municipal ativas para o ano e
-sem candidato a feriado pendente naquele ano/território. Municipal exige também
+só é confirmado com coberturas nacional, estadual e municipal ativas para o ano
+nas demais UFs; no Distrito Federal, exige somente nacional e distrital. Não pode
+haver candidato a feriado pendente naquele ano/território. Municipal exige também
 conferência do cliente. Ausência de cobertura, local ou confirmação retorna estado
 pendente e tipo de dia nulo; não constitui prova de dia comum. Registro e
 aposentadoria usam motivo, sessão e auditoria existentes.
+
+O DF não é dividido em municípios (CF, art. 32). Brasília/DF, código IBGE
+`5300108`, continua sendo a identidade territorial em `municipality_catalog`,
+nos vínculos e nos snapshots; esses nomes de campos são mantidos por compatibilidade.
+Não representam um município jurídico. Ocorrências e coberturas do DF usam âmbito
+`distrital`, UF `DF` e `municipality_code` nulo. Âmbitos `estadual` e `municipal`
+com UF `DF` são recusados. Nenhum feriado ou calendário distrital é inferido.
 
 ## Execução e histórico
 
@@ -43,7 +52,9 @@ lastro continuam protegidos por triggers, sem exceção administrativa de ediç�
 
 Com resolução OFF, o classificador antigo lê somente ocorrências `legado`: novos
 cadastros territoriais não contaminam cobrança, custo, classificação ou snapshots
-legados. A instalação não muda `pricing_settings`. Com ON, novas presenças exigem
+legados. A interface de cadastro mantém o calendário e as RPCs legadas com OFF,
+usando `useRegimeDoCalendario` além da capacidade. ON com 044 confirmado seleciona
+o territorial; erro ou estado desconhecido não presume regime. A instalação não muda `pricing_settings`. Com ON, novas presenças exigem
 local e calendário confirmado. O cálculo continua no núcleo 035 / integração do
 FIN-PR-09; o componente especial é aplicado uma vez, mesmo com sobreposições de
 abrangência ou domingo coincidente. Bônus permanece separado.
@@ -92,5 +103,6 @@ prazos e encerramento dos subprocessos; timeout é falha.
 
 Rollback: [rollback-calendario-territorial.sql](../runbooks/rollback-calendario-territorial.sql).
 Só é permitido antes do uso: qualquer catálogo, cobertura, local, ocorrência,
-snapshot ou auditoria territorial bloqueia com 55000. Não usa CASCADE nem apaga
+snapshot ou auditoria territorial, inclusive de Brasília/DF e do âmbito distrital,
+bloqueia com 55000. Não usa CASCADE nem apaga
 histórico. A reversão restaura funções e índice anteriores, preservando dados.

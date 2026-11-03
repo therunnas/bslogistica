@@ -74,7 +74,7 @@ export function codigoMunicipalDaUf(codigo: unknown, uf: unknown): boolean {
     PREFIXO_IBGE[uf] === codigo.slice(0, 2)
   );
 }
-export type Ambito = "nacional" | "estadual" | "municipal";
+export type Ambito = "nacional" | "estadual" | "municipal" | "distrital";
 export interface Municipio {
   codigo: string;
   nome: string;
@@ -170,9 +170,14 @@ export function validarTerritorio(
   f: Pick<FormularioTerritorial, "ambito" | "uf" | "municipio" | "norma" | "fonte" | "motivo">,
 ): string[] {
   const erros: string[] = [];
-  if (!["nacional", "estadual", "municipal"].includes(f.ambito)) erros.push("Selecione o âmbito.");
+  if (!["nacional", "estadual", "municipal", "distrital"].includes(f.ambito))
+    erros.push("Selecione o âmbito.");
   if (f.ambito !== "nacional" && !UFS.includes(f.uf as (typeof UFS)[number]))
     erros.push("Selecione a UF.");
+  if (f.ambito === "distrital" && (f.uf !== "DF" || f.municipio !== ""))
+    erros.push("O âmbito distrital exige DF e nenhuma localidade municipal.");
+  if ((f.ambito === "estadual" || f.ambito === "municipal") && f.uf === "DF")
+    erros.push("No Distrito Federal, use o âmbito distrital.");
   if (f.ambito === "municipal" && !codigoMunicipalDaUf(f.municipio, f.uf))
     erros.push("Selecione um município do IBGE.");
   if (!f.norma.trim()) erros.push("Informe a norma ou ato oficial conferido.");

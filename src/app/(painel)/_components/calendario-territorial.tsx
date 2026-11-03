@@ -29,6 +29,7 @@ import {
   situacaoCobertura,
   periodoLocalValido,
   type FormularioTerritorial,
+  type Ambito,
   type Municipio,
 } from "@/lib/calendario-territorial";
 import { useFeriados } from "@/lib/regras-definitivas-dados";
@@ -50,15 +51,17 @@ export function SeletorTerritorial({
   municipio,
   onUf,
   onMunicipio,
-  municipal = true,
+  ambito,
 }: {
   uf: string;
   municipio: Municipio | null;
   onUf: (uf: string) => void;
   onMunicipio: (m: Municipio | null) => void;
-  municipal?: boolean;
+  ambito?: Ambito;
 }) {
   const id = useId();
+  const municipal = !ambito || ambito === "municipal";
+  const ufs = ambito === "distrital" ? ["DF"] : ambito ? UFS.filter((u) => u !== "DF") : UFS;
   const lista = useMunicipios(municipal ? uf : "");
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -73,7 +76,7 @@ export function SeletorTerritorial({
           }}
         >
           <option value="">Selecione a UF</option>
-          {UFS.map((u) => (
+          {ufs.map((u) => (
             <option key={u} value={u}>
               {u}
             </option>
@@ -81,7 +84,10 @@ export function SeletorTerritorial({
         </select>
       </Campo>
       {municipal && (
-        <Campo id={`${id}-municipio`} nome="Município oficial (IBGE)">
+        <Campo
+          id={`${id}-municipio`}
+          nome={uf === "DF" ? "Localidade oficial (IBGE)" : "Município oficial (IBGE)"}
+        >
           <select
             id={`${id}-municipio`}
             className={SELECT}
@@ -92,7 +98,11 @@ export function SeletorTerritorial({
             }
           >
             <option value="">
-              {uf && lista.isPending ? "Consultando IBGE…" : "Selecione o município"}
+              {uf && lista.isPending
+                ? "Consultando IBGE…"
+                : uf === "DF"
+                  ? "Selecione a localidade"
+                  : "Selecione o município"}
             </option>
             {(lista.data ?? []).map((m) => (
               <option key={m.codigo} value={m.codigo}>
@@ -120,7 +130,7 @@ export function SeletorTerritorial({
               target="_blank"
               rel="noreferrer"
             >
-              Conferir município no IBGE
+              {uf === "DF" ? "Conferir localidade no IBGE" : "Conferir município no IBGE"}
             </a>
           )}
         </Campo>
@@ -175,7 +185,7 @@ export function CalendarioTerritorial() {
       <CardHeader>
         <CardTitle>Calendário territorial</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Feriados exigem data, âmbito, norma e fonte oficial. O cadastro do município não confirma
+          Feriados exigem data, âmbito, norma e fonte oficial. O cadastro da localidade não confirma
           seu calendário. Nada é importado ou ativado automaticamente.
         </p>
       </CardHeader>
@@ -187,11 +197,11 @@ export function CalendarioTerritorial() {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Antes de apontar, confira as três coberturas do ano: nacional, estadual da UF e municipal
-          do local real de trabalho. A cobertura municipal precisa ser conferida com o cliente,
-          inclusive quando não houver feriado municipal. Carnaval e Corpus Christi exigem norma
-          específica; ponto facultativo não vira feriado. As regras financeiras continuam dependendo
-          de ativação própria.
+          Antes de apontar, confira as coberturas do ano: no Distrito Federal, nacional e distrital
+          (duas); nas demais UFs, nacional, estadual e municipal do local real de trabalho (três). A
+          cobertura municipal precisa ser conferida com o cliente, inclusive quando não houver
+          feriado municipal. Carnaval e Corpus Christi exigem norma específica; ponto facultativo
+          não vira feriado. As regras financeiras continuam dependendo de ativação própria.
         </p>
         <div className="space-y-2">
           <h3 className="font-medium">Datas registradas</h3>
@@ -307,7 +317,7 @@ export function CalendarioTerritorial() {
                   value={f.ambito}
                   onChange={(e) => {
                     mudar("ambito", e.target.value as FormularioTerritorial["ambito"]);
-                    mudar("uf", "");
+                    mudar("uf", e.target.value === "distrital" ? "DF" : "");
                     mudar("municipio", "");
                     setMunicipio(null);
                   }}
@@ -315,13 +325,14 @@ export function CalendarioTerritorial() {
                   <option value="nacional">Nacional</option>
                   <option value="estadual">Estadual</option>
                   <option value="municipal">Municipal</option>
+                  <option value="distrital">Distrital (Distrito Federal)</option>
                 </select>
               </Campo>
               {f.ambito !== "nacional" && (
                 <SeletorTerritorial
                   uf={f.uf}
                   municipio={municipio}
-                  municipal={f.ambito === "municipal"}
+                  ambito={f.ambito}
                   onUf={(v) => mudar("uf", v)}
                   onMunicipio={(m) => {
                     setMunicipio(m);
@@ -507,8 +518,9 @@ export function LocalidadeDaOperacao({ id }: { id: string }) {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Selecione explicitamente o município da operação. O endereço ou a sede do cliente não
-        definem a localidade.
+        Selecione explicitamente a localidade da operação: município nas demais UFs ou Brasília
+        (IBGE 5300108) no Distrito Federal. O endereço ou a sede do cliente não definem a
+        localidade.
       </p>
       {locais.isError ? (
         <p role="alert">Erro ao carregar localidades.</p>
@@ -535,8 +547,9 @@ export function LocalidadeDaOperacao({ id }: { id: string }) {
           <DialogHeader>
             <DialogTitle>Localidade da operação</DialogTitle>
             <DialogDescription>
-              O município deve corresponder ao local efetivo de trabalho. A nova vigência não altera
-              o histórico dos apontamentos.
+              A localidade deve corresponder ao local efetivo de trabalho. No Distrito Federal,
+              Brasília é a identidade IBGE do local, sem criar município jurídico. A nova vigência
+              não altera o histórico dos apontamentos.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">

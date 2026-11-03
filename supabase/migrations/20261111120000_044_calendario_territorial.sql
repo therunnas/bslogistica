@@ -20,8 +20,9 @@ create function public.calendario_territorio_valido(p_ambito text,p_uf text,p_mu
 language sql immutable set search_path = pg_catalog,public as $$
  select coalesce(case p_ambito
  when 'nacional' then p_uf is null and p_municipio is null
- when 'estadual' then p_uf = any(array['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']) and p_municipio is null
- when 'municipal' then p_municipio ~ '^[0-9]{7}$' and public.calendario_uf_do_ibge(p_municipio)=p_uf
+ when 'distrital' then p_uf='DF' and p_municipio is null
+ when 'estadual' then p_uf = any(array['AC','AL','AP','AM','BA','CE','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']) and p_municipio is null
+ when 'municipal' then p_uf<>'DF' and p_municipio ~ '^[0-9]{7}$' and public.calendario_uf_do_ibge(p_municipio)=p_uf
  else false end,false);
 $$;
 
@@ -221,7 +222,7 @@ declare motivo text; novo public.financial_holidays%rowtype;
 begin
  perform public.condicoes_exigir_admin(); motivo:=public.condicoes_validar_motivo(p_reason);
  if jsonb_typeof(p_dados) is distinct from 'object' or exists(select 1 from jsonb_object_keys(p_dados) k where k not in('holiday_date','name','territory_scope','state_code','municipality_code','legal_act','official_url','verification_status','holiday_kind','is_movable','client_confirmed'))
-    or coalesce(p_dados->>'territory_scope','') not in('nacional','estadual','municipal') then raise exception 'Registro territorial inválido.' using errcode='22023'; end if;
+    or coalesce(p_dados->>'territory_scope','') not in('nacional','estadual','municipal','distrital') then raise exception 'Registro territorial inválido.' using errcode='22023'; end if;
  if not public.calendario_territorio_valido(p_dados->>'territory_scope',p_dados->>'state_code',p_dados->>'municipality_code')
     or not public.calendario_fonte_oficial(p_dados->>'official_url') or coalesce(btrim(p_dados->>'legal_act'),'')=''
     or p_dados->>'verification_status'='confirmado' and (coalesce(p_dados->>'holiday_kind','feriado')<>'feriado' or p_dados->>'territory_scope'='municipal' and not coalesce((p_dados->>'client_confirmed')::boolean,false)) then
@@ -275,15 +276,15 @@ begin
  if not found then return jsonb_build_object('status','localidade_ausente','municipality_code',null,'state_code',null,'location_term_id',null,'holiday_ids','[]'::jsonb,'coverage_ids','[]'::jsonb,'day_kind',null); end if;
  select * into strict cidade from public.municipality_catalog where code=local.municipality_code;
  select coalesce(jsonb_agg(id order by id),'[]'::jsonb) into coberturas from public.financial_calendar_coverage c
- where active and calendar_year=extract(year from p_data)::integer and (territory_scope='nacional' or territory_scope='estadual' and state_code=cidade.state_code or territory_scope='municipal' and municipality_code=cidade.code);
+ where active and calendar_year=extract(year from p_data)::integer and (territory_scope='nacional' or territory_scope='distrital' and cidade.state_code='DF' and state_code='DF' or territory_scope='estadual' and cidade.state_code<>'DF' and state_code=cidade.state_code or territory_scope='municipal' and cidade.state_code<>'DF' and municipality_code=cidade.code);
  select exists(select 1 from public.financial_holidays h where active and holiday_kind='feriado' and verification_status='pendente'
- and extract(year from holiday_date)=extract(year from p_data) and (territory_scope='nacional' or territory_scope='estadual' and state_code=cidade.state_code or territory_scope='municipal' and municipality_code=cidade.code)) into incompleto;
+ and extract(year from holiday_date)=extract(year from p_data) and (territory_scope='nacional' or territory_scope='distrital' and cidade.state_code='DF' and state_code='DF' or territory_scope='estadual' and cidade.state_code<>'DF' and state_code=cidade.state_code or territory_scope='municipal' and cidade.state_code<>'DF' and municipality_code=cidade.code)) into incompleto;
  select coalesce(jsonb_agg(id order by id),'[]'::jsonb) into feriados from public.financial_holidays h
  where active and holiday_kind='feriado' and verification_status='confirmado' and holiday_date=p_data
- and (territory_scope='nacional' or territory_scope='estadual' and state_code=cidade.state_code or territory_scope='municipal' and municipality_code=cidade.code and client_confirmed);
- return jsonb_build_object('status',case when jsonb_array_length(coberturas)=3 and not incompleto then 'confirmado' else 'pendente' end,
+ and (territory_scope='nacional' or territory_scope='distrital' and cidade.state_code='DF' and state_code='DF' or territory_scope='estadual' and cidade.state_code<>'DF' and state_code=cidade.state_code or territory_scope='municipal' and cidade.state_code<>'DF' and municipality_code=cidade.code and client_confirmed);
+ return jsonb_build_object('status',case when jsonb_array_length(coberturas)=case when cidade.state_code='DF' then 2 else 3 end and not incompleto then 'confirmado' else 'pendente' end,
  'municipality_code',cidade.code,'state_code',cidade.state_code,'location_term_id',local.id,'municipality_name',cidade.name,
- 'holiday_ids',feriados,'coverage_ids',coberturas,'day_kind',case when jsonb_array_length(coberturas)<>3 or incompleto then null when jsonb_array_length(feriados)>0 then 'feriado' when extract(isodow from p_data)=7 then 'domingo' when extract(isodow from p_data)=6 then 'sabado' else 'util' end);
+ 'holiday_ids',feriados,'coverage_ids',coberturas,'day_kind',case when jsonb_array_length(coberturas)<>case when cidade.state_code='DF' then 2 else 3 end or incompleto then null when jsonb_array_length(feriados)>0 then 'feriado' when extract(isodow from p_data)=7 then 'domingo' when extract(isodow from p_data)=6 then 'sabado' else 'util' end);
 end; $$;
 create function public.consultar_calendario_operacao(p_operation_id uuid,p_data date) returns jsonb
 language plpgsql stable security definer set search_path=pg_catalog,public,pg_temp as $$
@@ -296,7 +297,7 @@ language plpgsql stable security definer set search_path=pg_catalog,public,pg_te
 declare c jsonb;
 begin
  c:=public.calendario_da_operacao_interno(p_operation_id,p_data);
- if c->>'status'<>'confirmado' then raise exception 'Calendário territorial pendente: confirme o local real e as coberturas nacional, estadual e municipal do ano.' using errcode='55000'; end if;
+ if c->>'status'<>'confirmado' then raise exception 'Calendário territorial pendente: confirme o local real e as coberturas do ano: nacional e distrital no DF; nacional, estadual e municipal nas demais UFs.' using errcode='55000'; end if;
  return c->>'day_kind';
 end; $$;
 

@@ -566,6 +566,110 @@ select pg_temp.assert_eq('83g falta também registra zero minutos técnicos',
  (select concat_ws('|',worked_minutes,billed_amount,cost_amount,territorial_calendar_snapshot#>>'{segments,worked_minutes}') from public.timesheet_entries where id=pg_temp.id_de('1','2026-05-04')),'0|0.00|0.00|0');
 select pg_temp.assert_eq('83h falta conserva proveniência congelada',
  (select ((territorial_calendar_snapshot-'segments')=(select j from _proveniencia_off))::text from public.timesheet_entries where id=pg_temp.id_de('1','2026-05-04')),'true');
+-- R1: Brasília/DF é identidade IBGE, sem município jurídico (CF, art. 32).
+select pg_temp.exec('catalogo-df',$q$select public.catalogar_municipio('5300108','LOCALIDADE_TESTE_DF','DF',
+ 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios/5300108','FIXTURE_DF_SINTETICA')$q$);
+insert into public.operations(id,client_id,contract_id,name) values
+ ('5c42e000-0000-4000-8000-0000000000b1','5c42c000-0000-4000-8000-0000000000c1','5c42d000-0000-4000-8000-0000000000d1','OPERACAO_TESTE_DF');
+insert into public.shifts(id,operation_id,name,start_time,end_time,break_minutes,crosses_midnight,shift_period) values
+ ('5c42a000-0000-4000-8000-0000000000b1','5c42e000-0000-4000-8000-0000000000b1','TURNO_TESTE_DF','06:00','07:00',0,false,'diurno');
+insert into public.employees(id,name,daily_cost) values(pg_temp.emp('8'),'COLABORADOR_TESTE_DF',80);
+insert into public.employee_cost_terms(employee_id,valid_from,daily_cost,active,origin,reason)
+ values(pg_temp.emp('8'),'2026-01-01',80,true,'informada','FIXTURE_DF_SINTETICA');
+select pg_temp.exec('diaria-df',format($q$select public.registrar_diaria_individual('5c42d000-0000-4000-8000-0000000000d1',%L,'2026-01-01',260,'FIXTURE_DF_SINTETICA')$q$,pg_temp.emp('8')));
+insert into public.operation_team(operation_id,employee_id,job_function_id) values
+ ('5c42e000-0000-4000-8000-0000000000b1',pg_temp.emp('8'),pg_temp.fn('conferente'));
+select pg_temp.exec('local-df',$q$select public.registrar_local_operacao('5c42e000-0000-4000-8000-0000000000b1','5300108','2026-01-01','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.assert_eq('R1 DF nacional sem distrital deixa cobertura pendente',
+ public.calendario_da_operacao_interno('5c42e000-0000-4000-8000-0000000000b1','2026-02-04')->>'status','pendente');
+select pg_temp.assert_eq('R1 DF aceita âmbito distrital explícito sem município',
+ public.calendario_territorio_valido('distrital','DF',null)::text,'true');
+select pg_temp.assert_eq('R1 DF não admite município jurídico fictício',
+ public.calendario_territorio_valido('municipal','DF','5300108')::text,'false');
+select pg_temp.assert_eq('R1 DF não é âmbito estadual',public.calendario_territorio_valido('estadual','DF',null)::text,'false');
+select pg_temp.assert_eq('R1 distrital não aceita outra UF',public.calendario_territorio_valido('distrital','SC',null)::text,'false');
+select pg_temp.assert_eq('R1 distrital não aceita código municipal',public.calendario_territorio_valido('distrital','DF','5300108')::text,'false');
+select pg_temp.exec('cobertura-df',$q$select public.confirmar_cobertura_calendario(
+ '{"calendar_year":2026,"territory_scope":"distrital","state_code":"DF","legal_act":"ATO_DISTRITAL_SINTETICO","official_url":"https://exemplo.df.gov.br/calendario"}','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.assert_eq('R1 DF exige somente nacional e distrital, preservando código5300108',
+ (select concat_ws('|',r->>'status',r->>'municipality_code',r->>'state_code',jsonb_array_length(r->'coverage_ids'))
+ from (select public.calendario_da_operacao_interno('5c42e000-0000-4000-8000-0000000000b1','2026-02-04') r) x),'confirmado|5300108|DF|2');
+select pg_temp.assert_eq('R1 DF recebe feriado nacional',pg_temp.classificar('2026-02-04','5c42e000-0000-4000-8000-0000000000b1'),'feriado');
+select pg_temp.assert_eq('R1 DF não herda estadual SC',pg_temp.classificar('2026-02-05','5c42e000-0000-4000-8000-0000000000b1'),'util');
+select pg_temp.exec('feriado-df',$q$select public.registrar_feriado_territorial(
+ '{"holiday_date":"2026-10-05","name":"FERIADO_DISTRITAL_SINTETICO","territory_scope":"distrital","state_code":"DF","legal_act":"ATO_DISTRITAL_SINTETICO","official_url":"https://exemplo.df.gov.br/ato","verification_status":"confirmado"}','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.assert_eq('R1 DF aplica distrital',pg_temp.classificar('2026-10-05','5c42e000-0000-4000-8000-0000000000b1'),'feriado');
+select pg_temp.assert_eq('R1 distrital não contamina SC',pg_temp.classificar('2026-10-05','5c42e000-0000-4000-8000-0000000000a3'),'util');
+select pg_temp.assert_eq('R1 DF ano sem cobertura continua pendente',
+ public.calendario_da_operacao_interno('5c42e000-0000-4000-8000-0000000000b1','2028-02-04')->>'status','pendente');
+select pg_temp.exec('df-pendente',$q$select public.registrar_feriado_territorial(
+ '{"holiday_date":"2027-10-05","name":"DISTRITAL_PENDENTE_SINTETICO","territory_scope":"distrital","state_code":"DF","legal_act":"ATO_SINTETICO","official_url":"https://exemplo.df.gov.br/ato","verification_status":"pendente"}','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.exec('df-2027',$q$select public.confirmar_cobertura_calendario(
+ '{"calendar_year":2027,"territory_scope":"distrital","state_code":"DF","legal_act":"ATO_SINTETICO","official_url":"https://exemplo.df.gov.br/ato"}','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.assert_eq('R1 DF feriado pendente impede falso dia útil',
+ ((public.calendario_da_operacao_interno('5c42e000-0000-4000-8000-0000000000b1','2027-10-06')->>'day_kind') is null)::text,'true');
+select pg_temp.exec('df-facultativo',$q$select public.registrar_feriado_territorial(
+ '{"holiday_date":"2026-10-06","name":"FACULTATIVO_DF_SINTETICO","territory_scope":"distrital","state_code":"DF","legal_act":"ATO_SINTETICO","official_url":"https://exemplo.df.gov.br/ato","verification_status":"pendente","holiday_kind":"ponto_facultativo"}','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.assert_eq('R1 DF facultativo não vira feriado',pg_temp.classificar('2026-10-06','5c42e000-0000-4000-8000-0000000000b1'),'util');
+select pg_temp.assert_ok('R1 DF OFF nova presença ignora distrital',pg_temp.save('df-off','2026-10-05','8','06:00','15:00',60,'b1','b1'));
+select pg_temp.assert_eq('R1 DF OFF conserva regra043 sem snapshot territorial',
+ (select (billed_amount=100 and cost_amount=80 and billed_special_amount=0 and territorial_calendar_snapshot is null)::text from public.timesheet_entries where operation_id='5c42e000-0000-4000-8000-0000000000b1' and work_date='2026-10-05'),'true');
+select pg_temp.exec('df-overlap-nacional',$q$select public.registrar_feriado_territorial(
+ '{"holiday_date":"2026-10-11","name":"NACIONAL_SOBREPOSTO_DF_SINTETICO","territory_scope":"nacional","legal_act":"ATO_SINTETICO","official_url":"https://exemplo.gov.br/ato","verification_status":"confirmado"}','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.exec('df-overlap-distrital',$q$select public.registrar_feriado_territorial(
+ '{"holiday_date":"2026-10-11","name":"DISTRITAL_SOBREPOSTO_SINTETICO","territory_scope":"distrital","state_code":"DF","legal_act":"ATO_SINTETICO","official_url":"https://exemplo.df.gov.br/ato","verification_status":"confirmado"}','FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.exec('df-on-config',$q$select public.alterar_resolucao_tarifas(true,'FIXTURE_DF_SINTETICA')$q$);
+select pg_temp.assert_ok('R1 DF ON mantém fórmulaFIN09',pg_temp.save('df-on','2026-10-11','8','06:00','07:00',0,'b1','b1'));
+select pg_temp.assert_eq('R1 DF especial65 custo20 sem base nem HE',
+ (select pg_temp.money(id) from public.timesheet_entries where operation_id='5c42e000-0000-4000-8000-0000000000b1' and work_date='2026-10-11'),'65.00|20.00|0.00|0.00|65.00|0.00|60|feriado|2');
+
+select pg_temp.assert_eq('R1 DF sobreposição nacional+distrital+domingo cobra uma vez',
+ (select concat_ws('|',jsonb_array_length(territorial_calendar_snapshot#>'{days,0,holiday_ids}'),
+ jsonb_array_length(territorial_calendar_snapshot#>'{days,0,coverage_ids}'),territorial_calendar_snapshot#>>'{location,municipality_code}',billed_special_amount)
+ from public.timesheet_entries where operation_id='5c42e000-0000-4000-8000-0000000000b1' and work_date='2026-10-11'),'2|2|5300108|65.00');
+-- Mesma guarda nas RPCs distritais: recusas não deixam ocorrência, cobertura ou auditoria.
+do $$
+declare ident record; rpc record; claims jsonb; obtido text; esperado text; antes jsonb;
+begin
+ for ident in select * from (values
+  ('admin sem fator','authenticated','a1','aal1',true,true),
+  ('admin com fator AAL1','authenticated','a4','aal1',true,false),
+  ('admin com fator AAL2','authenticated','a4','aal2',true,true),
+  ('operacional','authenticated','a2','aal1',true,false),
+  ('anon','anon','a1','aal1',false,false),
+  ('sem papel','authenticated','a3','aal1',true,false),
+  ('sessão inválida','authenticated','a1','aal2',false,false)
+ ) x(nome,papel,usr,aal,sessao_valida,permitido) loop
+  claims:=jsonb_build_object('sub','5c420000-0000-4000-8000-0000000000'||ident.usr,'role',ident.papel,'aal',ident.aal);
+  if ident.sessao_valida then claims:=claims||jsonb_build_object('session_id','ec420000-0000-4000-8000-0000000000'||ident.usr); end if;
+  esperado:=case when ident.permitido then 'ok' else 'erro 42501' end;
+  for rpc in select * from (values
+   ('feriado distrital',$q$select public.registrar_feriado_territorial('{"holiday_date":"2095-02-01","name":"SONDA_DISTRITAL_SINTETICA","territory_scope":"distrital","state_code":"DF","legal_act":"ATO_SINTETICO","official_url":"https://exemplo.df.gov.br/ato","verification_status":"confirmado"}','SONDA_DF_SINTETICA')$q$),
+   ('cobertura distrital',$q$select public.confirmar_cobertura_calendario('{"calendar_year":2095,"territory_scope":"distrital","state_code":"DF","legal_act":"ATO_SINTETICO","official_url":"https://exemplo.df.gov.br/ato"}','SONDA_DF_SINTETICA')$q$)
+  ) x(nome,sql) loop
+   select jsonb_build_array((select count(*) from public.financial_terms_audit),(select count(*) from public.financial_holidays),(select count(*) from public.financial_calendar_coverage)) into antes;
+   obtido:=pg_temp.medir_como(ident.papel,claims,format('select pg_temp.sondar(%L)',rpc.sql));
+   perform pg_temp.assert_eq('R1 DF '||rpc.nome||' / '||ident.nome,obtido,esperado);
+   perform pg_temp.assert_eq('R1 DF sem escrita/auditoria residual '||rpc.nome||' / '||ident.nome,
+    (antes=jsonb_build_array((select count(*) from public.financial_terms_audit),(select count(*) from public.financial_holidays),(select count(*) from public.financial_calendar_coverage)))::text,'true');
+  end loop;
+ end loop;
+end; $$;
+select pg_temp.exec('fatura-df',$q$select (public.gerar_fatura('5c42c000-0000-4000-8000-0000000000c1','2026-10-01','2026-10-15')).id::text$q$);
+select pg_temp.assert_eq('R1 DF itens e total da fatura conferem em centavos',
+ (select (round(total_amount*100)=16500 and round(total_amount*100)=(select sum(round(amount*100)) from public.invoice_items where invoice_id=i.id))::text
+ from public.invoices i where id=pg_temp.r('fatura-df')::uuid),'true');
+create temporary table _df_faturado as select id,to_jsonb(t) j from public.timesheet_entries t where invoice_id=pg_temp.r('fatura-df')::uuid;
+select pg_temp.exec('aposentar-df',format($q$select public.aposentar_feriado(%L,'APOSENTADORIA_DF_SINTETICA')$q$,pg_temp.r('feriado-df')));
+select pg_temp.exec('aposentar-cobertura-df',$q$select public.aposentar_cobertura_calendario(
+ (select id from public.financial_calendar_coverage where territory_scope='distrital' and calendar_year=2026),'APOSENTADORIA_DF_SINTETICA')$q$);
+select pg_temp.assert_eq('R1 DF nova consulta com cobertura aposentada é pendente',
+ public.calendario_da_operacao_interno('5c42e000-0000-4000-8000-0000000000b1','2026-10-11')->>'status','pendente');
+select pg_temp.assert_eq('R1 DF aposentadoria não reprecifica fatura nem snapshots',
+ (select bool_and(to_jsonb(t)=f.j)::text from _df_faturado f join public.timesheet_entries t using(id)),'true');
+select pg_temp.assert_eq('R1 DF alteração de horário faturado recusada',pg_temp.adm($q$update public.timesheet_entries set check_out='08:00' where operation_id='5c42e000-0000-4000-8000-0000000000b1' and work_date='2026-10-11'$q$),'erro 42501');
+select pg_temp.assert_eq('R1 DF alteração de snapshot faturado recusada',pg_temp.adm($q$update public.timesheet_entries set territorial_calendar_snapshot='{}' where operation_id='5c42e000-0000-4000-8000-0000000000b1' and work_date='2026-10-11'$q$),'erro 42501');
+
 select pg_temp.assert_eq('84 todos os preparos declarativos passaram',
  (select count(*)::text from _resultado where situacao='FAIL'),'0');
 rollback;

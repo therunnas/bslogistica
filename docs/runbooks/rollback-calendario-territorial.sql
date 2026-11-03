@@ -1,5 +1,5 @@
 -- FIN-PR-10. SOMENTE ambiente local descartável. Não usar CASCADE.
--- Recusa qualquer uso do novo calendário: nem metadados/auditoria são apagados.
+-- Recusa qualquer uso do novo calendário, inclusive distrital/DF: nem metadados/auditoria são apagados.
 begin;
 do $$ begin
  if exists(select 1 from public.timesheet_entries where territorial_calendar_snapshot is not null)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCalendarioTerritorial } from "@/lib/vigencias-dados";
+import { useCalendarioTerritorial, useRegimeDoCalendario } from "@/lib/vigencias-dados";
 import { CalendarioTerritorial } from "../_components/calendario-territorial";
 import { useState } from "react";
 import { CalendarX2, Plus } from "lucide-react";
@@ -46,15 +46,16 @@ const INPUT_CLASS =
  */
 export function FeriadosDoCalendario() {
   const capacidade = useCalendarioTerritorial();
-  if (capacidade === "disponivel") return <CalendarioTerritorial />;
-  if (capacidade === "desconhecida") {
-    return (
-      <p className="mt-6 text-sm text-muted-foreground">
-        Verificando a disponibilidade do calendário. Se a consulta falhar, tente recarregar.
-      </p>
-    );
+  const regime = useRegimeDoCalendario();
+  if (capacidade === "disponivel" && regime === "territorial") {
+    return <CalendarioTerritorial />;
   }
-  return <FeriadosLegados />;
+  if (capacidade !== "desconhecida" && regime === "legado") return <FeriadosLegados />;
+  return (
+    <p className="mt-6 text-sm text-muted-foreground">
+      Verificando a disponibilidade do calendário. Se a consulta falhar, tente recarregar.
+    </p>
+  );
 }
 
 function FeriadosLegados() {
