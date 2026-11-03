@@ -84,7 +84,7 @@ comercial estão centralizados nesse documento.
 
 1. **FIN-PR-09 — concluído no Git:** domingo/feriado ×2 e correções R1 integrados;
    [checkpoint e limites de implantação](docs/ESTADO_DO_PROJETO.md#fin-pr-09--mergeado).
-2. **FIN-PR-10 — Desenvolvimento / Testes:** calendário nacional e territorial
+2. **FIN-PR-10:** calendário nacional e territorial
    expansível, local real da execução, cobertura oficial e proteção do histórico,
    antes do FIN-PR-11. Resultados de validação, pendências e limites de autorização
    ficam exclusivamente em

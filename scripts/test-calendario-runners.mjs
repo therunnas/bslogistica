@@ -288,3 +288,41 @@ test("somente cenário 044 prepara localidade e cobertura sintética dos três �
   assert.match(commands[0], /client_confirmed/);
   assert.match(commands[0], /true/);
 });
+
+for (const [scenario, inspectCode, inspectOutput, expectedCode] of [
+  ["presente", 0, "true", 0],
+  ["ausente", 1, "", 1],
+  ["parado", 0, "false", 1],
+  ["timeout", 124, "", 124],
+]) {
+  test(`inspect SQL local: ${scenario}, sem reset ou Docker real`, () => {
+    const shell = source("scripts/testar-sql-local.sh");
+    const start = shell.indexOf("estado=$(local_command 30 docker inspect");
+    const end = shell.indexOf('\necho "Container local:', start);
+    assert.ok(start > 0 && end > start);
+    const fragment = shell.slice(start, end);
+    const result = spawnSync(
+      "bash",
+      [
+        "-c",
+        `set -euo pipefail
+container=CONTAINER_SINTETICO
+local_command() {
+  [ "$*" = '30 docker inspect --format {{.State.Running}} CONTAINER_SINTETICO' ] || exit 99
+  printf '%s' '${inspectOutput}'
+  return ${inspectCode}
+}
+${fragment}
+`,
+      ],
+      { encoding: "utf8", timeout: 2000 },
+    );
+    assert.equal(result.status, expectedCode, result.stderr);
+    if (scenario === "presente") assert.equal(result.stderr, "");
+    else assert.match(result.stderr, /container|Container/);
+    if (scenario === "timeout") assert.match(result.stderr, /prazo|timeout/i);
+    if (scenario === "ausente" || scenario === "parado") {
+      assert.match(result.stderr, /não existe ou não está rodando/);
+    }
+  });
+}

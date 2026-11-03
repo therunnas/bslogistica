@@ -46,7 +46,16 @@ if [ -z "$project_id" ]; then
 fi
 
 container="supabase_db_${project_id}"
-estado=$(local_command 30 docker inspect --format '{{.State.Running}}' "$container")
+estado=$(local_command 30 docker inspect --format '{{.State.Running}}' "$container") || {
+  codigo=$?
+  if [ "$codigo" -eq 124 ]; then
+    echo "Tempo limite ao inspecionar o container $container; prazo excedido." >&2
+    exit 124
+  fi
+  echo "O container $container não existe ou não está rodando." >&2
+  echo "Confira 'supabase start' e 'docker ps' — este script não usa outro container." >&2
+  exit "$codigo"
+}
 if [ "$estado" != "true" ]; then
   echo "O container $container não existe ou não está rodando." >&2
   echo "Confira 'supabase start' e 'docker ps' — este script não usa outro container." >&2
