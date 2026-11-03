@@ -111,7 +111,8 @@ a leem; duas definições de "liberado" produzem laço entre rotas.
 | sem sessão                                  | `redirect("/login")` — HTTP 307, sem markup          |
 | autenticado sem papel                       | tela "Acesso não liberado"                           |
 | `admin` em AAL2                             | painel administrativo                                |
-| `admin` em AAL1                             | `/mfa`: cadastrar o primeiro fator ou desafiar       |
+| `admin` sem fator verificado, em AAL1       | painel administrativo                                |
+| `admin` com fator verificado, em AAL1       | `/mfa` até concluir o TOTP                           |
 | `operacional` sem fator verificado, em AAL1 | tela `/operacional`                                  |
 | `operacional` com fator verificado, em AAL1 | `/mfa` até concluir o TOTP                           |
 | `operacional` em AAL2                       | tela `/operacional`                                  |
@@ -130,13 +131,19 @@ modelo completo, incluindo MFA e recuperação de senha, está em
 
 | Superfície                               | admin        | operacional                          |
 | ---------------------------------------- | ------------ | ------------------------------------ |
-| tabelas de negócio, pelo PostgREST       | AAL2         | **nenhuma**, em nenhum nível         |
-| `user_operation_access`                  | AAL2         | nenhuma                              |
+| tabelas de negócio, pelo PostgREST       | piso de MFA  | **nenhuma**, em nenhum nível         |
+| `user_operation_access`                  | piso de MFA  | nenhuma                              |
 | cinco RPCs operacionais                  | recusadas    | operações atribuídas, sem financeiro |
 | `profiles`                               | vê todos     | só o próprio                         |
 | `user_roles`                             | só a própria | só a própria                         |
 | telas administrativas (`/usuarios` etc.) | sim          | bloqueadas no servidor               |
 | tela `/operacional`                      | bloqueada    | sim                                  |
+
+O piso de MFA é `mfa_cotidiano_ok()`: admin sem fator verificado pode usar AAL1;
+com fator verificado, exige AAL2 após TOTP no login. Papel administrativo e sessão
+válida continuam obrigatórios. Não há requisito de ativar MFA por funcionalidade.
+Desativar o próprio fator mantém a exceção do novo TOTP exigido pela interface.
+Essa é a política AUTH-01D.R1 da [Segurança](SEGURANCA.md).
 
 O `operacional` registra presença e horários **só** pela tela `/operacional`,
 que fala exclusivamente com as RPCs de `src/lib/operacional/`. Nenhum valor
@@ -265,7 +272,7 @@ Vocabulário: _apontamentos_ (cobrado dos lançamentos), _adicionais_, _ajuste d
 (compensação entre dias) é **informativo** e não altera nenhum valor.
 
 **Disponibilidade (gate).** O Fechamento depende das migrations 029/030. Página, `GET /api/fechamento`
-e `POST /api/fechamento/xlsx` consultam `estado_motor_vigencia` (sessão do admin, AAL2) **antes** de
+e `POST /api/fechamento/xlsx` consultam `estado_motor_vigencia` (sessão do admin com o piso de MFA da conta) **antes** de
 qualquer leitura e só liberam com `regras_definitivas = true`, motor novo ligado e estado
 consistente; erro, resposta desconhecida, 030 ausente ou motor desligado respondem 503
 `fechamento-indisponivel` com frase fixa (a página mostra a mesma mensagem). O link do menu some
