@@ -7,7 +7,81 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
 ## FIN-PR-11B — checkpoint de desenvolvimento local (04/11/2026)
 
-### FIN-PR-11B.R1 — P2 da revisão do PR #95 (04/11/2026)
+### FIN-PR-11B.R2 — fechamento documental da R1 (04/11/2026)
+
+**Estado técnico:** FIN-PR-11B validado, sem pendência técnica conhecida neste
+escopo, aguardando decisão de integração. O [PR #95](https://github.com/therunnas/bslogistica/pull/95)
+continua **Draft e não mergeado**. HEAD técnico validado:
+`74720841c1efaf65415e705977cfc0dfdbd43493`, na branch
+`feat/fin-pr-11b-backend-containers`. A R2 altera somente este documento e
+`PROGRESS.md`; não modifica o conteúdo técnico revisado. O parecer e a CI abaixo
+se referem ao SHA técnico, não automaticamente ao commit documental posterior.
+
+**Fechamento local comprovado, separado da CI:** o runner existente
+`scripts/testar-container-paridade-local.py` concluiu com saída zero usando a
+mesma instância descartável `bs-fin11-local-3fi66bvw`. Project_id, portas,
+labels, volume e rede exclusivos foram reconferidos; não houve referência
+remota nem alteração de recursos de outros projetos.
+
+- Paridade OFF completa **044×045 PASS, igualdade exata** de valores, minutos,
+  fontes, snapshots, itens/faturas e auditoria: instalação sobre históricos e
+  repetição das operações em banco limpo. Os JSON `off-044.json` e `off-045.json`
+  foram novamente comparados, sem tolerância monetária.
+- Rollback sem histórico: **PASS**, restauração exata do catálogo 044 e dados/
+  auditoria preservados. Rollback com histórico: **recusa `55000`**, mantendo
+  catálogo, serviços, receita, custos, faturas e auditoria idênticos ao estado
+  anterior à tentativa.
+- Após a recusa permaneceram **4 serviços, 8 participantes, 4 receitas,
+  3 faturas e 5 eventos de auditoria**, todos sintéticos; custos individuais
+  somados em **12012 centavos**. A suíte 045 executada como fixture transacional
+  pelo runner registrou **88 asserções PASS**.
+- As quatro provas NOWAIT da R1 já registradas abaixo retornaram `55P03` com
+  escritor ativo em `billing_additionals` e nas três tabelas novas, sem DROP e
+  sem alteração de catálogo/dados. A cobertura do teste foi conferida no
+  fechamento, sem repetir provas suficientes.
+
+Evidências locais preservadas em
+`/private/tmp/fin11-r1-evidencias-fechamento/`: `SHA256SUMS` conferido, logs de
+paridade/rollback, catálogos 044/045, diferenças esperadas, snapshots OFF e
+contagens do histórico. O log NOWAIT está em
+`/private/tmp/fin11-r1-green-final.log`. Esses arquivos ficam fora do Git e não
+são garantidos em outro computador; os runners e fixtures versionados permitem
+reprodução em instância local exclusiva.
+
+**Dificuldades ambientais preservadas:** os dois timeouts de 300 s da rodada
+inicial e os bloqueios de porta/DNS do build local realmente ocorreram. No
+fechamento, PostgreSQL/portas/CLI responderam e a execução controlada completou
+recriação, inicialização e migrations, sem mudar configurações nem substituir a
+instância. O bloqueio anterior foi localizado antes das migrations da aplicação;
+os logs antigos não permitem atribuir sua causa raiz com segurança. Isso não
+constitui falha financeira nem permanece como prova local pendente. As 46 suítes
+SQL e o build local não foram repetidos no fechamento; seus resultados remotos
+no HEAD R1 são evidências distintas.
+
+**Confirmação remota no SHA `74720841`:**
+
+- [CI run 41897151814](https://github.com/therunnas/bslogistica/actions/runs/41897151814):
+  **SUCCESS**; jobs `validar` e `sql-local` **SUCCESS**, incluindo o passo Build.
+  Vercel **SUCCESS** no mesmo SHA; esse check não comprova schema/flags remotos.
+- [Revisão independente Codex](https://github.com/therunnas/bslogistica/pull/95#issuecomment-6640415665)
+  concluída no HEAD R1, sem novos achados; o resumo registra `completed`,
+  `has_any_findings=false` e `has_unresolved_findings=false` para o SHA completo.
+  A [discussão P2](https://github.com/therunnas/bslogistica/pull/95#discussion_r4469985142)
+  está resolvida no GitHub. Não foi solicitada revisão duplicada.
+- CodeRabbit informou que o Draft não recebeu revisão substantiva. Seu check
+  SUCCESS **não é parecer técnico**.
+
+**Limites e próximo gate:** migration 045 somente versionada/testada localmente
+(também no banco efêmero da CI), sem aplicação remota comprovada ou autorizada.
+Nenhuma afirmação de implantação do backend em Preview, HML ou Production;
+nenhuma flag ativada nem dados reais carregados. Permanecem os limites comerciais
+e de rollback do contrato: custo devido não é quitação, idempotência exige a
+mesma chave e rollback 045→044 só é permitido antes de uso, sem concorrência.
+Próximo gate: avaliação final e **autorização específica de merge** do PR #95;
+somente depois, planejamento do FIN-PR-11C mediante autorização. FIN-PR-11C
+continua não iniciado. Não houve merge nem Ready for Review nesta etapa.
+
+### FIN-PR-11B.R1 — registro histórico do P2 (04/11/2026)
 
 Partida: `978c116e7e6aab9ecb7b85a08728b831f5813737`, branch
 `feat/fin-pr-11b-backend-containers`, worktree limpa. A revisão independente
@@ -31,7 +105,8 @@ Prettier Markdown e diff check aprovados. Rollback permitido restaurou catálogo
 exato 044 e preservou dados/auditoria. Os ensaios usaram exclusivamente o projeto
 descartável `bs-fin11-local-3fi66bvw`, com labels/volume/rede reconferidos.
 
-**Limitações desta rodada:** o reset seguinte excedeu 300 s; uma tentativa com o
+**Limitações da rodada inicial (registro histórico):** o reset seguinte excedeu
+300 s; uma tentativa com o
 binário 2.117.0 já instalado, sem resolução npm, também excedeu 300 s. O Postgres
 aceita conexões, mas sem `public.clients` nem catálogo de migrations. Não houve
 outra tentativa nem intervenção em recursos de outros projetos. A repetição da
@@ -42,10 +117,11 @@ específica; Webpack bloqueado por DNS de `fonts.googleapis.com` e encerrado.
 Não interpretar essas falhas ambientais como testes aprovados. Logs R1:
 `/private/tmp/fin11-r1-*.log`, fora do Git.
 
-PR #95 permanece Draft. Próximo gate: conferir CI do novo HEAD e repetir os
-ensaios SQL pendentes após recuperar somente o ambiente descartável, seguido de
-revisão independente. Até lá, validação R1 incompleta. Rollback continua restrito
-a 045→044 antes de uso, sem concorrência; histórico deve recusar com `55000`,
+Naquele checkpoint, o PR #95 permanecia Draft e a validação R1 estava incompleta:
+faltavam conferir a CI, recuperar o ambiente descartável e concluir os ensaios
+e a revisão independente. Essas pendências foram encerradas no fechamento acima.
+Rollback continua restrito a 045→044 antes de uso, sem concorrência; histórico
+deve recusar com `55000`,
 sem remoção de serviços/auditoria. Nenhum banco remoto, Preview, HML ou Production
 foi acessado/alterado, e FIN-PR-11C não foi iniciado.
 
