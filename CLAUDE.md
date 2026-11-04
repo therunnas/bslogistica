@@ -1,4 +1,4 @@
-# BS Soluções Logística — instruções permanentes
+# BS Soluções Logísticas — instruções permanentes
 
 Este arquivo é carregado em toda sessão. Contém apenas o que **não muda**: regras,
 invariantes e fluxo de trabalho. O estado atual de Production, de testes e de
