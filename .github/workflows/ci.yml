@@ -213,6 +213,9 @@ jobs:
       - name: Teste diaria-individual-bonus
         run: npm run test:diaria-individual-bonus
 
+      - name: Teste container-servico
+        run: npm run test:container-servico
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.
