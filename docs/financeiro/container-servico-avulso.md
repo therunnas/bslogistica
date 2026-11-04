@@ -12,9 +12,18 @@ ambientes: [Estado do projeto](../ESTADO_DO_PROJETO.md).
   recálculo de apontamento.
 - O FIN-PR-11 é independente dos PRs 01–10 e da exportação Dynamis do PR-12.
   Faturamento, Fechamento e Relatórios continuam módulos distintos.
-- Valor **cobrado do cliente** e valor **devido/pago pela execução** são
-  conceitos separados; sem regra comercial validada, não inventar tarifa,
-  distribuição, vínculo com trabalhador nem status de pagamento.
+- Valor **cobrado do cliente** e valor **devido ao colaborador pela
+  execução** são conceitos separados. O preço é negociado **caso a caso**,
+  sem tabela fixa; o pagamento é informado por colaborador participante,
+  seja um valor em R$ por pessoa, seja um total a dividir entre eles.
+- O pedido do serviço deve ocorrer **até um dia antes** da execução, conforme
+  a regra comercial relatada. Não inventar preço, equipe ou quantidade.
+- O registro contém data, cliente, operação opcional, descrição do serviço
+  (tamanho/produto), quantidade de containers e valor cobrado.
+- No fechamento e na fatura, o serviço aparece inclusive quando o cliente
+  contratou **somente containers**. Na exportação ao cliente (FIN-PR-12),
+  mostrar linha própria sem custo/margem; custo e resultado pertencem aos
+  relatórios **internos**.
 - Não alterar os snapshots ou os valores de lançamentos já faturados, nem
   reprecificar histórico. Sem carga automática nem alteração remota nesta fase.
 
@@ -39,7 +48,7 @@ produção, receita, obrigação de pagamento e faturamento numa tabela legada.
 Amplia riscos de regressão em RLS, relatórios e `gerar_fatura`.
 
 **B — entidade de execução de container, associada a um adicional de receita.**
-Proposta preferencial **sujeita à validação comercial e técnica**: registrar
+Proposta preferencial **sujeita à validação de arquitetura e testes**: registrar
 lote/serviço executado com quantidade e valores comerciais congelados; gerar
 ou vincular, por RPC transacional e idempotente, **um único**
 `billing_additional` para a cobrança. Obrigações de pagamento ficam em
@@ -48,51 +57,87 @@ Contras: exige nova migration, novas RPCs, integração de leitura e testes
 mais extensos. Vantagem: separa receita, execução e pagamento sem contaminar
 o núcleo de diárias.
 
-**Não implementar ainda nenhuma opção.** A opção B é uma hipótese de
-arquitetura; a adoção definitiva depende das respostas comerciais abaixo,
-da análise de consumers do ledger e da versão real do schema no ambiente
-alvo.
+**Não implementar ainda nenhuma opção.** A opção B é uma hipótese
+de arquitetura; a adoção definitiva depende da revisão dos consumidores
+de faturamento/ledger, da versão real do schema no ambiente alvo e da
+aprovação do desenho, **não de repetir perguntas comerciais já respondidas**.
 
-## Contrato proposto (ainda não aprovado)
+## Regras comerciais já informadas
 
-1. **Execução:** cliente, operação (quando existente), data/período da
-   execução, referência identificadora e quantidade positiva de containers.
-   Não pressupor que exista um número físico único de cada container.
-2. **Receita:** preço unitário negociado ou valor total combinado, conforme
-   regra aprovada; congelar a base de formação e o total por registro. Não
-   modificar o valor de uma fatura emitida.
-3. **Pagamento/custo:** valor unitário devido e beneficiário(s) somente após
-   confirmação comercial. Se houver divisão por equipe, especificar partes
-   sem atribuição presumida. Distinguir obrigação **a pagar** de pagamento
-   **efetivamente realizado**, com prova/auditoria se o escopo abranger baixa.
-4. **Competência:** utilizar o período de execução e a competência de cobrança
-   previstos na 038, sem reabrir faturas e sem criar duas receitas para
-   a mesma prestação. A competência de pagamento pode ser distinta e
-   precisa de decisão específica.
-5. **Segurança:** escrita só por RPC administrativa com piso MFA atual,
-   guardas de papel e identidade, menor privilégio, auditoria e trava de
-   concorrência/idempotência. Proibir UPDATE direto que altere valores
-   faturados ou comprovantes históricos.
-6. **Integração:** faturamento pode exibir quantidade e preço por container
-   **somente** se os totais e invariantes forem preservados. Relatórios podem
-   discriminar serviço avulso; Fechamento continua sem recalcular fontes.
-7. **Compatibilidade:** ausência de registros novos preserva valores,
-   leituras e exportações legados; resolução comercial OFF/ON e calendário
-   territorial não sofrem alteração.
+Estas diretrizes foram registradas na conversa do projeto em 30/10/2026,
+a partir das respostas do cliente; não são decisões técnicas novas:
 
-## Decisões comerciais em aberto (aprovação necessária)
+1. **Solicitação:** serviço solicitado até um dia antes; não impor prazos
+   horários adicionais sem evidência.
+2. **Cobrança:** valor negociado para cada serviço, considerando produto,
+   quantidade, tempo, equipe e eventual ajuda do cliente. **Sem tabela de
+   preços fixa**, fórmula automática de orçamento ou tarifa por container.
+3. **Registro:** data, cliente, operação opcional, descrição com produto/tamanho,
+   quantidade de containers e valor total efetivamente acordado.
+4. **Pagamento:** informar os colaboradores participantes e o valor devido
+   **por colaborador**, aceitando a entrada de R$ por pessoa ou o rateio
+   explícito de um total informado. Não pressupor divisão igualitária sem
+   ter sido escolhida ou registrada.
+5. **Faturamento:** incluir no fechamento/fatura do cliente; se não existirem
+   diárias, a fatura **somente de serviços avulsos** continua válida.
+6. **Exportação e indicadores:** containers em **linha própria** na
+   exportação ao cliente, sem custo/margem (FIN-PR-12); custos e resultado
+   apenas nos relatórios internos. Não duplicar receita no faturamento.
+7. **Competências:** a cobrança de serviço avulso pode ocorrer em
+   competência diferente da execução (capacidade já existente na 038).
+   A data exata do pagamento não foi detalhada.
 
-- **Cobrança:** preço por unidade × quantidade ou valor fechado por lote?
-  O valor varia por cliente, contrato, operação ou execução específica?
-- **Pagamento:** quem recebe — trabalhador individual, equipe, fornecedor ou
-  prestador externo? O pagamento é por container para cada pessoa ou um total
-  a dividir? Qual a regra de custo e de rateio?
-- **Registro:** quem confirma o serviço executado, qual a referência exigida,
-  e como distinguir correção legítima de lançamento duplicado?
-- **Competências:** quando ocorre faturamento e quando o pagamento é devido?
-  Deve existir baixa financeira efetiva ou só previsão/controle de custos?
-- **Cancelamento e alterações:** o que é permitido antes e depois de faturar
-  ou pagar, inclusive estorno e compensação, sem reescrever histórico?
+O sistema deve preservar essas decisões. Não pedir novamente ao cliente
+respostas já fornecidas nem confundir custo previsto com quitação efetiva.
+
+## Contrato técnico proposto (ainda não aprovado)
+
+1. **Execução:** cliente, operação opcional, data/período de execução,
+   descrição do produto/tamanho, quantidade positiva de containers e
+   referência operacional para impedir duplicidade. Não pressupor
+   identificador físico individual de cada container.
+2. **Receita:** valor **total negociado** por execução. Se o orçamento
+   trouxer valor unitário, preservá-lo como evidência, **não** como
+   tabela de preços nem como regra para recalcular o valor combinado.
+   Congelar valor e vínculo de fatura; não reabrir valores históricos.
+3. **Custo por colaborador:** registrar participantes e o custo informado
+   individualmente, em R$ por pessoa ou mediante distribuição explícita
+   de valor total. Validar soma, precisão decimal, não negatividade e
+   autorização da correção. Não associar esse custo à diária ou HE.
+   Distinguir valor **devido** de baixa/valor **pago**; a existência
+   de baixa bancária é extensão não confirmada, não pré-requisito inventado.
+4. **Competência:** reaproveitar período de execução e competência de
+   **cobrança** da 038. Preservar a possibilidade de cobrança antes/depois
+   da execução, sem emissão duplicada. A competência de pagamento será
+   mantida distinta se o fluxo exigir, sem assumir um vencimento.
+5. **Segurança:** escrita por RPC administrativa com piso MFA em vigor,
+   autorização, menor privilégio, auditoria e idempotência. Sem modificar
+   diretamente adicionais faturados, snapshots ou comprovantes históricos.
+6. **Integração:** manter elegibilidade de `billing_additionals` e
+   invariantes de `gerar_fatura`. Testar fatura mista e **somente containers**.
+   Exportação ao cliente com linha própria sem custo/margem; Relatórios
+   internos podem mostrar custo e resultado. Fechamento não recalcula
+   valores fontes.
+7. **Compatibilidade:** sem containers novos, não há alterações em
+   diárias, horas extras, calendário, fechamento legado ou faturas
+   preexistentes; resolução financeira OFF/ON permanece independente.
+
+## Detalhes operacionais a especificar na implementação
+
+Não são lacunas da regra de negócio já respondida. Devem ser resolvidas
+na análise de produto/segurança com a menor alteração necessária:
+
+- Chave de idempotência e evidência mínima para identificar a execução,
+  impedir lançamentos repetidos e tratar correções com trilha.
+- Representação de participantes e rateio individual: como registrar
+  explicitamente a modalidade escolhida, prevenir arredondamento com
+  centavos perdidos e manter histórico; não inventar alocação de equipe.
+- Fluxo de cancelamento antes do faturamento e de ajuste posterior por
+  documento compensatório, nunca edição silenciosa da fatura.
+- Distinguir acompanhamento de custo a pagar de **baixa financeira real**.
+  Não criar conciliação bancária nesta etapa sem decisão de escopo.
+- Acesso por perfil, relatórios internos, item da fatura e formato da
+  exportação ao cliente, mantendo os três módulos separados.
 
 ## Plano de implementação (após aprovação do desenho)
 
@@ -115,7 +160,8 @@ alvo.
 
 ## Critério de saída do desenho
 
-Aprovação explícita da modelagem e das regras de cobrança/pagamento,
-acompanhada de matriz de risco e proposta de testes. **Sem essas decisões,
-o FIN-PR-11 não deve gravar dados financeiros nem criar uma regra de
-pagamento inventada.**
+As regras comerciais acima estão registradas; o próximo gate exige
+**aprovação do desenho técnico e dos critérios de aceite**, matriz de risco
+e proposta de testes. O PR de implementação não deve inventar tarifa,
+quantidade, rateio, pagamento ou datas e **não** autoriza implantação remota.
+O FIN-PR-11 não deve gravar dados reais antes da homologação específica.
