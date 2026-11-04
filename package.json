@@ -67,6 +67,7 @@
     "test:funcoes-turno": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-funcoes-turno.mjs",
     "test:snapshots-tarifas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-snapshots-tarifas.mjs",
     "test:container-servico": "node --experimental-strip-types scripts/testar-container-servico.mjs",
+    "test:container-backend": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-backend.mjs",
     "test:diaria-individual-bonus": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-diaria-individual-bonus.mjs"
   },
   "dependencies": {

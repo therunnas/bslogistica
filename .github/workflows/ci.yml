@@ -216,6 +216,9 @@ jobs:
       - name: Teste container-servico
         run: npm run test:container-servico
 
+      - name: Teste container-backend
+        run: npm run test:container-backend
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.
@@ -225,3 +228,37 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.invalid
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-not-a-real-key
+
+  sql-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # VM efêmera, sem secrets nem vínculo remoto. Nunca reutiliza recursos.
+      - name: Isolar identidade do Supabase local
+        env:
+          CI_LOCAL_PROJECT: bs-fin11-ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          test -z "$(docker ps -aq)"
+          test -z "$(docker volume ls -q)"
+          test ! -e supabase/.temp/project-ref
+          python3 - <<'PY'
+          import os, pathlib, re
+          config = pathlib.Path('supabase/config.toml')
+          text, count = re.subn(r'^project_id\s*=\s*"[^"]+"',
+                               'project_id = "' + os.environ['CI_LOCAL_PROJECT'] + '"',
+                               config.read_text(), count=1, flags=re.M)
+          assert count == 1
+          config.write_text(text)
+          PY
+
+      - name: Testes SQL incluindo backend de containers
+        run: bash scripts/testar-sql-local.sh

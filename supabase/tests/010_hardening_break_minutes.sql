@@ -414,9 +414,11 @@ begin
   -- desde a criação — 22. A 041 acrescenta `contract_rate_terms` (tarifas) e `pricing_settings` (chave da
   -- resolução), ambas com RLS desde a criação — 24. A 042 acrescenta `contract_employee_rates` (diária
   -- individual), com RLS desde a criação — 25. A 044 acrescenta município, local da operação
-  -- e cobertura anual, todas com RLS desde a criação — 28. O banco 043 continua exigindo 25.
+  -- e cobertura anual, todas com RLS desde a criação — 28. A 045 acrescenta execução,
+  -- participantes e auditoria de containers — 31. Bancos 043/044 conservam seus totais exatos.
   perform pg_temp.registrar('F3. todas as tabelas de public seguem com RLS ativa',
-    case when to_regclass('public.municipality_catalog') is null then '25' else '28' end,
+    case when to_regclass('public.container_services') is not null then '31'
+         when to_regclass('public.municipality_catalog') is null then '25' else '28' end,
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity));
@@ -426,6 +428,13 @@ begin
       (select string_agg(c.relname, ', ' order by c.relname) from pg_class c
         where c.relnamespace='public'::regnamespace and c.relkind='r' and c.relrowsecurity
           and c.relname in ('municipality_catalog','operation_location_terms','financial_calendar_coverage')));
+  end if;
+  if to_regclass('public.container_services') is not null then
+    perform pg_temp.registrar('F3c. as três tabelas de containers da 045 têm RLS ativa',
+      'container_service_audit, container_service_participants, container_services',
+      (select string_agg(c.relname, ', ' order by c.relname) from pg_class c
+        where c.relnamespace='public'::regnamespace and c.relkind='r' and c.relrowsecurity
+          and c.relname in ('container_services','container_service_participants','container_service_audit')));
   end if;
 end;
 $bloco_f$;

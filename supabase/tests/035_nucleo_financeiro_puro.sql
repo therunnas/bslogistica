@@ -1548,7 +1548,7 @@ select pg_temp.registrar('F. motor_custo_do_dia (20261021100000_025)', '1|e72d9d
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'motor_custo_do_dia'));
-select pg_temp.registrar('F. gerar_fatura (20261105120000_038)', '1|6fdfcdaf72100fb7db4bc381a2230e41',
+select pg_temp.registrar('F. gerar_fatura (20261112120000_045)', '1|b7ddafbd6b0276f99ebf8eac8147a50a',
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'gerar_fatura'));
