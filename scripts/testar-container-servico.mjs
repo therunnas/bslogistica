@@ -32,7 +32,10 @@ const base = {
 };
 const erros = (altera) => validarLoteDeContainers({ ...base, ...altera });
 function recusa(altera, trecho) {
-  assert.ok(erros(altera).some((e) => e.includes(trecho)), "Esperava erro: " + trecho);
+  assert.ok(
+    erros(altera).some((e) => e.includes(trecho)),
+    "Esperava erro: " + trecho,
+  );
 }
 console.log("FIN-PR-11A: contrato puro de containers");
 caso("1. 0, decimal e inteiro para centavos exatos", () => {
@@ -49,7 +52,15 @@ caso("2. vazio/negativo/3 casas/milhar/valor maior que NUMERIC(12,2) recusados",
 });
 caso("3. datas reais e ano bissexto", () => {
   assert.equal(dataCivilValida("2028-02-29"), true);
-  for (const x of ["2026-02-29", "2026-02-30", "2026-13-01", "2026-00-01", "2026-01-00", "2026-1-1", "abc"]) {
+  for (const x of [
+    "2026-02-29",
+    "2026-02-30",
+    "2026-13-01",
+    "2026-00-01",
+    "2026-01-00",
+    "2026-1-1",
+    "abc",
+  ]) {
     assert.equal(dataCivilValida(x), false, x);
   }
 });
@@ -74,7 +85,9 @@ caso("8. solicitação no mesmo dia ou posterior é recusada", () => {
   recusa({ solicitadoEm: "2026-11-04" }, "dia anterior");
   recusa({ solicitadoEm: "2026-11-05" }, "dia anterior");
 });
-caso("9. datas inexistentes são recusadas", () => recusa({ solicitadoEm: "2026-02-30" }, "datas válidas"));
+caso("9. datas inexistentes são recusadas", () =>
+  recusa({ solicitadoEm: "2026-02-30" }, "datas válidas"),
+);
 caso("10. descrição obrigatória e limitada", () => {
   recusa({ descricao: "   " }, "Descreva");
   recusa({ descricao: "A".repeat(501) }, "500 caracteres");
@@ -89,10 +102,20 @@ caso("12. preço total negociado válido e positivo", () => {
     recusa({ totalCobrado }, "valor total negociado");
   }
 });
-caso("13. referência operacional opcional com limite", () => recusa({ referencia: "x".repeat(201) }, "referência"));
+caso("13. referência operacional opcional com limite", () =>
+  recusa({ referencia: "x".repeat(201) }, "referência"),
+);
 caso("14. participantes são obrigatórios, sem duplicidade", () => {
   recusa({ participantes: [] }, "participantes");
-  recusa({ participantes: [{ colaboradorId: "x", valorDevido: "1" }, { colaboradorId: "x", valorDevido: "1" }] }, "duas vezes");
+  recusa(
+    {
+      participantes: [
+        { colaboradorId: "x", valorDevido: "1" },
+        { colaboradorId: "x", valorDevido: "1" },
+      ],
+    },
+    "duas vezes",
+  );
   recusa({ participantes: [{ colaboradorId: "", valorDevido: "1" }] }, "colaborador");
 });
 caso("15. custo individual não aceita valor inválido", () => {
@@ -101,7 +124,10 @@ caso("15. custo individual não aceita valor inválido", () => {
 caso("16. custo total é soma das partes, sem usar diária nem alterar receita", () => {
   const x = prepararLoteDeContainers({
     ...base,
-    participantes: [{ colaboradorId: "x", valorDevido: "300,10" }, { colaboradorId: "y", valorDevido: "599,90" }],
+    participantes: [
+      { colaboradorId: "x", valorDevido: "300,10" },
+      { colaboradorId: "y", valorDevido: "599,90" },
+    ],
   });
   assert.equal(x.custoTotalCentavos, 90000);
   assert.equal(x.receitaCentavos, 150000);
@@ -119,7 +145,9 @@ caso("17. modo total distribuído exige partes de soma exata, não faz rateio au
 caso("18. modo por pessoa recusa total extra que poderia gerar segunda contagem", () => {
   recusa({ totalDistribuido: "900" }, "não deve enviar");
 });
-caso("19. modalidade desconhecida é recusada", () => recusa({ modalidadeCusto: "outro" }, "desconhecida"));
+caso("19. modalidade desconhecida é recusada", () =>
+  recusa({ modalidadeCusto: "outro" }, "desconhecida"),
+);
 caso("20. competência de cobrança pode diferir da execução", () => {
   const x = prepararLoteDeContainers({
     ...base,
