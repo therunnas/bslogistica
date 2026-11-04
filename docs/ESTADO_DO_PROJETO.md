@@ -5,7 +5,117 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-11C.1 — interface administrativa de containers (04/11/2026)
+
+**Base comprovada:** [PR #95](https://github.com/therunnas/bslogistica/pull/95)
+mergeado por squash em `10bcfd83a42409c477a7df584cca279a1368f216`, main remota
+confirmada no início desta etapa. O checkout FIN-PR-11B foi preservado limpo;
+implementação em `/private/tmp/bs-fin-pr-11c`, branch
+`feat/fin-pr-11c-interface-containers`, criada diretamente dessa main.
+Commit da implementação e testes: `91befbd13bd23eeaf81e97ba68b9971a673ef630`;
+o checkpoint documental fica no commit seguinte. A main foi reconferida na base
+antes da publicação; resultados de CI remota devem ser conferidos no HEAD do PR.
+Os checkpoints anteriores abaixo preservam os estados anteriores ao merge.
+
+**Escopo implementado localmente:** `/containers`, `/containers/novo` e
+`/containers/[id]`, com guarda administrativa server-side, listagem filtrada e
+ordenada, revisão antes de cadastrar, participantes/custos explícitos, competência
+opcional, detalhes persistidos, auditoria e cancelamento confirmado. Navegação
+administrativa e acesso contextual pelo Faturamento; nenhum acesso financeiro
+acrescentado ao operacional. Reutilizados domínio e adaptador FIN-PR-11A/B,
+`registrar_servico_container` e `cancelar_servico_container`, sem escrita direta
+nem nova fonte de receita/custo. Custo devido continua diferente de quitação.
+
+As Server Actions delegam a `exigirAdminAtor()` antes de consultar dados e usam
+`criarClienteServidor()` com cookies da sessão, sem service_role. MFA permanece
+opcional: admin sem fator trabalha em AAL1; fator verificado exige login AAL2.
+RLS, RPCs, grants e regras monetárias continuam sendo autoridade do banco.
+Todas as migrations, inclusive 045, foram preservadas byte a byte com a base.
+
+**Leituras:** DTOs explícitos, campos mínimos, conferência de lastro/centavos,
+contagem e cursor estável; participantes paginados por `employee_id` no serviço,
+pois não têm `id`. Auditoria apresentada sem payloads internos ou identificadores
+de sessão. Schema ausente, autorização, rede e inconsistência recebem respostas
+distintas. Ausência comprovada da tabela 045 conserva o fluxo legado de
+adicionais; erro de rede, RPC/coluna ausente ou leitura parcial não prova que um
+adicional seja legado. Não há fallback de container para adicional genérico nem
+execução automática de migration.
+
+**Intenção e recuperação:** `sessionStorage` preserva usuário, cliente, UUID,
+payload canônico, motivo e estado antes da escrita; não armazena tokens ou
+credenciais. A identidade atual é confirmada no servidor antes de recuperar ou
+reenviar. Erro/corrupção de storage bloqueia envio sem descartar a intenção.
+Duplo clique possui trava síncrona; timeout mantém chave/payload. Recarregamento
+exige reconciliação no backend; resultado incerto nunca cria nova chave.
+Rejeição explícita de validação/entidade inexistente na primeira tentativa pode
+ser corrigida após ausência confirmada, mantendo **cliente e chave**. Intenção
+anteriormente indeterminada permanece bloqueada para edição. Uma nova chave não
+permite inferir duplicidade física entre pedidos distintos, limite já existente.
+
+**Correções da revisão local:** foram reproduzidos e corrigidos dois P2: formulário
+preso após rejeição definitiva de competência e mapa financeiro desatualizado
+oferecendo cancelamento genérico. O formulário agora distingue recusa de resposta
+incerta. Faturamento confirma vínculo fresco tanto antes de abrir como antes de
+confirmar cancelamento; container encaminha ao detalhe, falha bloqueia e somente
+adicional legado comprovado usa a RPC genérica existente. UUIDs são normalizados
+na comparação canônica sem alterar caixa de textos comerciais. A revisão final
+independente do HEAD publicado continua sendo o próximo gate.
+
+**Arquivos:** novas rotas/componentes e `_acoes.ts` em
+`src/app/(painel)/containers/`; módulos `container-servico-dados.ts`,
+`container-servico-servidor.ts`, `container-servico-intencao.ts` e
+`container-servico-ui.ts`; quatro suítes `test-container-{dados,integracao,intencao,telas}.mjs`,
+runner `testar-container-leitura-local.py`, navegação e adicionais de Faturamento.
+Package/CI incluem as novas suítes; runner de compatibilidade inclui a 045.
+Inventários de testes reconhecem o novo link administrativo, guard de página e
+décimo cenário, preservando os cenários antigos e restrições do operacional.
+
+**Evidências executadas:** RED real por módulos/rotas ausentes antes da
+implementação; RED adicionais para corrupção/transições de intenção, reconciliação
+de UUID, rejeição definitiva e erros de capacidade. GREEN em **63 scripts Node**,
+incluindo **21 testes de dados/Actions, 17 de intenção, 27 de telas e 2 de integração**;
+23 do domínio e 7 do adaptador anteriores preservados. Os testes de telas executam
+handlers TSX reais com fronteiras de rede/navegador simuladas; não são E2E visual.
+Lint, TypeScript e AST Python aprovados. Formatação e diff check são conferidos
+antes da publicação.
+
+**Banco local:** nova instância exclusiva `/private/tmp/bs-fin11-local-c1pl1vue11`,
+project_id correspondente, portas 56220–56229 conferidas, labels, volume e rede
+próprios, sem referência remota. Nenhum container/volume anterior reutilizado ou
+removido. A suíte SQL 045 foi realmente executada (**88 asserções PASS**) com
+fixtures sintéticas; a leitura real pela API comprovou quatro serviços,
+participantes, auditoria, lastro e reconciliação sob RLS para admin AAL1 sem fator.
+O runner de leitura não grava nem reseta banco e mantém JWT/credenciais locais
+apenas em memória. A preparação de fixtures foi exclusiva desse projeto.
+
+Compatibilidade final **034, 037, 038, 039, 040, 041, 042, 043, 044 e 045 PASS**:
+**665 asserções**, incluindo capacidade, páginas administrativas autenticadas e
+conferência fresca do vínculo legado, sem RPC de escrita de container nos bancos
+anteriores à 045. O build com o código final e o Supabase local passou nessa
+rodada; o build separado com variáveis inertes também passou. Prettier nos
+formatos suportados e `git diff --check` aprovados.
+
+**Limites:** nenhuma migration aplicada ou flag alterada em banco remoto;
+Não houve intervenção administrativa em Preview, HML ou Production; o destino
+dos seus bancos não foi validado nesta etapa. Código no Git, eventuais checks
+automáticos de Preview e schema implantado são evidências diferentes. Não houve
+homologação com dados reais nem E2E visual em navegador real. Storage de negócio
+é acessível ao JavaScript da origem: não autentica conteúdo, pode ser perdido ao
+encerrar a aba/limpar o navegador e não substitui a idempotência/autorização do
+banco. Resposta sem confirmação permanece bloqueada para reconciliação.
+
+**Continuidade:** logs fora do Git em `/private/tmp/fin11c-*.log`; fixtures e
+runners versionados permitem repetir testes em outro ambiente descartável.
+Próximo gate: PR Draft contra main, CI do HEAD e revisão independente; merge
+depende de autorização específica. Nenhuma migration nova foi criada e nenhuma
+regra de diária, HE, bônus, feriado, tarifa ou faturamento foi modificada.
+FIN-PR-12 e FIN-PR-13 não foram iniciados.
+
 ## FIN-PR-11B — checkpoint de desenvolvimento local (04/11/2026)
+
+Registro histórico anterior à integração do PR #95; o merge comprovado está no
+checkpoint FIN-PR-11C.1 acima. As referências a Draft/merge pendente abaixo
+descrevem seus respectivos momentos, não o estado atual do PR #95.
 
 ### FIN-PR-11B.R2 — fechamento documental da R1 (04/11/2026)
 

@@ -110,12 +110,12 @@ para a última evidência de integração.
    antes do FIN-PR-11. Resultados de validação, pendências e limites de autorização
    ficam exclusivamente em
    [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-histórico-do-pr-90).
-3. **FIN-PR-11A concluído no Git:** domínio puro de containers (PR #94), após o
-   desenho do PR #93. **FIN-PR-11B tecnicamente validado**, aguardando decisão de
-   integração do PR #95 (Draft), com persistência, segurança e faturamento;
-   [checkpoint, riscos e próximo gate](docs/ESTADO_DO_PROJETO.md#fin-pr-11b--checkpoint-de-desenvolvimento-local-04112026).
-   FIN-PR-11C não iniciado: planejamento somente após autorização específica
-   de merge e integração do backend.
+3. **FIN-PR-11A e FIN-PR-11B integrados no Git:** domínio e backend de containers
+   (PRs #94 e #95), após o desenho do PR #93. **FIN-PR-11C.1:** interface
+   administrativa, recuperação de intenção e integração visual com Faturamento;
+   [evidências, limites por ambiente e próximo gate](docs/ESTADO_DO_PROJETO.md#fin-pr-11c1--interface-administrativa-de-containers-04112026).
+   Integração da interface depende de revisão independente e autorização específica;
+   aplicação remota da migration 045 não é presumida.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
    efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título
