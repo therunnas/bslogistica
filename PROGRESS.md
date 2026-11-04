@@ -1,4 +1,4 @@
-# BS Soluções Logística — Progresso
+# BS Soluções Logísticas — Progresso
 
 Andamento do projeto: marcos concluídos, etapa atual e próximas etapas. Regras
 permanentes ficam em [CLAUDE.md](CLAUDE.md); o estado factual de Production, dos
@@ -77,18 +77,39 @@ da matriz.
 ## Próximas etapas
 
 O estado factual e suas limitações estão em [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
-O checkpoint de integração do FIN-PR-09, a situação das migrations e da resolução
-comercial estão centralizados nesse documento.
+O checkpoint de integração dos PRs #90 e #91, a situação das migrations por
+ambiente e da resolução comercial estão centralizados nesse documento.
+
+### Gate documental e diagnóstico antes das próximas implementações
+
+- [ ] **DOC-MASTER-01/B2:** consolidar referências e distinguir fatos atuais,
+  checkpoints históricos e pendências; não duplicar estado mutável fora de
+  [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
+- [ ] **CHECK-UP-AMB-01 (somente leitura):** identificar URL/projeto real de
+  Preview, HML e Production, isolamento entre bancos, migrations presentes,
+  políticas, secrets por escopo e flags; registrar evidências sem expor valores.
+- [ ] **CHECK-UP-REC-01:** conferir integridade, possibilidade de restauração
+  completa e dependências de recuperação antes de qualquer migration em HML.
+- [ ] **CHECK-UP-E2E-01:** concluir matriz real de papéis/MFA, recuperação e
+  isolamento de dados, com contas e cenários de homologação aprovados.
+- [ ] **FIN-VAL:** integrar FIN-PR-11/12/13 separadamente e reconciliar cálculo,
+  fechamento e exportação com as evidências comerciais da quinzena Dynamis.
+
+Os itens acima são **critérios de saída**, não autorização de migração,
+ativação, deploy manual ou teste invasivo. Aprovação de CI e merge de PR não
+substituem validação dos bancos. Consulte o
+[checkpoint Git de 04/11](docs/ESTADO_DO_PROJETO.md#checkpoint-verificado-no-github--04112026)
+para a última evidência de integração.
 
 ### Fase A — financeiro
 
-1. **FIN-PR-09 — concluído no Git:** domingo/feriado ×2 e correções R1 integrados;
+1. **FIN-PR-09:** domingo/feriado ×2 e correções R1 integrados;
    [checkpoint e limites de implantação](docs/ESTADO_DO_PROJETO.md#fin-pr-09--mergeado).
 2. **FIN-PR-10:** calendário nacional e territorial
    expansível, local real da execução, cobertura oficial e proteção do histórico,
    antes do FIN-PR-11. Resultados de validação, pendências e limites de autorização
    ficam exclusivamente em
-   [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-em-andamento).
+   [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-histórico-do-pr-90).
 3. FIN-PR-11: container como serviço avulso.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
@@ -105,8 +126,9 @@ turnos e funções das alocações; cadastrar tarifas padrão e diárias individ
 revisar adicionais entre competências; fazer backup e validar restauração.
 
 Antes da primeira migration em HML, executar integralmente, em uma execução,
-`scripts/testar-compatibilidade-deploy.sh` e confirmar PASS nos sete cenários
-originais de 034–042, ampliando para migrations seguintes. Aplicar migrations em
+`scripts/testar-compatibilidade-deploy.sh` e confirmar PASS nos cenários
+versionados aplicáveis de 034–044 (sem presumir compatibilidade com o catálogo
+remoto), além de verificar backup e a ordem real das migrations. Aplicar migrations em
 HML somente com autorização específica, validar HML antes de Production e ativar
 a resolução comercial somente por decisão separada.
 

@@ -388,8 +388,9 @@ operações sem turno cadastrado.
 Projeto Supabase **BSLOG**. RLS ativa em todas as tabelas do schema `public`, e
 um event trigger (`ensure_rls`) a habilita automaticamente em tabelas novas.
 
-Migrations em `supabase/migrations/`, aplicadas em Production na ordem; o estado
-atual está em [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md). **Nunca editar
+Migrations versionadas em `supabase/migrations/`; a ordem de implantação depende
+do catálogo efetivo de cada ambiente e de autorização específica. O estado
+verificado e os limites de evidência estão em [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md). **Nunca editar
 migration já aplicada** — criar nova com `supabase migration new <nome>`. Antes
 de commitar mudança de esquema, rodar `supabase db advisors --linked --type
 security`. Testes de banco ficam em `supabase/tests/`.

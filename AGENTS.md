@@ -1,4 +1,4 @@
-# Instruções para agentes — BS Soluções Logística
+# Instruções para agentes — BS Soluções Logísticas
 
 Subconjunto essencial e permanente das regras do projeto. A versão completa, para
 Claude Code, é o [CLAUDE.md](CLAUDE.md); as regras compartilhadas **não podem se
