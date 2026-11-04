@@ -219,6 +219,13 @@ jobs:
       - name: Teste container-backend
         run: npm run test:container-backend
 
+      - name: Testes interface e recuperação de containers
+        run: |
+          npm run test:container-dados
+          npm run test:container-integracao
+          npm run test:container-intencao
+          npm run test:container-telas
+
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
       # .invalid nunca resolve, e nenhum código roda contra um banco no build.

@@ -62,6 +62,7 @@ const TELAS = [
   ["relatorios", "PainelRelatorios"],
   ["fechamento", "PainelFechamento"],
   ["usuarios", "PainelUsuarios"],
+  ["containers", "ListaContainers"],
 ];
 
 const fontes = {
@@ -247,9 +248,9 @@ const TELAS_NAV = TELAS.filter(([rota]) => rota !== "usuarios");
 {
   const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";
   verificar(
-    "E5. admin mantém os oito links da navegação principal",
+    "E5. admin mantém os oito links e acrescenta Containers",
     (bloco.match(/\{ href: "\//g) ?? []).length,
-    8,
+    9,
   );
   verificar(
     "E5b. usuários NÃO é um item da navegação principal",
@@ -350,11 +351,11 @@ console.log("\nF. Esconder o link não é a proteção\n");
 // Se o AppShell fosse a única barreira, nenhuma página chamaria o guard. A
 // contagem existe para que remover a chamada de uma tela apareça aqui.
 verificar(
-  "F1. as nove telas chamam o guard, não oito",
+  "F1. as nove telas anteriores e Containers chamam o guard",
   Object.values(paginas).filter(
     (f) => f.includes("await exigirAdmin()") || f.includes("await exigirAdmin()"),
   ).length,
-  9,
+  10,
 );
 // A tela é só a vitrine: a API do Fechamento é alcançável sem passar por ela, e
 // por isso decide o acesso por conta própria, com a mesma regra central.

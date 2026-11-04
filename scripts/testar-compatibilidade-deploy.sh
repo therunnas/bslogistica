@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Compatibilidade de deploy (FIN-PR-03, 05, 06, 07, 08, 09 e 10): o app desta branch contra o banco LOCAL
-#   1) até a 034 — o banco de Production hoje (sem 035 em diante);
+#   1) até a 034 — referência histórica 034 (sem 035 em diante);
 #   2) até a 037 — leitores pelos componentes, sem o período contratual;
 #   3) até a 038 — período contratual e janela de cobrança;
 #   4) até a 039 — catálogo de funções e período do turno;
@@ -10,12 +10,13 @@
 #      ligada: a individual prevalece, HE sobre ela, adicional separado, faturamento concorrente).
 #   8) até a 043 — dias especiais V2;
 #   9) até a 044 — calendário territorial.
+#  10) até a 045 — backend de containers e interface administrativa.
 #
 # NUNCA toca Production nem homologação: Supabase local descartável (`supabase start`,
 # `db reset --local`) e um `next start` local apontado para ele. Cria uma conta de admin SÓ no Auth
 # local, que some no reset seguinte. Não roda na CI (precisa de Docker).
 #
-# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 044)
+# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 045)
 
 set -euo pipefail
 
@@ -71,7 +72,7 @@ rodar() {
 }
 
 echo ""
-echo "=== Cenário 1: banco até a 034 (como Production hoje, sem 035 em diante) ==="
+echo "=== Cenário 1: banco até a 034 (referência histórica, sem 035 em diante) ==="
 supa db reset --local --version 20261101120000 >/dev/null 2>&1
 rodar "banco-034" "sem-componentes" "sem-periodo" "sem-funcoes" "sem-snap" "sem-tarifas" "sem-diaria"
 
@@ -113,10 +114,14 @@ echo "=== Cenário 9: banco até a 044 (calendário territorial) ==="
 supa db reset --local --version 20261111120000 >/dev/null 2>&1
 rodar "banco-044" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
 
+echo "=== Cenário 10: banco até a 045 (containers) ==="
+supa db reset --local --version 20261112120000 >/dev/null 2>&1
+rodar "banco-045" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
+
 if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   echo "FALHOU: o servidor Next registrou erro:" >&2
   grep -iE "unhandled|TypeError|ReferenceError" "$tmp/next.log" | head -10 >&2
   exit 1
 fi
 echo ""
-echo "PASS: o app desta branch funciona com o banco de Production de hoje (034), com os bancos até a 037, 038, 039, 040, 041, 042, 043 e 044 (resolução desligada e ligada, diária individual, bônus, dias especiais V2 e calendário territorial)."
+echo "PASS: compatibilidade local com os schemas 034, 037, 038, 039, 040, 041, 042, 043, 044 e 045, incluindo páginas de containers e ausência segura da capacidade antes da 045. Isso não comprova o schema de Production."

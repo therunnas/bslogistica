@@ -68,7 +68,11 @@
     "test:snapshots-tarifas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-snapshots-tarifas.mjs",
     "test:container-servico": "node --experimental-strip-types scripts/testar-container-servico.mjs",
     "test:container-backend": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-backend.mjs",
-    "test:diaria-individual-bonus": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-diaria-individual-bonus.mjs"
+    "test:diaria-individual-bonus": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-diaria-individual-bonus.mjs",
+    "test:container-dados": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-dados.mjs",
+    "test:container-integracao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-integracao.mjs",
+    "test:container-intencao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-intencao.mjs",
+    "test:container-telas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-telas.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
