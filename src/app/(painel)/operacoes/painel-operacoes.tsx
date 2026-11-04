@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalidadeDaOperacao } from "../_components/calendario-territorial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
@@ -746,6 +747,8 @@ export function PainelOperacoes() {
                     </Button>
                   </div>
                 </div>
+
+                <LocalidadeDaOperacao id={operation.id} />
 
                 {opShifts.length ? (
                   <div className="overflow-x-auto">

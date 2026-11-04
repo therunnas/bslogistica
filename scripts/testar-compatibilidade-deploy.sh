@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compatibilidade de deploy (FIN-PR-03, 05, 06, 07, 08 e 09): o app desta branch contra o banco LOCAL
+# Compatibilidade de deploy (FIN-PR-03, 05, 06, 07, 08, 09 e 10): o app desta branch contra o banco LOCAL
 #   1) até a 034 — o banco de Production hoje (sem 035 em diante);
 #   2) até a 037 — leitores pelos componentes, sem o período contratual;
 #   3) até a 038 — período contratual e janela de cobrança;
@@ -8,25 +8,34 @@
 #   6) até a 041 — tarifas por função e período (resolução desligada e, no fim, ligada);
 #   7) até a 042 — diária individual e adicional diário (resolução desligada = valores iguais;
 #      ligada: a individual prevalece, HE sobre ela, adicional separado, faturamento concorrente).
+#   8) até a 043 — dias especiais V2;
+#   9) até a 044 — calendário territorial.
 #
 # NUNCA toca Production nem homologação: Supabase local descartável (`supabase start`,
 # `db reset --local`) e um `next start` local apontado para ele. Cria uma conta de admin SÓ no Auth
 # local, que some no reset seguinte. Não roda na CI (precisa de Docker).
 #
-# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 043)
+# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 044)
 
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-docker info >/dev/null 2>&1 || { echo "Docker não está disponível." >&2; exit 1; }
+# Ambiente do processo não pode sobrepor a identidade do config.toml isolado.
+unset SUPABASE_PROJECT_ID
 
-supa() { env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 "$@"; }
+local_command() { python3 scripts/_executar_local.py "$@"; }
+
+local_command 30 docker info >/dev/null 2>&1 || { codigo=$?; echo "Docker indisponível ou fora do prazo." >&2; exit "$codigo"; }
+
+supa() { local_command 300 env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 "$@"; }
 
 echo "Subindo Supabase local..."
-supa start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null 2>&1 || supa start >/dev/null
+supa start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null 2>&1 || { codigo=$?; if [ "$codigo" -eq 124 ]; then exit 124; fi; supa start >/dev/null; }
 
-eval "$(supa status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+status_local=$(supa status -o env 2>/dev/null)
+eval "$(printf '%s\n' "$status_local" | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+unset status_local
 project_id=$(grep -E '^project_id' supabase/config.toml | sed -E 's/^project_id[[:space:]]*=[[:space:]]*"(.*)"$/\1/')
 export API_URL ANON_KEY SERVICE_ROLE_KEY CONTAINER="supabase_db_${project_id}"
 case "$API_URL" in http://127.0.0.1:*|http://localhost:*) ;; *) echo "API_URL não é local: $API_URL" >&2; exit 1 ;; esac
@@ -34,18 +43,31 @@ case "$API_URL" in http://127.0.0.1:*|http://localhost:*) ;; *) echo "API_URL n�
 tmp=$(mktemp -d)
 porta=3987
 servidor=""
-trap '[ -n "$servidor" ] && kill "$servidor" 2>/dev/null; rm -rf "$tmp"' EXIT
+cleanup() {
+  if [ -n "$servidor" ]; then
+    kill "$servidor" 2>/dev/null || true
+    wait "$servidor" 2>/dev/null || true
+  fi
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
 
 echo "Build do app apontado para o Supabase local..."
 export NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" NEXT_TELEMETRY_DISABLED=1
-npm run build >"$tmp/build.log" 2>&1 || { tail -30 "$tmp/build.log" >&2; exit 1; }
-npx next start -p "$porta" >"$tmp/next.log" 2>&1 &
+local_command 300 npm run build >"$tmp/build.log" 2>&1 || { tail -30 "$tmp/build.log" >&2; exit 1; }
+python3 scripts/_executar_local.py 7200 npx next start -p "$porta" >"$tmp/next.log" 2>&1 &
 servidor=$!
-for _ in $(seq 1 60); do curl -s -o /dev/null "http://127.0.0.1:$porta/login" && break; sleep 1; done
+pronto=false
+for _ in $(seq 1 60); do
+  if curl --connect-timeout 1 --max-time 2 -fs -o /dev/null "http://127.0.0.1:$porta/login"; then pronto=true; break; fi
+  kill -0 "$servidor" 2>/dev/null || { echo "Servidor local encerrou antes de ficar pronto." >&2; exit 1; }
+  sleep 1
+done
+[ "$pronto" = true ] || { echo "Servidor local não ficou pronto dentro do prazo." >&2; exit 124; }
 export BASE_URL="http://127.0.0.1:$porta"
 
 rodar() {
-  node --experimental-strip-types --import ./scripts/_resolver-compat.mjs scripts/testar-compatibilidade-deploy.mjs "$1" "$2" "$3" "$4" "$5" "$6" "$7"
+  local_command 300 node --experimental-strip-types --import ./scripts/_resolver-compat.mjs scripts/testar-compatibilidade-deploy.mjs "$1" "$2" "$3" "$4" "$5" "$6" "$7"
 }
 
 echo ""
@@ -84,8 +106,12 @@ supa db reset --local --version 20261109120000 >/dev/null 2>&1
 rodar "banco-042" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
 
 echo "=== Cenário 8: banco até a 043 (dias especiais V2) ==="
-supa db reset --local >/dev/null 2>&1
+supa db reset --local --version 20261110120000 >/dev/null 2>&1
 rodar "banco-043" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
+
+echo "=== Cenário 9: banco até a 044 (calendário territorial) ==="
+supa db reset --local --version 20261111120000 >/dev/null 2>&1
+rodar "banco-044" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
 
 if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   echo "FALHOU: o servidor Next registrou erro:" >&2
@@ -93,4 +119,4 @@ if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   exit 1
 fi
 echo ""
-echo "PASS: o app desta branch funciona com o banco de Production de hoje (034), com os bancos até a 037, 038, 039, 040, 041, 042 e 043 (resolução desligada e ligada, diária individual, bônus e dias especiais V2)."
+echo "PASS: o app desta branch funciona com o banco de Production de hoje (034), com os bancos até a 037, 038, 039, 040, 041, 042, 043 e 044 (resolução desligada e ligada, diária individual, bônus, dias especiais V2 e calendário territorial)."

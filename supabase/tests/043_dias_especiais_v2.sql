@@ -118,6 +118,29 @@ insert into public.operation_team (operation_id, shift_id, employee_id, job_func
 insert into public.user_operation_access (user_id, operation_id)
   values ('5c420000-0000-4000-8000-0000000000a2', '5c42e000-0000-4000-8000-0000000000a1');
 
+-- Precondições territoriais somente quando a 044 estiver instalada.
+-- São dados sintéticos explícitos; os oráculos financeiros e a ativação da resolução permanecem os da suíte.
+do $$
+declare ano integer;
+begin
+ if to_regclass('public.municipality_catalog') is not null then
+  execute $q$insert into public.municipality_catalog(code,name,state_code,official_url)
+   values('4200000','MUNICIPIO_TESTE_044','SC',
+    'https://servicodados.ibge.gov.br/api/v1/localidades/municipios/4200000')$q$;
+  execute $q$insert into public.operation_location_terms(operation_id,municipality_code,valid_from,reason)
+   select id,'4200000',date '2020-01-01','FIXTURE_LOCALIDADE_SINTETICA_044'
+    from public.operations where client_id='5c42c000-0000-4000-8000-0000000000c1'$q$;
+  -- 2025 nas suítes 043 permite testar tarifa fora da vigência sem confundir falta de calendário com falta de preço.
+  foreach ano in array array[2025,2026] loop
+   execute $q$insert into public.financial_calendar_coverage
+    (calendar_year,territory_scope,state_code,municipality_code,legal_act,official_url,client_confirmed,reason)
+    values($1,'nacional',null,null,'ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044'),
+          ($1,'estadual','SC',null,'ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044'),
+          ($1,'municipal','SC','4200000','ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044')$q$ using ano;
+  end loop;
+ end if;
+end; $$;
+
 set constraints all immediate;
 select pg_temp.registrar('F0. motor ligado', 'true',
   pg_temp.adm($q$select (public.alterar_motor_vigencia(true, 'Ligado no teste IND') ->> 'ativo')$q$));
@@ -202,7 +225,27 @@ select pg_temp.assert_eq('02 fonte individual, contrato, custo, função e perí
     and job_function_id_snapshot=pg_temp.fn('conferente') and shift_period_snapshot='diurno')::text
    from public.timesheet_entries where id=pg_temp.id_de('1','2026-03-01')), 'true');
 select pg_temp.adm($q$select public.registrar_feriado('2026-03-02','FERIADO_TESTE_A','FERIADO_TESTE_A')$q$);
+-- A mesma hipótese de feriado fica confirmada no território do teste, sem promover o legado global.
+do $$
+begin
+ if to_regclass('public.municipality_catalog') is not null then
+  execute $q$insert into public.financial_holidays
+   (holiday_date,name,reason,territory_scope,legal_act,official_url,verification_status,client_confirmed)
+   values('2026-03-02','FERIADO_TERRITORIAL_SINTETICO_2026-03-02','FIXTURE_LOCALIDADE_SINTETICA_044',
+    'nacional','ATO_SINTETICO','https://exemplo.gov.br/calendario','confirmado',true)$q$;
+ end if;
+end; $$;
 select pg_temp.adm($q$select public.registrar_feriado('2026-03-08','FERIADO_TESTE_B','FERIADO_TESTE_B')$q$);
+-- A mesma hipótese de feriado fica confirmada no território do teste, sem promover o legado global.
+do $$
+begin
+ if to_regclass('public.municipality_catalog') is not null then
+  execute $q$insert into public.financial_holidays
+   (holiday_date,name,reason,territory_scope,legal_act,official_url,verification_status,client_confirmed)
+   values('2026-03-08','FERIADO_TERRITORIAL_SINTETICO_2026-03-08','FIXTURE_LOCALIDADE_SINTETICA_044',
+    'nacional','ATO_SINTETICO','https://exemplo.gov.br/calendario','confirmado',true)$q$;
+ end if;
+end; $$;
 select pg_temp.save('holiday','2026-03-02','1','06:00','08:00');
 select pg_temp.assert_eq('03 feriado 120 minutos', pg_temp.money(pg_temp.id_de('1','2026-03-02')),
  '130.00|40.00|0.00|0.00|130.00|0.00|120|0|0|feriado|2');
@@ -225,9 +268,23 @@ select pg_temp.assert_eq('11 operação sem contrato usa valor acordado 200, cus
  (select billed_amount::text||'|'||cost_amount||'|'||daily_rate_snapshot||'|'||terms_origin from public.timesheet_entries where employee_id=pg_temp.emp('1') and operation_id='5c42e000-0000-4000-8000-0000000000a2' and work_date='2026-03-01'), '50.00|20.00|200.00|valor_acordado');
 select pg_temp.assert_eq('12 jornada incompleta recusada', pg_temp.save('incomplete','2026-03-15','1','06:00',null),'erro 22023');
 select pg_temp.assert_eq('13 entrada igual saída recusada', pg_temp.save('equal','2026-03-15','1','06:00','06:00'),'erro 23514');
-select pg_temp.save('midnight','2026-03-15','1','23:30','01:30',60);
-select pg_temp.assert_eq('14 virada e intervalo, sem HE comum', pg_temp.money(pg_temp.id_de('1','2026-03-15')),
- '65.00|20.00|0.00|0.00|65.00|0.00|60|0|0|domingo|2');
+do $$
+begin
+ if to_regclass('public.municipality_catalog') is not null then
+  -- Na 044 a jornada ocupa domingo e segunda civis. Sem regra comercial aprovada para mistura,
+  -- o motor recusa; não é permitido atribuir todos os minutos ao domingo de work_date.
+  perform pg_temp.assert_eq('14 na 044 virada domingo/útil requer regra comercial',
+   pg_temp.save('midnight','2026-03-15','1','23:30','01:30',60),'erro 55000');
+  perform pg_temp.assert_eq('14 na 044 jornada mista recusada não deixa registro',
+   (select count(*)::text from public.timesheet_entries where employee_id=pg_temp.emp('1')
+    and operation_id='5c42e000-0000-4000-8000-0000000000a1' and work_date='2026-03-15'),'0');
+ else
+  -- Oráculo monetário original da 043 permanece integralmente coberto no banco 043.
+  perform pg_temp.save('midnight','2026-03-15','1','23:30','01:30',60);
+  perform pg_temp.assert_eq('14 virada e intervalo, sem HE comum', pg_temp.money(pg_temp.id_de('1','2026-03-15')),
+   '65.00|20.00|0.00|0.00|65.00|0.00|60|0|0|domingo|2');
+ end if;
+end; $$;
 select pg_temp.save('absent','2026-03-15','2',null,null,0,'a1','a1','','absent');
 select pg_temp.assert_eq('15 ausência zero, sem fonte inventada',
  (select (billed_amount=0 and cost_amount=0 and additional_amount=0 and worked_minutes=0 and calc_version=2 and contract_terms_id is null)::text from public.timesheet_entries where id=pg_temp.id_de('2','2026-03-15')), 'true');
@@ -335,7 +392,7 @@ end; $$;
 select pg_temp.assert_eq('46 lastro não se exclui',pg_temp.adm(format('delete from public.timesheet_entries where id=%L',pg_temp.id_de('1','2026-03-01'))),'erro 42501');
 select pg_temp.assert_eq('47 bônus faturado recusado',pg_temp.adm(format($q$select public.definir_bonus_do_apontamento(%L,40,'FATURADO',true)$q$,pg_temp.id_de('1','2026-03-01'))),'erro 55000');
 select pg_temp.adm($q$select public.registrar_diaria_individual('5c42d000-0000-4000-8000-0000000000d1','5c42f000-0000-4000-8000-000000000001','2026-07-01',300,'FUTURO_TESTE',null,true)$q$);
-select pg_temp.adm($q$select public.aposentar_feriado((select id from public.financial_holidays where holiday_date='2026-03-02' and active),'FUTURO_CALENDARIO_TESTE')$q$);
+select pg_temp.adm($q$select public.aposentar_feriado((select id from public.financial_holidays h where holiday_date='2026-03-02' and active and coalesce(to_jsonb(h)->>'territory_scope','legado')='legado'),'FUTURO_CALENDARIO_TESTE')$q$);
 select pg_temp.assert_eq('48 futuro preço/calendário/modo não reprecifica faturados', (select bool_and(to_jsonb(te)=f.j)::text from _frozen f join public.timesheet_entries te using(id)),'true');
 select pg_temp.assert_eq('49 auditoria bônus presente', (select (count(*)>=4)::text from public.financial_terms_audit where action='apontamento_bonus_definido'),'true');
 select pg_temp.exec('invoice-rounded',$q$select (public.gerar_fatura('5c42c000-0000-4000-8000-0000000000c1','2026-04-01','2026-04-15')).id::text$q$);

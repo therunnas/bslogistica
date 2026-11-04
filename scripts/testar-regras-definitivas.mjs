@@ -644,9 +644,9 @@ const migrations = readdirSync("supabase/migrations")
   .filter((f) => f.endsWith(".sql"))
   .sort();
 verificar(
-  "G1. a 030 existe, a 043 (dias especiais V2, FIN-PR-09) é a última migration e a 019 continua ausente",
+  "G1. a 030 existe, a 044 (calendário territorial, FIN-PR-10) é a última migration e a 019 continua ausente",
   [migrations.includes(NOME), migrations.at(-1), migrations.some((m) => m.includes("_019_"))],
-  [true, "20261110120000_043_dias_especiais_v2.sql", false],
+  [true, "20261111120000_044_calendario_territorial.sql", false],
 );
 verificar(
   "G2. arredondamento só na COBRANÇA: o custo usa o excedente exato; o feriado só no custo",

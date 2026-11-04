@@ -141,6 +141,13 @@ export interface EntradaDaLinha {
   regrasBs?: boolean;
   /** O banco anunciou as regras definitivas (030, `regras_definitivas`). */
   regrasDefinitivas?: boolean;
+  /** Consulta independente: erro ou pendência nunca transforma feriado em dia comum. */
+  estadoDoCalendario?: "pronto" | "carregando" | "erro" | "pendente" | "localidade_ausente";
+  /** Só para antiga presença sem classificação congelada: fallback exclusivo do calendário 030. */
+  calendarioLegado?: {
+    estado: "pronto" | "carregando" | "erro";
+    tipoDoDia: TipoDoDia;
+  };
   /** O banco anunciou o núcleo V2 no motor (036, `nucleo_v2`). */
   nucleoV2?: boolean;
   /** A 043 e a resolução ON foram confirmadas; prévia especial aguarda o banco. */
@@ -282,7 +289,7 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
       estado.tag === "carregando"
         ? "Prévia indisponível: verificando as regras financeiras."
         : "Prévia indisponível: as regras financeiras não foram confirmadas.",
-      false,
+      e.estadoDoCalendario !== undefined,
     );
   }
 
@@ -290,7 +297,10 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
   if (semMudanca && e.gravado) return doBanco(e.gravado);
   const regrasBs = e.regrasBs === true;
   const regrasDefinitivas = regrasBs && e.regrasDefinitivas === true;
-  const tipoDoDia: TipoDoDia = e.tipoDoDia ?? "util";
+  const gravadaPresente = e.gravada && e.gravado && e.gravado.status !== "absent";
+  const tipoDoDia: TipoDoDia = gravadaPresente
+    ? tipoGravado(e.gravado?.day_kind_snapshot, e.calendarioLegado?.tipoDoDia ?? "util")
+    : (e.tipoDoDia ?? "util");
   const especialV2 =
     e.diasEspeciaisV2 === true &&
     (e.domingo === true ||
@@ -322,6 +332,19 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
     if (!c) {
       return INDISPONIVEL(
         "Apontamento anterior ao histórico de vigências: horário, intervalo e status só mudam depois da regularização por um administrador.",
+        true,
+      );
+    }
+    const classificacaoCongelada =
+      g.day_kind_snapshot === "domingo" || TIPOS_DO_DIA.includes(g.day_kind_snapshot ?? "");
+    if (
+      regrasDefinitivas &&
+      !classificacaoCongelada &&
+      e.calendarioLegado &&
+      e.calendarioLegado.estado !== "pronto"
+    ) {
+      return INDISPONIVEL(
+        "Prévia indisponível: aguardando o calendário legado deste apontamento.",
         true,
       );
     }
@@ -367,7 +390,17 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
     };
   }
 
-  // Linha nova ou falta -> presença: vigência da data trabalhada.
+  // Linha nova ou falta -> presença: só aqui é necessário capturar o calendário atual.
+  if (e.estadoDoCalendario && e.estadoDoCalendario !== "pronto") {
+    return INDISPONIVEL(
+      e.estadoDoCalendario === "localidade_ausente"
+        ? "Defina a localidade real da operação com vigência antes de apontar."
+        : e.estadoDoCalendario === "pendente"
+          ? "Calendário pendente: confirme a cobertura nacional, estadual e municipal do ano."
+          : "Prévia indisponível: aguardando confirmação do calendário. Tente novamente.",
+      true,
+    );
+  }
   const cond = e.condicaoDoDia;
   if (!cond) return INDISPONIVEL("Consultando a vigência da data trabalhada…", true);
   if (!cond.ok) return INDISPONIVEL(cond.motivo, true);

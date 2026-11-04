@@ -45,6 +45,12 @@ jobs:
       - name: Teste dias-especiais
         run: npm run test:dias-especiais
 
+      - name: Teste calendario-territorial
+        run: npm run test:calendario-territorial
+
+      - name: Teste calendario-runners
+        run: npm run test:calendario-runners
+
       - name: Teste cookies-supabase
         run: npm run test:cookies-supabase
 

@@ -5,6 +5,8 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
+    "test:calendario-territorial": "node --experimental-strip-types scripts/test-calendario-territorial.mjs",
+    "test:calendario-runners": "node --experimental-strip-types scripts/test-calendario-runners.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

@@ -5,11 +5,12 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
-## Checkpoint de 01/11/2026
+## Checkpoint de 02/11/2026 — início do FIN-PR-10
 
-**Ambientes: último estado informado, não revalidado nesta sessão.** O Git confirma
-os PRs #86 e #87 na base `6b1edc3aa2a5894aa674ef22ed43f989551da966`; o
-PR #86 encerrou o FIN-PR-08 em `b38579075d2675918b24b97440ef546ea04ad27f`.
+**Ambientes: último estado informado, não revalidado nesta sessão.** O GitHub
+confirma o PR #89 (FIN-PR-09) mergeado em
+`5e28b01fef992090136595aa2ee5dd97975e1160`, base do FIN-PR-10.
+O FIN-PR-08 e as correções documentais anteriores permanecem integrados.
 Código versionado, validação de testes, publicação de aplicação, aplicação de
 migrations e ativação de funcionalidade são estados distintos.
 
@@ -18,11 +19,11 @@ migrations e ativação de funcionalidade são estados distintos.
   São controles diferentes.
 - Migrations 032 (MFA opcional), 033 (integridade da taxa legada) e 034 (MFA
   somente no login): aplicadas em Production, conforme informado. As migrations
-  035–042 estão versionadas, mas não aplicadas em HML ou Production, conforme
-  informado. A 042 é a última versionada nesta base, não uma afirmação sobre a
-  última aplicada em Production.
+  035–043 estão versionadas. Não há aplicação remota da 043 confirmada no último
+  checkpoint; as anteriores permanecem conforme o último estado informado. Código
+  mergeado não comprova aplicação em HML ou Production.
 - FIN-PR-01, 02, 03, 05, 06, 07 e 08 foram integrados; PR-04 foi absorvido pelo
-  PR-02. PR-09 é a próxima implementação financeira e está pendente.
+  PR-02. FIN-PR-09 foi mergeado; FIN-PR-10 está em andamento local.
 - SEC-DEP-01 foi integrado. A matriz E2E e a comprovação de isolamento real de
   Preview/HML permanecem pendentes; riscos residuais estão em [Segurança](SEGURANCA.md).
 
@@ -39,7 +40,8 @@ migrations e ativação de funcionalidade são estados distintos.
 | 040       | Snapshots de função e período          |
 | 041       | Tarifas por função, período e vigência |
 | 042       | Diária individual e bônus diário       |
-| 043       | Dias especiais V2 (nesta branch)       |
+| 043       | Dias especiais V2 (PR #89 mergeado)    |
+| 044       | Calendário territorial (nesta branch)  |
 
 O repositório contém suítes para essas entregas; resultados históricos não
 comprovam execução nesta sessão. As migrações remotas e a ativação de preços não
@@ -52,24 +54,23 @@ podem ser inferidas de código mergeado nem dos testes locais.
   por 1,5, com arredondamento diário 15/45 ou acumulado quando configurado.
 - Sábado: referência de cobrança de 4 horas, diária integral até a referência,
   HE depois dela e divisor 8 para HE.
-- Domingo e feriado: regra comercial aprovada para o **FIN-PR-09, ainda não
-  implementada na integração**: sem diária-base; horas trabalhadas × diária
-  comercial resolvida ÷ 8 × 2; custo previsto separado também ×2; arredondamento
-  especial configurável, com minutos exatos por padrão. O núcleo puro já admite
-  dias especiais; os lançamentos seguem o cálculo legado até o PR-09.
+- Domingo e feriado: regra integrada pelo **FIN-PR-09**, somente com resolução
+  comercial ON: sem diária-base nem HE comum; minutos trabalhados × diária
+  comercial resolvida × 2 ÷ 480; custo previsto separado também ×2; arredondamento
+  especial configurável, com minutos exatos por padrão. Domingo também feriado
+  recebe o fator uma vez. Com OFF, novos lançamentos preservam a regra anterior.
 - Com resolução comercial ligada, a fonte é a diária individual vigente por
   colaborador e contrato; na ausência, a tarifa padrão de contrato, função,
   período e vigência; sem fonte válida, há erro. Operação sem contrato usa sua
   fonte de valor acordado. Com resolução desligada preservam-se valores legados.
 - Função e período são snapshots; a HE usa a diária comercial resolvida. O bônus
   diário por acúmulo é separado, somado uma vez, fora da base de HE, e registrado
-  por RPC administrativa com motivo e auditoria. A 042 recusa bônus em domingo e
-  feriado enquanto esses lançamentos permanecem no cálculo legado; a integração
-  de bônus nesses dias pertence ao PR-09.
+  por RPC administrativa com motivo e auditoria. Domingo/feriado em V2 admite
+  bônus conforme FIN-PR-09; registros legados e resolução OFF recusam novos bônus.
 - Preço cobrado não é custo do colaborador. O sistema apresenta **custo previsto**,
   não folha de pagamento; não se presume custo para o bônus.
 
-### FIN-PR-09 — implementação local em revisão
+### FIN-PR-09 — mergeado
 
 A migration `20261110120000_043_dias_especiais_v2.sql` integra domingo/feriado ao
 núcleo 035 somente com resolução comercial ligada. OFF conserva a 042; instalar
@@ -88,9 +89,10 @@ ou `meia_hora_15_45` (fronteiras do núcleo: 15 inclui meia hora, 45 inclui hora
 inteira). Só a cobrança arredonda; o custo usa minutos efetivos. A nova RPC
 `registrar_condicao_contrato_especial` espelha os parâmetros da RPC antiga e
 acrescenta `p_special_rounding_mode`; registra uma versão com motivo e auditoria.
-As assinaturas antigas permanecem; a correção contratual preserva o modo da
-versão corrigida. Trocar modo exige nova vigência. A configuração não tem nova
-interface nesta etapa.
+As assinaturas antigas permanecem; o registro pela assinatura antiga herda o
+modo da versão ativa imediatamente anterior (ou minutos sem anterior), e a
+correção contratual preserva o modo da versão corrigida. Trocar modo exige nova
+vigência. A configuração não tem nova interface nesta etapa.
 
 Provas locais reproduzíveis: suíte `supabase/tests/043_dias_especiais_v2.sql`,
 `npm run test:dias-especiais` e
@@ -108,8 +110,89 @@ versionado. CLI fixado em 2.117.0 para reprodução; nenhuma dependência do app
 Rollback: [rollback-dias-especiais-v2.sql](runbooks/rollback-dias-especiais-v2.sql).
 Recusa uso especial V2 ou configuração incompatível, inclusive auditada; não
 apaga bônus, snapshots, tarifas, lastro ou trilha. Nenhuma aplicação remota desta
-migration é autorizada por esta implementação. Resultado final das execuções e
-limitações devem constar no PR Draft, antes da revisão independente.
+migration é autorizada por esta implementação. Evidências da entrega e da revisão
+R1 estão no PR #89. Especial V2 não faturado que exija recálculo com resolução OFF
+é recusado com 55000; notas sem mudança financeira preservam valores, e ON permite
+recalcular preservando o bônus. Faturados continuam imutáveis.
+
+### FIN-PR-10 — calendário territorial nacional em andamento
+
+Desenvolvimento e testes exclusivamente locais, seguido de commits, push e PR
+Draft. Sem autorização para merge, Ready for Review, deploy, HML, Production,
+ativação de tarifas ou carga remota. Migrations 001–043 permanecem intactas.
+O estado mutável permanece centralizado neste documento; PROGRESS aponta para cá.
+
+A migration `20261111120000_044_calendario_territorial.sql` está implementada na
+branch `feat/fin-pr-10-calendario-nacional`, sem aplicação remota. O primeiro
+commit, `4edb43e40182811ce1b6f805bdcf82a2af68aa81`, contém somente este documento e
+PROGRESS. O modelo usa `financial_holidays`, catálogo IBGE, local de execução
+vigenciado e cobertura oficial anual por âmbito. Novas presenças ON sem local ou
+cobertura confirmados são recusadas; OFF conserva o caminho anterior. Não houve
+carga real de calendário, backfill ou ativação de preços.
+
+Validação local repetida no FIN-PR-10/R1: 45 suítes SQL no schema 044 e todas
+as 57 suítes Node passaram; lint, TypeScript, Prettier nos formatos suportados e
+build também. A suíte 044 contém 255 asserções, incluindo 52 específicas de R1;
+a renderização comportamental da interface cobre 17 casos.
+Paridade financeira OFF exata 042/043 e 043/044, catálogo e rollback permitido e
+bloqueado foram comprovados na instância descartável exclusiva. Compatibilidade
+034, 037, 038, 039, 040, 041, 042, 043 e 044 aprovada: 541 asserções, zero falhas.
+Entrega em PR Draft para revisão independente, sem Ready for Review ou merge.
+
+Na revisão R1 do PR #90, o cadastro escolhe a interface pelo regime financeiro
+confirmado e pela capacidade: OFF mantém calendário/RPCs legados; ON com 044 usa
+territorial; estado desconhecido não libera cadastro. Brasília/DF mantém o código
+IBGE `5300108` e os mesmos campos de vínculo/snapshot, sem município jurídico.
+O âmbito `distrital` exige UF DF, sem código municipal; o calendário do DF exige
+coberturas nacional e distrital, sem terceira cobertura municipal fictícia.
+As demais UFs mantêm as três coberturas. Nenhuma data distrital foi inferida.
+
+RED/GREEN registrados para OFF e DF. A matriz distrital confirma admin sem fator
+em AAL1 e admin com fator em AAL2; recusa MFA pendente, operacional, sem papel,
+anon e sessão inválida sem escrita/auditoria residual. Sobreposição com domingo
+cobra ×2 uma vez; fatura e snapshots permanecem imutáveis após aposentadoria de
+feriado/cobertura. O corpo da derivação financeira e os pins de MD5 não mudaram
+em R1. As duas referências de Ilhota esclarecem a alteração do Anexo Único do
+Decreto 14/2026 pelo Decreto 235/2026, sem mudar datas ou classificações.
+
+Os ensaios R1 reutilizaram somente a instância descartável exclusiva FIN10 após
+revalidar labels, volume, rede e fixtures sintéticos. Nenhuma ação em banco
+remoto. PR #90 permanece Draft para revisão independente. Resultados da CI devem
+ser conferidos no HEAD remoto do PR. Sem Ready for Review ou merge.
+
+Contratos, guardas e reprodução em
+[calendario-territorial.md](financeiro/calendario-territorial.md); pesquisa oficial,
+datas e pendências em
+[calendario-fontes-oficiais.md](financeiro/calendario-fontes-oficiais.md). Fontes
+municipais ainda exigem conferência do cliente e da legislação aplicável; anos
+sem calendário anual confirmado permanecem pendentes. A regra de turnos mistos
+não foi ativada: classificações distintas são bloqueadas com 55000 até decisão
+comercial explícita sobre segmentos e horários do intervalo.
+
+Regras confirmadas para esta etapa:
+
+- Calendário expansível para todas as UFs e municípios brasileiros, sem alteração
+  de código ao incluir uma nova localidade. Prioridade inicial: Santa Catarina,
+  Itajaí, Navegantes, Balneário Camboriú, Brusque, Barra Velha e Ilhota.
+- O local real da execução determina a abrangência nacional, estadual e municipal;
+  não se presume a sede do cliente. Localidade conhecida e calendário oficialmente
+  confirmado são estados distintos. Ausência de cadastro não prova dia útil.
+- Fechamento predominantemente quinzenal, com modalidade mensal. Não há aprovação
+  do cliente no fluxo de fechamento.
+- Jornada de referência de 8 horas; intervalo conforme turno, de 1 ou 2 horas.
+  Turnos mistos exigem identificação dos segmentos por data civil; sem horário do
+  intervalo, não se inventa sua distribuição nem nova cobrança. A classificação
+  financeira por segmento depende de regra comercial confirmada; FIN-PR-09 segue
+  protegido enquanto essa decisão estiver pendente.
+- Adicionais avulsos podem ter competência de cobrança diferente da execução.
+  Container é serviço avulso com cobrança negociada e pagamento por container,
+  exclusivo do FIN-PR-11; não será desenvolvido nesta etapa.
+- Diária individual muda por admin mediante nova vigência. Históricos, snapshots
+  e faturas não são reprecificados. Domingo/feriado e bônus seguem FIN-PR-09.
+- Custo previsto não é folha de pagamento.
+- Fontes oficiais para 2026–2028 serão conferidas; datas municipais dependem de
+  conferência do cliente antes de ativação real. Sem comprovação, ficam pendentes;
+  ponto facultativo não vira feriado automaticamente. Nenhuma carga real na migration.
 
 ### Referência para conciliação futura
 

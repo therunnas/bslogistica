@@ -118,6 +118,29 @@ insert into public.operation_team (operation_id, shift_id, employee_id, job_func
 insert into public.user_operation_access (user_id, operation_id)
   values ('5c420000-0000-4000-8000-0000000000a2', '5c42e000-0000-4000-8000-0000000000a1');
 
+-- Precondições territoriais somente quando a 044 estiver instalada.
+-- São dados sintéticos explícitos; os oráculos financeiros e a ativação da resolução permanecem os da suíte.
+do $$
+declare ano integer;
+begin
+ if to_regclass('public.municipality_catalog') is not null then
+  execute $q$insert into public.municipality_catalog(code,name,state_code,official_url)
+   values('4200000','MUNICIPIO_TESTE_044','SC',
+    'https://servicodados.ibge.gov.br/api/v1/localidades/municipios/4200000')$q$;
+  execute $q$insert into public.operation_location_terms(operation_id,municipality_code,valid_from,reason)
+   select id,'4200000',date '2020-01-01','FIXTURE_LOCALIDADE_SINTETICA_044'
+    from public.operations where client_id='5c42c000-0000-4000-8000-0000000000c1'$q$;
+  -- 2025 nas suítes 043 permite testar tarifa fora da vigência sem confundir falta de calendário com falta de preço.
+  foreach ano in array array[2025,2026] loop
+   execute $q$insert into public.financial_calendar_coverage
+    (calendar_year,territory_scope,state_code,municipality_code,legal_act,official_url,client_confirmed,reason)
+    values($1,'nacional',null,null,'ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044'),
+          ($1,'estadual','SC',null,'ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044'),
+          ($1,'municipal','SC','4200000','ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044')$q$ using ano;
+  end loop;
+ end if;
+end; $$;
+
 set constraints all immediate;
 select pg_temp.registrar('F0. motor ligado', 'true',
   pg_temp.adm($q$select (public.alterar_motor_vigencia(true, 'Ligado no teste IND') ->> 'ativo')$q$));
@@ -199,6 +222,16 @@ select pg_temp.adm(format($q$select public.registrar_diaria_individual('5c42d000
 select pg_temp.adm(format($q$select public.registrar_tarifa_contrato('5c42d000-0000-4000-8000-0000000000d1',%L,'diurno','2026-01-01',250,'R3_PADRAO')$q$,pg_temp.fn('conferente')));
 select pg_temp.adm(format($q$select public.registrar_tarifa_contrato('5c42d000-0000-4000-8000-0000000000d2',%L,'diurno','2026-01-01',300,'R3_PADRAO_B')$q$,pg_temp.fn('conferente')));
 select pg_temp.adm($q$select public.registrar_feriado('2026-03-02','FERIADO_TESTE_R3','FERIADO_TESTE_R3')$q$);
+-- A mesma hipótese de feriado fica confirmada no território do teste, sem promover o legado global.
+do $$
+begin
+ if to_regclass('public.municipality_catalog') is not null then
+  execute $q$insert into public.financial_holidays
+   (holiday_date,name,reason,territory_scope,legal_act,official_url,verification_status,client_confirmed)
+   values('2026-03-02','FERIADO_TERRITORIAL_SINTETICO_2026-03-02','FIXTURE_LOCALIDADE_SINTETICA_044',
+    'nacional','ATO_SINTETICO','https://exemplo.gov.br/calendario','confirmado',true)$q$;
+ end if;
+end; $$;
 select pg_temp.adm($q$select public.alterar_resolucao_tarifas(true,'R3_ON')$q$);
 select pg_temp.assert_eq('R3 fixture resolução ON',public.resolucao_de_tarifas_ativa()::text,'true');
 select pg_temp.salvar('R3_DOM','a1','a1','2026-03-01','1','08:00');

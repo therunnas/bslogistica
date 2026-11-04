@@ -142,6 +142,28 @@ insert into public.operation_team (operation_id, shift_id, employee_id, job_func
 insert into public.user_operation_access (user_id, operation_id)
   values ('5c420000-0000-4000-8000-0000000000a2', '5c42e000-0000-4000-8000-0000000000a1');
 
+-- Precondições territoriais somente quando a 044 estiver instalada.
+-- São dados sintéticos explícitos; os oráculos financeiros e a ativação da resolução permanecem os da suíte.
+do $$
+declare ano integer;
+begin
+ if to_regclass('public.municipality_catalog') is not null then
+  execute $q$insert into public.municipality_catalog(code,name,state_code,official_url)
+   values('4200000','MUNICIPIO_TESTE_044','SC',
+    'https://servicodados.ibge.gov.br/api/v1/localidades/municipios/4200000')$q$;
+  execute $q$insert into public.operation_location_terms(operation_id,municipality_code,valid_from,reason)
+   select id,'4200000',date '2020-01-01','FIXTURE_LOCALIDADE_SINTETICA_044'
+    from public.operations where client_id='5c42c000-0000-4000-8000-0000000000c1'$q$;
+  foreach ano in array array[2026] loop
+   execute $q$insert into public.financial_calendar_coverage
+    (calendar_year,territory_scope,state_code,municipality_code,legal_act,official_url,client_confirmed,reason)
+    values($1,'nacional',null,null,'ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044'),
+          ($1,'estadual','SC',null,'ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044'),
+          ($1,'municipal','SC','4200000','ATO_SINTETICO','https://exemplo.gov.br/calendario',true,'FIXTURE_LOCALIDADE_SINTETICA_044')$q$ using ano;
+  end loop;
+ end if;
+end; $$;
+
 set constraints all immediate;
 select pg_temp.registrar('F0. motor ligado', 'true',
   pg_temp.adm($q$select (public.alterar_motor_vigencia(true, 'Ligado no teste IND') ->> 'ativo')$q$));

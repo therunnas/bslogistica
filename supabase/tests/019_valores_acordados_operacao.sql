@@ -615,8 +615,11 @@ select pg_temp.registrar('V3. as 7 funções SECURITY DEFINER novas são do post
       and array_to_string(p.proconfig, ',') like '%search_path=pg_catalog, public, pg_temp%'
       and p.proname in ('registrar_valor_acordado_operacao', 'corrigir_valor_acordado_operacao', 'encerrar_valor_acordado_operacao', 'aposentar_valor_acordado_operacao',
                         'valor_acordado_operacao_na_data', 'exigir_valor_acordado_operacao_na_data', 'condicoes_encerrar_operacao_interno')));
-select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 + snapshots da 040 = 15, todos habilitados', '15',
-  (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'));
+-- Mantém o inventário anterior à 044, sem incluir o novo snapshot territorial;
+-- nenhum dos 15 gatilhos já exigidos deixa de ser contado.
+select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 + snapshots da 040 = 15, todos habilitados (snapshot da 044 fora deste inventário)', '15',
+  (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'
+    and tgname <> 'trg_timesheet_entries_ba_snapshot_territorial'));
 select pg_temp.registrar('V5. shifts: 4 triggers originais + o da classificação do turno (039) habilitados + o congelamento DESABILITADO', '5|1',
   (select count(*) filter (where tgenabled = 'O')::text || '|' || count(*) filter (where tgenabled = 'D')::text from pg_trigger where tgrelid = 'public.shifts'::regclass and not tgisinternal));
 select pg_temp.registrar('V6. a derivação financeira e gerar_fatura não citam as versões', '0',

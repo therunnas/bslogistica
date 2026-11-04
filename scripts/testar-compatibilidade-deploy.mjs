@@ -22,6 +22,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 
 import { createClient } from "@supabase/supabase-js";
@@ -84,10 +85,29 @@ function verificar(caso, obtido, esperado) {
   }
 }
 
+const COMMAND_TIMEOUT = 120;
+const LOCAL_RUNNER = fileURLToPath(new URL("./_executar_local.py", import.meta.url));
+const requestTimeout = 30_000;
+const fetchLocal = (input, init = {}) =>
+  fetch(input, {
+    ...init,
+    signal: init.signal
+      ? AbortSignal.any([init.signal, AbortSignal.timeout(requestTimeout)])
+      : AbortSignal.timeout(requestTimeout),
+  });
+const deadline = setTimeout(() => {
+  console.error("Tempo limite do cenário local excedido.");
+  process.exit(124);
+}, 300_000);
+deadline.unref();
+
 const psql = (sql) =>
   execFileSync(
-    "docker",
+    "python3",
     [
+      LOCAL_RUNNER,
+      String(COMMAND_TIMEOUT),
+      "docker",
       "exec",
       "-i",
       CONTAINER,
@@ -112,7 +132,10 @@ const psql = (sql) =>
 // ---------------------------------------------------------------------------
 // Conta de admin LOCAL e sessão real
 // ---------------------------------------------------------------------------
-const servico = createClient(API_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const servico = createClient(API_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+  global: { fetch: fetchLocal },
+});
 const email = `admin-compat-${Date.now()}@bslog.test`;
 const senha = randomBytes(18).toString("base64url");
 const criado = await servico.auth.admin.createUser({ email, password: senha, email_confirm: true });
@@ -120,7 +143,10 @@ if (criado.error) throw criado.error;
 const uid = criado.data.user.id;
 psql(`insert into public.user_roles (user_id, role) values ('${uid}', 'admin');`);
 
-const cliente = createClient(API_URL, ANON_KEY, { auth: { persistSession: false } });
+const cliente = createClient(API_URL, ANON_KEY, {
+  auth: { persistSession: false },
+  global: { fetch: fetchLocal },
+});
 const entrou = await cliente.auth.signInWithPassword({ email, password: senha });
 if (entrou.error) throw entrou.error;
 const sessao = entrou.data.session;
@@ -146,6 +172,29 @@ insert into public.employee_cost_terms (employee_id, valid_from, daily_cost, act
   select ('5c39f000-0000-4000-8000-00000000000' || i)::uuid, date '2026-01-01', 100, true, 'informada', 'COMPAT'
     from generate_series(1, 6) i;
 `);
+// FIN10: cobertura exclusivamente sintética no Supabase local descartável.
+if (cenario === "banco-044") {
+  psql(`
+insert into public.municipality_catalog (code, name, state_code, official_url)
+  values ('4200000', 'MUNICIPIO_TESTE_044', 'SC',
+          'https://servicodados.ibge.gov.br/api/v1/localidades/municipios/4200000');
+insert into public.operation_location_terms
+  (operation_id, municipality_code, valid_from, reason, created_by)
+  select id, '4200000', date '2020-01-01', 'FIXTURE_SINTETICA_COMPAT_044', '${uid}'::uuid
+    from public.operations;
+insert into public.financial_calendar_coverage
+  (calendar_year, territory_scope, state_code, municipality_code, legal_act, official_url,
+   client_confirmed, reason, created_by)
+  values
+    (2026, 'nacional', null, null, 'SINTETICA', 'https://exemplo.gov.br/calendario/sintetico',
+     true, 'FIXTURE_SINTETICA_COMPAT_044', '${uid}'::uuid),
+    (2026, 'estadual', 'SC', null, 'SINTETICA', 'https://exemplo.gov.br/calendario/sintetico',
+     true, 'FIXTURE_SINTETICA_COMPAT_044', '${uid}'::uuid),
+    (2026, 'municipal', 'SC', '4200000', 'SINTETICA', 'https://exemplo.gov.br/calendario/sintetico',
+     true, 'FIXTURE_SINTETICA_COMPAT_044', '${uid}'::uuid);
+`);
+}
+
 const motor = await cliente.rpc("alterar_motor_vigencia", {
   p_ativar: true,
   p_reason: "Ligado no teste de compatibilidade",
@@ -1011,7 +1060,7 @@ if (!esperaDiaria) {
 }
 
 // FIN-PR-09: o cenário novo exercita o mesmo app com domingo V2 e corrida bônus/fatura.
-if (cenario === "banco-043") {
+if (cenario === "banco-043" || cenario === "banco-044") {
   const liga = await cliente.rpc("alterar_resolucao_tarifas", {
     p_ativar: true,
     p_reason: "ESPECIAL_TESTE",
@@ -1113,6 +1162,7 @@ if (cenario === "banco-043") {
 if (BASE_URL) {
   let cookies = [];
   const ssr = createServerClient(API_URL, ANON_KEY, {
+    global: { fetch: fetchLocal },
     cookies: {
       getAll: () => cookies,
       setAll: (c) => (cookies = c.map(({ name, value }) => ({ name, value }))),
@@ -1124,7 +1174,7 @@ if (BASE_URL) {
   });
   const cookie = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
   const q = new URLSearchParams({ cliente: C, inicio: filtros.inicio, fim: filtros.fim });
-  const get = await fetch(`${BASE_URL}/api/fechamento?${q}`, {
+  const get = await fetchLocal(`${BASE_URL}/api/fechamento?${q}`, {
     headers: { cookie },
     redirect: "manual",
   });
@@ -1134,7 +1184,7 @@ if (BASE_URL) {
     [get.status, corpo?.consolidado?.faturadoCentavos],
     [200, somaCobrada],
   );
-  const post = await fetch(`${BASE_URL}/api/fechamento/xlsx`, {
+  const post = await fetchLocal(`${BASE_URL}/api/fechamento/xlsx`, {
     method: "POST",
     headers: { cookie, "content-type": "application/json", origin: BASE_URL },
     body: JSON.stringify({
@@ -1161,7 +1211,10 @@ if (BASE_URL) {
     "/colaboradores",
     "/operacoes",
   ]) {
-    const resp = await fetch(`${BASE_URL}${pagina}`, { headers: { cookie }, redirect: "manual" });
+    const resp = await fetchLocal(`${BASE_URL}${pagina}`, {
+      headers: { cookie },
+      redirect: "manual",
+    });
     const html = await resp.text();
     verificar(
       `H3. página ${pagina} = 200, sem erro do servidor`,
@@ -1172,6 +1225,7 @@ if (BASE_URL) {
 }
 
 await servico.auth.admin.deleteUser(uid);
+clearTimeout(deadline);
 console.log(`\n[${cenario}] ${passou} asserções passaram, ${falhas.length} falharam.\n`);
 if (falhas.length > 0) {
   for (const f of falhas) console.log(`  FALHA  ${f}`);

@@ -416,8 +416,131 @@ export type Database = {
         };
         Relationships: [];
       };
+      municipality_catalog: {
+        Row: {
+          code: string;
+          name: string;
+          state_code: string;
+          official_url: string;
+          created_at: string;
+        };
+        Insert: {
+          code?: string;
+          name?: string;
+          state_code?: string;
+          official_url?: string;
+          created_at?: string;
+        };
+        Update: {
+          code?: string;
+          name?: string;
+          state_code?: string;
+          official_url?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      operation_location_terms: {
+        Row: {
+          id: string;
+          operation_id: string;
+          municipality_code: string;
+          valid_from: string;
+          valid_to: string | null;
+          reason: string;
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          operation_id?: string;
+          municipality_code?: string;
+          valid_from?: string;
+          valid_to?: string | null;
+          reason?: string;
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          operation_id?: string;
+          municipality_code?: string;
+          valid_from?: string;
+          valid_to?: string | null;
+          reason?: string;
+          active?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Relationships: [];
+      };
+      financial_calendar_coverage: {
+        Row: {
+          id: string;
+          calendar_year: number;
+          territory_scope: string;
+          state_code: string | null;
+          municipality_code: string | null;
+          legal_act: string;
+          official_url: string;
+          client_confirmed: boolean;
+          active: boolean;
+          reason: string;
+          created_at: string;
+          created_by: string | null;
+          retired_at: string | null;
+          retired_by: string | null;
+          retire_reason: string | null;
+        };
+        Insert: {
+          id?: string;
+          calendar_year?: number;
+          territory_scope?: string;
+          state_code?: string | null;
+          municipality_code?: string | null;
+          legal_act?: string;
+          official_url?: string;
+          client_confirmed?: boolean;
+          active?: boolean;
+          reason?: string;
+          created_at?: string;
+          created_by?: string | null;
+          retired_at?: string | null;
+          retired_by?: string | null;
+          retire_reason?: string | null;
+        };
+        Update: {
+          id?: string;
+          calendar_year?: number;
+          territory_scope?: string;
+          state_code?: string | null;
+          municipality_code?: string | null;
+          legal_act?: string;
+          official_url?: string;
+          client_confirmed?: boolean;
+          active?: boolean;
+          reason?: string;
+          created_at?: string;
+          created_by?: string | null;
+          retired_at?: string | null;
+          retired_by?: string | null;
+          retire_reason?: string | null;
+        };
+        Relationships: [];
+      };
       financial_holidays: {
         Row: {
+          territory_scope: string;
+          state_code: string | null;
+          municipality_code: string | null;
+          legal_act: string | null;
+          official_url: string | null;
+          verification_status: string;
+          holiday_kind: string;
+          is_movable: boolean;
+          client_confirmed: boolean;
           active: boolean;
           created_at: string;
           created_by: string | null;
@@ -430,6 +553,15 @@ export type Database = {
           retired_by: string | null;
         };
         Insert: {
+          territory_scope?: string;
+          state_code?: string | null;
+          municipality_code?: string | null;
+          legal_act?: string | null;
+          official_url?: string | null;
+          verification_status?: string;
+          holiday_kind?: string;
+          is_movable?: boolean;
+          client_confirmed?: boolean;
           active?: boolean;
           created_at?: string;
           created_by?: string | null;
@@ -442,6 +574,15 @@ export type Database = {
           retired_by?: string | null;
         };
         Update: {
+          territory_scope?: string;
+          state_code?: string | null;
+          municipality_code?: string | null;
+          legal_act?: string | null;
+          official_url?: string | null;
+          verification_status?: string;
+          holiday_kind?: string;
+          is_movable?: boolean;
+          client_confirmed?: boolean;
           active?: boolean;
           created_at?: string;
           created_by?: string | null;
@@ -1022,6 +1163,7 @@ export type Database = {
       };
       timesheet_entries: {
         Row: {
+          territorial_calendar_snapshot: Json | null;
           additional_amount: number;
           billed_amount: number;
           billed_base_amount: number | null;
@@ -1344,6 +1486,40 @@ export type Database = {
       aposentar_custo_colaborador: {
         Args: { p_reason: string; p_term_id: string };
         Returns: undefined;
+      };
+      catalogar_municipio: {
+        Args: {
+          p_codigo: string;
+          p_nome: string;
+          p_uf: string;
+          p_fonte_url: string;
+          p_reason: string;
+        };
+        Returns: string;
+      };
+      registrar_feriado_territorial: { Args: { p_dados: Json; p_reason: string }; Returns: string };
+      confirmar_cobertura_calendario: {
+        Args: { p_dados: Json; p_reason: string };
+        Returns: string;
+      };
+      aposentar_cobertura_calendario: {
+        Args: { p_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      registrar_local_operacao: {
+        Args: {
+          p_operation_id: string;
+          p_municipality_code: string;
+          p_valid_from: string;
+          p_reason: string;
+          p_encerrar_anterior?: boolean;
+          p_valid_to?: string;
+        };
+        Returns: string;
+      };
+      consultar_calendario_operacao: {
+        Args: { p_operation_id: string; p_data: string };
+        Returns: Json;
       };
       aposentar_feriado: { Args: { p_id: string; p_reason: string }; Returns: undefined };
       aposentar_valor_acordado_operacao: {

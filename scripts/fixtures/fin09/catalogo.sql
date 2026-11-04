@@ -9,7 +9,7 @@ select 'index:'||c.relname,to_jsonb(pg_get_indexdef(c.oid)) from pg_class c wher
 union all
 select 'trigger:'||c.relname||'.'||t.tgname,jsonb_build_object('def',pg_get_triggerdef(t.oid,true),'enabled',t.tgenabled) from pg_trigger t join pg_class c on c.oid=t.tgrelid where c.relnamespace='public'::regnamespace and not t.tgisinternal
 union all
-select 'function:'||p.oid::regprocedure::text,jsonb_build_object('def',pg_get_functiondef(p.oid),'owner',pg_get_userbyid(p.proowner),'acl',p.proacl,'security_definer',p.prosecdef,'config',p.proconfig) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f'
+select 'function:'||p.oid::regprocedure::text,jsonb_build_object('def',pg_get_functiondef(p.oid),'owner',pg_get_userbyid(p.proowner),'acl',case when p.proacl is null then null else array(select x::text from unnest(p.proacl) x order by x::text) end,'security_definer',p.prosecdef,'config',p.proconfig) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f'
 union all
 select 'policy:'||tablename||'.'||policyname,to_jsonb(p)-'schemaname'-'tablename'-'policyname' from pg_policies p where schemaname='public'
 union all

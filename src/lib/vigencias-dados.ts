@@ -1,3 +1,4 @@
+import { capacidadeCalendario, regimeCalendario } from "./calendario-territorial";
 import { interpretarBonusDiario, interpretarDiariaIndividual } from "./diaria-individual";
 import { decidirDisponibilidade } from "./fechamento/disponibilidade";
 import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./fechamento/periodo";
@@ -171,6 +172,20 @@ export function useRegrasDefinitivas(): boolean {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data) return false;
   return interpretarRegrasDefinitivas(consulta.data.data, consulta.data.error);
+}
+
+/** Capacidade anunciada pela 044. Erro técnico não significa banco antigo. */
+export function useCalendarioTerritorial() {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return "desconhecida" as const;
+  return capacidadeCalendario(consulta.data.data, consulta.data.error);
+}
+
+/** Regime confirmado pela mesma resposta do motor; falha não é resolução OFF. */
+export function useRegimeDoCalendario() {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data) return "desconhecido" as const;
+  return regimeCalendario(consulta.data.data, consulta.data.error);
 }
 
 /** O banco já tem a migration 036 (núcleo V2 no motor)? Mesma consulta do estado do motor. */
