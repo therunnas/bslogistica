@@ -248,36 +248,58 @@ function chaveDoUsuario(userId: string): string {
   return `bs:container:intencao:v1:${uuid(userId)}`;
 }
 
-/**
- * Persistência de negócio, nunca de sessão de autenticação: não aceita tokens.
- * sessionStorage é acessível a JavaScript/XSS; esta validação detecta corrupção,
- * não autentica o conteúdo. A RPC repete domínio, autorização e idempotência.
- */
-export function salvarIntencao(storage: Armazenamento, intent: IntencaoContainer): void {
-  const userId = uuid(intent.userId);
-  storage.setItem(chaveDoUsuario(userId), JSON.stringify(validarIntencao(intent, userId)));
+/** Somente identificadores opacos sobrevivem à navegação; valores ficam na memória da tela. */
+export type MarcadorIntencaoContainer = { versao: 2; userId: string; chave: string };
+
+function marcador(valor: unknown, userId: string): MarcadorIntencaoContainer {
+  const item = objeto(valor, ["versao", "userId", "chave"]);
+  if (item["versao"] !== 2 || item["userId"] !== userId) {
+    throw new Error("Marcador de intenção inválido. Reconciliação administrativa necessária.");
+  }
+  return { versao: 2, userId, chave: uuid(item["chave"]) };
 }
 
-/** userId deve vir da identidade atual confirmada no servidor, nunca do storage. */
+export function salvarIntencao(storage: Armazenamento, intent: IntencaoContainer): void {
+  const userId = uuid(intent.userId);
+  const validada = validarIntencao(intent, userId);
+  storage.setItem(
+    chaveDoUsuario(userId),
+    JSON.stringify({ versao: 2, userId, chave: validada.chave }),
+  );
+}
+
+/** Nunca devolve o payload legado. JSON inválido continua bloqueando uma chave nova. */
 export function recuperarIntencao(
   storage: Armazenamento,
   userId: string,
-): IntencaoContainer | null {
+): MarcadorIntencaoContainer | null {
   const identidade = uuid(userId);
   const key = chaveDoUsuario(identidade);
   const bruto = storage.getItem(key);
   if (bruto === null) return null;
-  try {
-    const intent = validarIntencao(JSON.parse(bruto), identidade);
-    return intent.estado === "confirmada" || intent.estado === "recusada"
-      ? intent
-      : congelar({ ...intent, estado: "indeterminada" });
-  } catch {
-    // Não apagar: uma chamada anterior pode ter sido gravada no banco. Gerar
-    // outra chave após perder esse envelope poderia duplicar o mesmo serviço.
-    throw new Error(
-      "A intenção salva é inválida. Reconcilie o serviço antes de registrar novamente.",
-    );
+  return marcador(JSON.parse(bruto), identidade);
+}
+
+/** Atualiza envelopes antigos de TODAS as identidades, sem apagar a chave de reconciliação. */
+export function sanearIntencoes(storage: Armazenamento & Pick<Storage, "length" | "key">): void {
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (!key?.startsWith("bs:container:intencao:v1:")) continue;
+    let seguro: unknown = { versao: 2, bloqueada: true };
+    try {
+      const userId = uuid(key.slice("bs:container:intencao:v1:".length));
+      const item = JSON.parse(storage.getItem(key) ?? "null");
+      if (item?.versao === 1) {
+        if (item.userId !== userId) throw new Error("Identidade inválida.");
+        seguro = { versao: 2, userId, chave: uuid(item.chave) };
+      } else {
+        seguro = marcador(item, userId);
+      }
+    } catch {
+      // Retira também texto sensível corrompido, mantendo um bloqueio persistente.
+    }
+    const texto = JSON.stringify(seguro);
+    if (storage.getItem(key) !== texto) storage.setItem(key, texto);
   }
 }
 

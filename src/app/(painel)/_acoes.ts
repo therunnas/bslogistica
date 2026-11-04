@@ -13,6 +13,7 @@ import { criarClienteServidor } from "@/integrations/supabase/server";
  */
 export async function sair() {
   const supabase = await criarClienteServidor();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new Error("Não foi possível confirmar a saída. Tente novamente.");
   redirect("/login");
 }

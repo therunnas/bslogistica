@@ -18,10 +18,13 @@ import {
   marcarIntencao,
   recuperarIntencao,
   salvarIntencao,
+  sanearIntencoes,
+  type MarcadorIntencaoContainer,
 } from "@/lib/container-servico-intencao";
 import {
   carregarFormularioContainerAction,
   recuperarIntencaoContainerAction,
+  recuperarMarcadorContainerAction,
   registrarContainerAction,
 } from "./_acoes";
 import { dinheiroContainer } from "./lista-containers";
@@ -92,6 +95,7 @@ export function FormularioContainer() {
   const [dados, setDados] = useState<Dados | null>(null);
   const [lote, setLote] = useState<LoteDeContainers>(vazio);
   const [motivo, setMotivo] = useState("");
+  const [marcador, setMarcador] = useState<MarcadorIntencaoContainer | null>(null);
   const [intencao, setIntencao] = useState<Intencao | null>(null);
   const [mensagem, setMensagem] = useState("");
   const [ocupado, setOcupado] = useState(true);
@@ -154,13 +158,22 @@ export function FormularioContainer() {
         const dados = resultado.data;
         setDados(dados);
         // A identidade confirmada no servidor precede a leitura do armazenamento.
+        sanearIntencoes(sessionStorage);
         const salva = recuperarIntencao(sessionStorage, dados.userId);
         if (salva) {
-          setLote(salva.lote);
-          setMotivo(salva.motivo);
-          setIntencao(salva);
+          setMarcador(salva);
           setRecuperacaoPendente(true);
-          await reconciliar(salva);
+          const registro = await recuperarMarcadorContainerAction(salva.chave);
+          if (!ativo) return;
+          if (!registro.ok) throw new Error(registro.mensagem);
+          if (registro.data.estado === "registrado" && uuid(registro.data.id)) {
+            setConfirmado(registro.data.id);
+            atualizarConsultas();
+          } else {
+            setMensagem(
+              "A chave foi preservada, mas o serviço ainda não foi confirmado. Por confidencialidade, os dados financeiros não são armazenados após recarregar ou sair. Reenvio bloqueado: solicite reconciliação administrativa desta intenção antes de iniciar outro registro.",
+            );
+          }
         }
       } catch {
         if (ativo) {
@@ -177,7 +190,7 @@ export function FormularioContainer() {
     return () => {
       ativo = false;
     };
-  }, [reconciliar]);
+  }, [atualizarConsultas]);
 
   function alterar<K extends keyof LoteDeContainers>(campo: K, valor: LoteDeContainers[K]) {
     setLote((anterior) => ({ ...anterior, [campo]: valor }));
@@ -293,7 +306,7 @@ export function FormularioContainer() {
   }
 
   async function conferir() {
-    if (!dados || !intencao || trava.current) return;
+    if (!dados || (!intencao && !marcador) || trava.current) return;
     trava.current = true;
     setOcupado(true);
     try {
@@ -301,6 +314,20 @@ export function FormularioContainer() {
       if (!identidade.ok || identidade.data.userId !== dados.userId) {
         throw new Error("A sessão mudou. Recarregue a página.");
       }
+      if (!intencao && marcador) {
+        const registro = await recuperarMarcadorContainerAction(marcador.chave);
+        if (!registro.ok) throw new Error(registro.mensagem);
+        if (registro.data.estado === "registrado" && uuid(registro.data.id)) {
+          setConfirmado(registro.data.id);
+          atualizarConsultas();
+        } else {
+          setMensagem(
+            "Registro ainda não confirmado. Reenvio bloqueado; a chave original está preservada para reconciliação administrativa.",
+          );
+        }
+        return;
+      }
+      if (!intencao) return;
       await reconciliar(intencao);
       setMensagem(
         intencao.estado === "recusada"
@@ -401,7 +428,8 @@ export function FormularioContainer() {
           {mensagem}
         </p>
       )}
-      {recuperacaoPendente && intencao && (
+      {marcador && <p>Código da intenção preservada: {marcador.chave}</p>}
+      {recuperacaoPendente && (intencao || marcador) && (
         <Button disabled={ocupado} onClick={() => void conferir()}>
           Conferir registro preservado
         </Button>
@@ -414,10 +442,25 @@ export function FormularioContainer() {
                 <Selecao
                   id="cliente"
                   valor={lote.clienteId}
-                  disabled={!!intencao}
+                  disabled={!!intencao && !editandoPreparada}
                   vazio="Selecione"
                   opcoes={dados.clientes}
-                  onChange={(clienteId) => setLote({ ...lote, clienteId, operacaoId: null })}
+                  onChange={(clienteId) => {
+                    if (intencao) {
+                      if (!editandoPreparada || intencao.estado !== "preparada" || !dados) return;
+                      try {
+                        limparIntencao(sessionStorage, dados.userId);
+                      } catch {
+                        setMensagem(
+                          "Não foi possível liberar o rascunho. O cliente foi preservado.",
+                        );
+                        return;
+                      }
+                      setIntencao(null);
+                      setEditandoPreparada(false);
+                    }
+                    setLote({ ...lote, clienteId, operacaoId: null });
+                  }}
                 />
               </Campo>
               <Campo id="operacao" titulo="Operação (opcional)">

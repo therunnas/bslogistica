@@ -41,3 +41,7 @@ export async function registrarContainerAction(entrada: {
 export async function cancelarContainerAction(entrada: { id: string; motivo: string }) {
   return acoes().cancelar(entrada);
 }
+
+export async function recuperarMarcadorContainerAction(chave: string) {
+  return acoes().marcador(chave);
+}

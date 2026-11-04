@@ -36,6 +36,7 @@ for (const papel of ["operacional", "sem-papel", "anon", "sessao-invalida", "adm
       () => acoes.registrar({}),
       () => acoes.cancelar({}),
       () => acoes.vinculo("invalido"),
+      () => acoes.marcador("invalido"),
       () => acoes.recuperar("invalido", "invalido", {}),
     ])
       assert.equal((await chamada()).codigo, "nao-autorizado");
@@ -390,4 +391,32 @@ test("mapa financeiro antigo não autoriza cancelar: consulta fresca resolve ví
     id: uuid(1),
   });
   assert.deepEqual(await dados.lerVinculoAdicionalContainer(db, uuid(1002)), { tipo: "legado" });
+});
+
+test("marcador reconcilia após reload sem receber/devolver payload nem chamar RPC", async () => {
+  let escritas = 0;
+  const rows = [
+    {
+      id: uuid(1),
+      client_id: uuid(900),
+      idempotency_key: uuid(50),
+      request_payload: prepararLoteDeContainers(lote),
+    },
+  ];
+  const db = dbFake({ container_services: rows }, () => {
+    escritas++;
+  });
+  const acoes = servidor.criarAcoesContainer({
+    autorizar: async () => ({ id: uuid(7) }),
+    cliente: async () => db,
+  });
+  assert.deepEqual(await acoes.marcador(uuid(50)), {
+    ok: true,
+    data: { estado: "registrado", id: uuid(1) },
+  });
+  assert.deepEqual(await acoes.marcador(uuid(51)), { ok: true, data: { estado: "ausente" } });
+  assert.equal((await acoes.marcador("invalido")).codigo, "validacao");
+  rows.push({ ...rows[0], id: uuid(2), client_id: uuid(901) });
+  assert.equal((await acoes.marcador(uuid(50))).codigo, "inconsistente");
+  assert.equal(escritas, 0);
 });

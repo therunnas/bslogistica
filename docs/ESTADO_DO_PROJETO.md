@@ -5,6 +5,92 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-11C.3 — correções de privacidade e cliente (04/11/2026)
+
+Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), ainda
+**Draft, não mergeado**, na branch `feat/fin-pr-11c-interface-containers`, checkout
+`/private/tmp/bs-fin-pr-11c`. HEAD revisado antes das correções:
+`05625a92e59db4a5cd3e9c2bc0e4fa13034de5e2`; base main preservada:
+`10bcfd83a42409c477a7df584cca279a1368f216`. Working tree estava limpa no preflight.
+O checkpoint C.1 abaixo descreve a implementação anterior: seu contrato de
+persistência financeira foi substituído pela correção P1 desta seção.
+
+**P1 — confidencialidade e recuperação:** lote, payload canônico, motivo, receita
+e custos ficam somente na memória da tela. `sessionStorage` persiste apenas
+`versao: 2`, UUID do usuário e chave UUID da intenção, nunca tokens/credenciais.
+Separar chaves por usuário continua útil, mas não é tratado como proteção do
+conteúdo. Envelopes antigos de todas as identidades são reduzidos a marcadores;
+conteúdo corrompido sem chave recuperável vira bloqueio persistente, sem gerar
+outra intenção. O saneamento ocorre também no provider inicial, inclusive no login.
+
+Ao iniciar logout, o AppShell retira o conteúdo financeiro e limpa o cache antes
+da resposta do servidor. Falha de logout mantém o conteúdo oculto e informa que a
+saída não foi confirmada. A Action também verifica o campo `error` retornado por
+`signOut()` antes de redirecionar: o RED adicional demonstrou que antes o erro
+resolvido pelo SDK era ignorado. O redirecionamento de sucesso foi preservado.
+Um canal entre abas transmite somente invalidação;
+eventos de saída/troca de conta do SDK também retiram o conteúdo. Isso **não é
+nova decisão de autorização**: páginas/Actions continuam nos guards existentes,
+com MFA opcional e RLS. Sem BroadcastChannel, a proteção local e os marcadores
+sem valores permanecem; não se promete apagar a memória de outra aba suspensa
+ou com código antigo antes que ela receba o evento ou seja recarregada.
+
+**Limitação deliberada:** após recarregamento/logout, o payload volátil não pode
+ser reconstituído do storage. A nova Action administrativa de **leitura**
+`recuperarMarcadorContainerAction` consulta a chave no backend e só devolve
+`ausente` ou o UUID do serviço confirmado; ambiguidade é recusada. Não escreve
+em tabelas nem cria RPC/migration. Serviço confirmado abre seu detalhe. Se estiver
+ausente, houver erro ou leitura inconsistente, a tela conserva o marcador,
+mostra a chave para reconciliação administrativa e bloqueia edição/reenvio/nova
+chave, inclusive depois de uma leitura de ausência. Não há descarte automático.
+Enquanto a tela original continua aberta, timeout/retry preservam o mesmo payload
+e a mesma chave e exigem reconciliação antes de repetir. Fechar a aba ou limpar
+manualmente o armazenamento ainda pode perder o marcador; essa ação não é um
+procedimento seguro para resolver uma intenção de resultado incerto.
+
+**P2 — cliente antes do envio:** após revisar e voltar para corrigir uma intenção
+preparada, o cliente pode ser alterado. A operação anterior é limpa; o rascunho
+comprovadamente não enviado é liberado e a próxima revisão cria outra chave para
+o novo cliente. Alterações no mesmo cliente preservam a chave original. Domínio,
+soma de custos e vínculo cliente/operação são revalidados pelos contratos
+existentes. Intenção enviada/indeterminada nunca libera cliente ou payload.
+
+**Evidências locais executadas:** RED P1 com 17/18 testes passando, falhando porque
+o JSON continha lote/motivo/receita/custos; RED P2 com 27/28 passando, falhando
+porque o seletor de cliente permanecia desabilitado antes de qualquer envio.
+GREEN final: **63 suítes Node PASS**, incluindo **22 testes de dados/Actions,
+21 de intenção/privacidade, 33 de telas e 2 de integração**. Cobertos logout com
+falha, evento de saída, troca de conta, aviso entre abas, ausência de canal,
+saneamento legado/corrupção, storage indisponível, reload bloqueado, reconciliação
+confirmada, timeout após commit, retry estável, correção de cliente/operação,
+autorização e cancelamento financeiro. São funções e handlers TSX reais com
+fronteiras de navegador/rede/Supabase simuladas, não E2E em navegador ou banco.
+
+Lint, TypeScript e Prettier dos arquivos alterados passaram. A primeira rodada
+completa encontrou a asserção literal G8 de `test:papel` pela referência direta a
+storage no AppShell. O acesso foi concentrado no módulo de privacidade; a
+asserção original foi preservada e a rodada completa seguinte passou. O build
+padrão Turbopack foi impedido de abrir porta local (`Operation not permitted`),
+mesmo na tentativa com exceção específica. Build alternativo **webpack PASS**
+com variáveis públicas inertes da CI, após exceção de rede para fontes públicas;
+a tentativa inicial restrita havia falhado por DNS. Sem alteração de configuração
+para mascarar essas limitações. Build padrão e SQL da CI devem ser conferidos
+no **novo SHA**, sem transferir o sucesso do HEAD anterior para esta correção.
+
+**Escopo:** intenção/privacidade, formulário, leitura/Action do marcador,
+AppShell/provider, três suítes de regressão e os dois documentos de continuidade.
+Migrations 001–045, RPCs, RLS/grants, domínio/adaptador, regras monetárias e corpo
+de faturamento não foram alterados. Não houve SQL/reset local nesta correção,
+migration remota, deploy manual, alteração de ambientes, flags ou dados reais.
+A 045 continua apenas versionada/testada localmente conforme as evidências
+anteriores; sua aplicação em Preview, HML ou Production não é presumida.
+
+**Próximo gate:** conferir CI e Vercel do commit publicado, mantendo o PR Draft,
+e obter nova revisão independente das correções. Merge depende de autorização
+específica. Homologação real e E2E visual continuam pendentes; FIN-PR-12/13 não
+foram iniciados. Em eventual reversão de aplicativo, não restaurar a persistência
+do payload financeiro do HEAD anterior; o marcador não é uma intenção reenviável.
+
 ## FIN-PR-11C.1 — interface administrativa de containers (04/11/2026)
 
 **Base comprovada:** [PR #95](https://github.com/therunnas/bslogistica/pull/95)

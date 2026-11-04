@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { BSLogo } from "@/components/branding/bs-logo";
 import { useTema } from "@/components/theme-provider";
@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { observarPrivacidadeContainers } from "@/lib/container-servico-privacidade";
 import { sair } from "../_acoes";
 import type { PapelEfetivo } from "../_papel";
 
@@ -115,6 +117,44 @@ export function AppShell({
 
   const [menuMobileAberto, setMenuMobileAberto] = useState(false);
   const [saindo, iniciarSaida] = useTransition();
+  const [conteudoProtegido, setConteudoProtegido] = useState(false);
+  const [erroSaida, setErroSaida] = useState("");
+  const privacidade = useRef<ReturnType<typeof observarPrivacidadeContainers> | null>(null);
+  const protegerConteudo = useCallback(() => {
+    setConteudoProtegido(true);
+    queryClient.clear();
+  }, [queryClient]);
+
+  useEffect(() => {
+    let canal: BroadcastChannel | null = null;
+    try {
+      canal =
+        typeof BroadcastChannel === "undefined"
+          ? null
+          : new BroadcastChannel("bs:container:privacidade");
+      privacidade.current = observarPrivacidadeContainers(canal, protegerConteudo);
+    } catch {
+      protegerConteudo();
+    }
+    const {
+      data: { subscription },
+    } = criarClienteNavegador().auth.onAuthStateChange((evento, sessao) => {
+      if (evento === "SIGNED_OUT" || (sessao?.user.email && sessao.user.email !== email)) {
+        try {
+          privacidade.current?.invalidar();
+        } catch {
+          // O painel permanece fechado se o navegador não permitir sanear o storage.
+        } finally {
+          protegerConteudo();
+        }
+      }
+    });
+    return () => {
+      subscription.unsubscribe();
+      privacidade.current?.fechar();
+      canal?.close();
+    };
+  }, [email, protegerConteudo]);
 
   const paginaAtual =
     [...navegacao, ...itensDeConta, ROTA_TECNICA_IMPLANTACAO].find(({ href }) => href === caminho)
@@ -124,10 +164,21 @@ export function AppShell({
     papel === "admin" ? "Administrador" : papel === "operacional" ? "Operacional" : "Sem perfil";
 
   function encerrarSessao() {
-    queryClient.clear();
-
+    protegerConteudo();
+    try {
+      privacidade.current?.sair();
+    } catch {
+      setErroSaida(
+        "Não foi possível proteger o armazenamento. Feche esta aba antes de trocar de conta.",
+      );
+      return;
+    }
     iniciarSaida(() => {
-      void sair();
+      void sair().catch(() => {
+        setErroSaida(
+          "Saída não confirmada. Tente sair novamente; o conteúdo financeiro permanece oculto.",
+        );
+      });
     });
   }
 
@@ -378,7 +429,16 @@ export function AppShell({
               className="pointer-events-none absolute -top-64 right-[-14rem] h-[34rem] w-[34rem] rounded-full bg-primary/[0.04] blur-[130px]"
             />
 
-            <main className="relative min-w-0 overflow-x-hidden p-4 md:p-6 xl:p-8">{children}</main>
+            <main className="relative min-w-0 overflow-x-hidden p-4 md:p-6 xl:p-8">
+              {conteudoProtegido ? (
+                <p role="alert" className="p-6">
+                  {erroSaida ||
+                    "A sessão mudou ou a saída foi iniciada. Conteúdo protegido. Recarregue para verificar o acesso; as chaves pendentes foram preservadas."}
+                </p>
+              ) : (
+                children
+              )}
+            </main>
           </div>
         </div>
       </div>

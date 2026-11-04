@@ -470,3 +470,16 @@ export async function recuperarRegistroContainer(
     throw { code: "23505" };
   return { estado: "registrado", id: id(rows[0]!["id"]) };
 }
+
+/** Recupera apenas o identificador persistido; marcador sem payload nunca autoriza reenvio. */
+export async function recuperarMarcadorContainer(
+  db: ClienteContainer,
+  chave: string,
+): Promise<{ estado: "ausente" } | { estado: "registrado"; id: string }> {
+  exigirIdContainer(chave);
+  await lerCapacidadeContainers(db);
+  const rows = await paginas(db, "container_services", "id", "id", [["idempotency_key", chave]]);
+  if (!rows.length) return { estado: "ausente" };
+  if (rows.length !== 1) return inconsistente();
+  return { estado: "registrado", id: id(rows[0]!["id"]) };
+}

@@ -11,6 +11,7 @@ import {
   lerCatalogosContainer,
   lerCapacidadeContainers,
   recuperarRegistroContainer,
+  recuperarMarcadorContainer,
   lerVinculoAdicionalContainer,
   exigirIdContainer,
   type ClienteContainer,
@@ -45,6 +46,7 @@ export function criarAcoesContainer(deps: {
       executar((db) => lerVinculoAdicionalContainer(db, adicionalId)),
     recuperar: (clienteId: string, chave: string, payload: LoteNormalizado) =>
       executar((db) => recuperarRegistroContainer(db, clienteId, chave, payload)),
+    marcador: (chave: string) => executar((db) => recuperarMarcadorContainer(db, chave)),
     registrar: (entrada: { lote: LoteDeContainers; chave: string; motivo: string }) =>
       executar(async (db) => {
         let payload: LoteNormalizado;

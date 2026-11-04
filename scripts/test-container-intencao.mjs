@@ -134,7 +134,7 @@ test("snapshot não muda por mutação posterior do formulário ou do payload", 
   assert.throws(() => (intent.lote.participantes[0].valorDevido = "999"));
 });
 
-test("reload preserva chave, payload e motivo e exige reconciliar antes de nova tentativa", async () => {
+test("reload preserva somente marcador; conteúdo e motivo ficam exclusivamente em memória", async () => {
   const { criarIntencao, salvarIntencao, recuperarIntencao, marcarIntencao } = await intencoes();
   for (const estado of ["preparada", "enviando", "indeterminada"]) {
     const storage = armazenamento();
@@ -143,11 +143,10 @@ test("reload preserva chave, payload e motivo e exige reconciliar antes de nova 
     if (estado === "indeterminada") intent = marcarIntencao(intent, "indeterminada");
     salvarIntencao(storage, intent);
     const recuperada = recuperarIntencao(storage, userId);
-    assert.equal(recuperada.estado, "indeterminada");
-    assert.equal(recuperada.chave, chave);
-    assert.deepEqual(recuperada.payload, intent.payload);
-    assert.equal(recuperada.motivo, motivo);
-    assert.deepEqual(recuperada.lote, intent.lote);
+    assert.deepEqual(recuperada, { versao: 2, userId, chave });
+    assert.equal(recuperada.payload, undefined);
+    assert.equal(recuperada.motivo, undefined);
+    assert.equal(recuperada.lote, undefined);
   }
 });
 
@@ -157,8 +156,8 @@ test("recuperação confirmada mantém identificador sem tornar serviço reenvi�
   const enviando = marcarIntencao(criarIntencao(userId, lote, motivo, chave), "enviando");
   salvarIntencao(storage, marcarIntencao(enviando, "confirmada", servicoId));
   const recuperada = recuperarIntencao(storage, userId);
-  assert.equal(recuperada.estado, "confirmada");
-  assert.equal(recuperada.servicoId, servicoId);
+  assert.deepEqual(recuperada, { versao: 2, userId, chave });
+  assert.equal(recuperada.servicoId, undefined);
   assert.throws(() => marcarIntencao(recuperada, "enviando"));
 });
 
@@ -207,15 +206,14 @@ test("intenção indeterminada, confirmada ou em envio nunca permite alterar con
   }
 });
 
-test("reload preserva rejeição explícita para reconciliar antes da correção", async () => {
+test("reload de rejeição preserva chave, mas exige reconciliação sem restaurar valores", async () => {
   const { criarIntencao, marcarIntencao, salvarIntencao, recuperarIntencao } = await intencoes();
   const storage = armazenamento();
   const enviando = marcarIntencao(criarIntencao(userId, lote, motivo, chave), "enviando");
   salvarIntencao(storage, marcarIntencao(enviando, "recusada"));
   const recuperada = recuperarIntencao(storage, userId);
-  assert.equal(recuperada.estado, "recusada");
-  assert.equal(recuperada.chave, chave);
-  assert.equal(recuperada.payload.receitaCentavos, 10001);
+  assert.deepEqual(recuperada, { versao: 2, userId, chave });
+  assert.equal(recuperada.payload, undefined);
 });
 
 test("identidade confirmada é obrigatória antes de qualquer acesso ao storage", async () => {
@@ -301,4 +299,104 @@ test("storage indisponível impede persistência explicitamente", async () => {
   };
   assert.throws(() => salvarIntencao(storage, criarIntencao(userId, lote, motivo, chave)), falha);
   assert.throws(() => recuperarIntencao(storage, userId), falha);
+});
+
+test("P1: persistência nunca contém lote, motivo, receita ou custos, mesmo após confirmação", async () => {
+  const { criarIntencao, salvarIntencao, marcarIntencao, recuperarIntencao } = await intencoes();
+  const storage = armazenamento();
+  const preparada = criarIntencao(userId, lote, motivo, chave);
+  const enviada = marcarIntencao(preparada, "enviando");
+  for (const intent of [
+    preparada,
+    enviada,
+    marcarIntencao(enviada, "indeterminada"),
+    marcarIntencao(enviada, "confirmada", servicoId),
+  ]) {
+    salvarIntencao(storage, intent);
+    const raw = JSON.parse([...storage.itens.values()][0]);
+    assert.deepEqual(raw, { versao: 2, userId, chave });
+    assert.deepEqual(recuperarIntencao(storage, userId), raw);
+    assert.equal(recuperarIntencao(storage, otherUserId), null);
+  }
+});
+
+test("P1: envelopes legados de todas as contas perdem valores sem perder UUID; corrupção bloqueia", async () => {
+  const { criarIntencao, sanearIntencoes, recuperarIntencao } = await intencoes();
+  const storage = armazenamento();
+  Object.defineProperty(storage, "length", { get: () => storage.itens.size });
+  storage.key = (i) => [...storage.itens.keys()][i] ?? null;
+  for (const uid of [userId, otherUserId]) {
+    storage.setItem(
+      `bs:container:intencao:v1:${uid}`,
+      JSON.stringify(criarIntencao(uid, lote, motivo, chave)),
+    );
+  }
+  sanearIntencoes(storage);
+  for (const uid of [userId, otherUserId]) {
+    assert.deepEqual(recuperarIntencao(storage, uid), { versao: 2, userId: uid, chave });
+  }
+  const key = `bs:container:intencao:v1:${userId}`;
+  storage.setItem(key, '{"totalCobrado":"100,01"');
+  sanearIntencoes(storage);
+  assert.doesNotMatch(storage.getItem(key), /100,01|totalCobrado/);
+  assert.throws(() => recuperarIntencao(storage, userId));
+  assert.notEqual(storage.getItem(key), null);
+});
+
+test("P1: saída com falha e múltiplas abas bloqueiam conteúdo sem apagar marcadores", async () => {
+  const { observarPrivacidadeContainers } =
+    await import("../src/lib/container-servico-privacidade.ts");
+  const { criarIntencao, salvarIntencao } = await intencoes();
+  const canais = [];
+  function canal() {
+    const c = {
+      onmessage: null,
+      postMessage: () => canais.filter((v) => v !== c).forEach((v) => v.onmessage?.()),
+      close() {},
+    };
+    canais.push(c);
+    return c;
+  }
+  let bloqueiosA = 0,
+    bloqueiosB = 0;
+  const a = armazenamento(),
+    b = armazenamento();
+  for (const storage of [a, b]) {
+    Object.defineProperty(storage, "length", { get: () => storage.itens.size });
+    storage.key = (i) => [...storage.itens.keys()][i] ?? null;
+    salvarIntencao(storage, criarIntencao(userId, lote, motivo, chave));
+  }
+  const tabA = observarPrivacidadeContainers(canal(), () => bloqueiosA++, a);
+  const tabB = observarPrivacidadeContainers(canal(), () => bloqueiosB++, b);
+  const sair = async () => {
+    throw new Error("Logout sem resposta");
+  };
+  tabA.sair();
+  await assert.rejects(sair());
+  assert.equal(bloqueiosA, 1);
+  assert.equal(bloqueiosB, 1);
+  for (const storage of [a, b]) {
+    assert.deepEqual(JSON.parse([...storage.itens.values()][0]), { versao: 2, userId, chave });
+  }
+  tabB.invalidar();
+  assert.equal(bloqueiosA, 1);
+  assert.equal(bloqueiosB, 2);
+  tabA.fechar();
+  tabB.fechar();
+});
+
+test("P1: ausência de BroadcastChannel não impede proteção local nem apaga intenção", async () => {
+  const { observarPrivacidadeContainers } =
+    await import("../src/lib/container-servico-privacidade.ts");
+  const { criarIntencao, salvarIntencao } = await intencoes();
+  const storage = armazenamento();
+  Object.defineProperty(storage, "length", { get: () => storage.itens.size });
+  storage.key = (i) => [...storage.itens.keys()][i] ?? null;
+  salvarIntencao(storage, criarIntencao(userId, lote, motivo, chave));
+  let bloqueios = 0;
+  const observador = observarPrivacidadeContainers(null, () => bloqueios++, storage);
+  observador.sair();
+  assert.equal(bloqueios, 1);
+  assert.deepEqual(JSON.parse([...storage.itens.values()][0]), { versao: 2, userId, chave });
+  observador.fechar();
 });
