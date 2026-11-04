@@ -1,4 +1,4 @@
-# BS Soluções Logística — sistema de gestão
+# BS Soluções Logísticas — sistema de gestão
 
 Painel interno de gestão operacional e financeira de mão de obra terceirizada.
 Uso interno, publicado em `admin.bslogisticas.com.br`; não há cadastro público.
@@ -125,6 +125,7 @@ quebrada. O Preview não recebe as variáveis do banco de produção.
 | [Estado do projeto](docs/ESTADO_DO_PROJETO.md) | fotografia atual: Production, testes, módulos            |
 | [Progresso](PROGRESS.md)                       | etapa atual, marcos e próximas etapas                    |
 | [Dívidas técnicas](docs/divida-tecnica/)       | histórico dos defeitos já diagnosticados e resolvidos    |
+| [Runbooks](docs/runbooks/README.md)               | recuperação por versão, pré-condições e riscos            |
 
 Regras permanentes para quem edita o projeto com agentes de código:
 [CLAUDE.md](CLAUDE.md) (Claude Code) e [AGENTS.md](AGENTS.md) (demais agentes).
