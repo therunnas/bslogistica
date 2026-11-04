@@ -11,6 +11,7 @@ import subprocess
 import os
 import signal
 import argparse
+import time
 
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -31,11 +32,11 @@ rollback_path = Path(args.baseline) if args.baseline else runner.SOURCE / runner
 rollback_source = rollback_path.read_text()
 prefix_end = rollback_source.index('CREATE OR REPLACE FUNCTION public.gerar_fatura(')
 # Somente BEGIN + travas + DO de pré-condições. Nunca executa CREATE/DROP nesta prova.
-rollback_prefix = rollback_source[:prefix_end] + 'rollback;\n'
+rollback_prefix = "set statement_timeout = '2s';\n" + rollback_source[:prefix_end] + 'rollback;\n'
 
 # Simula a trava ROW EXCLUSIVE que um registro/cancelamento mantém na tabela.
 # Não depende de sleep ou de observar uma corrida; READY só sai após adquirir a trava.
-for table in sorted(runner.NEW_TABLES):
+for table in ['billing_additionals', *sorted(runner.NEW_TABLES)]:
     runner.guard()
     holder = subprocess.Popen(
         ['docker', 'exec', '-i', runner.CONTAINER, 'psql', '-U', 'postgres', '-d', 'postgres',
@@ -53,11 +54,21 @@ for table in sorted(runner.NEW_TABLES):
             if not selector.select(timeout=15):
                 raise TimeoutError('A sessão concorrente não confirmou a trava em 15s')
             assert holder.stdout.readline().strip() == 'READY', 'Sessão concorrente não adquiriu a trava'
-        result = runner.sql(rollback_prefix, check=False)
+        runner.guard()
+        started = time.monotonic()
+        result = runner.command(
+            ['docker', 'exec', '-i', runner.CONTAINER, 'psql', '-U', 'postgres', '-d', 'postgres',
+             '-X', '-q', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose'],
+            rollback_prefix, check=False, timeout=10)
+        elapsed = time.monotonic() - started
         label = 'baseline-' if args.baseline else ''
         (runner.EVIDENCE / ('rollback-concorrente-' + label + table + '.log')).write_text(result.stdout + result.stderr)
-        assert result.returncode != 0 and '55P03' in result.stderr, result.stderr
-        print('PASS: rollback recusa escritor concorrente em ' + table + ' com 55P03', flush=True)
+        assert result.returncode != 0 and '55P03' in result.stderr, (
+            f'{table}: esperado 55P03 com escritor ativo; retorno={result.returncode}; '
+            f'tempo={elapsed:.3f}s; stderr={result.stderr}')
+        assert elapsed < 10, f'Recusa demorou {elapsed:.3f}s'
+        assert holder.poll() is None, 'Escritor precisa continuar ativo durante a recusa'
+        print(f'PASS: rollback recusa escritor concorrente em {table} com 55P03 em {elapsed:.3f}s', flush=True)
         holder.stdin.write('rollback;\n\\q\n')
         holder.stdin.flush()
         holder.communicate(timeout=15)

@@ -6,7 +6,8 @@
 -- As travas precedem a leitura e permanecem até COMMIT: operação em andamento
 -- faz a reversão falhar imediatamente com 55P03; não aguardar nem apagar dados.
 begin;
-lock table public.container_services, public.container_service_participants,
+-- Receita primeiro; NOWAIT impede espera/inversão com o fluxo financeiro.
+lock table public.billing_additionals, public.container_services, public.container_service_participants,
   public.container_service_audit in access exclusive mode nowait;
 do $$
 begin

@@ -7,6 +7,50 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
 ## FIN-PR-11B — checkpoint de desenvolvimento local (04/11/2026)
 
+### FIN-PR-11B.R1 — P2 da revisão do PR #95 (04/11/2026)
+
+Partida: `978c116e7e6aab9ecb7b85a08728b831f5813737`, branch
+`feat/fin-pr-11b-backend-containers`, worktree limpa. A revisão independente
+identificou que o DROP TRIGGER poderia aguardar em `billing_additionals`.
+O rollback agora trava essa tabela primeiro, seguida das três tabelas novas,
+com `ACCESS EXCLUSIVE NOWAIT` antes das guardas. Nenhuma aquisição espera por
+outra transação; conflito aborta imediatamente e desfaz as travas já adquiridas.
+Corpo financeiro de `gerar_fatura`, migration 045, RPCs e RLS não foram alterados.
+
+RED real: sessão com ROW EXCLUSIVE confirmada em `billing_additionals`; o prefixo
+antigo retornou sucesso em 0,096 s, violando a expectativa de `55P03`. Nenhum DROP
+foi executado nessa prova. GREEN com o escritor ainda ativo: `55P03` em
+`billing_additionals` (0,095 s), `container_service_audit` (0,105 s),
+`container_service_participants` (0,447 s) e `container_services` (0,194 s).
+Catálogo e dados permaneceram iguais nos quatro casos. O teste limita o SQL a
+2 s e o processo a 10 s, separando a inspeção Docker da medição; uma rodada
+intermediária detectou atraso da inspeção, sem falha da recusa SQL.
+
+Regressões R1 executadas: 59 scripts Node, lint, TypeScript, AST Python,
+Prettier Markdown e diff check aprovados. Rollback permitido restaurou catálogo
+exato 044 e preservou dados/auditoria. Os ensaios usaram exclusivamente o projeto
+descartável `bs-fin11-local-3fi66bvw`, com labels/volume/rede reconferidos.
+
+**Limitações desta rodada:** o reset seguinte excedeu 300 s; uma tentativa com o
+binário 2.117.0 já instalado, sem resolução npm, também excedeu 300 s. O Postgres
+aceita conexões, mas sem `public.clients` nem catálogo de migrations. Não houve
+outra tentativa nem intervenção em recursos de outros projetos. A repetição da
+paridade OFF completa, do rollback bloqueado com histórico e das suítes SQL R1
+ficou pendente; seus PASS no checkpoint original abaixo são históricos.
+Build local Turbopack bloqueado ao abrir porta (`EPERM`), inclusive após exceção
+específica; Webpack bloqueado por DNS de `fonts.googleapis.com` e encerrado.
+Não interpretar essas falhas ambientais como testes aprovados. Logs R1:
+`/private/tmp/fin11-r1-*.log`, fora do Git.
+
+PR #95 permanece Draft. Próximo gate: conferir CI do novo HEAD e repetir os
+ensaios SQL pendentes após recuperar somente o ambiente descartável, seguido de
+revisão independente. Até lá, validação R1 incompleta. Rollback continua restrito
+a 045→044 antes de uso, sem concorrência; histórico deve recusar com `55000`,
+sem remoção de serviços/auditoria. Nenhum banco remoto, Preview, HML ou Production
+foi acessado/alterado, e FIN-PR-11C não foi iniciado.
+
+### Checkpoint original da implementação
+
 Git confirmado nesta execução: desenho FIN-PR-11/PR #93 integrado em
 `cc5405b8cd2e6203ba2d4190aaa3b88f463595a2`; domínio puro FIN-PR-11A/PR #94
 integrado em `cebf80e3a1c9b74e47d6f5c0e43255d9fa3489c4`, base desta implementação.
