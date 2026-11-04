@@ -5,22 +5,117 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-11B — checkpoint de desenvolvimento local (04/11/2026)
+
+Git confirmado nesta execução: desenho FIN-PR-11/PR #93 integrado em
+`cc5405b8cd2e6203ba2d4190aaa3b88f463595a2`; domínio puro FIN-PR-11A/PR #94
+integrado em `cebf80e3a1c9b74e47d6f5c0e43255d9fa3489c4`, base desta implementação.
+Branch isolada: `feat/fin-pr-11b-backend-containers`. Commit do backend e testes:
+`7acfbe9b7cb44ca82a785d9018e509bddc627c4e`; a continuidade documental é registrada
+no commit seguinte. Escopo implementado e validado localmente, aguardando revisão
+independente em PR Draft; não homologado nem integrado à main neste checkpoint.
+
+A migration nova `20261112120000_045_container_servico.sql` foi aplicada somente
+no Supabase local descartável. Separa execução, participantes/custos devidos e
+auditoria, vinculando uma única receita a `billing_additionals`. As RPCs
+`registrar_servico_container(jsonb,uuid,text)` e
+`cancelar_servico_container(uuid,text)` revalidam admin, sessão e piso MFA atual,
+com escrita direta vedada, RLS, motivos, auditoria e trava transacional por
+cliente. `gerar_fatura` mantém o fluxo existente e acrescenta apenas o custo
+devido dos containers dos mesmos adicionais selecionados. Diárias, HE, bônus e
+faturas existentes preservam suas regras. Não há preço fixo, rateio automático
+ou registro de pagamento quitado. Detalhes no
+[contrato do backend](financeiro/container-servico-avulso.md#contrato-do-backend-fin-pr-11b).
+
+**Evidências executadas nesta sessão:**
+
+- RED SQL real até a 044: ausência de
+  `registrar_servico_container(jsonb,uuid,text)`; execução chegou ao banco, sem
+  erro de infraestrutura. Adaptador também teve RED antes da implementação.
+- GREEN: todas as **46 suítes SQL**, incluindo **88 asserções da 045**, em banco
+  limpo; todos os **59 scripts Node `test:*`**, com sete testes do adaptador e
+  23 do domínio integrado. Lint, `tsc --noEmit`, Prettier nos formatos suportados,
+  build e `git diff --check` passaram.
+- Três provas com sessões PostgreSQL concorrentes: retry da mesma chave gera
+  somente um serviço/receita/trilha; cancelamento vencedor impede fatura vazia;
+  faturamento vencedor impede cancelamento, preservando receita e custo.
+- Matriz de ambas as RPCs: admin AAL1 sem fator e admin AAL2 com fator permitidos;
+  MFA pendente, operacional, sem papel, anon e sessão inválida recusados. Testes
+  de DML direto, atomicidade após erro intermediário, fatura só de containers,
+  fatura mista, competência distinta e imutabilidade passaram.
+- Paridade OFF **044×045 exata**, antes/depois da instalação e repetindo as
+  operações: valores, minutos, fontes, snapshots, itens/faturas e auditoria
+  preservados. Normalização restrita a IDs técnicos e timestamps voláteis.
+- Catálogo: somente três tabelas, suas constraints/índices/triggers/policies,
+  cinco funções novas, guarda de cancelamento do adicional e o delta de custo
+  em `gerar_fatura`. Owner, ACL, security_definer e config anteriores preservados.
+- Compatibilidade do app com **034, 037, 038, 039, 040, 041, 042, 043 e 044**:
+  **541 asserções**, sem falhas. O backend novo foi testado no schema 045; telas
+  de containers não fazem parte desta etapa.
+- Rollback antes do uso restaurou catálogo exato 044 e preservou os dados.
+  Após uso, recusou com `55000`, sem mudar catálogo, serviços, faturas ou trilha.
+  Revisão estática identificou uma janela concorrente no rollback: corrigida
+  com `ACCESS EXCLUSIVE NOWAIT` antes da guarda e comprovada por RED/GREEN real
+  com `55P03` nas três tabelas. A revisão da correção não encontrou outro bloqueio
+  concreto nesse escopo; não substitui a revisão independente do PR.
+
+Os inventários das suítes 010/015 receberam somente os três objetos e seis
+policies novos, conservando os inventários antigos. O pin da suíte 035 para
+`gerar_fatura` mudou de `6fdfcdaf72100fb7db4bc381a2230e41` para
+`b7ddafbd6b0276f99ebf8eac8147a50a`: a comparação de catálogo exige o delta exato
+de custo avulso, sem alteração de oráculos monetários. Falhas intermediárias
+de inventário e contaminação por fixtures foram corrigidas por inventário
+explícito e nova execução em banco limpo, sem tolerância financeira.
+
+**Reprodução e isolamento:** checkout `/private/tmp/bs-fin-pr-11b`; instância
+`/private/tmp/bs-fin11-local-3fi66bvw`, com project_id próprio, labels, único volume,
+rede e portas exclusivos conferidos. Nesse diretório descartável, os runners
+`testar-sql-local.sh` e `testar-compatibilidade-deploy.sh` usam apenas resets
+`--local`. Os três scripts `testar-container-*-local.py` recebem esse workdir e
+revalidam o alvo; paridade/rollback fazem resets exclusivos, concorrência grava
+fixtures sintéticas e a prova de travas do rollback exige tabelas novas vazias.
+Executar essas provas separadamente, restaurando o alvo local entre fixtures.
+Logs desta execução estão em `/private/tmp/fin11-*.log`; catálogo e dados em
+`fin11-evidence/` dentro da instância descartável. Não são artefatos versionados;
+os runners e fixtures permitem reproduzir as provas.
+
+Nenhum container/volume anterior foi reutilizado ou removido. Todas as migrations
+anteriores foram comparadas byte a byte com a base. A CI inclui os novos testes
+Node e um job SQL em VM efêmera, com identidade exclusiva, sem secrets/vínculo
+remoto. Seus resultados remotos devem ser conferidos no HEAD do PR após publicar.
+Não houve consulta ou alteração de banco remoto, nem alteração administrativa de
+Preview, HML ou Production. O estado desses ambientes continua não comprovado por
+esta etapa. Código versionado, Preview do aplicativo, migration aplicada e
+ativação de regras são estados distintos.
+
+**Riscos e próximo gate:** revisão independente do PR Draft e CI do HEAD. A chave
+de idempotência precisa ser reutilizada para o mesmo pedido; uma nova chave não
+permite inferir duplicidade física pela referência opcional. A API não edita
+valores: correção antes de faturar exige cancelamento e novo serviço. Rollback
+somente de 045 para 044 antes de qualquer uso, sem concorrência; nunca apagar
+histórico para vencer a guarda. Integração visual FIN-PR-11C, homologação em HML,
+restore, migrations remotas e ativação dependem de gates/autorização específicos.
+Nenhum desses passos foi iniciado, e não houve merge.
+
 ## Checkpoint verificado no GitHub — 04/11/2026
+
+Registro anterior, preservado como evidência histórica; não representa a main
+mais recente confirmada no checkpoint FIN-PR-11B acima.
 
 **Fonte e limite:** refs, PRs, checks e commits consultados no GitHub. Não houve
 consulta autenticada ao catálogo efetivo do Supabase, ao banco HML ou às
 variáveis/destino do Preview. Código mergeado, deploy do aplicativo, migration
 aplicada e flag ativada **não são equivalentes**.
 
-| Superfície | Última evidência verificável | Limite e próximo gate |
-| --- | --- | --- |
-| `main` (Git) | HEAD `041aa27b2de41390f121fcc931a18430f34473e1`. [FIN-PR-10 / PR #90](https://github.com/therunnas/bslogistica/pull/90) mergeado por squash em `5795c0960d9b58a9c54037adfdfe55b6213f2fc2`; [DOC-MASTER-01/B1 / PR #91](https://github.com/therunnas/bslogistica/pull/91) mergeado por squash no HEAD atual. | Migrations até a 044 **versionadas**, sem presumir implantação remota. |
-| Qualidade no Git | CI do HEAD `3851a6e` do PR #90 e do HEAD `568269f` do PR #91 aprovadas; seis threads do #90 resolvidas. Revisão Codex do #91 concluída sem achados. | CodeRabbit do #91 não fez revisão substantiva por limite de uso; estado `success` do check não equivale a parecer. |
-| Vercel | Check de deploy do merge do PR #90: `success`; checks de Preview nos PRs aprovados. | O deploy de Production após o PR #91 e o comportamento do domínio não foram revalidados neste checkpoint. |
-| Preview | Proteções de isolamento documentadas e testes de código anteriores. | **Destino real do Supabase e separação dos dados não comprovados nesta verificação**. Não inserir dados reais sem o gate de isolamento. |
-| HML / Supabase | Sem leitura do catálogo remoto neste checkpoint. | Determinar projeto, versão do schema, migrations, roles, flags e possibilidade de restauração antes de aplicar alterações. |
-| Production / Supabase | Último relato histórico: migrations 032–034 aplicadas, motor por vigência ligado desde 29/10 e resolução comercial por função/colaborador **OFF**. | Situação atual e aplicação de 035–044 **não verificadas ao vivo**. Nenhuma migration ou flag alterada por estes merges. |
-| Backup e acesso | Backups e ensaios anteriores registrados nos históricos do projeto. | Restauração integral atual, matriz E2E real de papéis e recuperação não foram comprovadas neste checkpoint. |
+| Superfície            | Última evidência verificável                                                                                                                                                                                                                                                                                | Limite e próximo gate                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `main` (Git)          | HEAD `041aa27b2de41390f121fcc931a18430f34473e1`. [FIN-PR-10 / PR #90](https://github.com/therunnas/bslogistica/pull/90) mergeado por squash em `5795c0960d9b58a9c54037adfdfe55b6213f2fc2`; [DOC-MASTER-01/B1 / PR #91](https://github.com/therunnas/bslogistica/pull/91) mergeado por squash no HEAD atual. | Migrations até a 044 **versionadas**, sem presumir implantação remota.                                                                  |
+| Qualidade no Git      | CI do HEAD `3851a6e` do PR #90 e do HEAD `568269f` do PR #91 aprovadas; seis threads do #90 resolvidas. Revisão Codex do #91 concluída sem achados.                                                                                                                                                         | CodeRabbit do #91 não fez revisão substantiva por limite de uso; estado `success` do check não equivale a parecer.                      |
+| Vercel                | Check de deploy do merge do PR #90: `success`; checks de Preview nos PRs aprovados.                                                                                                                                                                                                                         | O deploy de Production após o PR #91 e o comportamento do domínio não foram revalidados neste checkpoint.                               |
+| Preview               | Proteções de isolamento documentadas e testes de código anteriores.                                                                                                                                                                                                                                         | **Destino real do Supabase e separação dos dados não comprovados nesta verificação**. Não inserir dados reais sem o gate de isolamento. |
+| HML / Supabase        | Sem leitura do catálogo remoto neste checkpoint.                                                                                                                                                                                                                                                            | Determinar projeto, versão do schema, migrations, roles, flags e possibilidade de restauração antes de aplicar alterações.              |
+| Production / Supabase | Último relato histórico: migrations 032–034 aplicadas, motor por vigência ligado desde 29/10 e resolução comercial por função/colaborador **OFF**.                                                                                                                                                          | Situação atual e aplicação de 035–044 **não verificadas ao vivo**. Nenhuma migration ou flag alterada por estes merges.                 |
+| Backup e acesso       | Backups e ensaios anteriores registrados nos históricos do projeto.                                                                                                                                                                                                                                         | Restauração integral atual, matriz E2E real de papéis e recuperação não foram comprovadas neste checkpoint.                             |
 
 **Sequência de entrega:** concluir a reconciliação documental DOC-MASTER-01/B2,
 verificar ambientes e backups por leitura antes de qualquer alteração, executar
@@ -40,7 +135,6 @@ restore completo, regras comerciais ativadas ou homologação de ponta a ponta.
 motor desligado em outubro descrevem decisões e estados daqueles dias. O
 checkpoint de 04/11 acima prevalece para o Git atual; estados remotos continuam
 sujeitos à comprovação por ambiente.
-
 
 **Ambientes: último estado informado, não revalidado nesta sessão.** O GitHub
 confirma o PR #89 (FIN-PR-09) mergeado em

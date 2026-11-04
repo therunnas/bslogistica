@@ -1,7 +1,8 @@
 # FIN-PR-11 — desenho do container como serviço avulso
 
-**Status:** proposta de desenho para revisão. **Não implementado, não homologado e
-não autorizado para ativação.** Este documento não afirma que a migration 029,
+**Evolução do desenho:** arquitetura B aprovada e integrada pelo PR #93; domínio
+puro integrado pelo PR #94. O backend FIN-PR-11B tem implementação local em
+revisão, sem homologação ou autorização de ativação. Este documento não afirma que a migration 029,
 038 ou qualquer outra esteja aplicada em HML ou Production. Estado real dos
 ambientes: [Estado do projeto](../ESTADO_DO_PROJETO.md).
 
@@ -29,13 +30,13 @@ ambientes: [Estado do projeto](../ESTADO_DO_PROJETO.md).
 
 ## Base técnica verificada no Git
 
-| Estrutura existente | Comportamento no código versionado | Consequência para o PR-11 |
-| --- | --- | --- |
-| `billing_additionals` (migration 029) | Adicional por cliente, operação opcional, período de execução, descrição, referência, valor total e vínculo com fatura. Escrita por RPC com motivo/trilha; cancelamento restrito; item faturado imutável. | Reaproveitar o fluxo de **receita** já existente, sem criar segunda soma paralela. |
-| `gerar_fatura` (migrations 029/037/038) | Seleciona adicionais elegíveis, soma o valor em receita, cria `invoice_items` e vincula o adicional na mesma transação. O item avulso atual nasce com quantidade 1 e valor total. | A quantidade de containers precisa ser modelada à parte; alterar a quantidade do item exige preservar invariantes de faturamento. |
-| `billing_period_start/end` (migration 038) | Competência de cobrança separada das datas de execução; respeita a frequência quinzenal/mensal do cliente. | Não duplicar lógica de competências nem faturar duas vezes. |
-| `src/lib/adicionais.ts` e `adicionais-dados.ts` | Formulário e RPC de adicionais com valor total, sem quantidade física, valor unitário de container ou custo de execução. | Não representar pagamento por um campo de receita ou texto livre. |
-| `timesheet_entries` / núcleo financeiro | Deriva diária, HE, especial e bônus por regras de jornada. | O serviço por container **não** deve gerar presença/diária nem entrar no motor de HE. |
+| Estrutura existente                             | Comportamento no código versionado                                                                                                                                                                        | Consequência para o PR-11                                                                                                         |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `billing_additionals` (migration 029)           | Adicional por cliente, operação opcional, período de execução, descrição, referência, valor total e vínculo com fatura. Escrita por RPC com motivo/trilha; cancelamento restrito; item faturado imutável. | Reaproveitar o fluxo de **receita** já existente, sem criar segunda soma paralela.                                                |
+| `gerar_fatura` (migrations 029/037/038)         | Seleciona adicionais elegíveis, soma o valor em receita, cria `invoice_items` e vincula o adicional na mesma transação. O item avulso atual nasce com quantidade 1 e valor total.                         | A quantidade de containers precisa ser modelada à parte; alterar a quantidade do item exige preservar invariantes de faturamento. |
+| `billing_period_start/end` (migration 038)      | Competência de cobrança separada das datas de execução; respeita a frequência quinzenal/mensal do cliente.                                                                                                | Não duplicar lógica de competências nem faturar duas vezes.                                                                       |
+| `src/lib/adicionais.ts` e `adicionais-dados.ts` | Formulário e RPC de adicionais com valor total, sem quantidade física, valor unitário de container ou custo de execução.                                                                                  | Não representar pagamento por um campo de receita ou texto livre.                                                                 |
+| `timesheet_entries` / núcleo financeiro         | Deriva diária, HE, especial e bônus por regras de jornada.                                                                                                                                                | O serviço por container **não** deve gerar presença/diária nem entrar no motor de HE.                                             |
 
 A implementação de custo previsto de um colaborador **não é comprovante de
 pagamento**. O modelo atual de adicionais não cria custo de execução.
@@ -90,7 +91,7 @@ a partir das respostas do cliente; não são decisões técnicas novas:
 O sistema deve preservar essas decisões. Não pedir novamente ao cliente
 respostas já fornecidas nem confundir custo previsto com quitação efetiva.
 
-## Contrato técnico proposto (ainda não aprovado)
+## Contrato técnico registrado no desenho
 
 1. **Execução:** cliente, operação opcional, data/período de execução,
    descrição do produto/tamanho, quantidade positiva de containers e
@@ -122,7 +123,10 @@ respostas já fornecidas nem confundir custo previsto com quitação efetiva.
    diárias, horas extras, calendário, fechamento legado ou faturas
    preexistentes; resolução financeira OFF/ON permanece independente.
 
-## Detalhes operacionais a especificar na implementação
+## Detalhes operacionais registrados no desenho
+
+Lista histórica do desenho; as decisões implementadas no FIN-PR-11B estão no
+contrato do backend ao final deste documento.
 
 Não são lacunas da regra de negócio já respondida. Devem ser resolvidas
 na análise de produto/segurança com a menor alteração necessária:
@@ -139,7 +143,7 @@ na análise de produto/segurança com a menor alteração necessária:
 - Acesso por perfil, relatórios internos, item da fatura e formato da
   exportação ao cliente, mantendo os três módulos separados.
 
-## Plano de implementação (após aprovação do desenho)
+## Plano de implementação registrado no desenho
 
 1. Inventariar a versão **efetiva** dos schemas e as dependências
    `billing_additionals`, `invoice_items`, `gerar_fatura`, Fechamento,
@@ -158,10 +162,61 @@ na análise de produto/segurança com a menor alteração necessária:
    estado real das migrations e autorização específica. Production exige
    gate separado. Conciliação com dados reais pertence ao FIN-PR-13.
 
-## Critério de saída do desenho
+## Critério de saída do desenho (histórico)
+
+Critério anterior à aprovação no PR #93, preservado para rastreabilidade.
 
 As regras comerciais acima estão registradas; o próximo gate exige
 **aprovação do desenho técnico e dos critérios de aceite**, matriz de risco
 e proposta de testes. O PR de implementação não deve inventar tarifa,
 quantidade, rateio, pagamento ou datas e **não** autoriza implantação remota.
 O FIN-PR-11 não deve gravar dados reais antes da homologação específica.
+
+## Contrato do backend FIN-PR-11B
+
+A migration nova `20261112120000_045_container_servico.sql` separa
+`container_services`, `container_service_participants` e
+`container_service_audit`. O vínculo único com `billing_additionals` é a única
+fonte de receita para faturamento; quantidade física, custo devido e modalidade
+ficam na execução. Nenhum registro representa pagamento quitado.
+
+`registrar_servico_container(p_dados jsonb, p_idempotency_key uuid, p_reason text)`
+recebe o payload normalizado de `prepararLoteDeContainers`: centavos inteiros,
+participantes explícitos e competência opcional. O banco repete as validações de
+datas, quantidade, precisão, soma, cliente/operação e modalidade. Não há rateio
+automático. O adaptador `src/lib/container-servico-backend.ts` reutiliza o domínio
+e propaga erros da RPC; não substitui a autorização ou o cálculo no banco.
+
+A chave UUID identifica uma execução por cliente e deve ser reutilizada nas
+tentativas do mesmo pedido. Payload canônico igual retorna o mesmo UUID sem nova
+receita ou auditoria; conteúdo diferente com a mesma chave é recusado. A
+referência operacional continua opcional e não substitui a chave de idempotência.
+Serviços diferentes precisam de chaves diferentes; o backend não infere se dois
+pedidos com novas chaves correspondem à mesma execução física.
+
+`cancelar_servico_container(p_id uuid, p_reason text)` preserva o serviço, os
+participantes e a trilha, cancelando a receita na mesma transação. Serviço
+faturado é imutável. A API legada de cancelar adicional não pode cancelar
+isoladamente a receita vinculada a serviço ativo. Não há edição financeira: uma
+correção anterior ao faturamento exige cancelamento explícito e novo registro.
+
+Registro, cancelamento e `gerar_fatura` usam a mesma trava de cliente. A fatura
+continua incluindo o adicional uma única vez, inclusive sem apontamentos. Sua
+expressão de custo acrescenta somente o custo devido dos containers vinculados
+aos adicionais selecionados; diárias, HE e bônus mantêm suas fórmulas. Faturas
+existentes não são recalculadas. Custo devido não comprova quitação.
+
+As três tabelas permitem leitura somente a admin com sessão válida e piso
+`mfa_cotidiano_ok()`, sem escrita direta pela API. As duas RPCs revalidam essas
+condições internamente e possuem grants mínimos/search_path controlado. As cinco
+RPCs operacionais permanecem sem nova superfície financeira.
+
+O [rollback da 045](../runbooks/rollback-container-servico.sql) só se destina ao
+estágio 045 antes de qualquer uso: serviço, participante ou auditoria bloqueia
+a remoção com SQLSTATE `55000`. Exige janela sem escrita ou faturamento; travas
+exclusivas `NOWAIT` precedem a guarda e recusam concorrência com `55P03`.
+Não apagar histórico para vencer a guarda. Versões posteriores exigem
+novo plano de dependências; não executar esse SQL como rollback genérico.
+Resultados e limites de implantação ficam no
+[checkpoint canônico](../ESTADO_DO_PROJETO.md#fin-pr-11b--checkpoint-de-desenvolvimento-local-04112026).
+A interface e os consumidores de apresentação pertencem ao FIN-PR-11C.
