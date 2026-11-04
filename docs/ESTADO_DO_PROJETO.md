@@ -95,6 +95,16 @@ anteriores à 045. O build com o código final e o Supabase local passou nessa
 rodada; o build separado com variáveis inertes também passou. Prettier nos
 formatos suportados e `git diff --check` aprovados.
 
+A primeira CI do PR da interface (run `41920379242`, HEAD `c817f10`) passou no
+job SQL, mas o job Node encontrou uma corrida na limpeza do teste antigo de
+streaming de logs: `terminate()` seguido de espera de 2 s competia com a
+finalização do filho no Linux. O teste passou a liberar o filho por stdin
+somente depois de observar seu log e comprovar que ainda estava ativo, sem
+alterar o helper de execução ou retirar testes de deadline. As **15 verificações
+do runner passaram localmente**, com lint/Prettier/diff check. CI final deve ser
+conferida no HEAD posterior desse ajuste; sucesso anterior não é transferido
+automaticamente a outro SHA.
+
 **Limites:** nenhuma migration aplicada ou flag alterada em banco remoto;
 Não houve intervenção administrativa em Preview, HML ou Production; o destino
 dos seus bancos não foi validado nesta etapa. Código no Git, eventuais checks

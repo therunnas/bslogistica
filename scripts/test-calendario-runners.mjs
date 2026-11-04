@@ -179,14 +179,18 @@ test("CLI entrega logs antes do fim do comando para permitir inspeção do Next 
   const result = python(`
 import select, subprocess, sys
 p = subprocess.Popen([sys.executable, 'scripts/_executar_local.py', '5', sys.executable,
-                      '-u', '-c', 'import time; print("pronto", flush=True); time.sleep(2)'],
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                      '-u', '-c', 'import sys; print("pronto", flush=True); sys.stdin.readline()'],
+                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 try:
-    readable, _, _ = select.select([p.stdout], [], [], 1)
+    readable, _, _ = select.select([p.stdout], [], [], 2)
     assert readable, 'logs ficaram retidos até o encerramento'
     assert p.stdout.readline().strip() == 'pronto'
+    assert p.poll() is None, 'o comando terminou antes de transmitir o log'
 finally:
-    p.terminate(); p.communicate(timeout=2)
+    # Libera o filho somente DEPOIS de observar seu log. Evita competir com a
+    # instalação dos handlers SIGTERM do helper (o timeout é testado à parte).
+    p.communicate(input='sair\\n' if p.poll() is None else None, timeout=3)
+    assert p.returncode == 0
 `);
   assert.equal(result.status, 0, result.stderr);
 });
