@@ -83,17 +83,17 @@ ambiente e da resolução comercial estão centralizados nesse documento.
 ### Gate documental e diagnóstico antes das próximas implementações
 
 - [ ] **DOC-MASTER-01/B2:** consolidar referências e distinguir fatos atuais,
-  checkpoints históricos e pendências; não duplicar estado mutável fora de
-  [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
+      checkpoints históricos e pendências; não duplicar estado mutável fora de
+      [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
 - [ ] **CHECK-UP-AMB-01 (somente leitura):** identificar URL/projeto real de
-  Preview, HML e Production, isolamento entre bancos, migrations presentes,
-  políticas, secrets por escopo e flags; registrar evidências sem expor valores.
+      Preview, HML e Production, isolamento entre bancos, migrations presentes,
+      políticas, secrets por escopo e flags; registrar evidências sem expor valores.
 - [ ] **CHECK-UP-REC-01:** conferir integridade, possibilidade de restauração
-  completa e dependências de recuperação antes de qualquer migration em HML.
+      completa e dependências de recuperação antes de qualquer migration em HML.
 - [ ] **CHECK-UP-E2E-01:** concluir matriz real de papéis/MFA, recuperação e
-  isolamento de dados, com contas e cenários de homologação aprovados.
+      isolamento de dados, com contas e cenários de homologação aprovados.
 - [ ] **FIN-VAL:** integrar FIN-PR-11/12/13 separadamente e reconciliar cálculo,
-  fechamento e exportação com as evidências comerciais da quinzena Dynamis.
+      fechamento e exportação com as evidências comerciais da quinzena Dynamis.
 
 Os itens acima são **critérios de saída**, não autorização de migração,
 ativação, deploy manual ou teste invasivo. Aprovação de CI e merge de PR não
@@ -110,7 +110,12 @@ para a última evidência de integração.
    antes do FIN-PR-11. Resultados de validação, pendências e limites de autorização
    ficam exclusivamente em
    [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-histórico-do-pr-90).
-3. FIN-PR-11: container como serviço avulso.
+3. **FIN-PR-11A concluído no Git:** domínio puro de containers (PR #94), após o
+   desenho do PR #93. **FIN-PR-11B tecnicamente validado**, aguardando decisão de
+   integração do PR #95 (Draft), com persistência, segurança e faturamento;
+   [checkpoint, riscos e próximo gate](docs/ESTADO_DO_PROJETO.md#fin-pr-11b--checkpoint-de-desenvolvimento-local-04112026).
+   FIN-PR-11C não iniciado: planejamento somente após autorização específica
+   de merge e integração do backend.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
    efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título

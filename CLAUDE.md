@@ -75,7 +75,8 @@ MFA, recuperação ou nas telas exige rodar todas.**
 **Antes de entregar:** `npm run lint`, `npx tsc --noEmit`, todas as suítes
 `test:*` e `npm run build`. A CI (`.github/workflows/ci.yml`) roda essa sequência
 em todo PR e em push para `main`, sem secret e sem tocar o Supabase de Production.
-Os testes SQL não rodam nela.
+As suítes SQL também rodam no job `sql-local`, em VM efêmera com Supabase local,
+identidade exclusiva e sem secrets ou vínculo remoto.
 
 Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 `--fix` — o formatador reescreve arquivos que não fazem parte da tarefa.
