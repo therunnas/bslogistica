@@ -158,8 +158,17 @@ export function FormularioContainer() {
         const dados = resultado.data;
         setDados(dados);
         // A identidade confirmada no servidor precede a leitura do armazenamento.
-        sanearIntencoes(sessionStorage);
-        const salva = recuperarIntencao(sessionStorage, dados.userId);
+        let salva: MarcadorIntencaoContainer | null;
+        try {
+          sanearIntencoes(sessionStorage);
+          salva = recuperarIntencao(sessionStorage, dados.userId);
+        } catch {
+          setRecuperacaoPendente(true);
+          setMensagem(
+            "Armazenamento de intenção indisponível. O cadastro de containers está bloqueado. Verifique o armazenamento do navegador e recarregue para reconciliar qualquer intenção preservada; os demais módulos continuam disponíveis.",
+          );
+          return;
+        }
         if (salva) {
           setMarcador(salva);
           setRecuperacaoPendente(true);

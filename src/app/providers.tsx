@@ -32,7 +32,7 @@ export function Providers({ children }: { children: ReactNode }) {
     try {
       sanearIntencoes(sessionStorage);
     } catch {
-      // Storage indisponível não libera registro; o formulário e o painel fecham nesse caso.
+      // Storage indisponível bloqueia somente o cadastro de containers, no próprio formulário.
     }
   }, []);
 

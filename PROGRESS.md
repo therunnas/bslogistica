@@ -111,9 +111,9 @@ para a última evidência de integração.
    ficam exclusivamente em
    [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-histórico-do-pr-90).
 3. **FIN-PR-11A e FIN-PR-11B integrados no Git:** domínio e backend de containers
-   (PRs #94 e #95), após o desenho do PR #93. **FIN-PR-11C.3:** correções de
-   privacidade da intenção e de cliente no rascunho da interface administrativa;
-   [evidências, limites por ambiente e próximo gate](docs/ESTADO_DO_PROJETO.md#fin-pr-11c3--correções-de-privacidade-e-cliente-04112026).
+   (PRs #94 e #95), após o desenho do PR #93. **FIN-PR-11C.5:** isolamento das
+   falhas de armazenamento e preservação da tentativa de logout da interface;
+   [evidências, limites por ambiente e próximo gate](docs/ESTADO_DO_PROJETO.md#fin-pr-11c5--isolamento-de-falhas-de-armazenamento-e-logout-04112026).
    Integração da interface depende de revisão independente e autorização específica;
    aplicação remota da migration 045 não é presumida.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as

@@ -5,6 +5,87 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-11C.5 — isolamento de falhas de armazenamento e logout (04/11/2026)
+
+Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), ainda
+**Draft, não mergeado**, na branch `feat/fin-pr-11c-interface-containers`, checkout
+`/private/tmp/bs-fin-pr-11c`. HEAD de referência confirmado antes de editar:
+`2d02509093d90803c02483588bec1117ca610432`, com working tree limpa e remote
+`therunnas/bslogistica`. Base main preservada: `10bcfd83a42409c477a7df584cca279a1368f216`.
+O novo HEAD é o commit que publica este checkpoint e as correções abaixo; deve
+ser conferido no Git/PR, junto aos checks desse SHA. Os registros C.3/C.1 abaixo
+preservam o histórico anterior, não o tratamento atual de falhas do AppShell.
+
+**Dois P2 comprovados na revisão C.4:** uma exceção do getter `sessionStorage`
+acionava o bloqueio global de confidencialidade, ocultando qualquer módulo de
+uma sessão válida, inclusive Operacional. Além disso, uma falha de saneamento
+na saída lançava exceção antes do aviso entre abas e encontrava um `return`
+no AppShell: a Action `sair()` não era chamada.
+
+**Correção de disponibilidade:** o observador de privacidade captura a recusa de
+storage e informa capacidade local indisponível, sem interpretar isso como
+mudança de sessão. O canal entre abas é opcional; falha ao criá-lo não invalida
+papel ou acesso. Dashboard, Apontamentos, Faturamento e Operacional permanecem
+no fluxo normal com autorização server-side existente. O cadastro de containers
+continua bloqueado no próprio formulário quando não consegue sanear/ler a
+intenção, com mensagem específica de armazenamento; não há fallback para outro
+storage nem persistência do payload financeiro. A mudança no Provider é apenas
+a correção do comentário que descrevia o antigo bloqueio global.
+
+**Correção de logout:** o conteúdo sensível é retirado e o cache limpo antes da
+resposta do servidor. A falha local é apresentada separadamente da falha de
+`signOut()`, sem retorno antecipado que impeça a Action. O observador tenta
+notificar outras abas em `finally`, mesmo quando o saneamento falha. Eventos de
+saída/troca de identidade continuam ocultando o conteúdo e limpando cache,
+independentemente da capacidade de storage. A verificação do erro real de
+`signOut()` da C.3 foi preservada: falha não anuncia saída concluída.
+
+**Controles anteriores preservados:** no navegador continuam persistidos somente
+UUID do usuário/chave e versão do marcador. Lote, motivo, receita e custos
+permanecem em memória. Não se apagam marcadores para contornar uma falha de
+leitura; intenção incerta/recarregada não autoriza novo payload ou chave sem
+reconciliação. Correção de cliente antes do primeiro envio, limpeza da operação,
+nova chave para outro cliente e guardas administrativas das Actions permanecem
+cobertas pelas suítes existentes. Domínio, faturamento, RPCs, RLS, MFA e migrations
+001–045 não foram modificados; nenhuma dependência foi adicionada.
+
+**RED executado antes de corrigir:** suíte de telas com **38/45 PASS, 7 FAIL**:
+quatro módulos ocultos com getter recusado; mensagem genérica em vez de erro de
+storage no formulário; duas saídas com **zero chamadas** da Action, quando era
+esperada uma. Suíte de intenção com **21/22 PASS, 1 FAIL**: falha de leitura
+interrompia a invalidação de outra aba. Não foram falhas de conexão ou de runner.
+
+**GREEN/regressões locais:** **63 suítes Node PASS**, incluindo **47 testes de
+telas, 22 de intenção/privacidade, 22 de dados/Actions e 2 de integração**.
+Cobertos storage disponível, getter `SecurityError`, leitura recusada após
+montagem, logout com falha/sucesso de servidor, demais módulos para admin e
+operacional, troca de identidade com storage recusado, aviso entre abas mesmo
+com saneamento falho, saneamento legado, payload nunca persistido, intenção
+incerta, correção de cliente e autorização. Funções e componentes TSX reais,
+com fronteiras de Auth/rede/navegador simuladas; não são E2E em navegador real.
+Lint, `tsc --noEmit --incremental false`, Prettier dos arquivos alterados e
+`git diff --check` passaram. O build padrão local voltou a falhar por
+`Operation not permitted` ao abrir a porta interna do Turbopack, apesar da
+exceção específica; isso não foi declarado PASS nem motivou mudança de config.
+O build local alternativo `npm run build -- --webpack` **PASS**, com variáveis
+públicas inertes da CI e exceção específica para fontes públicas. O build padrão
+automático da CI deve ser conferido no novo SHA, sem confundir as duas provas.
+
+**Limites e ambientes:** não houve SQL/reset local, migration remota, deploy
+manual, alteração de Preview/HML/Production, flags, credenciais ou dados reais.
+A aplicação remota da 045 continua sem comprovação. CI `validar`/`sql-local` e
+Vercel devem ser conferidos no novo SHA; sucesso anterior não é aprovação da C.5.
+Se o navegador recusar acesso/escrita, o aplicativo não pode garantir que um
+envelope legado já existente tenha sido saneado: mantém aviso e bloqueio local
+de cadastro, sem descartar o marcador nem prometer limpeza concluída. Abas com
+código antigo/suspensas ainda dependem de receber invalidação ou recarregar.
+A impossibilidade de reconstituir payload volátil após reload permanece documentada
+na C.3; não é resolvida criando nova intenção automaticamente.
+
+**Próximo gate:** revisão independente do novo HEAD com CI e Vercel confirmados,
+mantendo o PR Draft. Integração depende de autorização específica. Nenhum merge,
+Ready for Review ou FIN-PR-12/13 foi iniciado.
+
 ## FIN-PR-11C.3 — correções de privacidade e cliente (04/11/2026)
 
 Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), ainda

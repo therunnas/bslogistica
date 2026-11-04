@@ -45,6 +45,9 @@ import { observarPrivacidadeContainers } from "@/lib/container-servico-privacida
 import { sair } from "../_acoes";
 import type { PapelEfetivo } from "../_papel";
 
+const AVISO_ARMAZENAMENTO =
+  "Armazenamento de intenção indisponível. O cadastro de containers permanece bloqueado até a recuperação do recurso.";
+
 const NAVEGACAO = {
   admin: [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -119,6 +122,7 @@ export function AppShell({
   const [saindo, iniciarSaida] = useTransition();
   const [conteudoProtegido, setConteudoProtegido] = useState(false);
   const [erroSaida, setErroSaida] = useState("");
+  const [avisoArmazenamento, setAvisoArmazenamento] = useState("");
   const privacidade = useRef<ReturnType<typeof observarPrivacidadeContainers> | null>(null);
   const protegerConteudo = useCallback(() => {
     setConteudoProtegido(true);
@@ -132,18 +136,21 @@ export function AppShell({
         typeof BroadcastChannel === "undefined"
           ? null
           : new BroadcastChannel("bs:container:privacidade");
-      privacidade.current = observarPrivacidadeContainers(canal, protegerConteudo);
     } catch {
-      protegerConteudo();
+      // Canal opcional: sua ausência não altera sessão nem papel.
     }
+    privacidade.current = observarPrivacidadeContainers(canal, protegerConteudo);
+    if (!privacidade.current.armazenamentoSeguro) setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
     const {
       data: { subscription },
     } = criarClienteNavegador().auth.onAuthStateChange((evento, sessao) => {
       if (evento === "SIGNED_OUT" || (sessao?.user.email && sessao.user.email !== email)) {
         try {
-          privacidade.current?.invalidar();
+          if (privacidade.current?.invalidar() === false) {
+            setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
+          }
         } catch {
-          // O painel permanece fechado se o navegador não permitir sanear o storage.
+          setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
         } finally {
           protegerConteudo();
         }
@@ -166,12 +173,9 @@ export function AppShell({
   function encerrarSessao() {
     protegerConteudo();
     try {
-      privacidade.current?.sair();
+      if (privacidade.current?.sair() === false) setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
     } catch {
-      setErroSaida(
-        "Não foi possível proteger o armazenamento. Feche esta aba antes de trocar de conta.",
-      );
-      return;
+      setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
     }
     iniciarSaida(() => {
       void sair().catch(() => {
@@ -430,6 +434,11 @@ export function AppShell({
             />
 
             <main className="relative min-w-0 overflow-x-hidden p-4 md:p-6 xl:p-8">
+              {avisoArmazenamento && (
+                <p role="alert" className="mb-4 rounded-md border p-4">
+                  {avisoArmazenamento}
+                </p>
+              )}
               {conteudoProtegido ? (
                 <p role="alert" className="p-6">
                   {erroSaida ||

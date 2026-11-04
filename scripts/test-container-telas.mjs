@@ -214,7 +214,10 @@ function navegador(acoes = {}, conteudo = null, config = {}) {
         };
       if (id === "./_acoes" || id === "../containers/_acoes") return actions;
       if (id === "next/navigation")
-        return { useRouter: () => config.router, usePathname: () => "/containers/novo" };
+        return {
+          useRouter: () => config.router,
+          usePathname: () => config.caminho ?? "/containers/novo",
+        };
       if (id === "@/lib/adicionais") return adicionaisDominio;
       if (id === "@/lib/container-servico-ui") return containerUi;
       if (id === "@/lib/format") return formatos;
@@ -281,6 +284,14 @@ function navegador(acoes = {}, conteudo = null, config = {}) {
   const find = (label) =>
     nodes(tree).find((n) => ["Button", "AlertDialogAction"].includes(n.type) && text(n) === label);
   render();
+  if (config.negarGetterStorage) {
+    Object.defineProperty(globalThis, "sessionStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Persistência recusada", "SecurityError");
+      },
+    });
+  }
   effects.forEach((fn) => {
     const cleanup = fn();
     if (typeof cleanup === "function") cleanups.push(cleanup);
@@ -1060,3 +1071,161 @@ test("P1: logout confirmado conserva o redirecionamento de saída", async () => 
   await modulo.sair();
   assert.deepEqual(destinos, ["/login"]);
 });
+
+function montarShell(config = {}, conteudo = null) {
+  const originalWindow = globalThis.window;
+  globalThis.window = {
+    matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }),
+  };
+  const configuracao = {
+    arquivo: "../_components/app-shell.tsx",
+    componente: "AppShell",
+    props: { children: "MODULO_AUTORIZADO", papel: "admin", email: "teste@example.invalid" },
+    ...config,
+  };
+  const h = navegador({}, conteudo, configuracao);
+  return {
+    h,
+    mudarSessao: (evento, sessao) => configuracao.receberAuth(evento, sessao),
+    restaurar() {
+      h.restaurar();
+      if (originalWindow === undefined) delete globalThis.window;
+      else globalThis.window = originalWindow;
+    },
+  };
+}
+
+for (const [papel, caminho] of [
+  ["admin", "/dashboard"],
+  ["admin", "/apontamentos"],
+  ["admin", "/faturamento"],
+  ["operacional", "/operacional"],
+]) {
+  for (const negarGetterStorage of [false, true]) {
+    test(`C.5: ${papel} acessa ${caminho} com storage ${negarGetterStorage ? "recusado" : "disponível"}`, async () => {
+      const tela = montarShell({
+        negarGetterStorage,
+        caminho,
+        props: { children: "MODULO_AUTORIZADO", papel, email: "teste@example.invalid" },
+      });
+      try {
+        await tela.h.pronto();
+        assert.match(tela.h.text(), /MODULO_AUTORIZADO/);
+        assert.doesNotMatch(tela.h.text(), /A sessão mudou ou a saída foi iniciada/);
+        if (negarGetterStorage && papel === "admin") {
+          assert.match(tela.h.text(), /armazenamento.*indisponível/i);
+        }
+      } finally {
+        tela.restaurar();
+      }
+    });
+  }
+}
+
+test("C.5: formulário bloqueia cadastro localmente e explica storage recusado", async () => {
+  const h = navegador({}, null, { negarGetterStorage: true });
+  try {
+    await h.pronto();
+    assert.match(h.text(), /armazenamento.*indisponível/i);
+    assert.equal(h.nodes().find((n) => n.type === "fieldset").props.disabled, true);
+    h.click("Revisar serviço");
+    assert.equal(h.find("Confirmar registro"), undefined);
+    assert.equal(h.eventos.filter(([tipo]) => ["salvar", "registrar"].includes(tipo)).length, 0);
+  } finally {
+    h.restaurar();
+  }
+});
+
+for (const recusarSignOut of [false, true]) {
+  test(`C.5: falha de leitura não impede logout ${recusarSignOut ? "recusado" : "confirmado"}`, async () => {
+    let chamadas = 0;
+    let concluir;
+    const pendente = new Promise((resolve, reject) => {
+      concluir = () => (recusarSignOut ? reject(new Error("signOut recusado")) : resolve());
+    });
+    const intent = intencoes.criarIntencao(
+      userId,
+      lote,
+      "Registro solicitado",
+      crypto.randomUUID(),
+    );
+    const tela = montarShell(
+      {
+        sair: () => {
+          chamadas++;
+          return pendente;
+        },
+      },
+      JSON.stringify(intent),
+    );
+    try {
+      await tela.h.pronto();
+      const antes = [...tela.h.storage.values()][0];
+      sessionStorage.getItem = () => {
+        throw new Error("Leitura recusada");
+      };
+      tela.h
+        .nodes()
+        .find((n) => n.type === "DropdownMenuItem" && n.props.onClick)
+        .props.onClick();
+      tela.h.render();
+      assert.doesNotMatch(tela.h.text(), /MODULO_AUTORIZADO/);
+      assert.equal(chamadas, 1);
+      concluir();
+      await tela.h.pronto();
+      assert.equal([...tela.h.storage.values()][0], antes);
+      assert.match(tela.h.text(), /armazenamento.*indisponível/i);
+      assert.doesNotMatch(tela.h.text(), /logout concluído|saída concluída/i);
+      if (recusarSignOut) assert.match(tela.h.text(), /Saída não confirmada/);
+    } finally {
+      concluir();
+      await pendente.catch(() => {});
+      tela.restaurar();
+    }
+  });
+}
+
+test("C.5: getter recusado não impede a Action sair", async () => {
+  let chamadas = 0;
+  const tela = montarShell({
+    negarGetterStorage: true,
+    sair: async () => {
+      chamadas++;
+    },
+  });
+  try {
+    await tela.h.pronto();
+    tela.h
+      .nodes()
+      .find((n) => n.type === "DropdownMenuItem" && n.props.onClick)
+      .props.onClick();
+    await tela.h.pronto();
+    assert.equal(chamadas, 1);
+    assert.doesNotMatch(tela.h.text(), /MODULO_AUTORIZADO/);
+  } finally {
+    tela.restaurar();
+  }
+});
+
+for (const evento of ["SIGNED_OUT", "SIGNED_IN"]) {
+  test(`C.5: ${evento} mantém bloqueio de confidencialidade mesmo com getter recusado`, async () => {
+    const config = {
+      negarGetterStorage: true,
+      props: { children: "DADOS_FINANCEIROS", papel: "admin", email: "teste@example.invalid" },
+    };
+    const tela = montarShell(config);
+    try {
+      await tela.h.pronto();
+      assert.match(tela.h.text(), /DADOS_FINANCEIROS/);
+      tela.mudarSessao(
+        evento,
+        evento === "SIGNED_OUT" ? null : { user: { email: "outro@example.invalid" } },
+      );
+      await tela.h.pronto();
+      assert.doesNotMatch(tela.h.text(), /DADOS_FINANCEIROS/);
+      assert.ok(tela.h.eventos.some(([tipo]) => tipo === "limpar-cache"));
+    } finally {
+      tela.restaurar();
+    }
+  });
+}

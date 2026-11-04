@@ -400,3 +400,44 @@ test("P1: ausência de BroadcastChannel não impede proteção local nem apaga i
   assert.deepEqual(JSON.parse([...storage.itens.values()][0]), { versao: 2, userId, chave });
   observador.fechar();
 });
+
+test("C.5: saneamento recusado não impede invalidação de outra aba nem apaga marcador", async () => {
+  const { observarPrivacidadeContainers } =
+    await import("../src/lib/container-servico-privacidade.ts");
+  const { criarIntencao, salvarIntencao } = await intencoes();
+  const abas = [];
+  function canal() {
+    const atual = {
+      onmessage: null,
+      postMessage: () => abas.filter((aba) => aba !== atual).forEach((aba) => aba.onmessage?.()),
+      close() {},
+    };
+    abas.push(atual);
+    return atual;
+  }
+  const a = armazenamento(),
+    b = armazenamento();
+  for (const storage of [a, b]) {
+    Object.defineProperty(storage, "length", { get: () => storage.itens.size });
+    storage.key = (i) => [...storage.itens.keys()][i] ?? null;
+    salvarIntencao(storage, criarIntencao(userId, lote, motivo, chave));
+  }
+  let bloqueiosA = 0,
+    bloqueiosB = 0;
+  const tabA = observarPrivacidadeContainers(canal(), () => bloqueiosA++, a);
+  const tabB = observarPrivacidadeContainers(canal(), () => bloqueiosB++, b);
+  a.getItem = () => {
+    throw new Error("Leitura recusada");
+  };
+  try {
+    assert.doesNotThrow(() => tabA.sair());
+    assert.equal(bloqueiosA, 1);
+    assert.equal(bloqueiosB, 1);
+    for (const storage of [a, b]) {
+      assert.deepEqual(JSON.parse([...storage.itens.values()][0]), { versao: 2, userId, chave });
+    }
+  } finally {
+    tabA.fechar();
+    tabB.fechar();
+  }
+});
