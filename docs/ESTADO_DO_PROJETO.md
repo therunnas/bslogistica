@@ -1,11 +1,46 @@
 # Estado do projeto
 
-Fotografia factual do sistema de **BS Soluções Logística**. É a **fonte única**
+Fotografia factual do sistema de **BS Soluções Logísticas**. É a **fonte única**
 dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
-## Checkpoint de 02/11/2026 — início do FIN-PR-10
+## Checkpoint verificado no GitHub — 04/11/2026
+
+**Fonte e limite:** refs, PRs, checks e commits consultados no GitHub. Não houve
+consulta autenticada ao catálogo efetivo do Supabase, ao banco HML ou às
+variáveis/destino do Preview. Código mergeado, deploy do aplicativo, migration
+aplicada e flag ativada **não são equivalentes**.
+
+| Superfície | Última evidência verificável | Limite e próximo gate |
+| --- | --- | --- |
+| `main` (Git) | HEAD `041aa27b2de41390f121fcc931a18430f34473e1`. [FIN-PR-10 / PR #90](https://github.com/therunnas/bslogistica/pull/90) mergeado por squash em `5795c0960d9b58a9c54037adfdfe55b6213f2fc2`; [DOC-MASTER-01/B1 / PR #91](https://github.com/therunnas/bslogistica/pull/91) mergeado por squash no HEAD atual. | Migrations até a 044 **versionadas**, sem presumir implantação remota. |
+| Qualidade no Git | CI do HEAD `3851a6e` do PR #90 e do HEAD `568269f` do PR #91 aprovadas; seis threads do #90 resolvidas. Revisão Codex do #91 concluída sem achados. | CodeRabbit do #91 não fez revisão substantiva por limite de uso; estado `success` do check não equivale a parecer. |
+| Vercel | Check de deploy do merge do PR #90: `success`; checks de Preview nos PRs aprovados. | O deploy de Production após o PR #91 e o comportamento do domínio não foram revalidados neste checkpoint. |
+| Preview | Proteções de isolamento documentadas e testes de código anteriores. | **Destino real do Supabase e separação dos dados não comprovados nesta verificação**. Não inserir dados reais sem o gate de isolamento. |
+| HML / Supabase | Sem leitura do catálogo remoto neste checkpoint. | Determinar projeto, versão do schema, migrations, roles, flags e possibilidade de restauração antes de aplicar alterações. |
+| Production / Supabase | Último relato histórico: migrations 032–034 aplicadas, motor por vigência ligado desde 29/10 e resolução comercial por função/colaborador **OFF**. | Situação atual e aplicação de 035–044 **não verificadas ao vivo**. Nenhuma migration ou flag alterada por estes merges. |
+| Backup e acesso | Backups e ensaios anteriores registrados nos históricos do projeto. | Restauração integral atual, matriz E2E real de papéis e recuperação não foram comprovadas neste checkpoint. |
+
+**Sequência de entrega:** concluir a reconciliação documental DOC-MASTER-01/B2,
+verificar ambientes e backups por leitura antes de qualquer alteração, executar
+FIN-PR-11 (container como serviço avulso), FIN-PR-12 (XLSX Dynamis) e FIN-PR-13
+(conciliação/HML) em PRs isolados. Só então avaliar migrations remotas, rollout
+financeiro, matriz E2E final e aceite do cliente por gates específicos. O PR
+[antigo #63](https://github.com/therunnas/bslogistica/pull/63) permanece fora
+deste fluxo até triagem explícita.
+
+**Evidência negativa:** este checkpoint não certifica HML, Production/DB,
+restore completo, regras comerciais ativadas ou homologação de ponta a ponta.
+
+## Checkpoint histórico de 02/11/2026 — início do FIN-PR-10
+
+**Registro histórico, não status vigente.** As referências abaixo a
+`FIN-PR-10 em andamento`, `PR #90 Draft`, ausência de autorização de merge e
+motor desligado em outubro descrevem decisões e estados daqueles dias. O
+checkpoint de 04/11 acima prevalece para o Git atual; estados remotos continuam
+sujeitos à comprovação por ambiente.
+
 
 **Ambientes: último estado informado, não revalidado nesta sessão.** O GitHub
 confirma o PR #89 (FIN-PR-09) mergeado em
@@ -41,7 +76,7 @@ migrations e ativação de funcionalidade são estados distintos.
 | 041       | Tarifas por função, período e vigência |
 | 042       | Diária individual e bônus diário       |
 | 043       | Dias especiais V2 (PR #89 mergeado)    |
-| 044       | Calendário territorial (nesta branch)  |
+| 044       | Calendário territorial (PR #90 no Git) |
 
 O repositório contém suítes para essas entregas; resultados históricos não
 comprovam execução nesta sessão. As migrações remotas e a ativação de preços não
@@ -115,7 +150,7 @@ R1 estão no PR #89. Especial V2 não faturado que exija recálculo com resoluç
 é recusado com 55000; notas sem mudança financeira preservam valores, e ON permite
 recalcular preservando o bônus. Faturados continuam imutáveis.
 
-### FIN-PR-10 — calendário territorial nacional em andamento
+### FIN-PR-10 — calendário territorial nacional (histórico do PR #90)
 
 Desenvolvimento e testes exclusivamente locais, seguido de commits, push e PR
 Draft. Sem autorização para merge, Ready for Review, deploy, HML, Production,
