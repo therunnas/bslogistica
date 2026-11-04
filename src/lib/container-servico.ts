@@ -88,9 +88,7 @@ export function dataCivilValida(valor: string): boolean {
   const data = new Date(Date.UTC(ano, mes - 1, dia));
   data.setUTCFullYear(ano);
   return (
-    data.getUTCFullYear() === ano &&
-    data.getUTCMonth() === mes - 1 &&
-    data.getUTCDate() === dia
+    data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia
   );
 }
 
@@ -147,9 +145,10 @@ export function validarLoteDeContainers(lote: LoteDeContainers): string[] {
     erros.push("Os custos individuais precisam ser valores válidos, em centavos.");
   }
   if (lote.modalidadeCusto === "total_distribuido") {
-    const total = lote.totalDistribuido === null || lote.totalDistribuido === undefined
-      ? null
-      : reaisEmCentavos(lote.totalDistribuido);
+    const total =
+      lote.totalDistribuido === null || lote.totalDistribuido === undefined
+        ? null
+        : reaisEmCentavos(lote.totalDistribuido);
     if (total === null || total !== soma || valorInvalido) {
       erros.push("A soma dos participantes precisa igualar o total a distribuir.");
     }
