@@ -8,6 +8,8 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { dirname, resolve } from "node:path";
 
 import {
   conciliarBaseComercial,
@@ -30,11 +32,13 @@ try {
   if (!Array.isArray(containers) || containers.some((id) => typeof id !== "string")) {
     throw new Error("containers.json deve conter um array de IDs em texto.");
   }
-  const resultado = conciliarBaseComercial(
-    validarBaseComercial(JSON.parse(baseBruta)),
-    JSON.parse(fechamentoBruto),
-    containers,
-  );
+  const base = validarBaseComercial(JSON.parse(baseBruta));
+  // Caminhos relativos são resolvidos a partir do JSON da base, nunca do cwd.
+  const fonte = await readFile(resolve(dirname(resolve(basePath)), base.fonte.arquivo));
+  if (createHash("sha256").update(fonte).digest("hex") !== base.fonte.sha256) {
+    throw new Error("SHA-256 do arquivo-fonte diverge da base comercial.");
+  }
+  const resultado = conciliarBaseComercial(base, JSON.parse(fechamentoBruto), containers);
   console.log(JSON.stringify(resultado, null, 2));
   process.exitCode = resultado.confere ? 0 : 1;
 } catch (erro) {

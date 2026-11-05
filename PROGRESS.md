@@ -29,7 +29,10 @@ faturamento por período e relatórios. Duas trilhas de uso:
 `feat/fin-pr-13-integracao-conciliacao`, worktree `/private/tmp/bs-fin-pr-13`, a partir
 da `main` `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. Implementação local concluída e
 PR [#100](https://github.com/therunnas/bslogistica/pull/100) aberto como Draft;
-CI, Preview e revisão são o gate atual. O estado e a próxima ação exatos ficam no
+Revisão independente da sessão 10 corrigiu quatro achados P2 com RED/GREEN;
+a matriz de homologação está em
+[Homologação integrada](docs/financeiro/homologacao-fin-pr-13.md).
+Validação final/CI e homologação posterior são o gate atual. O estado e a próxima ação exatos ficam no
 [HANDOFF](docs/HANDOFF.md).
 
 **FIN-PR-12:** PR #99 mergeado por squash em `3e5b7b1`; CI de `main` e deploy
@@ -174,7 +177,7 @@ para a última evidência de integração.
    integrado cobre apontamentos, diárias, HE, adicionais, Containers, fechamento,
    faturamento e os dois XLSX em banco local descartável. A base comercial aceita
    proveniência por arquivo e SHA-256 e compara cada componente sem tolerância. A
-   planilha original da Dynamis não foi encontrada nas fontes locais autorizadas;
+   modelo comercial Dynamis ainda não está acessível nas fontes locais autorizadas;
    portanto R$ 35.118,12 não foi usado como resultado de fixture e a conciliação
    real segue pendente.
 

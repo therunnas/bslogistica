@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 import {
   conciliarBaseComercial,
@@ -7,7 +12,7 @@ import {
 } from "../src/lib/fechamento/conciliacao-comercial.ts";
 import { gerarXlsxDoCliente } from "../src/lib/fechamento/xlsx-cliente.ts";
 import { gerarXlsxDoFechamento } from "../src/lib/fechamento/xlsx.ts";
-import { dadosDoOuro } from "./_fechamento-exportacao.mjs";
+import { dadosDoOuro, lerPlanilha, lerStringsCompartilhadas } from "./_fechamento-exportacao.mjs";
 import { lerZip } from "./_zip.mjs";
 
 const CONTAINER_ID = "5c45d000-0000-4000-8000-000000000013";
@@ -105,5 +110,122 @@ const [xlsxInterno, xlsxCliente] = await Promise.all([
 ]);
 assert.ok(lerZip(xlsxInterno).has("xl/worksheets/sheet3.xml"));
 assert.ok(lerZip(xlsxCliente).has("xl/worksheets/sheet2.xml"));
+const zipCliente = lerZip(xlsxCliente);
+const stringsCliente = lerStringsCompartilhadas(zipCliente.get("xl/sharedStrings.xml"));
+const celulasCliente = lerPlanilha(zipCliente.get("xl/worksheets/sheet1.xml"), stringsCliente);
+const linhaTotal = [...celulasCliente]
+  .find(([, c]) => c.texto === "Total do fechamento")[0]
+  .slice(1);
+assert.equal(celulasCliente.get(`L${linhaTotal}`).bruto, "1135.65");
+const linhaContainer = [...celulasCliente]
+  .find(([, c]) => c.texto?.includes("Descarga de dois containers"))[0]
+  .match(/\d+$/)[0];
+assert.equal(celulasCliente.get(`K${linhaContainer}`).bruto, "45.67");
 
-console.log("FIN-PR-13: conciliação sintética e as duas exportações XLSX passaram.");
+const casos = [];
+function caso(nome, executar) {
+  try {
+    executar();
+    console.log(`PASS ${nome}`);
+  } catch (erro) {
+    casos.push(`${nome}: ${erro.message}`);
+  }
+}
+caso("ajuste negativo legítimo", () => {
+  const negativa = structuredClone(base);
+  negativa.componentes.ajustesCentavos = -375;
+  negativa.totalCentavos -= 375;
+  const fechamento = structuredClone(dados);
+  fechamento.financeiro.ajusteCentavos = -375;
+  fechamento.financeiro.ajusteFaturadoCentavos = -375;
+  fechamento.ajustesFaturados = [
+    { faturaId: "sintetica", descricao: "Ajuste signed", valorCentavos: -375 },
+  ];
+  fechamento.financeiro.receitaCentavos -= 375;
+  assert.equal(conciliarBaseComercial(negativa, fechamento, [CONTAINER_ID]).confere, true);
+});
+caso("ajuste sem lastro e contagens impossíveis são recusados", () => {
+  const semLastro = structuredClone(dados);
+  semLastro.financeiro.ajusteCentavos += 100;
+  semLastro.financeiro.receitaCentavos += 100;
+  assert.throws(() => extrairComponentesDoFechamento(semLastro, [CONTAINER_ID]));
+  assert.throws(() =>
+    extrairComponentesDoFechamento({ ...dados, colaboradores: [] }, [CONTAINER_ID]),
+  );
+  assert.throws(() =>
+    extrairComponentesDoFechamento({ ...dados, meta: { ...dados.meta, linhasLidas: 0 } }, [
+      CONTAINER_ID,
+    ]),
+  );
+});
+caso("centavos fracionários não se anulam na soma", () => {
+  const invalido = structuredClone(dados);
+  invalido.adicionais[1].valorCentavos += 0.5;
+  invalido.adicionais.push({ ...invalido.adicionais[0], id: "fracao", valorCentavos: -0.5 });
+  assert.throws(() => extrairComponentesDoFechamento(invalido, [CONTAINER_ID]));
+});
+caso("vínculo de Container desconhecido é recusado", () => {
+  assert.throws(() => extrairComponentesDoFechamento(dados, ["inexistente"]));
+});
+caso("adicional duplicado é recusado mesmo com total adulterado", () => {
+  const invalido = structuredClone(dados);
+  invalido.adicionais.push(invalido.adicionais[0]);
+  invalido.financeiro.receitaCentavos += 4567;
+  assert.throws(() => extrairComponentesDoFechamento(invalido, [CONTAINER_ID]));
+});
+caso("período impossível ou invertido é recusado", () => {
+  for (const periodo of [
+    { inicio: "2026-02-30", fim: "2026-03-15" },
+    { inicio: "2026-03-16", fim: "2026-03-15" },
+  ])
+    assert.throws(() => validarBaseComercial({ ...base, periodo }));
+});
+caso("snapshot de versão incorreta ou conciliação divergente é recusado", () => {
+  for (const alteracao of [
+    { versao: 666 },
+    { conciliacao: [{ confere: false }] },
+    { detalhes: [] },
+  ]) {
+    assert.throws(() => conciliarBaseComercial(base, { ...dados, ...alteracao }, [CONTAINER_ID]));
+  }
+});
+caso("CLI verifica bytes da fonte e códigos de saída", () => {
+  const pasta = mkdtempSync(join(tmpdir(), "fin13-cli-"));
+  try {
+    const fonte = Buffer.from("modelo comercial sintético; não é Dynamis");
+    const entrada = structuredClone(base);
+    entrada.fonte = {
+      arquivo: "fonte.txt",
+      sha256: createHash("sha256").update(fonte).digest("hex"),
+    };
+    writeFileSync(join(pasta, "fonte.txt"), fonte);
+    writeFileSync(join(pasta, "base.json"), JSON.stringify(entrada));
+    writeFileSync(join(pasta, "fechamento.json"), JSON.stringify(dados));
+    writeFileSync(join(pasta, "containers.json"), JSON.stringify([CONTAINER_ID]));
+    const rodar = () =>
+      spawnSync(
+        process.execPath,
+        [
+          "--experimental-strip-types",
+          "--import",
+          "./scripts/_resolver-ts.mjs",
+          "scripts/conciliar-fin-pr-13.mjs",
+          join(pasta, "base.json"),
+          join(pasta, "fechamento.json"),
+          join(pasta, "containers.json"),
+        ],
+        { encoding: "utf8" },
+      );
+    assert.equal(rodar().status, 0);
+    entrada.componentes.diariasCentavos++;
+    entrada.totalCentavos++;
+    writeFileSync(join(pasta, "base.json"), JSON.stringify(entrada));
+    assert.equal(rodar().status, 1);
+    writeFileSync(join(pasta, "fonte.txt"), "fonte alterada");
+    assert.equal(rodar().status, 2);
+  } finally {
+    rmSync(pasta, { recursive: true, force: true });
+  }
+});
+assert.deepEqual(casos, []);
+console.log("FIN-PR-13: conciliação, casos negativos, CLI e dois XLSX passaram.");

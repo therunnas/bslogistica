@@ -13,7 +13,7 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 | Campo                     | Valor                                                                                        |
 | ------------------------- | -------------------------------------------------------------------------------------------- |
 | Etapa                     | FIN-PR-13 — testes integrados e conciliação financeira                                       |
-| Gate atual                | PR Draft #100 aberto; aguarda CI, Preview e revisão no HEAD final                            |
+| Gate atual                | PR Draft #100; revisão independente corrigida; validar/publicar sessão 10                    |
 | Último gate concluído     | Matriz local 034 → 045, 66 suítes, lint, TypeScript e build verdes                           |
 | Worktree                  | `/private/tmp/bs-fin-pr-13`                                                                  |
 | Branch                    | `feat/fin-pr-13-integracao-conciliacao`                                                      |
@@ -23,9 +23,19 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 | PR                        | [#100 — Draft](https://github.com/therunnas/bslogistica/pull/100)                            |
 | Ambiente-alvo             | Nenhum remoto; somente Supabase local descartável e Preview automático futuro                |
 | Última ação comprovada    | Build de produção passou após 66/66 suítes e 697/697 asserções de compatibilidade            |
-| Próxima ação exata        | Publicar este checkpoint e conferir CI, CodeRabbit e Preview no HEAD final                   |
+| Próxima ação exata        | Conferir CI e Preview do novo HEAD; aguardar autorização de homologação/merge                |
 
 ## Evidências
+
+- Sessão 10: revisão independente por outro agente, somente leitura, sobre
+  `39e7262f0dd0b7a63a17b58eb902034a670ec15a`. Quatro P2 reproduzidos, corrigidos
+  com RED/GREEN e reavaliados: ajustes negativos; validação runtime e lastro;
+  duplicidades/vínculos de Containers; verificação dos bytes/SHA pelo CLI.
+- Revisor aprovou o delta final no working tree; suíte confere também total e
+  Container no XML real. Matriz de 27 casos preparada em
+  [Homologação integrada](financeiro/homologacao-fin-pr-13.md), todos não executados.
+- Dynamis é modelo comercial histórico, não regra obrigatória V2. **Modelo externo
+  ainda não acessível** após nova busca local autorizada; não bloqueia revisão.
 
 - PR #99: HEAD autorizado `9b98b072a146d347a966c64c7c8c7a57669ed91b`, CI verde,
   mergeável e sem threads; squash em `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`.
@@ -71,7 +81,7 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Bloqueios e riscos
 
-- falta a planilha original Dynamis de 01–15/09/2026 com procedência verificável;
+- modelo externo Dynamis ainda não acessível; comparação histórica/Excel pendente;
 - conciliação real e validação do arquivo no Microsoft Excel continuam pendentes;
 - nove fluxos reais de Containers, jornada cadastro → faturamento e matriz de
   segurança/permissões permanecem na homologação completa;

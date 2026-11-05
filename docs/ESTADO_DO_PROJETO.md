@@ -7,6 +7,45 @@ Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
 ## FIN-PR-13 — integração e conciliação financeira (05/11/2026)
 
+### Revisão independente — sessão 10
+
+Retomada no HEAD `39e7262f0dd0b7a63a17b58eb902034a670ec15a`, sem alterações
+parciais posteriores. CI run `42069242206` e Preview `7579772555` verdes;
+CodeRabbit havia pulado a revisão. Outro agente, em contexto separado e somente
+leitura, revisou código e contratos e reproduziu quatro achados **P2**, sem
+crítico/alto identificado: ajuste negativo legítimo recusado; snapshot serializado
+sem validação suficiente (frações que se anulam, versão/detalhes/lastro e contagens
+inconsistentes); duplicidades e IDs de Containers sem correspondência; SHA-256
+apenas declarado, sem verificação dos bytes pelo CLI.
+
+Correções com RED/GREEN: ajustes signed com lastro; centavos inteiros seguros
+validados antes das somas; conferência de versão, detalhes/consolidado, contagens,
+colaboradores e ajustes; duplicidade e vínculos ausentes recusados; datas civis
+inválidas/invertidas recusadas; CLI verifica arquivo-fonte pelo hash (caminho
+relativo ao JSON da base) e códigos 0/1/2. A suíte também confere no XML real o
+total e a receita do Container. O revisor repetiu as reproduções e aprovou o delta
+final no working tree. Revisão por agente do mesmo modelo não substitui revisão
+humana ou homologação. Nenhuma regra comercial, migration, grant ou RLS mudou.
+
+Validação da sessão 10 no working tree revisado: 66/66 suítes, lint,
+TypeScript, Prettier, workflow documental, diff check e build aprovados. A matriz
+local 034–045 está sendo repetida; seu resultado final e o novo HEAD de CI ficam
+no HANDOFF ao encerrar.
+
+Preparada [matriz E2E](financeiro/homologacao-fin-pr-13.md), com 27 casos,
+os nove fluxos de Containers, critérios/evidências e distinção entre uso de dados
+existentes (a confirmar) e preparação controlada em HML. Todos continuam NÃO
+EXECUTADOS. Preview comum não tem secrets de administração/recuperação; esses
+casos exigem candidato com capacidade comprovada e autorização específica.
+
+O arquivo `Dynamis Controle de jornada 2026 (1).xlsx` foi esclarecido pelo usuário
+como **modelo comercial de referência**, não especificação das regras atuais.
+Nova busca local autorizada não encontrou cópia: **modelo externo ainda não
+acessível**. Não se inferiram abas/fórmulas nem se forçou equivalência com V2.
+A falta do modelo não bloqueia a revisão técnica do PR; limita a comparação
+comercial e a validação real do Excel. O plano registra como explicar diferenças
+históricas por componente, preservando o motor aprovado.
+
 **Estado:** implementação e validação local concluídas na branch
 `feat/fin-pr-13-integracao-conciliacao`, baseada na `main`
 `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. O PR
