@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                  |
-| ------------------------- | -------------------------------------------------------------------------------------- |
-| Etapa                     | WORKFLOW-01 — padronização definitiva do desenvolvimento                               |
-| Gate atual                | Revisão independente R1 do PR #97; ajustes R1 aguardando CI no novo HEAD               |
-| Último gate concluído     | Gate 2 — validação local e CI no `HEAD validado`                                       |
-| Worktree                  | `/private/tmp/bs-workflow-01`                                                          |
-| Branch                    | `docs/workflow-01`                                                                     |
-| Base                      | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)                             |
-| HEAD validado             | `0e1848ae9cbdcf34a33497a20ef9fc66119b63ee`; local = remoto na retomada da sessão R1    |
-| Alterações não commitadas | Nenhuma além dos ajustes R1 deste checkpoint, entregues no commit seguinte ao validado |
-| PR                        | [#97 — Draft](https://github.com/therunnas/bslogistica/pull/97)                        |
-| Ambiente-alvo             | Nenhum ambiente remoto; somente repositório e CI sem secrets                           |
-| Última ação comprovada    | CI do PR verde em `0e1848a` (run 42019884284); revisão R1 aplicada no working tree     |
-| Próxima ação exata        | Conferir CI do commit R1 e registrar o novo `HEAD validado`; não fazer merge           |
+| Campo                     | Valor                                                                    |
+| ------------------------- | ------------------------------------------------------------------------ |
+| Etapa                     | WORKFLOW-01 — padronização definitiva do desenvolvimento                 |
+| Gate atual                | Revisão R1 concluída; aguardando autorização de merge do PR #97          |
+| Último gate concluído     | Gate 2 — validação local e CI no `HEAD validado`                         |
+| Worktree                  | `/private/tmp/bs-workflow-01`                                            |
+| Branch                    | `docs/workflow-01`                                                       |
+| Base                      | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)               |
+| HEAD validado             | `4e3b0ab565635fd1a7af894983f953975c48db25`; local = remoto no checkpoint |
+| Alterações não commitadas | Nenhuma                                                                  |
+| PR                        | [#97 — Draft](https://github.com/therunnas/bslogistica/pull/97)          |
+| Ambiente-alvo             | Nenhum ambiente remoto; somente repositório e CI sem secrets             |
+| Última ação comprovada    | Ajustes R1 em `4e3b0ab`, CI verde (run 42023101884)                      |
+| Próxima ação exata        | Usuário decide o merge do PR #97; até lá, Draft e sem merge              |
 
 ## Evidências
 
@@ -44,6 +44,9 @@ permitted` ao abrir porta interna; build Webpack local passou.
   alterações não commitadas, último gate e checkpoint de transferência entre
   agentes. Ajustes em `WORKFLOW.md`, `AGENTS.md`, `CLAUDE.md`, neste arquivo e no
   validador documental; RED 1/5 pelo campo `Worktree` ausente antes do GREEN.
+- `4e3b0ab`: localmente GREEN 5/5, `check:workflow`, 64/64 `test:*`, lint,
+  TypeScript, Prettier e `git diff --check`; build local não executado. CI run
+  42023101884: `validar` (inclui build padrão) e `sql-local` com sucesso.
 
 ## Migrations por ambiente
 
