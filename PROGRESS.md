@@ -28,14 +28,15 @@ faturamento por período e relatórios. Duas trilhas de uso:
 **FIN-PR-11 — preparação de HML e homologação de Containers.** WORKFLOW-01 foi
 encerrada com o merge do [PR #97](https://github.com/therunnas/bslogistica/pull/97)
 em `314c08c`. O diagnóstico somente leitura de HML, Production, Preview e backup
-está concluído; cada operação remota seguinte (backup de HML, migrations 035–045,
-homologação) exige autorização específica. O estado e a próxima ação exatos ficam
+está concluído, e o backup cifrado de HML foi restaurado e conferido localmente;
+cada operação remota seguinte (migrations 035–045, homologação) exige
+autorização específica. O estado e a próxima ação exatos ficam
 no [HANDOFF](docs/HANDOFF.md).
 
 ### Fila
 
-1. **FIN-PR-11**: backup verificável de HML (`CHECK-UP-REC-01`), migrations
-   035–045 em HML e homologação de Containers no Preview ligado ao HML.
+1. **FIN-PR-11**: migrations 035–045 em HML (backup e dry-run prontos) e
+   homologação de Containers no Preview ligado ao HML.
 2. **FIN-PR-12**: exportação específica de cliente — ainda não iniciado.
 3. **FIN-PR-13**: testes integrados, HML e conciliação — ainda não iniciado.
 
@@ -118,8 +119,8 @@ ambiente e da resolução comercial estão centralizados nesse documento.
       registrados em [Ambientes](docs/AMBIENTES.md).
 - [x] **WORKFLOW-01:** documentação e controles locais/CI integrados no PR #97
       (`314c08c`); controles administrativos de GitHub/Vercel continuam externos.
-- [ ] **CHECK-UP-REC-01:** HML e Production sem backup gerenciado nem PITR
-      (05/11); falta produzir e restaurar backup de HML antes de qualquer migration.
+- [x] **CHECK-UP-REC-01 (HML):** backup lógico cifrado do HML restaurado e
+      conferido localmente em 05/11; Production segue sem backup recente.
 - [ ] **CHECK-UP-E2E-01:** concluir matriz real de papéis/MFA, recuperação e
       isolamento de dados, com contas e cenários de homologação aprovados.
 - [ ] **FIN-VAL:** integrar FIN-PR-11/12/13 separadamente e reconciliar cálculo,

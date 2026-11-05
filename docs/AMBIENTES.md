@@ -108,8 +108,9 @@ Production, mas não prova que os dados do HML sejam sintéticos.
   foram inspecionados neste diagnóstico.
 - Nenhuma migration, SQL ou configuração foi aplicada durante WORKFLOW-01.
 - Backups gerenciados (05/11/2026): `supabase backups list` vazio e PITR
-  desligado em HML e em Production. Nenhum backup de HML está registrado; o último
-  backup lógico de Production é de 23/10/2026, anterior à `025` (ver
+  desligado em HML e em Production. HML tem backup lógico cifrado de 05/11/2026
+  (head 034) com restauração local comprovada (ver [HANDOFF](HANDOFF.md)); o
+  último backup lógico de Production é de 23/10/2026, anterior à `025` (ver
   [Estado do projeto](ESTADO_DO_PROJETO.md)).
 
 Antes de usar HML para homologação:

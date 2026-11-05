@@ -24,9 +24,11 @@ migration só remota e 035–045 pendentes nos dois. Nenhuma migration, SQL ou
 configuração foi alterada.
 
 **Backup:** `supabase backups list` vazio e PITR desligado em HML e Production.
-Não há backup de HML registrado. O último backup lógico de Production é de
-23/10/2026, anterior à `025`, sem restauração ensaiada do pacote (ver o bloco
-"Backups de Production" adiante). `CHECK-UP-REC-01` continua aberto.
+Em 05/11/2026 (sessão 03) foi gerado backup lógico cifrado do HML na 034 e
+restaurado em instância local descartável, com catálogo, ACL, RLS e contagens
+iguais ao HML; hash, cobertura e ajustes de restauração no [HANDOFF](HANDOFF.md).
+O último backup lógico de Production continua sendo o de 23/10/2026, anterior à
+`025` (ver "Backups de Production" adiante).
 
 **Preview → banco:** pela API da Vercel, `NEXT_PUBLIC_SUPABASE_URL` aponta para o
 HML no Preview de todas as branches e no override da branch `staging`, e para
@@ -39,8 +41,11 @@ novos ou editados (decisão do proprietário de 30/10/2026), sem recalcular linh
 existentes; a 041 e a 042 nascem desligadas. Implantar 035–045 em Production é
 gate próprio, depois da homologação.
 
-Próximo gate: autorização para gerar e restaurar backup de HML e então aplicar
-035–045 em HML. Plano e roteiro de homologação no [HANDOFF](HANDOFF.md).
+**Migrations em HML:** dry-run listou exatamente 035–045, em ordem; o ensaio das
+11 na cópia restaurada passou sem alterar valores existentes. Nada aplicado no HML.
+
+Próximo gate: autorização para aplicar 035–045 em HML. Plano e roteiro de
+homologação no [HANDOFF](HANDOFF.md).
 
 ## WORKFLOW-01 — histórico até o merge do PR #97 (05/11/2026)
 
