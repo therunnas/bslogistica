@@ -155,7 +155,7 @@ export function montarQuadroDeDiarias(
 export function rotuloDaVigenciaIndividual(
   d: Pick<DiariaIndividual, "valid_from" | "valid_to">,
 ): string {
-  return `desde ${dataBr(d.valid_from)}${d.valid_to ? ` até ${dataBr(d.valid_to)}` : ""}`;
+  return `desde ${dataBr(d.valid_from)}${d.valid_to ? ` até ${dataBr(d.valid_to)} (fim exclusivo)` : ""}`;
 }
 
 // ---------------------------------------------------------------------------

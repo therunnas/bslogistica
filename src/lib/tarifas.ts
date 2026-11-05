@@ -213,7 +213,7 @@ export function dataBr(iso: string): string {
 
 /** Texto da vigência de uma tarifa. */
 export function rotuloDaVigencia(t: Pick<TarifaDoContrato, "valid_from" | "valid_to">): string {
-  return `desde ${dataBr(t.valid_from)}${t.valid_to ? ` até ${dataBr(t.valid_to)}` : ""}`;
+  return `desde ${dataBr(t.valid_from)}${t.valid_to ? ` até ${dataBr(t.valid_to)} (fim exclusivo)` : ""}`;
 }
 
 export interface SnapshotsDoApontamento {

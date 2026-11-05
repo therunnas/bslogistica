@@ -206,7 +206,7 @@ verificar(
     rotuloDaVigenciaIndividual({ valid_from: "2026-01-01", valid_to: null }),
     rotuloDaVigenciaIndividual({ valid_from: "2026-01-01", valid_to: "2026-04-01" }),
   ],
-  ["desde 01/01/2026", "desde 01/01/2026 até 01/04/2026"],
+  ["desde 01/01/2026", "desde 01/01/2026 até 01/04/2026 (fim exclusivo)"],
 );
 verificar(
   "T10. fonte do preço: individual, tarifa da função e período, e a regra anterior (nulo/desconhecido)",
