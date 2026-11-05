@@ -13,16 +13,16 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 | Campo                     | Valor                                                                                  |
 | ------------------------- | -------------------------------------------------------------------------------------- |
 | Etapa                     | FIN-PR-11 — preparação de HML e homologação de Containers                              |
-| Gate atual                | Gate 4 — backup de HML restaurado e dry-run feito; aguarda autorização para aplicar    |
-| Último gate concluído     | `CHECK-UP-REC-01` para HML — backup cifrado restaurado e conferido em instância local  |
+| Gate atual                | Gate 4 — backup preservado, restaurado e dry-run feito; aguarda autorização de aplicar |
+| Último gate concluído     | `CHECK-UP-REC-01` para HML — backup restaurado e preservado em guarda local durável    |
 | Worktree                  | `/private/tmp/bs-workflow-01`                                                          |
 | Branch                    | `docs/fin-pr-11-preparacao-hml`                                                        |
 | Base                      | `314c08cb20e9a32dd10b4a0665e1be7dad108264` (`origin/main`)                             |
-| HEAD validado             | `2cf0b1f34b5d59b2084caa35574c40fd8c18cead`; local = remoto; CI run 42027079244 verde   |
+| HEAD validado             | `dfe65ad4c0bc73db50a408a75351ddf63b04dd47`; local = remoto; CI run 42028802735 verde   |
 | Alterações não commitadas | Nenhuma; este checkpoint vai no commit seguinte ao validado                            |
 | PR                        | [#98 — Draft](https://github.com/therunnas/bslogistica/pull/98), só documentação       |
 | Ambiente-alvo             | HML `qbnfcmrxmssnwkhaitgd`; nenhuma escrita remota executada                           |
-| Última ação comprovada    | Backup HML cifrado e restaurado; dry-run 035–045 no HML; ensaio 035–045 na cópia local |
+| Última ação comprovada    | Backup e chave copiados para guarda durável separada; hash e decifragem conferidos     |
 | Próxima ação exata        | Pedir autorização para aplicar 035–045 em HML; depois, homologar Containers no Preview |
 
 ## Evidências
@@ -42,8 +42,24 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   `hml-qbnfcmrxmssnwkhaitgd-034-20261105T122650Z.tar.age`, SHA-256
   `03eccd7042c88e1977246458079b0429af9053b8b547e0d07f637f3009b8ceac`; tar interno
   SHA-256 `33068983313cb1bcc9285b13d61174364a39a9e799fefd19980f7b370e00291a`.
-- Arquivo e chave ficam fora do repositório, sob guarda do usuário; caminhos e
-  chave não se registram aqui. Cópias em claro foram apagadas após o teste.
+- Cópias em claro foram apagadas após o teste de restauração.
+
+### Guarda do backup (sessão 04, 05/11/2026)
+
+- Arquivo cifrado e `.sha256` na pasta local persistente de backups do projeto,
+  já usada para backups anteriores; chave `age` na pasta local de chaves do
+  projeto, separada da do arquivo. Ambas no home do usuário, com acesso só do
+  dono (0700/0600), fora de pastas temporárias, do repositório e da sincronização
+  com iCloud, em disco com FileVault ligado. Caminhos não se registram aqui.
+- SHA-256 do arquivo no destino igual ao registrado; chave idêntica byte a byte
+  à original.
+- Recuperação: o arquivo do destino, decifrado em fluxo com a chave do destino
+  (sem gravar em claro), reproduz o SHA-256 do tar interno; o pacote tem os 7
+  arquivos esperados e o histórico termina em `20261101120000`. É o mesmo pacote
+  restaurado e conferido na sessão 03.
+- A cópia de origem em armazenamento temporário não foi apagada.
+- Limite: arquivo e chave estão no mesmo computador. Perda ou roubo da máquina
+  leva os dois; cópia fora da máquina depende de decisão do usuário.
 
 ### Restauração (instância Supabase local descartável, Postgres 17)
 
@@ -136,8 +152,10 @@ Testes automatizados e o ensaio local não substituem nenhum item acima.
 
 ## Autorizações
 
-- vigentes na sessão 03: publicar a branch e o PR #98 em Draft; backup cifrado
-  só de HML; restauração local descartável; dry-run de 035–045.
+- sessão 03: publicar a branch e o PR #98 em Draft; backup cifrado só de HML;
+  restauração local descartável; dry-run de 035–045.
+- sessão 04: preservar backup e chave em guarda local durável e separada;
+  atualizar este checkpoint no PR #98. Nenhuma nuvem autorizada.
 
 ## Proibições
 
@@ -150,8 +168,9 @@ Testes automatizados e o ensaio local não substituem nenhum item acima.
 
 ## Bloqueios e riscos
 
-- backup e chave estão em armazenamento temporário local: mover para guarda
-  durável e separada antes da aplicação em HML;
+- backup e chave só existem neste computador: falta cópia fora da máquina
+  (chave em gerenciador de senhas; arquivo cifrado em mídia externa ou nuvem
+  autorizada), a decidir pelo usuário;
 - natureza dos dados de HML (sintéticos ou não) e contas de teste ainda não
   aprovadas para homologação;
 - merge em `main` publica Production antes da CI; contenção administrativa
@@ -166,7 +185,7 @@ Sequência preservada: **migrations 035–045 em HML → homologação de Contai
 
 1. Reconciliar Git e GitHub conforme
    [Transferência entre agentes](WORKFLOW.md#reconciliação-na-retomada).
-2. Confirmar com o usuário que backup e chave estão em guarda durável.
+2. Conferir o SHA-256 do backup na guarda local antes de aplicar migrations.
 3. Com autorização, executar o plano de HML acima.
 4. Homologar Containers pelo roteiro; registrar executor, data, HEAD, deployment
    e migration head.
