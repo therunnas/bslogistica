@@ -13,19 +13,30 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 | Campo                     | Valor                                                                                        |
 | ------------------------- | -------------------------------------------------------------------------------------------- |
 | Etapa                     | FIN-PR-13 — testes integrados e conciliação financeira                                       |
-| Gate atual                | PR Draft #100; revisão independente corrigida; validar/publicar sessão 10                    |
+| Gate atual                | PR Draft #100 revisado; aguarda homologação e autorização de merge                           |
 | Último gate concluído     | Matriz local 034 → 045, 66 suítes, lint, TypeScript e build verdes                           |
 | Worktree                  | `/private/tmp/bs-fin-pr-13`                                                                  |
 | Branch                    | `feat/fin-pr-13-integracao-conciliacao`                                                      |
 | Base                      | `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420` (`origin/main`, squash do PR #99)                 |
-| HEAD validado             | `fcd482f7cb34bc51441d3fc38df52bc36ab34f19`; local = remoto antes deste checkpoint documental |
+| HEAD validado             | `7fa003e0a0c54a4f622cfd766633015deeb2d12c`; local = remoto antes deste checkpoint documental |
 | Alterações não commitadas | Nenhuma antes deste checkpoint; esta atualização documental será o commit seguinte           |
 | PR                        | [#100 — Draft](https://github.com/therunnas/bslogistica/pull/100)                            |
 | Ambiente-alvo             | Nenhum remoto; somente Supabase local descartável e Preview automático futuro                |
 | Última ação comprovada    | Build de produção passou após 66/66 suítes e 697/697 asserções de compatibilidade            |
-| Próxima ação exata        | Conferir CI e Preview do novo HEAD; aguardar autorização de homologação/merge                |
+| Próxima ação exata        | Autorizar dados/identidades HML e executar matriz E2E; merge requer aprovação própria        |
 
 ## Evidências
+
+- Sessão 10 encerrada: revisão independente aprovada explicitamente no SHA
+  `7fa003e0a0c54a4f622cfd766633015deeb2d12c`; 66/66 suítes, lint, TypeScript,
+  workflow, Prettier, diff check e build aprovados. Matriz local repetida no
+  código corrigido: 697 asserções, 0 falhas, schemas 034 e 037–045. Stack local
+  exclusiva; nenhum banco remoto acessado ou alterado.
+- CI `42075739071` verde no mesmo SHA (`validar` e `sql-local`); Preview
+  `7580690936` em sucesso. CodeRabbit pulou revisão; avaliação independente foi
+  a do agente em contexto separado. PR #100 continua Draft, sem merge.
+- Este commit posterior só altera HANDOFF; preserva o SHA validado conforme
+  WORKFLOW. A consulta final de CI/Preview do HEAD documental vai no relatório.
 
 - Sessão 10: revisão independente por outro agente, somente leitura, sobre
   `39e7262f0dd0b7a63a17b58eb902034a670ec15a`. Quatro P2 reproduzidos, corrigidos
