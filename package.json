@@ -69,6 +69,7 @@
     "test:periodo-contratual": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-periodo-contratual.mjs",
     "test:funcoes-turno": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-funcoes-turno.mjs",
     "test:snapshots-tarifas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-snapshots-tarifas.mjs",
+    "test:margem-containers": "node --experimental-strip-types scripts/testar-margem-containers.mjs",
     "test:custo-containers": "node --experimental-strip-types scripts/testar-custo-containers.mjs",
     "test:container-servico": "node --experimental-strip-types scripts/testar-container-servico.mjs",
     "test:container-backend": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-backend.mjs",

@@ -251,6 +251,8 @@ export interface DadosDoBanco {
   ajustesFaturados: AjusteFaturado[];
   adicionais: AdicionalDoFechamento[];
   saldoDeHoras: SaldoDeHoras[];
+  /** Custo dos serviços de Containers dos adicionais do recorte (045). Ausente = 0 (banco sem a 045). */
+  custoContainersCentavos?: number;
   /**
    * Frequência de fechamento do cliente no mês do início (migration 038). Ausente = banco sem a
    * 038: os alertas de período seguem a regra de antes (quinzena ou mês).
@@ -274,8 +276,16 @@ export interface Financeiro {
   ajusteCentavos: number;
   /** apontamentos + adicionais + ajustes. */
   receitaCentavos: number;
-  /** Custo previsto (valor devido) dos lançamentos. Adicionais e ajustes não têm custo. */
+  /**
+   * Custo TOTAL previsto: custo dos apontamentos + custo dos serviços de Containers (o mesmo que o
+   * `total_cost` da fatura). Ajustes e adicionais comuns não têm custo.
+   */
   custoCentavos: number;
+  /** Custo previsto (valor devido) dos lançamentos. */
+  custoApontamentosCentavos: number;
+  /** `cost_total_cents` dos serviços de Containers não cancelados dos adicionais do recorte. */
+  custoContainersCentavos: number;
+  /** `receita total − custo total`. */
   resultadoCentavos: number;
   margemPermil: number | null;
   /** Lançamentos sem fatura + adicionais sem fatura + ajuste previsto. */

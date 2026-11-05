@@ -47,6 +47,33 @@ export function somarCustoDeContainers(
   return centavos / 100;
 }
 
+export interface ServicoDoAdicional {
+  billing_additional_id: string;
+  cost_total_cents: number;
+}
+
+/**
+ * Custo dos serviços ligados aos adicionais dados (a prévia do Faturamento): o adicional é quem
+ * decide o recorte, como na fatura. Cada adicional tem no máximo um serviço; soma em centavos.
+ */
+export function somarCustoDosAdicionais(
+  servicos: readonly ServicoDoAdicional[],
+  adicionalIds: readonly string[],
+): number {
+  const ids = new Set(adicionalIds);
+  let centavos = 0;
+  for (const s of servicos) {
+    if (
+      ids.has(s.billing_additional_id) &&
+      Number.isSafeInteger(s.cost_total_cents) &&
+      s.cost_total_cents >= 0
+    ) {
+      centavos += s.cost_total_cents;
+    }
+  }
+  return centavos / 100;
+}
+
 const CODIGOS_SEM_CONTAINERS = ["42P01", "PGRST205"];
 
 /**

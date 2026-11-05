@@ -15,6 +15,7 @@
  *   Receita           apontamentos + adicionais + ajuste faturado + ajuste previsto
  *   A faturar         o que ainda não está em fatura (inclui o ajuste previsto)
  *   Já faturado       o que já está em fatura
+ *   Custo             custo dos apontamentos + custo dos serviços de Containers (= `total_cost` da fatura)
  *
  * **A conciliação nunca corrige.** Quando o Fechamento e o banco discordam, o item aparece como
  * "não confere" e vira alerta crítico; nenhum total é alterado para as duas telas coincidirem.
@@ -58,7 +59,10 @@ export function comporFinanceiro(
     [apontamentosCentavos, adicionaisCentavos, ajusteFaturadoCentavos, ajustePrevistoCentavos],
     "receita",
   );
-  const custoCentavos = consolidado.custoCentavos;
+  // Custo total = apontamentos + serviços de Containers (a fatura soma o custo do serviço uma vez).
+  const custoApontamentosCentavos = consolidado.custoCentavos;
+  const custoContainersCentavos = banco.custoContainersCentavos ?? 0;
+  const custoCentavos = somar([custoApontamentosCentavos, custoContainersCentavos], "custo");
   const resultadoCentavos = receitaCentavos - custoCentavos;
 
   return {
@@ -69,6 +73,8 @@ export function comporFinanceiro(
     ajusteCentavos: somar([ajusteFaturadoCentavos, ajustePrevistoCentavos], "ajuste"),
     receitaCentavos,
     custoCentavos,
+    custoApontamentosCentavos,
+    custoContainersCentavos,
     resultadoCentavos,
     margemPermil: margemPermil(receitaCentavos, custoCentavos),
     aFaturarCentavos: somar(

@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
-import { ehSchemaSemContainers, type ServicoComCusto } from "@/lib/custo-containers";
+import {
+  ehSchemaSemContainers,
+  type ServicoComCusto,
+  type ServicoDoAdicional,
+} from "@/lib/custo-containers";
 import { lerConsultaPaginada } from "@/lib/paginacao";
 
 /**
@@ -9,23 +13,27 @@ import { lerConsultaPaginada } from "@/lib/paginacao";
  * Dashboard e dos Relatórios. Mesmo critério do adicional de receita: não cancelados, executados
  * no período. Banco sem a 045 devolve lista vazia, não erro. Nenhuma escrita, nenhuma RPC.
  */
-interface ConsultaDeServicos extends PromiseLike<{
-  data: ServicoComCusto[] | null;
+interface ConsultaDeServicos<T> extends PromiseLike<{
+  data: T[] | null;
   error: { message: string } | null;
   count?: number | null;
 }> {
-  gte(coluna: string, valor: string): ConsultaDeServicos;
-  lte(coluna: string, valor: string): ConsultaDeServicos;
-  is(coluna: string, valor: null): ConsultaDeServicos;
-  gt(coluna: string, valor: string): ConsultaDeServicos;
-  order(coluna: string, opcoes: { ascending: boolean }): ConsultaDeServicos;
-  limit(quantidade: number): ConsultaDeServicos;
+  eq(coluna: string, valor: string): ConsultaDeServicos<T>;
+  gte(coluna: string, valor: string): ConsultaDeServicos<T>;
+  lte(coluna: string, valor: string): ConsultaDeServicos<T>;
+  is(coluna: string, valor: null): ConsultaDeServicos<T>;
+  gt(coluna: string, valor: string): ConsultaDeServicos<T>;
+  order(coluna: string, opcoes: { ascending: boolean }): ConsultaDeServicos<T>;
+  limit(quantidade: number): ConsultaDeServicos<T>;
 }
 
 /** `container_services` ainda não está nos tipos gerados do banco: leitura tipada à mão. */
 export interface ClienteDeLeitura {
   from(tabela: string): {
-    select(colunas: string, opcoes?: { count?: "exact"; head?: boolean }): ConsultaDeServicos;
+    select<T = ServicoComCusto>(
+      colunas: string,
+      opcoes?: { count?: "exact"; head?: boolean },
+    ): ConsultaDeServicos<T>;
   };
 }
 
@@ -51,7 +59,7 @@ export async function lerServicosDoPeriodo(
       ({ depoisDe, limite }) => {
         let q = db
           .from("container_services")
-          .select(colunas)
+          .select<ServicoComCusto>(colunas)
           .gte("executed_on", inicio)
           .lte("executed_on", fim)
           .is("canceled_at", null);
@@ -70,6 +78,49 @@ export async function lerServicosDoPeriodo(
     if (ehSchemaSemContainers(erro)) return [];
     throw erro;
   }
+}
+
+/**
+ * Serviços NÃO cancelados de um cliente, com o adicional a que pertencem (prévia do Faturamento).
+ * Mesma sondagem para o schema 034.
+ */
+export async function lerServicosDoCliente(
+  db: ClienteDeLeitura,
+  clienteId: string,
+): Promise<ServicoDoAdicional[]> {
+  const colunas = "id, billing_additional_id, cost_total_cents";
+  const sonda = await db.from("container_services").select("id").limit(1);
+  if (sonda.error) {
+    if (ehSchemaSemContainers(sonda.error)) return [];
+    throw sonda.error;
+  }
+  const linhas = await lerConsultaPaginada<ServicoDoAdicional & { id: string }>(
+    ({ depoisDe, limite }) => {
+      let q = db
+        .from("container_services")
+        .select<ServicoDoAdicional & { id: string }>(colunas)
+        .eq("client_id", clienteId)
+        .is("canceled_at", null);
+      if (depoisDe !== null) q = q.gt("id", depoisDe);
+      return q.order("id", { ascending: true }).limit(limite);
+    },
+    () =>
+      db
+        .from("container_services")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clienteId)
+        .is("canceled_at", null),
+  );
+  return linhas;
+}
+
+export function useCustoDeContainersDoCliente(clienteId: string, habilitado: boolean) {
+  return useQuery({
+    queryKey: [...CHAVE_DO_CUSTO_DE_CONTAINERS, "cliente", clienteId],
+    enabled: habilitado && clienteId !== "",
+    queryFn: (): Promise<ServicoDoAdicional[]> =>
+      lerServicosDoCliente(criarClienteNavegador() as unknown as ClienteDeLeitura, clienteId),
+  });
 }
 
 export function useCustoDeContainers(inicio: string, fim: string, habilitado: boolean) {
