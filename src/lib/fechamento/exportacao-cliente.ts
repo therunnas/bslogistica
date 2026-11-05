@@ -128,20 +128,24 @@ export interface TabelaDoCliente {
   total: ValorExportado[];
 }
 
-/** Os valores de uma linha, na escala do domínio (centésimos de hora e centavos). */
+/**
+ * Os valores de uma linha, na escala do domínio: minutos de hora extra cobrados e centavos. As
+ * horas só viram centésimos na saída, sobre a soma dos minutos — como a tela e o XLSX interno —,
+ * para o total de horas não acumular o arredondamento de cada lançamento.
+ */
 interface Componentes {
-  centesimos: number;
+  minutos: number;
   diaria: number;
   extra: number;
   especial: number;
   adicional: number;
 }
 
-const ZERO: Componentes = { centesimos: 0, diaria: 0, extra: 0, especial: 0, adicional: 0 };
+const ZERO: Componentes = { minutos: 0, diaria: 0, extra: 0, especial: 0, adicional: 0 };
 
 function somarComponentes(a: Componentes, b: Componentes): Componentes {
   return {
-    centesimos: a.centesimos + b.centesimos,
+    minutos: a.minutos + b.minutos,
     diaria: somarCentavos(a.diaria, b.diaria, "diária"),
     extra: somarCentavos(a.extra, b.extra, "hora extra"),
     especial: somarCentavos(a.especial, b.especial, "domingo/feriado"),
@@ -167,7 +171,8 @@ interface LinhaDoCliente {
     tipoDoDia: string | null,
     lancamento: string,
   ];
-  horas: number | null;
+  /** `true` nas diárias: as únicas linhas com horas extras. */
+  temHoras: boolean;
   valores: Componentes;
 }
 
@@ -175,7 +180,7 @@ const comparar = new Intl.Collator("pt-BR", { sensitivity: "base" }).compare;
 
 function componentesDoLancamento(d: LinhaDetalhe): Componentes {
   const valores: Componentes = {
-    centesimos: centesimosDeHora(d.minutosExtrasCobrados),
+    minutos: d.minutosExtrasCobrados,
     diaria: d.diariaCentavos,
     extra: d.extraCentavos,
     especial: d.especialCentavos,
@@ -229,7 +234,7 @@ function linhasDoCliente(dados: FechamentoData): LinhaDoCliente[] {
         null,
         ROTULO_DO_AJUSTE_ACUMULADO,
       ],
-      horas: null,
+      temHoras: false,
       valores: { ...ZERO, extra: ajuste },
     };
   };
@@ -245,7 +250,7 @@ function linhasDoCliente(dados: FechamentoData): LinhaDoCliente[] {
         d.tipoDoDia === null ? null : ROTULO_DO_TIPO_DO_DIA[d.tipoDoDia],
         `Diária — ${ROTULO_DO_STATUS[d.status].toLowerCase()}`,
       ],
-      horas: centesimosDeHora(d.minutosExtrasCobrados),
+      temHoras: true,
       valores: componentesDoLancamento(d),
     });
     if (lancamentos[i + 1]?.employeeId !== d.employeeId) {
@@ -280,7 +285,7 @@ function linhasDoCliente(dados: FechamentoData): LinhaDoCliente[] {
         null,
         `Adicional de serviço — ${s.descricao}${referencia}${periodo}`,
       ],
-      horas: null,
+      temHoras: false,
       valores: { ...ZERO, adicional: s.valorCentavos },
     });
   }
@@ -289,21 +294,30 @@ function linhasDoCliente(dados: FechamentoData): LinhaDoCliente[] {
     linhas.push({
       employeeId: null,
       celulas: [null, null, null, null, null, ROTULO_DO_AJUSTE_JA_FATURADO],
-      horas: null,
+      temHoras: false,
       valores: { ...ZERO, extra: dados.financeiro.ajusteFaturadoCentavos },
     });
   }
   return linhas;
 }
 
-function celulasDosValores(horas: number | null, v: Componentes): ValorExportado[] {
-  return [horas, v.diaria, v.extra, v.especial, v.adicional, totalDe(v)];
+/** As células numéricas. `comHoras` falso deixa a coluna de horas vazia (ajustes, serviços). */
+function celulasDosValores(v: Componentes, comHoras: boolean): ValorExportado[] {
+  return [
+    comHoras ? centesimosDeHora(v.minutos) : null,
+    v.diaria,
+    v.extra,
+    v.especial,
+    v.adicional,
+    totalDe(v),
+  ];
 }
 
 /** A soma de todas as linhas tem de ser o Fechamento: receita e cada componente. */
 function conferirTotais(dados: FechamentoData, total: Componentes): void {
   const c = dados.consolidado;
   const esperado: [string, number, number][] = [
+    ["minutos de hora extra", total.minutos, c.minutosExtrasCobrados],
     ["diária", total.diaria, c.diariaCentavos],
     ["domingo/feriado", total.especial, c.especialCentavos],
     [
@@ -335,11 +349,10 @@ export function tabelaDosLancamentos(dados: FechamentoData): TabelaDoCliente {
   const linhas = linhasDoCliente(dados);
   const total = linhas.reduce((soma, l) => somarComponentes(soma, l.valores), ZERO);
   conferirTotais(dados, total);
-  const horas = linhas.reduce((soma, l) => soma + (l.horas ?? 0), 0);
 
   return {
     colunas: COLUNAS_DOS_LANCAMENTOS,
-    linhas: linhas.map((l) => [...l.celulas, ...celulasDosValores(l.horas, l.valores)]),
+    linhas: linhas.map((l) => [...l.celulas, ...celulasDosValores(l.valores, l.temHoras)]),
     somadas: SOMADAS_DOS_LANCAMENTOS,
     total: [
       ROTULO_DO_TOTAL_DO_FECHAMENTO,
@@ -348,7 +361,7 @@ export function tabelaDosLancamentos(dados: FechamentoData): TabelaDoCliente {
       null,
       null,
       null,
-      ...celulasDosValores(horas, total),
+      ...celulasDosValores(total, true),
     ],
   };
 }
@@ -365,7 +378,7 @@ export function tabelaDoResumo(dados: FechamentoData): TabelaDoCliente {
   let ajusteFaturado = ZERO;
 
   for (const l of linhas) {
-    const valores = { ...l.valores, centesimos: l.horas ?? 0 };
+    const valores = l.valores;
     if (l.employeeId === null) {
       if (l.celulas[5] === ROTULO_DO_AJUSTE_JA_FATURADO) {
         ajusteFaturado = somarComponentes(ajusteFaturado, valores);
@@ -391,17 +404,15 @@ export function tabelaDoResumo(dados: FechamentoData): TabelaDoCliente {
   for (const c of dados.colaboradores) {
     const linha = porColaborador.get(c.employeeId);
     if (!linha) continue;
-    if (linha.diarias !== c.consolidado.diarias) {
+    if (
+      linha.diarias !== c.consolidado.diarias ||
+      linha.valores.minutos !== c.consolidado.minutosExtrasCobrados
+    ) {
       throw new ErroDaExportacaoDoCliente(
-        `Colaborador ${c.employeeId}: a quantidade de diárias não confere com o fechamento.`,
+        `Colaborador ${c.employeeId}: diárias ou horas extras não conferem com o fechamento.`,
       );
     }
-    resultado.push([
-      c.nome,
-      c.funcao,
-      linha.diarias,
-      ...celulasDosValores(linha.valores.centesimos, linha.valores),
-    ]);
+    resultado.push([c.nome, c.funcao, linha.diarias, ...celulasDosValores(linha.valores, true)]);
     somar(linha.diarias, linha.valores);
     porColaborador.delete(c.employeeId);
   }
@@ -410,7 +421,7 @@ export function tabelaDoResumo(dados: FechamentoData): TabelaDoCliente {
   }
 
   if (dados.adicionais.length > 0) {
-    resultado.push([ROTULO_DOS_SERVICOS, null, null, ...celulasDosValores(null, servicos)]);
+    resultado.push([ROTULO_DOS_SERVICOS, null, null, ...celulasDosValores(servicos, false)]);
     somar(0, servicos);
   }
   if (dados.financeiro.ajusteFaturadoCentavos !== 0) {
@@ -418,7 +429,7 @@ export function tabelaDoResumo(dados: FechamentoData): TabelaDoCliente {
       ROTULO_DO_AJUSTE_JA_FATURADO,
       null,
       null,
-      ...celulasDosValores(null, ajusteFaturado),
+      ...celulasDosValores(ajusteFaturado, false),
     ]);
     somar(0, ajusteFaturado);
   }
@@ -436,7 +447,7 @@ export function tabelaDoResumo(dados: FechamentoData): TabelaDoCliente {
       ROTULO_DO_TOTAL_DO_FECHAMENTO,
       null,
       total.diarias,
-      ...celulasDosValores(total.valores.centesimos, total.valores),
+      ...celulasDosValores(total.valores, true),
     ],
   };
 }

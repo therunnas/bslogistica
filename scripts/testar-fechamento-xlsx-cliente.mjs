@@ -48,10 +48,12 @@ import {
   tituloDoFechamento,
 } from "../src/lib/fechamento/exportacao-cliente.ts";
 import { normalizarLinhas } from "../src/lib/fechamento/normalizar.ts";
+import { centesimosDeHora } from "../src/lib/fechamento/valores.ts";
 import {
   ABA_DO_RESUMO,
   ABA_DOS_LANCAMENTOS,
   AVISO_SEM_LANCAMENTOS,
+  decimalDoXml,
   gerarXlsxDoCliente,
   LINHA_DO_CABECALHO,
 } from "../src/lib/fechamento/xlsx-cliente.ts";
@@ -509,6 +511,39 @@ verificar(
   true,
 );
 
+// Horas: o arquivo soma MINUTOS e arredonda uma vez, como a tela e o XLSX interno.
+const umMinuto = ["2026-10-01", "2026-10-02", "2026-10-05"].map((data, i) =>
+  linhaBruta({
+    id: `m-${i}`,
+    emp: "emp-bia",
+    nome: "Beatriz Alves",
+    funcao: "Conferente",
+    data,
+    base: "150.00",
+    he: "0.62",
+    minutosHe: 1,
+  }),
+);
+const minutosSoltos = montar(umMinuto, {});
+verificar(
+  "M21. total de horas = Fechamento (3 × 1 min = 0,05 h, não 0,06 h)",
+  tabelaDosLancamentos(minutosSoltos).total[6],
+  centesimosDeHora(minutosSoltos.consolidado.minutosExtrasCobrados),
+);
+verificar(
+  "M22. horas do colaborador no resumo = Fechamento",
+  tabelaDoResumo(minutosSoltos).linhas[0][3],
+  centesimosDeHora(minutosSoltos.colaboradores[0].consolidado.minutosExtrasCobrados),
+);
+verificar("M23. total de horas do resumo = Fechamento", tabelaDoResumo(minutosSoltos).total[3], 5);
+const minutosAdulterados = structuredClone(minutosSoltos);
+minutosAdulterados.consolidado.minutosExtrasCobrados += 1;
+verificar(
+  "M24. minutos de hora extra divergentes do Fechamento: recusa a exportação",
+  erroDe(() => tabelaDosLancamentos(minutosAdulterados)) instanceof ErroDaExportacaoDoCliente,
+  true,
+);
+
 // ---------------------------------------------------------------------------
 console.log("\nS. Sem custo, resultado nem margem");
 
@@ -622,6 +657,45 @@ igual(
   "F2. SUBTOTAL(109) nas colunas numéricas, só sobre as linhas de dados (6–14)",
   ["G", "H", "I", "J", "K", "L"].map((c) => formulaDe(aba1, `${c}16`)),
   ["G", "H", "I", "J", "K", "L"].map((c) => `SUBTOTAL(109,${c}6:${c}14)`),
+);
+const valorGravado = (aba, ref) => {
+  const m = new RegExp(`<c r="${ref}"[^>]*>(.*?)</c>`, "s").exec(aba.xml);
+  const v = m ? /<v>(.*?)<\/v>/s.exec(m[1])?.[1] : undefined;
+  return v === undefined ? null : Number(v);
+};
+igual(
+  "F2b. cada SUBTOTAL traz gravado o valor sem filtro (pré-visualização e modo protegido não ficam vazios)",
+  ["G", "H", "I", "J", "K", "L"].map((c) => valorGravado(aba1, `${c}16`)),
+  [1.5, 590, 68.82, 300, 1300.5, 2259.32],
+);
+verificar(
+  "F2c. sem filtro, o SUBTOTAL de dinheiro gravado é o Total do fechamento",
+  ["H", "I", "J", "K", "L"].every((c) => valorGravado(aba1, `${c}16`) === numero(aba1, `${c}17`)),
+  true,
+);
+igual(
+  "F2d. resumo: SUBTOTAL com valor gravado",
+  ["C", "D", "E", "F", "G", "H", "I"].map((c) => valorGravado(aba2, `${c}12`)),
+  [5, 1.5, 590, 68.82, 300, 1300.5, 2259.32],
+);
+igual(
+  "F2e. valor gravado em aritmética inteira (zero, negativo, inteiro)",
+  [decimalDoXml(0, 100), decimalDoXml(-7, 100), decimalDoXml(225932, 100), decimalDoXml(5, 1)],
+  ["0.00", "-0.07", "2259.32", "5"],
+);
+const xlsxMinutos = abrir(await gerarXlsxDoCliente(minutosSoltos));
+const minutos1 = xlsxMinutos.planilha(1);
+igual(
+  "F2f. horas na aba de lançamentos: o SUBTOTAL soma as linhas arredondadas (3 × 0,02 = 0,06); o Total do fechamento soma os minutos (0,05), como a tela",
+  [valorGravado(minutos1, "G10"), numero(minutos1, "G11")],
+  [0.06, 0.05],
+);
+verificar(
+  "F2g. em dinheiro o SUBTOTAL sem filtro e o Total do fechamento nunca divergem",
+  ["H", "I", "J", "K", "L"].every(
+    (c) => valorGravado(minutos1, `${c}10`) === numero(minutos1, `${c}11`),
+  ),
+  true,
 );
 verificar("F3. fórmula sem '=' (forma do OOXML)", formulaDe(aba1, "L16").startsWith("="), false);
 verificar("F4. subtotal de dinheiro em reais", formatoDe(aba1, "L16"), '"R$" #,##0.00');

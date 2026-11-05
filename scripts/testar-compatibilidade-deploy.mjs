@@ -1248,6 +1248,7 @@ if (BASE_URL) {
     [200, "PK"],
   );
   let totalDoCliente = null;
+  let subtotalGravado = null;
   let textosDoCliente = [];
   if (postCliente.status === 200) {
     const zip = lerZip(bytesCliente);
@@ -1256,11 +1257,21 @@ if (BASE_URL) {
     const rotulo = [...celulas.entries()].find(([, c]) => c.texto === "Total do fechamento")?.[0];
     const valor = rotulo ? celulas.get(`L${rotulo.slice(1)}`) : undefined;
     totalDoCliente = valor?.tipo === "n" ? Math.round(Number(valor.bruto) * 100) : null;
+    // A linha de SUBTOTAL fica uma acima do total quando há dados; seu valor gravado (`<v>`) é
+    // o que pré-visualizações e o modo protegido mostram.
+    const linhaDoTotal = rotulo ? Number(rotulo.slice(1)) : 0;
+    const subtotal = celulas.get(`L${linhaDoTotal - 1}`);
+    subtotalGravado =
+      subtotal?.formula && subtotal.tipo === "n" ? Math.round(Number(subtotal.bruto) * 100) : null;
   }
   verificar(
-    "H2c. Excel do cliente: total do fechamento = receita do GET, sem custo, margem nem resultado",
-    [totalDoCliente, textosDoCliente.some((t) => /custo|margem|resultado|lucro/i.test(t))],
-    [corpo?.financeiro?.receitaCentavos ?? null, false],
+    "H2c. Excel do cliente: total do fechamento = receita do GET = SUBTOTAL gravado, sem custo, margem nem resultado",
+    [
+      totalDoCliente,
+      subtotalGravado,
+      textosDoCliente.some((t) => /custo|margem|resultado|lucro/i.test(t)),
+    ],
+    [corpo?.financeiro?.receitaCentavos ?? null, corpo?.financeiro?.receitaCentavos ?? null, false],
   );
   for (const pagina of [
     "/fechamento",

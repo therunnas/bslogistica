@@ -12,8 +12,13 @@
  * que o filtro esconde: o cliente filtra por colaborador, data ou operação e vê o subtotal do que
  * ficou visível. Abaixo dele, "Total do fechamento" é o valor fixo do período inteiro.
  *
- * O arquivo não traz o resultado calculado das fórmulas; `fullCalcOnLoad` pede à planilha que as
- * calcule ao abrir. Texto do banco continua sempre `String` (célula de texto, nunca `<f>`).
+ * Cada SUBTOTAL leva GRAVADO o valor sem filtro (`<v>`, a soma da coluna, em aritmética inteira):
+ * pré-visualizações, o Modo de Exibição Protegido e leitores que não calculam mostram o número
+ * certo. `fullCalcOnLoad` ainda pede à planilha que recalcule ao abrir. Na coluna de horas da aba
+ * de lançamentos, o SUBTOTAL soma as horas já arredondadas de cada linha (é o que a planilha
+ * calcula) e pode diferir em centésimos do "Total do fechamento", que vem da soma dos minutos, como
+ * a tela. Em dinheiro, os dois são sempre iguais sem filtro. Texto do banco continua
+ * sempre `String` (célula de texto, nunca `<f>`).
  *
  * Importe este módulo só em Route Handler ou outro código de servidor.
  */
@@ -56,6 +61,23 @@ export const LINHA_DO_CABECALHO = 5;
 
 export const AVISO_SEM_LANCAMENTOS = "Nenhum lançamento no período.";
 
+/** Escala de cada tipo somado: o valor do modelo dividido por ela é o número do Excel. */
+const ESCALA_DA_SOMA: Partial<Record<TipoDeColuna, number>> = {
+  moeda: 100,
+  horas: 100,
+  inteiro: 1,
+};
+
+/** Inteiro na escala → número decimal do XML (`225932`, 100 → `2259.32`). Sem ponto flutuante. */
+export function decimalDoXml(inteiro: number, escala: number): string {
+  if (!Number.isSafeInteger(inteiro)) throw new Error("Soma fora do intervalo seguro.");
+  if (escala === 1) return String(inteiro);
+  const casas = String(escala).length - 1;
+  const absoluto = Math.abs(inteiro);
+  const fracao = String(absoluto % escala).padStart(casas, "0");
+  return `${inteiro < 0 ? "-" : ""}${Math.trunc(absoluto / escala)}.${fracao}`;
+}
+
 const FORMATO_DA_SOMA: Partial<Record<TipoDeColuna, string>> = {
   moeda: FORMATO_DE_MOEDA,
   horas: FORMATO_DE_HORAS,
@@ -82,12 +104,15 @@ function topo(dados: FechamentoData, subtitulo: string | null): SheetData {
   ];
 }
 
-/** Uma aba completa e a referência do autofiltro (cabeçalho e linhas, sem subtotal nem total). */
+/**
+ * Uma aba completa, a referência do autofiltro (cabeçalho e linhas, sem subtotal nem total) e o
+ * valor sem filtro de cada SUBTOTAL, por referência A1, para gravar no arquivo.
+ */
 export function abaDoCliente(
   dados: FechamentoData,
   tabela: TabelaDoCliente,
   subtitulo: string | null,
-): { dados: SheetData; filtro: string } {
+): { dados: SheetData; filtro: string; calculados: Map<string, string> } {
   const ultima = letraDaColuna(tabela.colunas.length);
   const primeiraLinha = LINHA_DO_CABECALHO + 1;
   const ultimaLinha = LINHA_DO_CABECALHO + tabela.linhas.length;
@@ -106,6 +131,7 @@ export function abaDoCliente(
     planilha.push(tabela.colunas.map((coluna, i) => celulaXlsx(coluna.tipo, linha[i] ?? null)));
   }
 
+  const calculados = new Map<string, string>();
   if (tabela.linhas.length === 0) {
     planilha.push([{ value: AVISO_SEM_LANCAMENTOS, type: String, fontStyle: "italic" }]);
   } else {
@@ -116,6 +142,15 @@ export function abaDoCliente(
         if (i === 0) return { ...ESTILO_DO_TOTAL, value: ROTULO_DO_SUBTOTAL, type: String };
         if (!tabela.somadas.includes(i)) return { ...ESTILO_DO_TOTAL };
         const letra = letraDaColuna(i + 1);
+        const escala = ESCALA_DA_SOMA[coluna.tipo];
+        if (escala === undefined) throw new Error("Coluna somada sem escala.");
+        const soma = tabela.linhas.reduce((total, linha) => {
+          const valor = linha[i] ?? null;
+          if (valor !== null && typeof valor !== "number")
+            throw new Error("Valor somado não numérico.");
+          return total + (valor ?? 0);
+        }, 0);
+        calculados.set(`${letra}${ultimaLinha + 2}`, decimalDoXml(soma, escala));
         return {
           ...ESTILO_DO_TOTAL,
           type: "Formula",
@@ -136,10 +171,38 @@ export function abaDoCliente(
   return {
     dados: planilha,
     filtro: `A${LINHA_DO_CABECALHO}:${ultima}${Math.max(ultimaLinha, LINHA_DO_CABECALHO)}`,
+    calculados,
   };
 }
 
-/** Pede à planilha que calcule as fórmulas ao abrir: o arquivo não traz o resultado delas. */
+/**
+ * Grava o valor calculado (`<v>`) em cada célula de SUBTOTAL, pelo mecanismo de features. Falha
+ * alto se a célula não estiver exatamente como o gerador a escreveu: nunca um arquivo sem o valor.
+ */
+export function recursoDeValoresCalculados(
+  porAba: ReadonlyMap<number, ReadonlyMap<string, string>>,
+): Feature<Arquivo> {
+  return {
+    files: {
+      transform: {
+        "xl/worksheets/sheet{id}.xml": {
+          transform(xml, _opcoes, { sheetIndex }) {
+            let resultado = xml;
+            for (const [ref, valor] of porAba.get(sheetIndex) ?? []) {
+              const celula = new RegExp(`(<c r="${ref}"[^>]*><f>[^<]*</f>)(</c>)`, "g");
+              const encontradas = resultado.match(celula)?.length ?? 0;
+              if (encontradas !== 1) throw new Error(`Célula de SUBTOTAL ${ref} fora do previsto.`);
+              resultado = resultado.replace(celula, `$1<v>${valor}</v>$2`);
+            }
+            return resultado;
+          },
+        },
+      },
+    },
+  };
+}
+
+/** Pede à planilha que recalcule as fórmulas ao abrir (o filtro, então, passa a valer). */
 export function recursoDeRecalculoAoAbrir(): Feature<Arquivo> {
   return {
     files: {
@@ -184,6 +247,17 @@ export async function gerarXlsxDoCliente(dados: FechamentoData): Promise<Buffer>
         stickyRowsCount: LINHA_DO_CABECALHO,
       },
     ],
-    { features: [recursoDeAutofiltro(filtros), recursoDeRecalculoAoAbrir()] },
+    {
+      features: [
+        recursoDeAutofiltro(filtros),
+        recursoDeValoresCalculados(
+          new Map([
+            [0, lancamentos.calculados],
+            [1, resumo.calculados],
+          ]),
+        ),
+        recursoDeRecalculoAoAbrir(),
+      ],
+    },
   ).toBuffer();
 }
