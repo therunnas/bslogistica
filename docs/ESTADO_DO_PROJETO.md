@@ -14,7 +14,9 @@ no Preview ligado ao HML. Nenhuma migration, regra financeira, RLS ou Auth mudou
 
 **Ambientes (PR #98 integrado em `a2fec9a`):** HML `qbnfcmrxmssnwkhaitgd` na
 045 desde 05/11/2026; Production `ehkduqokntemtmqzdrbd` na 034. Os nove fluxos de
-Containers (FIN-PR-11) continuam sem homologação.
+Containers (FIN-PR-11) continuam sem homologação. O merge do #98 (05/11/2026 14:14
+UTC) publicou Production `dpl_E3iQTUsSjSgC8UqjzBj1Etn6i98G` (READY 14:14:53, antes
+da CI de `main`, verde às 14:17:15); domínio 200, CSP com o Supabase de Production.
 
 **O que existe:** no Fechamento, ao lado do "Baixar Excel (.xlsx)" interno, o botão
 "Excel do cliente (.xlsx)" chama `POST /api/fechamento/xlsx-cliente` — mesmo
@@ -33,7 +35,8 @@ interna, leitura sob RLS pela sessão. O arquivo tem duas abas:
 
 Nas duas: autofiltro em todas as colunas, linha `SUBTOTAL(109; …)` que acompanha
 o filtro, "Total do fechamento" fixo, datas `dd/mm/aaaa`, moeda `R$`, cabeçalho
-congelado e recálculo ao abrir. **Sem custo, resultado, margem, já faturado ou a
+congelado, valor sem filtro gravado em cada SUBTOTAL (pré-visualização e modo
+protegido não ficam vazios) e recálculo ao abrir. **Sem custo, resultado, margem, já faturado ou a
 faturar.** Texto do banco é sempre célula de texto; as únicas fórmulas são os
 SUBTOTAL montados pelo gerador.
 
@@ -65,6 +68,27 @@ em **todos**, inclusive a 034 de Production, `POST /api/fechamento/xlsx-cliente`
 devolveu 200 com "Total do fechamento" igual à receita do `GET` e sem custo,
 margem nem resultado. Assinatura de frescor confirmada cobrindo lançamentos,
 adicionais e ajustes exibidos. Excel real continua não verificado.
+
+**Revisão independente (sessão 08):** feita por outro agente, em contexto novo, sem
+as conclusões anteriores, somente leitura, sobre `0bbe899` (mesmo modelo de IA: não
+substitui revisão humana). Sem achado crítico ou alto. Defeitos demonstrados e
+reproduzidos à parte, depois corrigidos com teste antes (RED 7/102, GREEN):
+
+- horas extras do arquivo arredondavam cada lançamento antes de somar (3 × 1 min =
+  0,06 h contra 0,05 h no Fechamento): o modelo agora soma minutos e converte uma
+  vez por total, e confere os minutos cobrados contra o Fechamento; na aba de
+  lançamentos o SUBTOTAL de horas soma as linhas arredondadas (é o que a planilha
+  calcula) e pode diferir em centésimos do total fixo; dinheiro nunca diverge;
+- os SUBTOTAL iam sem valor gravado: agora levam o valor sem filtro (`<v>`, em
+  aritmética inteira), mantendo `fullCalcOnLoad`.
+
+Decisões de produto registradas, sem bloquear: data do adicional de serviço é a da
+execução mesmo quando a competência é outra (só bancos com a 038); o arquivo não
+traz aviso de valores previstos nem bloqueia com alerta crítico; no modo acumulado
+o ajuste de HE não tem horas; ajuste de colaborador sem diária sai depois dos
+demais. Validação: suíte do cliente 105/105, 65/65 suítes, lint, `tsc`, build e
+compatibilidade 034 → 045 com 685 asserções e 0 falhas (SUBTOTAL gravado = total =
+receita do `GET` em todos os schemas).
 
 **Não usar R$ 35.118,12** como resultado esperado de nenhum conjunto que não seja a
 quinzena Dynamis original: essa conciliação é do FIN-PR-13.

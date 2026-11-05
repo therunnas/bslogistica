@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                   |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis)                                                             |
-| Gate atual                | Gate 2 — #99 reconciliado com a `main` após o #98; revisão independente e CI do HEAD em andamento                       |
-| Último gate concluído     | Gate 2 — validação local e CI (CI do HEAD R1 a registrar no checkpoint seguinte)                                        |
-| Worktree                  | `/private/tmp/bs-fin-pr-12`                                                                                             |
-| Branch                    | `feat/fin-pr-12-exportacao-dynamis`                                                                                     |
-| Base                      | `a2fec9a3f336bec3cbf8d53cd35880a4625370de` (`origin/main`, merge do PR #98)                                             |
-| HEAD validado             | `6452a95160847f57a251da67088e84fcb1e9adcb` (CI run 42041943752 verde); o merge da `main` que segue só traz documentação |
-| Alterações não commitadas | Nenhuma; este checkpoint vai no commit seguinte ao validado                                                             |
-| PR                        | [#99 — Draft](https://github.com/therunnas/bslogistica/pull/99)                                                         |
-| Ambiente-alvo             | Nenhum ambiente remoto alterado; CI e Preview automáticos do PR                                                         |
-| Última ação comprovada    | PR #98 mergeado (`a2fec9a`); `origin/main` mesclada no #99 com os 3 documentos reconciliados                            |
-| Próxima ação exata        | Aprovação do merge do PR #99 pelo usuário; depois FIN-PR-13                                                             |
+| Campo                     | Valor                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Etapa                     | FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis)                                           |
+| Gate atual                | Gate 2 — revisão independente feita e defeitos corrigidos; aguarda CI do HEAD e aprovação do merge    |
+| Último gate concluído     | Gate 2 — validação local completa e compatibilidade 034 → 045 no `HEAD validado`                      |
+| Worktree                  | `/private/tmp/bs-fin-pr-12`                                                                           |
+| Branch                    | `feat/fin-pr-12-exportacao-dynamis`                                                                   |
+| Base                      | `a2fec9a3f336bec3cbf8d53cd35880a4625370de` (`origin/main`, merge do PR #98)                           |
+| HEAD validado             | `20092cf01560293ffcaffec3fc381a53d1140e53`; validado localmente, CI a registrar                       |
+| Alterações não commitadas | Nenhuma; este checkpoint vai no commit seguinte ao validado                                           |
+| PR                        | [#99 — Draft](https://github.com/therunnas/bslogistica/pull/99)                                       |
+| Ambiente-alvo             | Nenhum ambiente remoto alterado; CI e Preview automáticos do PR                                       |
+| Última ação comprovada    | Revisão por outro agente; 2 defeitos reproduzidos e corrigidos; 65/65 suítes; compatibilidade 685/685 |
+| Próxima ação exata        | Usuário decide o merge do PR #99; depois FIN-PR-13                                                    |
 
 ## Evidências
 
@@ -44,8 +44,15 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   entrou na suíte de compatibilidade: cópia isolada, schemas 034 → 045, 685
   asserções, 0 falhas; na 034 de Production a rota responde 200 com total igual à
   receita do `GET`. 65/65 suítes, lint, `tsc`, Prettier e diff check.
-- Não executado: Excel real (automação de interface não autorizada nesta sessão)
-  e qualquer teste com dados do HML.
+- Sessão 08: PR #98 mergeado (`a2fec9a`), Production `dpl_E3iQTUsSjSgC8UqjzBj1Etn6i98G`
+  READY; `origin/main` mesclada (`0bbe899`, CI run 42043366475 verde). Revisão por
+  outro agente (contexto novo, somente leitura, mesmo modelo de IA): sem crítico ou
+  alto; corrigidos o total de horas (soma de minutos, como o Fechamento) e o valor
+  gravado dos SUBTOTAL, com RED 7/102 antes do GREEN 105/105. Compatibilidade
+  034 → 045: 685 asserções, 0 falhas, com SUBTOTAL gravado = total = receita.
+  65/65 suítes, lint, `tsc`, Prettier, diff check e build.
+- Não executado: Excel real (automação de interface não autorizada) e qualquer teste
+  com dados do HML.
 
 ## Migrations por ambiente
 
@@ -88,10 +95,11 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Bloqueios e riscos
 
-- revisão R1 feita pelo mesmo agente que implementou: falta revisão independente
-  de outro agente ou pessoa sobre o HEAD exato;
-- fórmulas sem resultado gravado: dependem do recálculo ao abrir;
-  visualizadores que não calculam mostram o subtotal vazio;
+- a revisão independente foi de outro agente do mesmo modelo de IA; revisão humana
+  continua recomendada antes do merge;
+- decisões de produto pendentes, sem bloquear: data do adicional de serviço (execução
+  × competência), aviso de valores previstos ou bloqueio com alerta crítico, horas do
+  ajuste no modo acumulado;
 - conciliação "não confere" não bloqueia o arquivo do cliente (como o interno);
 - Excel real e homologação de FIN-PR-11/FIN-PR-12 pendentes, previstos para a
   homologação completa depois do FIN-PR-13;
