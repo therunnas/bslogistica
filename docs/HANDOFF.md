@@ -10,111 +10,80 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                    |
-| ------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Etapa                     | FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis)                                              |
-| Gate atual                | Gate 2 concluído — revisão independente feita, defeitos corrigidos, CI verde; aguarda aprovação do merge |
-| Último gate concluído     | Gate 2 — validação local, compatibilidade 034 → 045 e CI no `HEAD validado`                              |
-| Worktree                  | `/private/tmp/bs-fin-pr-12`                                                                              |
-| Branch                    | `feat/fin-pr-12-exportacao-dynamis`                                                                      |
-| Base                      | `a2fec9a3f336bec3cbf8d53cd35880a4625370de` (`origin/main`, merge do PR #98)                              |
-| HEAD validado             | `a01d604d18833a953d320319c99dd532cf895753`; local = remoto; CI run 42045812665 verde                     |
-| Alterações não commitadas | Nenhuma; este checkpoint vai no commit seguinte ao validado                                              |
-| PR                        | [#99 — Draft](https://github.com/therunnas/bslogistica/pull/99)                                          |
-| Ambiente-alvo             | Nenhum ambiente remoto alterado; CI e Preview automáticos do PR                                          |
-| Última ação comprovada    | CI verde no HEAD final; Preview `dpl_BTSSeJksJjfbkYokb79zGUVHD8Y5` READY (SSO)                           |
-| Próxima ação exata        | Usuário decide o merge do PR #99; depois FIN-PR-13                                                       |
+| Campo                     | Valor                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Etapa                     | FIN-PR-13 — testes integrados e conciliação financeira                                                 |
+| Gate atual                | Implementação e validação local concluídas; preparar commit, push e PR Draft                           |
+| Último gate concluído     | Matriz local 034 → 045, 66 suítes, lint, TypeScript e build verdes                                     |
+| Worktree                  | `/private/tmp/bs-fin-pr-13`                                                                            |
+| Branch                    | `feat/fin-pr-13-integracao-conciliacao`                                                                |
+| Base                      | `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420` (`origin/main`, squash do PR #99)                           |
+| HEAD validado             | `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`; alterações validadas ainda não commitadas neste checkpoint |
+| Alterações não commitadas | Sim — implementação e documentação do FIN-PR-13 prontas para commit                                    |
+| PR                        | Draft a abrir na branch `feat/fin-pr-13-integracao-conciliacao`                                        |
+| Ambiente-alvo             | Nenhum remoto; somente Supabase local descartável e Preview automático futuro                          |
+| Última ação comprovada    | Build de produção passou após 66/66 suítes e 697/697 asserções de compatibilidade                      |
+| Próxima ação exata        | Revisar diff, commitar, fazer push, abrir PR Draft e conferir CI/Preview                               |
 
 ## Evidências
 
-- Funcionalidade: botão "Excel do cliente (.xlsx)" no Fechamento →
-  `POST /api/fechamento/xlsx-cliente` → `gerarXlsxDoCliente`. Detalhes no
-  [Estado do projeto](ESTADO_DO_PROJETO.md#fin-pr-12--excel-do-cliente-modelo-dynamis-05112026).
-- Arquivos: `src/lib/fechamento/exportacao-cliente.ts` (modelo e conferência),
-  `src/lib/fechamento/xlsx-cliente.ts` (arquivo), rota
-  `src/app/api/fechamento/xlsx-cliente/route.ts`, `download.ts` (rota por modelo),
-  `_exportar.tsx` (botão), `xlsx.ts` (só exporta auxiliares).
-- Implementação (`145666a`, CI run 42038640093 em `5e70631`): suíte nova 92/92,
-  mutação "adicional fora do total" barrada, `test:fechamento-xlsx` 279/279, 65/65
-  suítes, lint, `tsc`, build. Preview `dpl_8S7q95qJ3nUMyJAnDj2L8E51gzkQ` READY (SSO).
-- R1 (sessão 07, mesmo agente que implementou): sem achado crítico ou alto.
-  Corrigidos o rótulo "Serviço avulso" → "Adicional de serviço" (vocabulário único
-  do projeto) e o status da recusa por soma divergente (500 → 422
-  `dado-inconsistente`), com RED 5/95 antes do GREEN 95/95. A rota do cliente
-  entrou na suíte de compatibilidade: cópia isolada, schemas 034 → 045, 685
-  asserções, 0 falhas; na 034 de Production a rota responde 200 com total igual à
-  receita do `GET`. 65/65 suítes, lint, `tsc`, Prettier e diff check.
-- Sessão 08: PR #98 mergeado (`a2fec9a`), Production `dpl_E3iQTUsSjSgC8UqjzBj1Etn6i98G`
-  READY; `origin/main` mesclada (`0bbe899`, CI run 42043366475 verde). Revisão por
-  outro agente (contexto novo, somente leitura, mesmo modelo de IA): sem crítico ou
-  alto; corrigidos o total de horas (soma de minutos, como o Fechamento) e o valor
-  gravado dos SUBTOTAL, com RED 7/102 antes do GREEN 105/105. Compatibilidade
-  034 → 045: 685 asserções, 0 falhas, com SUBTOTAL gravado = total = receita.
-  65/65 suítes, lint, `tsc`, Prettier, diff check e build.
-- Não executado: Excel real (automação de interface não autorizada) e qualquer teste
-  com dados do HML.
+- PR #99: HEAD autorizado `9b98b072a146d347a966c64c7c8c7a57669ed91b`, CI verde,
+  mergeável e sem threads; squash em `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`.
+- Production decorrente exclusivamente do merge: CI run `42051545919` verde;
+  deployment `7577211847` em `success`; `/login` 200 e CSP apontando para o projeto
+  de Production. Nenhuma migration ou alteração de dados/configuração remota.
+- Conciliação: `src/lib/fechamento/conciliacao-comercial.ts` valida proveniência,
+  componentes em centavos e diferenças exatas; `scripts/conciliar-fin-pr-13.mjs`
+  aceita os três JSON locais e retorna código não zero em divergência.
+- TDD: a suíte nasceu RED por módulo ausente e ficou GREEN; cobre total sintético
+  R$ 1.135,65, propositalmente diferente da referência Dynamis, erro de um centavo,
+  SHA inválido, soma inválida e geração dos dois XLSX.
+- Integração local isolada: schemas 034, 037, 038, 039, 040, 041, 042, 043, 044 e
+  045; 697 asserções, zero falhas. O cenário 045 registra Containers pela RPC,
+  fecha, fatura e exporta pelas rotas reais; nos anteriores a capacidade não existe.
+- Validação geral: 66/66 suítes `test:*`, lint, `tsc --noEmit`, workflow documental,
+  Prettier e build de produção passaram.
+- Planilha original Dynamis: não encontrada nos worktrees nem na pasta local
+  autorizada do projeto. A conciliação real de R$ 35.118,12 não foi declarada.
 
 ## Migrations por ambiente
 
 - Esta tarefa não cria nem aplica migration.
-- HML `qbnfcmrxmssnwkhaitgd`: 045 (aplicada em 05/11/2026); evidências de backup,
-  restauração e aplicação em
-  [Estado do projeto](ESTADO_DO_PROJETO.md#fin-pr-11--evidências-de-backup-restauração-e-migrations-no-hml-05112026).
-- Production `ehkduqokntemtmqzdrbd`: 034. O Excel do cliente funciona na 034
-  (compatibilidade H2b/H2c).
-
-## Integração com o PR #98 (executada na sessão 08)
-
-1. PR #98 mergeado por squash em `a2fec9a` (05/11/2026 14:14:04 UTC), condicionado
-   ao head `7b6c8c7` com CI verde.
-2. `origin/main` mesclada neste PR com commit de merge normal (sem rebase nem force
-   push). Conflitos só em `HANDOFF.md`, `PROGRESS.md` e `ESTADO_DO_PROJETO.md`.
-3. `ESTADO_DO_PROJETO.md`: versão da `main` mais a seção do FIN-PR-12; as evidências
-   do HANDOFF do #98 (backup e SHA-256, guarda, restauração, aplicação em HML e
-   roteiro dos Containers) foram transferidas na íntegra para uma seção própria.
-4. `PROGRESS.md`: tarefa ativa FIN-PR-12/13 conforme a decisão do usuário; marcos do
-   #98 preservados.
-5. `HANDOFF.md`: este checkpoint.
+- HML `qbnfcmrxmssnwkhaitgd`: 045, não acessado nem alterado nesta execução.
+- Production `ehkduqokntemtmqzdrbd`: 034, não acessado no banco nem alterado.
+- A matriz 034 → 045 usou stack local própria, `project_id` e portas exclusivos.
 
 ## Autorizações
 
-- sessão 06: implementar FIN-PR-12, testes, commits, push, PR Draft, CI e Preview.
-- sessão 07: revisão R1, correções e testes no PR #99, push; preparar a integração
-  sem merge.
-- sessão 08: merge do PR #98 (inclui o deploy automático de Production dele);
-  reconciliar o #99, revisão por outro agente, correções, commits e push no #99.
-  **Merge do #99 não autorizado.**
+- squash merge do PR #99 condicionado ao HEAD exato autorizado, incluindo o deploy
+  automático de Production decorrente somente desse merge;
+- desenvolver FIN-PR-13, executar testes, criar branch/commits, push e PR Draft;
+- corrigir defeitos reais dentro do escopo financeiro integrado.
 
 ## Proibições
 
-- sem merge;
-- sem alterar Production, migrations remotas, credenciais ou ambientes;
-- sem alterar regras financeiras aprovadas;
-- sem iniciar FIN-PR-13 antes de autorização;
-- sem criar contas de teste.
+- sem migration remota, dados de HML/Production, secrets ou configuração remota;
+- sem merge do FIN-PR-13 e sem deploy manual de Production;
+- sem criar contas de teste remotas;
+- sem inventar regra comercial nem usar R$ 35.118,12 como fixture de outra base.
 
 ## Bloqueios e riscos
 
-- a revisão independente foi de outro agente do mesmo modelo de IA; revisão humana
-  continua recomendada antes do merge;
-- decisões de produto pendentes, sem bloquear: data do adicional de serviço (execução
-  × competência), aviso de valores previstos ou bloqueio com alerta crítico, horas do
-  ajuste no modo acumulado;
-- conciliação "não confere" não bloqueia o arquivo do cliente (como o interno);
-- Excel real e homologação de FIN-PR-11/FIN-PR-12 pendentes, previstos para a
-  homologação completa depois do FIN-PR-13;
-- merge em `main` publica Production antes da CI; contenção administrativa
-  pendente.
+- falta a planilha original Dynamis de 01–15/09/2026 com procedência verificável;
+- conciliação real e validação do arquivo no Microsoft Excel continuam pendentes;
+- nove fluxos reais de Containers, jornada cadastro → faturamento e matriz de
+  segurança/permissões permanecem na homologação completa;
+- manual de utilização e preparação de Production 035–045 são gates posteriores;
+- merge em `main` publica Production antes da CI; contenção administrativa pendente.
 
 ## Retomada
 
-Sequência: **merge autorizado do #99 → FIN-PR-13 → homologação
-completa E2E → manual de utilização → preparação de Production**.
+Sequência: **PR Draft FIN-PR-13 → CI/Preview/revisão → homologação completa E2E →
+manual de utilização → preparação controlada de Production 035–045**.
 
-1. Reconciliar Git e GitHub conforme
-   [Transferência entre agentes](WORKFLOW.md#reconciliação-na-retomada).
-2. Conferir que o PR #99 continua no HEAD validado, com CI verde.
-3. Merge do #99 só com autorização explícita.
-4. Na homologação, abrir o Excel do cliente no Excel real e conferir o SUBTOTAL
-   com filtro por colaborador.
-5. Se houver divergência, atualizar diagnóstico e este checkpoint antes de agir.
+1. Confirmar branch, worktree e diff somente do FIN-PR-13.
+2. Criar commit e push; abrir PR como Draft, sem merge.
+3. Conferir `validar`, `sql-local`, CodeRabbit e Preview no HEAD final.
+4. Na homologação posterior, fornecer a planilha original Dynamis, calcular seu
+   SHA-256, produzir os JSON de entrada e conciliar componente a componente.
+5. Manter as pendências de homologação; não declarar o projeto finalizado.

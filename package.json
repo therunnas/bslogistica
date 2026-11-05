@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "check:workflow": "node scripts/validar-workflow-documental.mjs",
+    "conciliar:fin-pr-13": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/conciliar-fin-pr-13.mjs",
     "test:calendario-territorial": "node --experimental-strip-types scripts/test-calendario-territorial.mjs",
     "test:calendario-runners": "node --experimental-strip-types scripts/test-calendario-runners.mjs",
     "dev": "next dev",
@@ -75,6 +76,7 @@
     "test:container-integracao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-integracao.mjs",
     "test:container-intencao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-intencao.mjs",
     "test:container-telas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-telas.mjs",
+    "test:fin-pr-13": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fin-pr-13.mjs",
     "test:workflow": "node --test scripts/testar-workflow-documental.mjs"
   },
   "dependencies": {
