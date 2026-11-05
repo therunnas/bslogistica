@@ -420,3 +420,17 @@ test("marcador reconcilia após reload sem receber/devolver payload nem chamar R
   assert.equal((await acoes.marcador(uuid(50))).codigo, "inconsistente");
   assert.equal(escritas, 0);
 });
+
+test("consulta conserva vínculo e nome da operação do container e da receita única", async () => {
+  const row = fixture();
+  row.operation_id = uuid(903);
+  row.operations = { name: "OPERACAO_TESTE_EXISTENTE" };
+  row.billing_additionals.operation_id = row.operation_id;
+  const resultado = await dados.listarContainers(dbFake({ container_services: [row] }), {});
+  assert.equal(resultado.servicos.length, 1);
+  assert.equal(resultado.servicos[0].operation_id, row.operation_id);
+  assert.equal(resultado.servicos[0].operacao_nome, "OPERACAO_TESTE_EXISTENTE");
+  assert.equal(resultado.servicos[0].billing_additional_id, row.billing_additional_id);
+  row.billing_additionals.operation_id = uuid(904);
+  await assert.rejects(dados.listarContainers(dbFake({ container_services: [row] }), {}));
+});

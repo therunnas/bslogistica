@@ -5,6 +5,83 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-11C — containers na operação existente (04/11/2026)
+
+Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), mantido
+**Draft e não mergeado**, na branch `feat/fin-pr-11c-interface-containers`, checkout
+`/private/tmp/bs-fin-pr-11c`. HEAD de entrada confirmado com working tree limpa:
+`bb9ec2c96cdb653edfbfef2cffcecb6ed0a4ae72`; base main preservada:
+`10bcfd83a42409c477a7df584cca279a1368f216`. O HEAD publicado deste incremento
+é o commit que contém esta seção, a conferir no Git/PR com seus próprios checks.
+
+**Decisão operacional:** uma mesma operação pode conter diárias, HE e serviços
+avulsos de containers. Container continua sendo serviço avulso, com receita
+negociada e custos explícitos, sem virar diária/HE. Não se cria outra operação
+nem contrato específico para registrar o serviço. O menu Containers permanece
+como visão geral dos serviços; Faturamento, Fechamento e Relatórios continuam
+separados.
+
+**Compatibilidade comprovada por inspeção:** a RPC 045
+`registrar_servico_container` já recebe `operacaoId`, preserva-o em
+`container_services` e encaminha a receita única para `registrar_adicional`
+(assinatura vigente da 038). Essa função valida no banco que a operação pertence
+ao cliente; não exige contrato específico. `gerar_fatura` da 045 conserva o
+vínculo da operação no item e fatura o adicional uma única vez. A suíte SQL 045
+já possui operação sem contrato (`MISTA-045`), com diária existente e container
+na mesma fatura, total exato, snapshot OFF preservado e sem dupla cobrança.
+Não houve bloqueio estrutural nem mudança de schema/RPC/RLS/regra financeira.
+
+**Fluxo anterior:** acesso pelo menu geral Containers e seleção manual de cliente
+e operação no formulário. **Fluxo novo:** cada cartão em Operações oferece
+“Adicionar serviço de container”, apontando para `/containers/novo?operacao=<uuid>`.
+A rota preserva `exigirAdmin()` e reutiliza o mesmo formulário. A operação e o
+cliente são resolvidos pelo catálogo retornado pela Action administrativa;
+nenhum cliente é aceito da URL como autoridade. Após preencher os demais dados,
+o registro usa a mesma Action/RPC e a consulta existente exibe o vínculo persistido.
+Não há chamada de criação de operação ou de contrato nesse atalho.
+
+**Proteções do contexto:** valor ausente conserva o formulário genérico. Operação
+inválida, parâmetro repetido/ambíguo, entidade ausente ou cliente fora do catálogo
+bloqueiam o cadastro, sem fallback genérico silencioso. Uma intenção preservada
+tem prioridade sobre o atalho: não se aplica outro cliente/operação, a chave é
+mantida e um aviso explícito aparece tanto na pendência quanto na recuperação de
+serviço confirmado. A chave React da página muda com o contexto para evitar
+reaproveitar estado de formulário de outra origem. Correção antes do primeiro
+envio permanece permitida; resultados incertos exigem reconciliação. Ausência
+real da 045 continua bloqueando o recurso, sem migration automática.
+
+**TDD e regressões executadas:** RED antes da implementação com **47/54 testes
+de tela PASS e 7 FAIL**, por atalho ausente, contexto não transmitido/preenchido,
+falta de recusa para URLs inválidas e ausência do aviso sobre intenção anterior.
+GREEN focal: **57/57 telas**, **23/23 dados/Actions** e **8/8 adaptador**, incluindo
+preenchimento real, guarda da rota, duplo clique com uma única chamada, consulta
+com operação/receita consistentes, contexto inválido, cliente ausente, intenção
+pendente/confirmada e capacidade 045 ausente. **63 suítes Node PASS**, incluindo
+regressões de autorização/MFA, idempotência, reconciliação, faturamento e
+adicionais. Os testes executam componentes/funções reais com fronteiras simuladas;
+o atalho no cartão também tem asserção estrutural. Não são E2E em navegador real.
+
+Lint, TypeScript e Prettier passaram. A primeira checagem de tipos identificou
+o contrato PageProps do Next e a prop opcional explicitamente indefinida; ambos
+foram corrigidos mantendo `exactOptionalPropertyTypes`, sem relaxar validações.
+O build padrão local continua impedido de abrir a porta do Turbopack
+(`Operation not permitted`), mesmo com exceção específica. Build local
+alternativo `npm run build -- --webpack` **PASS**, com variáveis públicas inertes
+da CI e exceção para fontes públicas. O build padrão da CI deve ser conferido
+no novo SHA como evidência distinta. Não houve mudança de configuração para
+mascarar a restrição ambiental.
+
+**Ambientes e continuidade:** migrations 001–045, domínio/adaptador, RPCs, RLS,
+grants, faturamento e dependências foram preservados; mudaram somente o atalho,
+a rota/formulário, três suítes e estes dois documentos. Não houve SQL/reset local,
+migration remota, alteração de flags/credenciais/ambientes ou deploy manual.
+Aplicação remota da 045 continua sem comprovação. CI `validar`/`sql-local` e Vercel
+devem ser conferidos no novo SHA, incluindo a prova SQL existente da fatura mista.
+Permanecem as limitações de storage/recuperação documentadas abaixo. Próximo gate:
+revisão independente deste incremento e decisão específica de integração do
+PR #96, mantido Draft; E2E real e homologação não foram declarados. FIN-PR-12/13
+não foram iniciados.
+
 ## FIN-PR-11C.5 — isolamento de falhas de armazenamento e logout (04/11/2026)
 
 Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), ainda

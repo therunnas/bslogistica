@@ -1229,3 +1229,188 @@ for (const evento of ["SIGNED_OUT", "SIGNED_IN"]) {
     }
   });
 }
+
+test("operação existente oferece atalho de container sem acionar criação de operação", () => {
+  const source = fs.readFileSync("src/app/(painel)/operacoes/painel-operacoes.tsx", "utf8");
+  assert.match(source, /href=\{`\/containers\/novo\?operacao=\$\{operation\.id\}`\}/);
+  assert.match(source, /Adicionar serviço de container/);
+});
+
+test("rota nova conserva guarda administrativa e transmite operação de origem", async () => {
+  let negado = false;
+  const pagina = carregarModulo(path.join(base, "novo/page.tsx"), (id) => {
+    if (id.includes("_exigir-admin"))
+      return { exigirAdmin: async () => (negado ? "NEGADO" : null) };
+    if (id.includes("formulario-container")) return { FormularioContainer: "formulario" };
+    return nativeRequire(id);
+  });
+  const origem = "20000000-0000-4000-8000-000000000003";
+  const resultado = await pagina.default({ searchParams: Promise.resolve({ operacao: origem }) });
+  assert.equal(resultado.props.operacaoInicialId, origem);
+  negado = true;
+  assert.equal(
+    await pagina.default({ searchParams: Promise.resolve({ operacao: origem }) }),
+    "NEGADO",
+  );
+});
+
+const operacaoDeOrigem = "20000000-0000-4000-8000-000000000003";
+const dadosDaOperacao = {
+  ...dados,
+  operacoes: [{ id: operacaoDeOrigem, name: "OPERACAO_TESTE_A", client_id: clienteId }],
+};
+
+test("atalho preenche cliente e operação existentes e registra uma única intenção", async () => {
+  const h = navegador(
+    { carregarFormularioContainerAction: async () => ({ ok: true, data: dadosDaOperacao }) },
+    null,
+    { props: { operacaoInicialId: operacaoDeOrigem } },
+  );
+  try {
+    await h.pronto();
+    const campo = (id) => h.nodes().find((n) => n.type === "select" && n.props.id === id);
+    assert.equal(campo("cliente").props.value, clienteId);
+    assert.equal(campo("operacao").props.value, operacaoDeOrigem);
+    assert.equal(h.storage.size, 0);
+    for (const [id, valor] of Object.entries({
+      solicitadoEm: lote.solicitadoEm,
+      executadoEm: lote.executadoEm,
+      totalCobrado: "100,00",
+      quantidade: "2",
+      descricao: "Servico na operação existente",
+      motivo: "Registro sintético autorizado",
+    }))
+      h.change(id, valor);
+    h.click("Adicionar participante");
+    h.change("p-0", colaboradorId);
+    h.change("c-0", "0");
+    h.click("Revisar serviço");
+    const confirmar = h.find("Confirmar registro").props.onClick;
+    confirmar();
+    confirmar();
+    await h.pronto();
+    const envios = h.eventos.filter(([tipo]) => tipo === "registrar");
+    assert.equal(envios.length, 1);
+    assert.equal(envios[0][1].lote.clienteId, clienteId);
+    assert.equal(envios[0][1].lote.operacaoId, operacaoDeOrigem);
+    assert.equal("contratoId" in envios[0][1].lote, false);
+    assert.match(h.text(), /Abrir serviço/);
+  } finally {
+    h.restaurar();
+  }
+});
+
+for (const origem of [
+  "invalida",
+  "20000000-0000-4000-8000-000000000099",
+  [operacaoDeOrigem, operacaoDeOrigem],
+]) {
+  test(`atalho inválido não libera cadastro genérico: ${JSON.stringify(origem)}`, async () => {
+    const h = navegador(
+      { carregarFormularioContainerAction: async () => ({ ok: true, data: dadosDaOperacao }) },
+      null,
+      { props: { operacaoInicialId: origem } },
+    );
+    try {
+      await h.pronto();
+      assert.equal(h.nodes().find((n) => n.type === "fieldset").props.disabled, true);
+      assert.match(h.text(), /operação.*origem.*inválida|operação.*não.*disponível/i);
+      h.click("Revisar serviço");
+      assert.equal(h.storage.size, 0);
+      assert.equal(h.eventos.filter(([tipo]) => tipo === "registrar").length, 0);
+    } finally {
+      h.restaurar();
+    }
+  });
+}
+
+test("atalho não substitui intenção pendente de outra operação ou cliente", async () => {
+  const chave = crypto.randomUUID();
+  const conteudo = JSON.stringify({ versao: 2, userId, chave });
+  const h = navegador(
+    { carregarFormularioContainerAction: async () => ({ ok: true, data: dadosDaOperacao }) },
+    conteudo,
+    { props: { operacaoInicialId: operacaoDeOrigem } },
+  );
+  try {
+    await h.pronto();
+    assert.equal(
+      h.nodes().find((n) => n.type === "select" && n.props.id === "cliente").props.value,
+      "",
+    );
+    assert.equal(h.nodes().find((n) => n.type === "fieldset").props.disabled, true);
+    assert.equal(JSON.parse([...h.storage.values()][0]).chave, chave);
+    assert.match(h.text(), /operação.*não foi aplicada/i);
+    assert.equal(h.eventos.filter(([tipo]) => tipo === "registrar").length, 0);
+  } finally {
+    h.restaurar();
+  }
+});
+
+test("atalho com cliente ausente no catálogo não cria vínculo visual nem libera envio", async () => {
+  const h = navegador(
+    {
+      carregarFormularioContainerAction: async () => ({
+        ok: true,
+        data: { ...dadosDaOperacao, clientes: [] },
+      }),
+    },
+    null,
+    { props: { operacaoInicialId: operacaoDeOrigem } },
+  );
+  try {
+    await h.pronto();
+    assert.equal(h.nodes().find((n) => n.type === "fieldset").props.disabled, true);
+    assert.match(h.text(), /operação.*não.*disponível/i);
+    assert.equal(h.eventos.filter(([tipo]) => tipo === "registrar").length, 0);
+  } finally {
+    h.restaurar();
+  }
+});
+
+test("atalho recupera serviço anterior confirmado com aviso explícito e sem nova cobrança", async () => {
+  const chave = crypto.randomUUID();
+  const conteudo = JSON.stringify({ versao: 2, userId, chave });
+  const h = navegador(
+    {
+      carregarFormularioContainerAction: async () => ({ ok: true, data: dadosDaOperacao }),
+      recuperarMarcadorContainerAction: async () => ({
+        ok: true,
+        data: { estado: "registrado", id: servicoId },
+      }),
+    },
+    conteudo,
+    { props: { operacaoInicialId: operacaoDeOrigem } },
+  );
+  try {
+    await h.pronto();
+    assert.match(h.text(), /Abrir serviço/);
+    assert.match(h.text(), /operação.*não foi aplicada/i);
+    assert.equal(JSON.parse([...h.storage.values()][0]).chave, chave);
+    assert.equal(h.eventos.filter(([tipo]) => tipo === "registrar").length, 0);
+  } finally {
+    h.restaurar();
+  }
+});
+
+test("atalho com schema anterior à 045 não preenche nem libera cadastro", async () => {
+  const h = navegador(
+    {
+      carregarFormularioContainerAction: async () => ({
+        ok: false,
+        codigo: "indisponivel",
+        mensagem: "Backend 045 indisponível neste banco.",
+      }),
+    },
+    null,
+    { props: { operacaoInicialId: operacaoDeOrigem } },
+  );
+  try {
+    await h.pronto();
+    assert.match(h.text(), /Backend 045 indisponível/);
+    assert.equal(h.find("Revisar serviço"), undefined);
+    assert.equal(h.eventos.filter(([tipo]) => tipo === "salvar" || tipo === "registrar").length, 0);
+  } finally {
+    h.restaurar();
+  }
+});

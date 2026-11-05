@@ -90,7 +90,11 @@ function Selecao({
   );
 }
 
-export function FormularioContainer() {
+export function FormularioContainer({
+  operacaoInicialId,
+}: {
+  operacaoInicialId?: string | string[];
+} = {}) {
   const queryClient = useQueryClient();
   const [dados, setDados] = useState<Dados | null>(null);
   const [lote, setLote] = useState<LoteDeContainers>(vazio);
@@ -183,6 +187,27 @@ export function FormularioContainer() {
               "A chave foi preservada, mas o serviço ainda não foi confirmado. Por confidencialidade, os dados financeiros não são armazenados após recarregar ou sair. Reenvio bloqueado: solicite reconciliação administrativa desta intenção antes de iniciar outro registro.",
             );
           }
+          return;
+        }
+        if (operacaoInicialId !== undefined) {
+          if (typeof operacaoInicialId !== "string") {
+            setRecuperacaoPendente(true);
+            setMensagem(
+              "Operação de origem inválida. Volte para Operações e selecione a operação novamente.",
+            );
+            return;
+          }
+          const operacao = dados.operacoes.find(
+            (o) => o.id === operacaoInicialId.trim().toLowerCase(),
+          );
+          if (!operacao || !dados.clientes.some((c) => c.id === operacao.client_id)) {
+            setRecuperacaoPendente(true);
+            setMensagem(
+              "A operação de origem não está disponível no catálogo autorizado. Volte para Operações e confira o cliente.",
+            );
+            return;
+          }
+          setLote({ ...vazio, clienteId: operacao.client_id, operacaoId: operacao.id });
         }
       } catch {
         if (ativo) {
@@ -199,7 +224,7 @@ export function FormularioContainer() {
     return () => {
       ativo = false;
     };
-  }, [atualizarConsultas]);
+  }, [atualizarConsultas, operacaoInicialId]);
 
   function alterar<K extends keyof LoteDeContainers>(campo: K, valor: LoteDeContainers[K]) {
     setLote((anterior) => ({ ...anterior, [campo]: valor }));
@@ -385,10 +410,16 @@ export function FormularioContainer() {
     }
   }
 
+  const avisoDeOrigem =
+    operacaoInicialId !== undefined && marcador
+      ? "Há uma intenção anterior preservada. A operação de origem não foi aplicada; confira o serviço anterior antes de iniciar outro registro."
+      : "";
+
   if (confirmado) {
     return (
       <div className="space-y-4">
         <PageHeader title="Serviço registrado" description="Registro confirmado pelo servidor." />
+        {avisoDeOrigem && <p role="alert">{avisoDeOrigem}</p>}
         <Button asChild>
           <Link href={`/containers/${confirmado}`}>Abrir serviço</Link>
         </Button>
@@ -432,6 +463,7 @@ export function FormularioContainer() {
       <Link className="underline" href="/containers">
         Voltar para containers
       </Link>
+      {avisoDeOrigem && <p role="alert">{avisoDeOrigem}</p>}
       {mensagem && (
         <p role="alert" className="rounded-md border p-4">
           {mensagem}
