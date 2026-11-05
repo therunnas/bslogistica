@@ -106,6 +106,9 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   Antes de transferir a sessão e ao retomá-la, seguir “Transferência entre
   agentes” em [docs/WORKFLOW.md](docs/WORKFLOW.md); a memória do Claude Code não
   é fonte de estado e não substitui o HANDOFF.
+- Prompts de sessão seguem [docs/PADRAO_DE_PROMPTS.md](docs/PADRAO_DE_PROMPTS.md):
+  cabeçalho `MODELO`/`EFFORT`/`ETAPA`/`ESTILO`/`SKILL`/`SESSÃO`, prompt único e
+  execução autônoma por PR, sem atravessar gates sem autorização nominal.
 - Ao terminar ou pausar, atualizar `HANDOFF.md`, `ESTADO_DO_PROJETO.md` e
   `PROGRESS.md` conforme as responsabilidades documentais, sem copiar estado
   mutável para instruções permanentes.
@@ -359,6 +362,7 @@ authenticated` e injetar as claims com `set_config`.
 | [docs/WORKFLOW.md](docs/WORKFLOW.md)                   | gates normativos de desenvolvimento e publicação  |
 | [docs/AMBIENTES.md](docs/AMBIENTES.md)                 | inventário factual de ambientes e vínculos        |
 | [docs/HANDOFF.md](docs/HANDOFF.md)                     | checkpoint curto para a próxima sessão            |
+| [docs/PADRAO_DE_PROMPTS.md](docs/PADRAO_DE_PROMPTS.md) | formato obrigatório dos prompts de sessão         |
 | [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md) | fotografia factual: Production, testes, módulos   |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md)             | organização do código e fluxo de dados            |
 | [docs/SEGURANCA.md](docs/SEGURANCA.md)                 | modelo de segurança e riscos residuais            |

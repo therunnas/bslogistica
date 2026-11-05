@@ -37,6 +37,7 @@ const ARQUIVOS_CANONICOS = [
   "docs/WORKFLOW.md",
   "docs/AMBIENTES.md",
   "docs/HANDOFF.md",
+  "docs/PADRAO_DE_PROMPTS.md",
   ".github/pull_request_template.md",
   ".github/workflows/ci.yml",
 ];
@@ -51,6 +52,7 @@ const ARQUIVOS_COM_REFERENCIAS = [
   "docs/WORKFLOW.md",
   "docs/AMBIENTES.md",
   "docs/HANDOFF.md",
+  "docs/PADRAO_DE_PROMPTS.md",
   ".github/pull_request_template.md",
 ];
 
@@ -138,7 +140,12 @@ export function validarRepositorio(root) {
     const absoluto = resolve(root, arquivo);
     if (!existsSync(absoluto)) continue;
     const conteudo = readFileSync(absoluto, "utf8");
-    for (const referencia of ["docs/WORKFLOW.md", "docs/AMBIENTES.md", "docs/HANDOFF.md"]) {
+    for (const referencia of [
+      "docs/WORKFLOW.md",
+      "docs/AMBIENTES.md",
+      "docs/HANDOFF.md",
+      "docs/PADRAO_DE_PROMPTS.md",
+    ]) {
       if (!conteudo.includes(referencia)) {
         erros.push(`${arquivo}: referência canônica ausente: ${referencia}`);
       }

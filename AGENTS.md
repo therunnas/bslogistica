@@ -114,6 +114,9 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
   Antes de transferir a sessão e ao retomá-la, seguir a seção “Transferência
   entre agentes” do [Workflow](docs/WORKFLOW.md); memória própria da ferramenta
   não é fonte de estado.
+- Prompts de sessão seguem o [Padrão de prompts](docs/PADRAO_DE_PROMPTS.md):
+  cabeçalho `MODELO`/`EFFORT`/`ETAPA`/`ESTILO`/`SKILL`/`SESSÃO`, prompt único e
+  execução autônoma por PR, sem atravessar gates sem autorização nominal.
 - Ao concluir ou pausar uma etapa, atualizar o checkpoint em `docs/HANDOFF.md`,
   o estado factual em `docs/ESTADO_DO_PROJETO.md` e a fila em `PROGRESS.md`, sem
   duplicar históricos.

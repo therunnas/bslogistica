@@ -26,9 +26,15 @@ faturamento por período e relatórios. Duas trilhas de uso:
 ## Tarefa ativa única
 
 **FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis).** Branch
-`feat/fin-pr-12-exportacao-dynamis`, worktree `/private/tmp/bs-fin-pr-12`, base
-`main` em `314c08c`. Implementada e validada localmente; PR Draft aberto. O
-estado e a próxima ação exatos ficam no [HANDOFF](docs/HANDOFF.md).
+`feat/fin-pr-12-exportacao-dynamis`, worktree `/private/tmp/bs-fin-pr-12`. Implementada,
+revisada em R1 e reconciliada com a `main` depois do merge do PR #98 (`a2fec9a`);
+PR #99 em Draft, **não homologado**. O estado e a próxima ação exatos ficam no
+[HANDOFF](docs/HANDOFF.md).
+
+**FIN-PR-11:** HML recebeu 035–045 em 05/11/2026, após backup restaurado,
+compatibilidade e dry-run; verificações pós-migration aprovadas. Os nove fluxos de
+Containers continuam sem homologação real no navegador. Production continua na 034 e
+qualquer implantação lá exige autorização específica.
 
 Decisão do usuário (05/11/2026): concluir primeiro as funcionalidades pendentes
 (FIN-PR-12 e FIN-PR-13) e fazer depois **uma homologação completa de ponta a
@@ -37,7 +43,8 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 ### Fila
 
-1. **FIN-PR-13**: testes integrados, HML e conciliação — próximo.
+1. **FIN-PR-13**: testes integrados, HML e conciliação — próximo, depois do merge
+   autorizado do PR #99.
 2. **Homologação completa E2E** no Preview ligado ao HML, cobrindo FIN-PR-11
    (nove fluxos de Containers), FIN-PR-12 e FIN-PR-13.
 3. Manual de utilização e preparação de Production (035–045 em Production é gate
@@ -45,8 +52,10 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 ### Pausadas
 
-- `DOC-MASTER-01/B2`: reavaliar só lacunas documentais remanescentes.
-- `CHECK-UP-E2E-01`: entra na homologação completa.
+- `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
+  lacunas documentais remanescentes, sem reabrir auditorias concluídas.
+- `CHECK-UP-E2E-01`: HML já tem o schema 045; entra na homologação completa, com
+  identidades de teste aprovadas.
 - Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
 
 Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
@@ -119,10 +128,10 @@ ambiente e da resolução comercial estão centralizados nesse documento.
 - [x] **CHECK-UP-AMB-01 (somente leitura):** projetos HML/Production e migration
       heads identificados; limites da auditoria de Vercel e vínculo Preview/HML
       registrados em [Ambientes](docs/AMBIENTES.md).
-- [ ] **WORKFLOW-01:** integrar documentação e controles locais/CI; controles
-      administrativos de GitHub/Vercel continuam externos a este PR.
-- [ ] **CHECK-UP-REC-01:** conferir integridade, possibilidade de restauração
-      completa e dependências de recuperação antes de qualquer migration em HML.
+- [x] **WORKFLOW-01:** documentação e controles locais/CI integrados no PR #97
+      (`314c08c`); controles administrativos de GitHub/Vercel continuam externos.
+- [x] **CHECK-UP-REC-01 (HML):** backup lógico cifrado do HML restaurado e
+      conferido localmente em 05/11; Production segue sem backup recente.
 - [ ] **CHECK-UP-E2E-01:** concluir matriz real de papéis/MFA, recuperação e
       isolamento de dados, com contas e cenários de homologação aprovados.
 - [ ] **FIN-VAL:** integrar FIN-PR-11/12/13 separadamente e reconciliar cálculo,
@@ -147,8 +156,8 @@ para a última evidência de integração.
    containers (PRs #93–#96). O PR #96 foi mergeado por squash em
    `eb8cec9af11c4b0e314296ed776caf15c3764b5f`; a interface foi publicada pela
    automação da Vercel sem homologação real. Migration 045 continua ausente em
-   HML/Production, que estavam na 034 no diagnóstico de 05/11. Próximo gate após
-   WORKFLOW-01: preparar HML e homologar Containers.
+   Production, que segue na 034; HML recebeu 035–045 em 05/11. Homologação dos
+   Containers incluída na homologação completa depois do FIN-PR-13.
 4. **FIN-PR-12 implementado (não homologado):** botão "Excel do cliente" no
    Fechamento; [estado e evidências](docs/ESTADO_DO_PROJETO.md#fin-pr-12--excel-do-cliente-modelo-dynamis-05112026).
    Escopo aprovado: exportação no modelo de cliente Dynamis. Filtros em todas as
