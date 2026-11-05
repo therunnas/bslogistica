@@ -104,7 +104,7 @@ Tela **Apontamentos**: escolha **Operação**, **Turno** e **Data**; a tabela **
 lista os colaboradores com Presença, Entrada, Saída e Intervalo, e mostra Trabalhado, Hora
 extra, A faturar e Custo.
 
-- **Presença**: Presente, Ausente ou Substituto. **Falta não gera valor** nem custo.
+- **Presença**: **Presente**, **Falta** ou **Substituição**. **Falta não gera valor** nem custo.
 - Entrada igual à saída é **recusada** (seria jornada de 24 h); o botão **Salvar** fica
   bloqueado e o que você digitou é mantido até corrigir.
 - **Salvar** grava o dia inteiro; se o banco recusar, nada é gravado pela metade.
@@ -170,11 +170,31 @@ na hora de faturar. Valores são "previstos": não representam pagamento realiza
 
 ## 12. Faturamento
 
-Tela **Faturamento por período**: escolha **Cliente** e o período (**Até**), **Gerar fatura**.
-A fatura soma diárias, horas extras, adicionais de serviço e o ajuste de arredondamento; o
-total dos itens é igual ao total da receita. Depois de emitida: os lançamentos e adicionais
-ficam **vinculados e imutáveis**, **a faturar** zera, e repetir a emissão é recusado.
-**Exportar CSV** está disponível na tela.
+Tela **Faturamento** ("Revise lançamentos faturáveis, valores consolidados e faturas geradas
+por cliente e período"):
+
+1. Escolha o **Cliente** e o período. A fatura é sempre uma **competência inteira** da
+   frequência do cliente (1 a 15 ou 16 ao último dia, ou o mês inteiro); a tela oferece os
+   botões de competência (`dd/mm a dd/mm`) e avisa em vermelho quando o período escolhido não
+   é uma competência.
+2. A tela mostra os lançamentos faturáveis, o valor de diárias, de horas extras, o ajuste de
+   arredondamento acumulado e os adicionais de serviço, o **total a faturar** e o resultado.
+   Sem lançamentos elegíveis aparece "Nenhum lançamento faturável".
+3. **Gerar fatura** emite a fatura do cliente e do período. O total dos itens é igual ao total
+   da receita. Depois de emitida, os lançamentos e adicionais ficam **vinculados e imutáveis**,
+   o **a faturar** zera e repetir a emissão é recusado.
+4. A lista **Faturas geradas** guarda o histórico. **Exportar CSV** exporta o período
+   mostrado. A planilha Excel do período está no **Fechamento** (seção 13).
+5. **Adicionais** (seção 9) ficam na mesma tela.
+
+## 12.1 Relatórios
+
+Tela **Relatórios** ("Analise diárias, faltas, horas extras, receita, custo e margem do
+período selecionado"): filtros **De** e **Até**, indicadores do período (diárias, faltas,
+horas extras, receita, custo e margem) e as seções **Desempenho por colaborador**, **Resultado
+por operação** e **Lançamentos detalhados**, com a situação de presença de cada linha.
+**Exportar CSV** exporta o período. A receita dos Relatórios vem da mesma função do banco
+usada pela fatura, com o ajuste de arredondamento separado.
 
 ## 13. Exportações Excel
 

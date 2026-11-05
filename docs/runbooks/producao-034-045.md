@@ -60,8 +60,11 @@ condições comuns, em [Runbooks](README.md).
 
 ## 5. Verificação de dependências e dados
 
-- Comparar o catálogo de Production com o esperado da 034 (funções, assinaturas, triggers,
-  grants e RLS) com os scripts `scripts/comparar-catalogo-*.sh` no ensaio local.
+- Os scripts `scripts/comparar-catalogo-*.sh` trabalham **somente no Supabase local** e comparam
+  o catálogo antes e depois de **uma** migration (e da sua reversão); eles **não** leem Production.
+  Para Production, restaure o backup novo (seção 4) num banco local isolado, aplique 035 → 045 nele
+  e compare o catálogo resultante (funções, assinaturas, triggers, grants, RLS e papéis) com o do HML
+  (por leitura) e com o do próprio backup antes das migrations.
 - Conferir dados que as migrations tocam: contratos sem vigência (038), turnos sem período
   e colaboradores sem função (039–041), lançamentos legados (042–043), operações sem
   localidade (044), unicidade por colaborador/operação/data, faturas existentes e vínculos.
