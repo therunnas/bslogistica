@@ -28,8 +28,8 @@ faturamento por período e relatórios. Duas trilhas de uso:
 **Homologação integrada FIN-PR-11/12/13 em HML.** O PR
 [#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em
 `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (CI de `main` verde). A matriz de 27 casos
-foi executada em HML nas sessões 12 e 13: 25 PASS, 1 PARCIAL (A05, convite por
-e-mail), 1 BLOQUEADO (E06, Dynamis), 0 FAIL
+foi executada em HML nas sessões 12 a 14: 27 PASS (A05 e E06 fechados na sessão 14,
+com ressalvas registradas), 0 FAIL
 ([resultados](docs/financeiro/homologacao-fin-pr-13.md)). Resolução comercial de HML
 restaurada para OFF. Production segue na 034 com o código da
 `main` publicado; a decisão sobre esse risco é o primeiro passo. O estado e a próxima
@@ -53,10 +53,10 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
    (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
-2. **Pendências da homologação:** convite por e-mail (A05, exige caixa de captura) e
-   planilha Dynamis (E06).
-3. Manual de utilização e preparação de Production (035–045 em Production é gate
-   próprio, com backup novo).
+2. **Pendências:** revisão humana; modelos de e-mail do Dashboard; achado I; PR #102.
+3. [Manual de uso](docs/MANUAL_DE_USO.md) redigido; [plano de Production
+   034 → 045](docs/runbooks/producao-034-045.md) redigido, **sem execução** (gate próprio,
+   com backup novo).
 
 ### Pausadas
 
