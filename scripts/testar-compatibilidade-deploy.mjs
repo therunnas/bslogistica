@@ -27,6 +27,11 @@ import { randomBytes } from "node:crypto";
 
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
+import {
+  lerCapacidadeContainers,
+  classificarErroContainer,
+  lerVinculoAdicionalContainer,
+} from "../src/lib/container-servico-dados.ts";
 
 import { montarRegistroDeAdicional } from "../src/lib/adicionais.ts";
 import { montarCargaDaRpc } from "../src/lib/apontamentos-salvar.ts";
@@ -151,6 +156,27 @@ const entrou = await cliente.auth.signInWithPassword({ email, password: senha })
 if (entrou.error) throw entrou.error;
 const sessao = entrou.data.session;
 
+let erroContainers = null;
+try {
+  await lerCapacidadeContainers(cliente);
+} catch (erro) {
+  erroContainers = erro;
+}
+verificar(
+  "C11. containers distinguem schema anterior à 045 sem executar RPC de escrita",
+  erroContainers === null ? "disponivel" : classificarErroContainer(erroContainers).codigo,
+  cenario === "banco-045" ? "disponivel" : "indisponivel",
+);
+const vinculoSemContainer = await lerVinculoAdicionalContainer(
+  cliente,
+  "5c45d000-0000-4000-8000-000000000099",
+);
+verificar(
+  "C12. conferência fresca de adicional legado funciona antes e depois da 045",
+  vinculoSemContainer.tipo,
+  "legado",
+);
+
 // ---------------------------------------------------------------------------
 // Dados sintéticos (mesmo SQL nos dois bancos: nenhuma coluna da 036)
 // ---------------------------------------------------------------------------
@@ -173,7 +199,7 @@ insert into public.employee_cost_terms (employee_id, valid_from, daily_cost, act
     from generate_series(1, 6) i;
 `);
 // FIN10: cobertura exclusivamente sintética no Supabase local descartável.
-if (cenario === "banco-044") {
+if (cenario === "banco-044" || cenario === "banco-045") {
   psql(`
 insert into public.municipality_catalog (code, name, state_code, official_url)
   values ('4200000', 'MUNICIPIO_TESTE_044', 'SC',
@@ -1060,7 +1086,7 @@ if (!esperaDiaria) {
 }
 
 // FIN-PR-09: o cenário novo exercita o mesmo app com domingo V2 e corrida bônus/fatura.
-if (cenario === "banco-043" || cenario === "banco-044") {
+if (cenario === "banco-043" || cenario === "banco-044" || cenario === "banco-045") {
   const liga = await cliente.rpc("alterar_resolucao_tarifas", {
     p_ativar: true,
     p_reason: "ESPECIAL_TESTE",
@@ -1210,6 +1236,8 @@ if (BASE_URL) {
     "/clientes",
     "/colaboradores",
     "/operacoes",
+    "/containers",
+    "/containers/novo",
   ]) {
     const resp = await fetchLocal(`${BASE_URL}${pagina}`, {
       headers: { cookie },

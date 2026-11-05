@@ -153,3 +153,15 @@ test("cancelamento inválido não chama a RPC e bloqueio de faturado propaga", a
     (obtido) => obtido === erro,
   );
 });
+
+test("operação existente é enviada à RPC sem criar operação ou contrato", async () => {
+  const { registrarServicoContainer } = await backend();
+  const db = cliente();
+  const operacaoId = "5c45e000-0000-4000-8000-000000000001";
+  await registrarServicoContainer(db, { ...base, operacaoId }, key, reason);
+  assert.equal(db.chamadas.length, 1);
+  assert.equal(db.chamadas[0].nome, "registrar_servico_container");
+  assert.equal(db.chamadas[0].parametros.p_dados.operacaoId, operacaoId);
+  assert.equal(db.chamadas[0].parametros.p_dados.clienteId, base.clienteId);
+  assert.equal("contratoId" in db.chamadas[0].parametros.p_dados, false);
+});

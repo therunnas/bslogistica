@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  Package,
   Settings,
   ShieldCheck,
   Sun,
@@ -23,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { BSLogo } from "@/components/branding/bs-logo";
 import { useTema } from "@/components/theme-provider";
@@ -39,8 +40,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { observarPrivacidadeContainers } from "@/lib/container-servico-privacidade";
 import { sair } from "../_acoes";
 import type { PapelEfetivo } from "../_papel";
+
+const AVISO_ARMAZENAMENTO =
+  "Armazenamento de intenção indisponível. O cadastro de containers permanece bloqueado até a recuperação do recurso.";
 
 const NAVEGACAO = {
   admin: [
@@ -50,6 +56,7 @@ const NAVEGACAO = {
     { href: "/clientes", label: "Clientes e contratos", icon: Building2 },
     { href: "/colaboradores", label: "Colaboradores", icon: Users },
     { href: "/faturamento", label: "Faturamento", icon: FileText },
+    { href: "/containers", label: "Containers", icon: Package },
     { href: "/fechamento", label: "Fechamento", icon: ClipboardCheck },
     { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
   ],
@@ -113,6 +120,48 @@ export function AppShell({
 
   const [menuMobileAberto, setMenuMobileAberto] = useState(false);
   const [saindo, iniciarSaida] = useTransition();
+  const [conteudoProtegido, setConteudoProtegido] = useState(false);
+  const [erroSaida, setErroSaida] = useState("");
+  const [avisoArmazenamento, setAvisoArmazenamento] = useState("");
+  const privacidade = useRef<ReturnType<typeof observarPrivacidadeContainers> | null>(null);
+  const protegerConteudo = useCallback(() => {
+    setConteudoProtegido(true);
+    queryClient.clear();
+  }, [queryClient]);
+
+  useEffect(() => {
+    let canal: BroadcastChannel | null = null;
+    try {
+      canal =
+        typeof BroadcastChannel === "undefined"
+          ? null
+          : new BroadcastChannel("bs:container:privacidade");
+    } catch {
+      // Canal opcional: sua ausência não altera sessão nem papel.
+    }
+    privacidade.current = observarPrivacidadeContainers(canal, protegerConteudo);
+    if (!privacidade.current.armazenamentoSeguro) setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
+    const {
+      data: { subscription },
+    } = criarClienteNavegador().auth.onAuthStateChange((evento, sessao) => {
+      if (evento === "SIGNED_OUT" || (sessao?.user.email && sessao.user.email !== email)) {
+        try {
+          if (privacidade.current?.invalidar() === false) {
+            setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
+          }
+        } catch {
+          setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
+        } finally {
+          protegerConteudo();
+        }
+      }
+    });
+    return () => {
+      subscription.unsubscribe();
+      privacidade.current?.fechar();
+      canal?.close();
+    };
+  }, [email, protegerConteudo]);
 
   const paginaAtual =
     [...navegacao, ...itensDeConta, ROTA_TECNICA_IMPLANTACAO].find(({ href }) => href === caminho)
@@ -122,10 +171,18 @@ export function AppShell({
     papel === "admin" ? "Administrador" : papel === "operacional" ? "Operacional" : "Sem perfil";
 
   function encerrarSessao() {
-    queryClient.clear();
-
+    protegerConteudo();
+    try {
+      if (privacidade.current?.sair() === false) setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
+    } catch {
+      setAvisoArmazenamento(AVISO_ARMAZENAMENTO);
+    }
     iniciarSaida(() => {
-      void sair();
+      void sair().catch(() => {
+        setErroSaida(
+          "Saída não confirmada. Tente sair novamente; o conteúdo financeiro permanece oculto.",
+        );
+      });
     });
   }
 
@@ -376,7 +433,21 @@ export function AppShell({
               className="pointer-events-none absolute -top-64 right-[-14rem] h-[34rem] w-[34rem] rounded-full bg-primary/[0.04] blur-[130px]"
             />
 
-            <main className="relative min-w-0 overflow-x-hidden p-4 md:p-6 xl:p-8">{children}</main>
+            <main className="relative min-w-0 overflow-x-hidden p-4 md:p-6 xl:p-8">
+              {avisoArmazenamento && (
+                <p role="alert" className="mb-4 rounded-md border p-4">
+                  {avisoArmazenamento}
+                </p>
+              )}
+              {conteudoProtegido ? (
+                <p role="alert" className="p-6">
+                  {erroSaida ||
+                    "A sessão mudou ou a saída foi iniciada. Conteúdo protegido. Recarregue para verificar o acesso; as chaves pendentes foram preservadas."}
+                </p>
+              ) : (
+                children
+              )}
+            </main>
           </div>
         </div>
       </div>

@@ -5,7 +5,371 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-11C — containers na operação existente (04/11/2026)
+
+Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), mantido
+**Draft e não mergeado**, na branch `feat/fin-pr-11c-interface-containers`, checkout
+`/private/tmp/bs-fin-pr-11c`. HEAD de entrada confirmado com working tree limpa:
+`bb9ec2c96cdb653edfbfef2cffcecb6ed0a4ae72`; base main preservada:
+`10bcfd83a42409c477a7df584cca279a1368f216`. O HEAD publicado deste incremento
+é o commit que contém esta seção, a conferir no Git/PR com seus próprios checks.
+
+**Decisão operacional:** uma mesma operação pode conter diárias, HE e serviços
+avulsos de containers. Container continua sendo serviço avulso, com receita
+negociada e custos explícitos, sem virar diária/HE. Não se cria outra operação
+nem contrato específico para registrar o serviço. O menu Containers permanece
+como visão geral dos serviços; Faturamento, Fechamento e Relatórios continuam
+separados.
+
+**Compatibilidade comprovada por inspeção:** a RPC 045
+`registrar_servico_container` já recebe `operacaoId`, preserva-o em
+`container_services` e encaminha a receita única para `registrar_adicional`
+(assinatura vigente da 038). Essa função valida no banco que a operação pertence
+ao cliente; não exige contrato específico. `gerar_fatura` da 045 conserva o
+vínculo da operação no item e fatura o adicional uma única vez. A suíte SQL 045
+já possui operação sem contrato (`MISTA-045`), com diária existente e container
+na mesma fatura, total exato, snapshot OFF preservado e sem dupla cobrança.
+Não houve bloqueio estrutural nem mudança de schema/RPC/RLS/regra financeira.
+
+**Fluxo anterior:** acesso pelo menu geral Containers e seleção manual de cliente
+e operação no formulário. **Fluxo novo:** cada cartão em Operações oferece
+“Adicionar serviço de container”, apontando para `/containers/novo?operacao=<uuid>`.
+A rota preserva `exigirAdmin()` e reutiliza o mesmo formulário. A operação e o
+cliente são resolvidos pelo catálogo retornado pela Action administrativa;
+nenhum cliente é aceito da URL como autoridade. Após preencher os demais dados,
+o registro usa a mesma Action/RPC e a consulta existente exibe o vínculo persistido.
+Não há chamada de criação de operação ou de contrato nesse atalho.
+
+**Proteções do contexto:** valor ausente conserva o formulário genérico. Operação
+inválida, parâmetro repetido/ambíguo, entidade ausente ou cliente fora do catálogo
+bloqueiam o cadastro, sem fallback genérico silencioso. Uma intenção preservada
+tem prioridade sobre o atalho: não se aplica outro cliente/operação, a chave é
+mantida e um aviso explícito aparece tanto na pendência quanto na recuperação de
+serviço confirmado. A chave React da página muda com o contexto para evitar
+reaproveitar estado de formulário de outra origem. Correção antes do primeiro
+envio permanece permitida; resultados incertos exigem reconciliação. Ausência
+real da 045 continua bloqueando o recurso, sem migration automática.
+
+**TDD e regressões executadas:** RED antes da implementação com **47/54 testes
+de tela PASS e 7 FAIL**, por atalho ausente, contexto não transmitido/preenchido,
+falta de recusa para URLs inválidas e ausência do aviso sobre intenção anterior.
+GREEN focal: **57/57 telas**, **23/23 dados/Actions** e **8/8 adaptador**, incluindo
+preenchimento real, guarda da rota, duplo clique com uma única chamada, consulta
+com operação/receita consistentes, contexto inválido, cliente ausente, intenção
+pendente/confirmada e capacidade 045 ausente. **63 suítes Node PASS**, incluindo
+regressões de autorização/MFA, idempotência, reconciliação, faturamento e
+adicionais. Os testes executam componentes/funções reais com fronteiras simuladas;
+o atalho no cartão também tem asserção estrutural. Não são E2E em navegador real.
+
+Lint, TypeScript e Prettier passaram. A primeira checagem de tipos identificou
+o contrato PageProps do Next e a prop opcional explicitamente indefinida; ambos
+foram corrigidos mantendo `exactOptionalPropertyTypes`, sem relaxar validações.
+O build padrão local continua impedido de abrir a porta do Turbopack
+(`Operation not permitted`), mesmo com exceção específica. Build local
+alternativo `npm run build -- --webpack` **PASS**, com variáveis públicas inertes
+da CI e exceção para fontes públicas. O build padrão da CI deve ser conferido
+no novo SHA como evidência distinta. Não houve mudança de configuração para
+mascarar a restrição ambiental.
+
+**Ambientes e continuidade:** migrations 001–045, domínio/adaptador, RPCs, RLS,
+grants, faturamento e dependências foram preservados; mudaram somente o atalho,
+a rota/formulário, três suítes e estes dois documentos. Não houve SQL/reset local,
+migration remota, alteração de flags/credenciais/ambientes ou deploy manual.
+Aplicação remota da 045 continua sem comprovação. CI `validar`/`sql-local` e Vercel
+devem ser conferidos no novo SHA, incluindo a prova SQL existente da fatura mista.
+Permanecem as limitações de storage/recuperação documentadas abaixo. Próximo gate:
+revisão independente deste incremento e decisão específica de integração do
+PR #96, mantido Draft; E2E real e homologação não foram declarados. FIN-PR-12/13
+não foram iniciados.
+
+## FIN-PR-11C.5 — isolamento de falhas de armazenamento e logout (04/11/2026)
+
+Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), ainda
+**Draft, não mergeado**, na branch `feat/fin-pr-11c-interface-containers`, checkout
+`/private/tmp/bs-fin-pr-11c`. HEAD de referência confirmado antes de editar:
+`2d02509093d90803c02483588bec1117ca610432`, com working tree limpa e remote
+`therunnas/bslogistica`. Base main preservada: `10bcfd83a42409c477a7df584cca279a1368f216`.
+O novo HEAD é o commit que publica este checkpoint e as correções abaixo; deve
+ser conferido no Git/PR, junto aos checks desse SHA. Os registros C.3/C.1 abaixo
+preservam o histórico anterior, não o tratamento atual de falhas do AppShell.
+
+**Dois P2 comprovados na revisão C.4:** uma exceção do getter `sessionStorage`
+acionava o bloqueio global de confidencialidade, ocultando qualquer módulo de
+uma sessão válida, inclusive Operacional. Além disso, uma falha de saneamento
+na saída lançava exceção antes do aviso entre abas e encontrava um `return`
+no AppShell: a Action `sair()` não era chamada.
+
+**Correção de disponibilidade:** o observador de privacidade captura a recusa de
+storage e informa capacidade local indisponível, sem interpretar isso como
+mudança de sessão. O canal entre abas é opcional; falha ao criá-lo não invalida
+papel ou acesso. Dashboard, Apontamentos, Faturamento e Operacional permanecem
+no fluxo normal com autorização server-side existente. O cadastro de containers
+continua bloqueado no próprio formulário quando não consegue sanear/ler a
+intenção, com mensagem específica de armazenamento; não há fallback para outro
+storage nem persistência do payload financeiro. A mudança no Provider é apenas
+a correção do comentário que descrevia o antigo bloqueio global.
+
+**Correção de logout:** o conteúdo sensível é retirado e o cache limpo antes da
+resposta do servidor. A falha local é apresentada separadamente da falha de
+`signOut()`, sem retorno antecipado que impeça a Action. O observador tenta
+notificar outras abas em `finally`, mesmo quando o saneamento falha. Eventos de
+saída/troca de identidade continuam ocultando o conteúdo e limpando cache,
+independentemente da capacidade de storage. A verificação do erro real de
+`signOut()` da C.3 foi preservada: falha não anuncia saída concluída.
+
+**Controles anteriores preservados:** no navegador continuam persistidos somente
+UUID do usuário/chave e versão do marcador. Lote, motivo, receita e custos
+permanecem em memória. Não se apagam marcadores para contornar uma falha de
+leitura; intenção incerta/recarregada não autoriza novo payload ou chave sem
+reconciliação. Correção de cliente antes do primeiro envio, limpeza da operação,
+nova chave para outro cliente e guardas administrativas das Actions permanecem
+cobertas pelas suítes existentes. Domínio, faturamento, RPCs, RLS, MFA e migrations
+001–045 não foram modificados; nenhuma dependência foi adicionada.
+
+**RED executado antes de corrigir:** suíte de telas com **38/45 PASS, 7 FAIL**:
+quatro módulos ocultos com getter recusado; mensagem genérica em vez de erro de
+storage no formulário; duas saídas com **zero chamadas** da Action, quando era
+esperada uma. Suíte de intenção com **21/22 PASS, 1 FAIL**: falha de leitura
+interrompia a invalidação de outra aba. Não foram falhas de conexão ou de runner.
+
+**GREEN/regressões locais:** **63 suítes Node PASS**, incluindo **47 testes de
+telas, 22 de intenção/privacidade, 22 de dados/Actions e 2 de integração**.
+Cobertos storage disponível, getter `SecurityError`, leitura recusada após
+montagem, logout com falha/sucesso de servidor, demais módulos para admin e
+operacional, troca de identidade com storage recusado, aviso entre abas mesmo
+com saneamento falho, saneamento legado, payload nunca persistido, intenção
+incerta, correção de cliente e autorização. Funções e componentes TSX reais,
+com fronteiras de Auth/rede/navegador simuladas; não são E2E em navegador real.
+Lint, `tsc --noEmit --incremental false`, Prettier dos arquivos alterados e
+`git diff --check` passaram. O build padrão local voltou a falhar por
+`Operation not permitted` ao abrir a porta interna do Turbopack, apesar da
+exceção específica; isso não foi declarado PASS nem motivou mudança de config.
+O build local alternativo `npm run build -- --webpack` **PASS**, com variáveis
+públicas inertes da CI e exceção específica para fontes públicas. O build padrão
+automático da CI deve ser conferido no novo SHA, sem confundir as duas provas.
+
+**Limites e ambientes:** não houve SQL/reset local, migration remota, deploy
+manual, alteração de Preview/HML/Production, flags, credenciais ou dados reais.
+A aplicação remota da 045 continua sem comprovação. CI `validar`/`sql-local` e
+Vercel devem ser conferidos no novo SHA; sucesso anterior não é aprovação da C.5.
+Se o navegador recusar acesso/escrita, o aplicativo não pode garantir que um
+envelope legado já existente tenha sido saneado: mantém aviso e bloqueio local
+de cadastro, sem descartar o marcador nem prometer limpeza concluída. Abas com
+código antigo/suspensas ainda dependem de receber invalidação ou recarregar.
+A impossibilidade de reconstituir payload volátil após reload permanece documentada
+na C.3; não é resolvida criando nova intenção automaticamente.
+
+**Próximo gate:** revisão independente do novo HEAD com CI e Vercel confirmados,
+mantendo o PR Draft. Integração depende de autorização específica. Nenhum merge,
+Ready for Review ou FIN-PR-12/13 foi iniciado.
+
+## FIN-PR-11C.3 — correções de privacidade e cliente (04/11/2026)
+
+Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), ainda
+**Draft, não mergeado**, na branch `feat/fin-pr-11c-interface-containers`, checkout
+`/private/tmp/bs-fin-pr-11c`. HEAD revisado antes das correções:
+`05625a92e59db4a5cd3e9c2bc0e4fa13034de5e2`; base main preservada:
+`10bcfd83a42409c477a7df584cca279a1368f216`. Working tree estava limpa no preflight.
+O checkpoint C.1 abaixo descreve a implementação anterior: seu contrato de
+persistência financeira foi substituído pela correção P1 desta seção.
+
+**P1 — confidencialidade e recuperação:** lote, payload canônico, motivo, receita
+e custos ficam somente na memória da tela. `sessionStorage` persiste apenas
+`versao: 2`, UUID do usuário e chave UUID da intenção, nunca tokens/credenciais.
+Separar chaves por usuário continua útil, mas não é tratado como proteção do
+conteúdo. Envelopes antigos de todas as identidades são reduzidos a marcadores;
+conteúdo corrompido sem chave recuperável vira bloqueio persistente, sem gerar
+outra intenção. O saneamento ocorre também no provider inicial, inclusive no login.
+
+Ao iniciar logout, o AppShell retira o conteúdo financeiro e limpa o cache antes
+da resposta do servidor. Falha de logout mantém o conteúdo oculto e informa que a
+saída não foi confirmada. A Action também verifica o campo `error` retornado por
+`signOut()` antes de redirecionar: o RED adicional demonstrou que antes o erro
+resolvido pelo SDK era ignorado. O redirecionamento de sucesso foi preservado.
+Um canal entre abas transmite somente invalidação;
+eventos de saída/troca de conta do SDK também retiram o conteúdo. Isso **não é
+nova decisão de autorização**: páginas/Actions continuam nos guards existentes,
+com MFA opcional e RLS. Sem BroadcastChannel, a proteção local e os marcadores
+sem valores permanecem; não se promete apagar a memória de outra aba suspensa
+ou com código antigo antes que ela receba o evento ou seja recarregada.
+
+**Limitação deliberada:** após recarregamento/logout, o payload volátil não pode
+ser reconstituído do storage. A nova Action administrativa de **leitura**
+`recuperarMarcadorContainerAction` consulta a chave no backend e só devolve
+`ausente` ou o UUID do serviço confirmado; ambiguidade é recusada. Não escreve
+em tabelas nem cria RPC/migration. Serviço confirmado abre seu detalhe. Se estiver
+ausente, houver erro ou leitura inconsistente, a tela conserva o marcador,
+mostra a chave para reconciliação administrativa e bloqueia edição/reenvio/nova
+chave, inclusive depois de uma leitura de ausência. Não há descarte automático.
+Enquanto a tela original continua aberta, timeout/retry preservam o mesmo payload
+e a mesma chave e exigem reconciliação antes de repetir. Fechar a aba ou limpar
+manualmente o armazenamento ainda pode perder o marcador; essa ação não é um
+procedimento seguro para resolver uma intenção de resultado incerto.
+
+**P2 — cliente antes do envio:** após revisar e voltar para corrigir uma intenção
+preparada, o cliente pode ser alterado. A operação anterior é limpa; o rascunho
+comprovadamente não enviado é liberado e a próxima revisão cria outra chave para
+o novo cliente. Alterações no mesmo cliente preservam a chave original. Domínio,
+soma de custos e vínculo cliente/operação são revalidados pelos contratos
+existentes. Intenção enviada/indeterminada nunca libera cliente ou payload.
+
+**Evidências locais executadas:** RED P1 com 17/18 testes passando, falhando porque
+o JSON continha lote/motivo/receita/custos; RED P2 com 27/28 passando, falhando
+porque o seletor de cliente permanecia desabilitado antes de qualquer envio.
+GREEN final: **63 suítes Node PASS**, incluindo **22 testes de dados/Actions,
+21 de intenção/privacidade, 33 de telas e 2 de integração**. Cobertos logout com
+falha, evento de saída, troca de conta, aviso entre abas, ausência de canal,
+saneamento legado/corrupção, storage indisponível, reload bloqueado, reconciliação
+confirmada, timeout após commit, retry estável, correção de cliente/operação,
+autorização e cancelamento financeiro. São funções e handlers TSX reais com
+fronteiras de navegador/rede/Supabase simuladas, não E2E em navegador ou banco.
+
+Lint, TypeScript e Prettier dos arquivos alterados passaram. A primeira rodada
+completa encontrou a asserção literal G8 de `test:papel` pela referência direta a
+storage no AppShell. O acesso foi concentrado no módulo de privacidade; a
+asserção original foi preservada e a rodada completa seguinte passou. O build
+padrão Turbopack foi impedido de abrir porta local (`Operation not permitted`),
+mesmo na tentativa com exceção específica. Build alternativo **webpack PASS**
+com variáveis públicas inertes da CI, após exceção de rede para fontes públicas;
+a tentativa inicial restrita havia falhado por DNS. Sem alteração de configuração
+para mascarar essas limitações. Build padrão e SQL da CI devem ser conferidos
+no **novo SHA**, sem transferir o sucesso do HEAD anterior para esta correção.
+
+**Escopo:** intenção/privacidade, formulário, leitura/Action do marcador,
+AppShell/provider, três suítes de regressão e os dois documentos de continuidade.
+Migrations 001–045, RPCs, RLS/grants, domínio/adaptador, regras monetárias e corpo
+de faturamento não foram alterados. Não houve SQL/reset local nesta correção,
+migration remota, deploy manual, alteração de ambientes, flags ou dados reais.
+A 045 continua apenas versionada/testada localmente conforme as evidências
+anteriores; sua aplicação em Preview, HML ou Production não é presumida.
+
+**Próximo gate:** conferir CI e Vercel do commit publicado, mantendo o PR Draft,
+e obter nova revisão independente das correções. Merge depende de autorização
+específica. Homologação real e E2E visual continuam pendentes; FIN-PR-12/13 não
+foram iniciados. Em eventual reversão de aplicativo, não restaurar a persistência
+do payload financeiro do HEAD anterior; o marcador não é uma intenção reenviável.
+
+## FIN-PR-11C.1 — interface administrativa de containers (04/11/2026)
+
+**Base comprovada:** [PR #95](https://github.com/therunnas/bslogistica/pull/95)
+mergeado por squash em `10bcfd83a42409c477a7df584cca279a1368f216`, main remota
+confirmada no início desta etapa. O checkout FIN-PR-11B foi preservado limpo;
+implementação em `/private/tmp/bs-fin-pr-11c`, branch
+`feat/fin-pr-11c-interface-containers`, criada diretamente dessa main.
+Commit da implementação e testes: `91befbd13bd23eeaf81e97ba68b9971a673ef630`;
+o checkpoint documental fica no commit seguinte. A main foi reconferida na base
+antes da publicação; resultados de CI remota devem ser conferidos no HEAD do PR.
+Os checkpoints anteriores abaixo preservam os estados anteriores ao merge.
+
+**Escopo implementado localmente:** `/containers`, `/containers/novo` e
+`/containers/[id]`, com guarda administrativa server-side, listagem filtrada e
+ordenada, revisão antes de cadastrar, participantes/custos explícitos, competência
+opcional, detalhes persistidos, auditoria e cancelamento confirmado. Navegação
+administrativa e acesso contextual pelo Faturamento; nenhum acesso financeiro
+acrescentado ao operacional. Reutilizados domínio e adaptador FIN-PR-11A/B,
+`registrar_servico_container` e `cancelar_servico_container`, sem escrita direta
+nem nova fonte de receita/custo. Custo devido continua diferente de quitação.
+
+As Server Actions delegam a `exigirAdminAtor()` antes de consultar dados e usam
+`criarClienteServidor()` com cookies da sessão, sem service_role. MFA permanece
+opcional: admin sem fator trabalha em AAL1; fator verificado exige login AAL2.
+RLS, RPCs, grants e regras monetárias continuam sendo autoridade do banco.
+Todas as migrations, inclusive 045, foram preservadas byte a byte com a base.
+
+**Leituras:** DTOs explícitos, campos mínimos, conferência de lastro/centavos,
+contagem e cursor estável; participantes paginados por `employee_id` no serviço,
+pois não têm `id`. Auditoria apresentada sem payloads internos ou identificadores
+de sessão. Schema ausente, autorização, rede e inconsistência recebem respostas
+distintas. Ausência comprovada da tabela 045 conserva o fluxo legado de
+adicionais; erro de rede, RPC/coluna ausente ou leitura parcial não prova que um
+adicional seja legado. Não há fallback de container para adicional genérico nem
+execução automática de migration.
+
+**Intenção e recuperação:** `sessionStorage` preserva usuário, cliente, UUID,
+payload canônico, motivo e estado antes da escrita; não armazena tokens ou
+credenciais. A identidade atual é confirmada no servidor antes de recuperar ou
+reenviar. Erro/corrupção de storage bloqueia envio sem descartar a intenção.
+Duplo clique possui trava síncrona; timeout mantém chave/payload. Recarregamento
+exige reconciliação no backend; resultado incerto nunca cria nova chave.
+Rejeição explícita de validação/entidade inexistente na primeira tentativa pode
+ser corrigida após ausência confirmada, mantendo **cliente e chave**. Intenção
+anteriormente indeterminada permanece bloqueada para edição. Uma nova chave não
+permite inferir duplicidade física entre pedidos distintos, limite já existente.
+
+**Correções da revisão local:** foram reproduzidos e corrigidos dois P2: formulário
+preso após rejeição definitiva de competência e mapa financeiro desatualizado
+oferecendo cancelamento genérico. O formulário agora distingue recusa de resposta
+incerta. Faturamento confirma vínculo fresco tanto antes de abrir como antes de
+confirmar cancelamento; container encaminha ao detalhe, falha bloqueia e somente
+adicional legado comprovado usa a RPC genérica existente. UUIDs são normalizados
+na comparação canônica sem alterar caixa de textos comerciais. A revisão final
+independente do HEAD publicado continua sendo o próximo gate.
+
+**Arquivos:** novas rotas/componentes e `_acoes.ts` em
+`src/app/(painel)/containers/`; módulos `container-servico-dados.ts`,
+`container-servico-servidor.ts`, `container-servico-intencao.ts` e
+`container-servico-ui.ts`; quatro suítes `test-container-{dados,integracao,intencao,telas}.mjs`,
+runner `testar-container-leitura-local.py`, navegação e adicionais de Faturamento.
+Package/CI incluem as novas suítes; runner de compatibilidade inclui a 045.
+Inventários de testes reconhecem o novo link administrativo, guard de página e
+décimo cenário, preservando os cenários antigos e restrições do operacional.
+
+**Evidências executadas:** RED real por módulos/rotas ausentes antes da
+implementação; RED adicionais para corrupção/transições de intenção, reconciliação
+de UUID, rejeição definitiva e erros de capacidade. GREEN em **63 scripts Node**,
+incluindo **21 testes de dados/Actions, 17 de intenção, 27 de telas e 2 de integração**;
+23 do domínio e 7 do adaptador anteriores preservados. Os testes de telas executam
+handlers TSX reais com fronteiras de rede/navegador simuladas; não são E2E visual.
+Lint, TypeScript e AST Python aprovados. Formatação e diff check são conferidos
+antes da publicação.
+
+**Banco local:** nova instância exclusiva `/private/tmp/bs-fin11-local-c1pl1vue11`,
+project_id correspondente, portas 56220–56229 conferidas, labels, volume e rede
+próprios, sem referência remota. Nenhum container/volume anterior reutilizado ou
+removido. A suíte SQL 045 foi realmente executada (**88 asserções PASS**) com
+fixtures sintéticas; a leitura real pela API comprovou quatro serviços,
+participantes, auditoria, lastro e reconciliação sob RLS para admin AAL1 sem fator.
+O runner de leitura não grava nem reseta banco e mantém JWT/credenciais locais
+apenas em memória. A preparação de fixtures foi exclusiva desse projeto.
+
+Compatibilidade final **034, 037, 038, 039, 040, 041, 042, 043, 044 e 045 PASS**:
+**665 asserções**, incluindo capacidade, páginas administrativas autenticadas e
+conferência fresca do vínculo legado, sem RPC de escrita de container nos bancos
+anteriores à 045. O build com o código final e o Supabase local passou nessa
+rodada; o build separado com variáveis inertes também passou. Prettier nos
+formatos suportados e `git diff --check` aprovados.
+
+A primeira CI do PR da interface (run `41920379242`, HEAD `c817f10`) passou no
+job SQL, mas o job Node encontrou uma corrida na limpeza do teste antigo de
+streaming de logs: `terminate()` seguido de espera de 2 s competia com a
+finalização do filho no Linux. O teste passou a liberar o filho por stdin
+somente depois de observar seu log e comprovar que ainda estava ativo, sem
+alterar o helper de execução ou retirar testes de deadline. As **15 verificações
+do runner passaram localmente**, com lint/Prettier/diff check. CI final deve ser
+conferida no HEAD posterior desse ajuste; sucesso anterior não é transferido
+automaticamente a outro SHA.
+
+**Limites:** nenhuma migration aplicada ou flag alterada em banco remoto;
+Não houve intervenção administrativa em Preview, HML ou Production; o destino
+dos seus bancos não foi validado nesta etapa. Código no Git, eventuais checks
+automáticos de Preview e schema implantado são evidências diferentes. Não houve
+homologação com dados reais nem E2E visual em navegador real. Storage de negócio
+é acessível ao JavaScript da origem: não autentica conteúdo, pode ser perdido ao
+encerrar a aba/limpar o navegador e não substitui a idempotência/autorização do
+banco. Resposta sem confirmação permanece bloqueada para reconciliação.
+
+**Continuidade:** logs fora do Git em `/private/tmp/fin11c-*.log`; fixtures e
+runners versionados permitem repetir testes em outro ambiente descartável.
+Próximo gate: PR Draft contra main, CI do HEAD e revisão independente; merge
+depende de autorização específica. Nenhuma migration nova foi criada e nenhuma
+regra de diária, HE, bônus, feriado, tarifa ou faturamento foi modificada.
+FIN-PR-12 e FIN-PR-13 não foram iniciados.
+
 ## FIN-PR-11B — checkpoint de desenvolvimento local (04/11/2026)
+
+Registro histórico anterior à integração do PR #95; o merge comprovado está no
+checkpoint FIN-PR-11C.1 acima. As referências a Draft/merge pendente abaixo
+descrevem seus respectivos momentos, não o estado atual do PR #95.
 
 ### FIN-PR-11B.R2 — fechamento documental da R1 (04/11/2026)
 

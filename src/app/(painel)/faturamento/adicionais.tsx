@@ -1,6 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import {
+  carregarContainersAction,
+  verificarVinculoAdicionalContainerAction,
+} from "../containers/_acoes";
+import { decidirAcaoAdicionalContainer } from "@/lib/container-servico-ui";
 import { PackagePlus, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +104,15 @@ export function AdicionaisDoPeriodo({
 }: AdicionaisDoPeriodoProps) {
   const registrar = useRegistrarAdicional();
   const cancelar = useCancelarAdicional();
+  const router = useRouter();
+  const travaVinculo = useRef(false);
+  const [verificandoVinculo, setVerificandoVinculo] = useState(false);
+  const [erroVinculo, setErroVinculo] = useState("");
+  const vinculosContainer = useQuery({
+    queryKey: ["containers", "adicionais", clienteId],
+    enabled: clienteId !== "",
+    queryFn: () => carregarContainersAction({ clienteId }),
+  });
 
   const [novoOpen, setNovoOpen] = useState(false);
   const [operacaoId, setOperacaoId] = useState("");
@@ -110,6 +127,39 @@ export function AdicionaisDoPeriodo({
 
   const [cancelando, setCancelando] = useState<Adicional | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+
+  async function conferirCancelamento(adicional: Adicional, confirmar: boolean) {
+    if (travaVinculo.current) return;
+    travaVinculo.current = true;
+    setVerificandoVinculo(true);
+    setErroVinculo("");
+    try {
+      const resultado = await verificarVinculoAdicionalContainerAction(adicional.id);
+      if (!resultado.ok) {
+        setErroVinculo(resultado.mensagem);
+        return;
+      }
+      if (resultado.data.tipo === "container") {
+        setCancelando(null);
+        router.push(`/containers/${resultado.data.id}`);
+        return;
+      }
+      if (confirmar) {
+        await cancelar.mutateAsync({ id: adicional.id, motivo: motivoCancelamento });
+        setCancelando(null);
+      } else {
+        setCancelando(adicional);
+        setMotivoCancelamento("");
+      }
+    } catch {
+      setErroVinculo(
+        "Não foi possível confirmar o vínculo ou cancelamento. Confira o estado antes de repetir.",
+      );
+    } finally {
+      travaVinculo.current = false;
+      setVerificandoVinculo(false);
+    }
+  }
 
   // A frequência é a do MÊS escolhido (pode mudar de um mês para outro): o banco informa.
   const frequenciaDoMes = useCompetenciaDeCobranca(
@@ -199,6 +249,11 @@ export function AdicionaisDoPeriodo({
       </CardHeader>
 
       <CardContent className="p-0">
+        {erroVinculo && (
+          <p role="alert" className="p-4 text-sm text-destructive">
+            {erroVinculo}
+          </p>
+        )}
         {erro ? (
           <p className="p-5 text-sm text-destructive">Não foi possível carregar os adicionais.</p>
         ) : aguardando ? (
@@ -228,6 +283,10 @@ export function AdicionaisDoPeriodo({
               <TableBody>
                 {doPeriodo.map((a) => {
                   const situacao = situacaoDoAdicional(a);
+                  const acaoContainer = decidirAcaoAdicionalContainer(
+                    vinculosContainer.isError ? undefined : vinculosContainer.data,
+                    a.id,
+                  );
                   const fora = adicionalForaDoPeriodo(a, clienteId, inicio, fim);
                   return (
                     <TableRow key={a.id} className="border-border">
@@ -271,18 +330,30 @@ export function AdicionaisDoPeriodo({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={situacao !== "a-faturar"}
-                          onClick={() => {
-                            setCancelando(a);
-                            setMotivoCancelamento("");
-                          }}
-                        >
-                          Cancelar
-                        </Button>
+                        {acaoContainer.tipo === "container" ? (
+                          <Link
+                            className="text-sm underline"
+                            href={`/containers/${acaoContainer.id}`}
+                          >
+                            Ver container
+                          </Link>
+                        ) : acaoContainer.tipo === "bloqueado" ? (
+                          <span className="text-xs text-muted-foreground">
+                            Vínculo não confirmado. Recarregue antes de cancelar.
+                          </span>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={situacao !== "a-faturar" || verificandoVinculo}
+                            onClick={() => {
+                              void conferirCancelamento(a, false);
+                            }}
+                          >
+                            Conferir cancelamento
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -484,14 +555,12 @@ export function AdicionaisDoPeriodo({
               type="button"
               variant="destructive"
               className="rounded-xl"
-              disabled={motivoCancelamento.trim() === "" || cancelar.isPending}
-              onClick={() =>
-                cancelando &&
-                cancelar.mutate(
-                  { id: cancelando.id, motivo: motivoCancelamento },
-                  { onSuccess: () => setCancelando(null) },
-                )
+              disabled={
+                motivoCancelamento.trim() === "" || cancelar.isPending || verificandoVinculo
               }
+              onClick={() => {
+                if (cancelando) void conferirCancelamento(cancelando, true);
+              }}
             >
               Cancelar adicional
             </Button>
