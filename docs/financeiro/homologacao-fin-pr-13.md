@@ -1,8 +1,11 @@
 # Homologação integrada FIN-PR-11/12/13
 
-Plano para execução posterior no Preview do PR #100 ligado ao HML
-`qbnfcmrxmssnwkhaitgd`, schema esperado 045. **Nenhum caso foi executado no HML
-nesta sessão.** Ready, CI e ensaio local não encerram a homologação.
+Plano de execução no HML `qbnfcmrxmssnwkhaitgd`, schema 045. O PR #100 foi
+mergeado em `91513b91b11461ac48d8dfe6af118234bfb6fbc0`. **A sessão 12 executou a
+matriz em HML (17 PASS, 8 PARCIAL, 2 BLOQUEADO) e a sessão 13 fechou os casos
+possíveis (ver "Resultados da execução" e "Sessão 13"): 25 PASS, 1 PARCIAL (A05),
+1 BLOQUEADO (E06), 0 FAIL.** Isso **não** encerra a homologação funcional: faltam
+o convite por e-mail, a planilha Dynamis e a revisão humana.
 
 ## Preparação e evidência
 
@@ -23,7 +26,7 @@ quatro apontamentos e nenhuma fatura; não se presume que continue igual. Não
 criar contas nesta etapa. Para cada caso registrar executor, data, IDs dos
 registros sintéticos, entrada, esperado em centavos/minutos, obtido, evidência
 de interface/RPC/auditoria e PASS/FAIL/BLOQUEADO. Resultado inicial de todos:
-**NÃO EXECUTADO**. Não registrar tokens, cookies, documentos pessoais ou senhas.
+**NÃO EXECUTADO** (atualizado em "Resultados da execução"). Não registrar tokens, cookies, documentos pessoais ou senhas.
 
 ## Matriz de execução
 
@@ -96,7 +99,148 @@ como diferença esperada explicada, e não declarar paridade financeira V2.
 ## Saída e próximos gates
 
 Apresentar resultados reais, falhas, bloqueios e evidências; obter aprovação
-explícita da homologação. O PR #100 permanece Draft enquanto os pré-requisitos
-dos gates de Preview/homologação/revisão não estiverem concluídos. Merge exige
-autorização própria. Manual e preparação de Production 035–045 vêm depois, com
-backup novo, rollback e controle do deploy automático de main.
+explícita da homologação. O PR #100 já foi integrado (sessão 11). Manual e
+preparação de Production 035–045 vêm depois, com backup novo, rollback e controle
+do deploy automático de main.
+
+## Resultados da execução (sessão 12, 05/11/2026)
+
+**Ambiente:** servidor Next local (`next dev`, porta 3100, `main` em `91513b9`)
+ligado **exclusivamente** ao HML `qbnfcmrxmssnwkhaitgd` (URL e chaves do HML; nenhuma
+variável de Production). Não houve Preview da Vercel: não havia acesso à Vercel
+(sem CLI, token ou MCP) para criar um Preview isolado. O ambiente local não substitui
+o Preview publicado; o isolamento de build/runtime da Vercel não foi exercido.
+**Identidades:** contas sintéticas `s11-*@e2e-sintetico.invalid` criadas pela Admin API
+do HML, sem envio de e-mail; senhas aleatórias fora do repositório. **Recuperação:** dump
+de dados de `public` do HML antes das escritas (não restaura `auth`). **Execução:**
+PostgREST/RPC com JWT reais das contas de teste e rotas do app com cookies de sessão reais;
+TOTP real calculado a partir do segredo do fator. O harness ficou fora do repositório.
+
+Esperados calculados à parte, em centavos, a partir das regras documentadas
+(diária 200,00; jornada líquida 8 h; fator 1,5; tolerância 10 min; custo 70–100/dia).
+
+| ID  | Resultado | Evidência resumida                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A01 | PASS      | Admin acessa `/dashboard` e `/fechamento` (200); sem sessão 307 para `/login`; logout global faz o token antigo ler 0 clientes; credencial inválida recusada.                                                                                                                                                                                                                                                                                                                                                           |
+| A02 | PASS      | Sem fator: AAL1 lê dados e acessa o app. Com fator: senha sozinha lê 0 linhas, RPC admin recusada, app 307 para `/mfa`; TOTP inválido recusado, válido libera sem novo código. Fator removido ao fim.                                                                                                                                                                                                                                                                                                                   |
+| A03 | PASS      | Operacional vê só a operação atribuída; zero campo financeiro nas 4 RPCs de leitura; operação alheia recusada; chave extra gera `22023`; 9 tabelas de negócio com 0 linhas; rotas financeiras mostram "Área administrativa restrita"; APIs de Fechamento/XLSX não geram arquivo.                                                                                                                                                                                                                                        |
+| A04 | PASS      | Sem papel: 0 linhas, RPC recusada, telas "Acesso não liberado"; token forjado 401; anon sem dados; admin+operacional decide como admin e não usa a superfície operacional.                                                                                                                                                                                                                                                                                                                                              |
+| A05 | PARCIAL   | Último admin: DELETE e rebaixamento recusados (ROLLBACK). Sessão 13, na interface: conceder papel Operacional grava `papel_concedido` em `admin_audit_log`; recuperação sem MFA (GET em `/auth/confirm` devolve 303 com cookie `httpOnly` e não consome; clique em "Continuar" consome; reuso recusado; nova senha entra); recuperação com MFA (TOTP inválido recusado, válido, senha nova e entrada no dashboard sem segundo código). Links gerados pela Admin API, sem e-mail. **Não executado:** convite por e-mail. |
+| B01 | PASS      | Operações ligadas ao contrato do próprio cliente; nome obrigatório, contrato de outro cliente, colaborador em duas equipes, função duplicada e diária negativa recusados.                                                                                                                                                                                                                                                                                                                                               |
+| B02 | PASS      | OFF (sessão 12): vigência 250,00 de 01/12; fonte congelada; diária individual não altera a cobrança. ON (sessão 13): tarifa padrão operador/diurno 220,00 → 22000 c; noturno 260,00 → 26000 c; tarifa conferente 300,00 de 10/11 a 12/11 (fim exclusivo): 10 e 11 → 30000 c, 09, 12 e 13 recusados; individual 280,00 desde 16/11 vence a tarifa (13/11 → 22000, 16 e 17/11 → 28000); individual 999,00 → 99900 c; contrato sem fonte recusado; lançamento OFF e linhas faturadas inalterados.                          |
+| C01 | PASS      | Presença 200,00/80,00; falta 0/0; substituição 200,00/90,00; entrada = saída recusada sem gravação parcial; noturno 22:00–07:00 (480 min) cobra 200,00 e custa 100,00.                                                                                                                                                                                                                                                                                                                                                  |
+| C02 | PASS      | HE de 0, 10, 15, 16, 45, 46, 75, 76 e 120 min: cobra 0, 0, 30, 30, 60, 60, 90, 90 e 120 min; custo separado e zerado abaixo da tolerância; saída antecipada proporcional (150,00/60,00). Regra 15/45 do `ESTADO_DO_PROJETO.md` — ver achado A.                                                                                                                                                                                                                                                                          |
+| C03 | PASS      | OFF (sessão 12): classificação com cobertura e pendência sem cobertura. ON (sessão 13): sábado 38500 c (220,00 + 4 h × 41,25); domingo 08/11 → 44000 c e custo 16000 c; domingo parcial de 240 min → 22000 c; feriados nacional, estadual e municipal → 44000 c; feriado com 600 min → 55000 c (sem HE comum); domingo que é feriado (15/11) → 44000 c, fator uma vez, tipo `feriado`; operação sem local recusada.                                                                                                     |
+| C04 | PASS      | Com a resolução ON: base 22000 + HE 4125 = 26125 c; adicional 25,00 → 28625 c (HE continua 4125, custo inalterado); salvar de novo preserva; duplicação sem confirmação recusada; substituição para 30,00 → 29125 c; trilha com motivo; também em domingo (44000 + 1500). Com OFF o banco recusa (`55000`).                                                                                                                                                                                                             |
+| C05 | PASS      | Navegador (sessão 13): erro de gravação (saída = entrada) bloqueia o Salvar e mantém o rascunho do outro colaborador (HE 1h00, R$ 237,50); corrigido, grava 200,00/80,00 e 237,50/101,25; "Fechar dia" fecha a folha (botão vira "Reabrir"), reabrir volta a `open`. Banco (sessão 12): escrita em folha fechada recusada, operacional recusado, linha faturada imutável.                                                                                                                                               |
+| D01 | PASS      | Admin: lista, detalhe e novo respondem 200; operacional: restrito na UI, `registrar`/`cancelar` recusados e 0 linhas nas 3 tabelas de container. Renderização client não inspecionada.                                                                                                                                                                                                                                                                                                                                  |
+| D02 | PASS      | Serviço de 450,00 (receita) e 250,00 (custo por pessoa 100,00 + 150,00); adicional de 450,00 com competência 01–15/10; trilha `registered` com motivo; lista/detalhe 200.                                                                                                                                                                                                                                                                                                                                               |
+| D03 | PASS      | Rateio 100,00 + 200,01 do total de 300,01 soma exata; total divergente recusado.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| D04 | PASS      | Navegador: `?operacao=` válido pré-seleciona Cliente A e Operação A1; inválido mostra o alerta "operação de origem não está disponível" sem pré-seleção; repetido não pré-seleciona; validação de formulário mostrou o alerta de data de solicitação e quantidade; envio válido persistiu. O banco recusa operação de outro cliente.                                                                                                                                                                                    |
+| D05 | PASS      | Mesma chave e payload no banco: +1 serviço, +1 adicional, +1 trilha; payload diferente com a mesma chave dá `23505`. Navegador: duplo clique em "Confirmar registro" gerou exatamente 1 serviço, 1 adicional e 1 trilha.                                                                                                                                                                                                                                                                                                |
+| D06 | PASS      | Quantidade zero, centavo fracionário, participante repetido, soma divergente, mesmo dia, campo desconhecido e competência invertida recusados; contagens de serviços, adicionais e trilhas inalteradas.                                                                                                                                                                                                                                                                                                                 |
+| D07 | PASS      | Cancelar exige motivo, cancela serviço e adicional juntos, é imutável depois e preserva `registered`+`canceled`; o adicional não cancela isolado; correção = cancelar + novo; serviço faturado não cancela (`55000`).                                                                                                                                                                                                                                                                                                   |
+| D08 | PASS      | Fatura mista (cliente A) e fatura só de Containers (cliente B, 800,00/300,00): cada serviço aparece uma vez; serviço executado em 16/10 com competência 1ª quinzena entrou na fatura da 1ª; vínculos e custo corretos; repetir a emissão é recusado.                                                                                                                                                                                                                                                                    |
+| D09 | PASS      | Custo só em visões internas: exportação do cliente sem custo/margem; operacional restrito; auditoria preservada; detalhe interno mostra custo por participante sem estado de pagamento e o Excel interno diz que os valores são previstos e não representam pagamento realizado.                                                                                                                                                                                                                                        |
+| E01 | PASS      | 1ª quinzena: apontamentos 2.862,50 + containers 920,01 = receita 3.782,51; soma por colaborador = apontamentos; conciliação confere; faltas fora das diárias; 2ª quinzena: 662,50 + 150,00 = 812,50 (serviço de competência 1ª não entra).                                                                                                                                                                                                                                                                              |
+| E02 | PASS      | Fatura 3.782,51; 13 diárias; 7 h; 7 itens somam o total; custo 1.781,64 (apontamentos 1.151,63 + containers 630,01 uma vez); depois da emissão a faturar = 0; janelas fora da frequência e repetição recusadas; linha/adicional/fatura faturados imutáveis.                                                                                                                                                                                                                                                             |
+| E03 | PASS      | Microsoft Excel real (via AppleScript): abas, colunas, datas dd/mm/aaaa, moeda R$, fórmula `=SUBTOTAL(109;…)` e AutoFilter ativo. Filtros reais: colaborador 2 → 4 linhas, 856,25; operação A2 → 200,00; tipo do dia Sábado → 350,00 e 4,00 h; datas 12–15/10 → 9 linhas, 1.682,50 e 3,00 h. O total fixo permaneceu 3.782,51 em todos os filtros.                                                                                                                                                                      |
+| E04 | PASS      | Excel real: HE total 7,00 h = 420 min. Caso de arredondamento acumulado (cliente B, 3 × 10 min): linhas 0,17 h cada, SUBTOTAL de horas 0,51 e total fixo 0,50 (30 min somados antes da conversão), dinheiro igual em ambos (928,13, com ajuste de −0,01). Cliente sem custo/resultado/margem; descrição `=HYPERLINK(...)` e referência `@SUM(...)` abertas como texto, sem fórmula.                                                                                                                                     |
+| E05 | PASS      | Sem sessão e operacional sem arquivo; JSON inválido, corpo incompleto e assinatura adulterada sem arquivo; assinatura vencida após mudança de dados recusada; nova assinatura exporta.                                                                                                                                                                                                                                                                                                                                  |
+| E06 | BLOQUEADO | Planilha Dynamis original indisponível; nada foi inferido.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+
+### Achados
+
+- **A (resolvido, documentação).** `docs/ARQUITETURA.md` descrevia o arredondamento
+  diário da HE como "até 15 descarta; 16 a 45 vira 30; 46 a 59 vira a hora seguinte",
+  divergente do núcleo V2. A regra V2 aprovada é 15 min = 30 min e 45 min = 60 min de
+  HE; o texto foi corrigido na sessão 13 e o núcleo não foi alterado. O C02 é PASS por
+  essa regra.
+- **B (observação).** Com a resolução OFF, domingo e o feriado nacional confirmado no
+  calendário foram cobrados como "Dia comum" (200,00), embora a consulta do calendário os
+  classifique como domingo/feriado. É o comportamento "OFF preserva regra anterior"; o
+  pagamento ×2 só existe com a resolução ON e não foi exercido.
+- **C (observação).** Turno 22:00–06:00 com 60 min de intervalo tem 7 h líquidas e cobra
+  proporcional (175,00), pela referência líquida de 8 h. O cadastro de turno não avisa.
+- **D (observação).** Telas protegidas respondem HTTP 200 com "Área administrativa
+  restrita" / "Acesso não liberado" (desenho documentado); os dados continuam protegidos
+  pela RLS e as APIs respondem 401/403.
+- **E (P4).** O cadastro de turno aceitou início = fim sem virada de meia-noite; só o
+  apontamento recusa entrada = saída.
+- **F (risco de Production).** Production está na 034 com o código da `main` (045) em
+  produção. Ver "Production" no `ESTADO_DO_PROJETO.md`.
+
+### Dados sintéticos criados em HML (limpeza posterior)
+
+Todos os nomes começam com `E2E-S11`. Faturas emitidas e lançamentos faturados são
+imutáveis por desenho (inclusive contra `DELETE`); a limpeza exige tarefa própria
+com sessão privilegiada. Além dos IDs abaixo existem: folhas e lançamentos das operações
+A1, A2 e B1; vigências (contrato A a partir de 01/12, diária individual 999,00 do
+colaborador 4); município 4208203, local da operação A1, coberturas 2026 e três feriados
+sintéticos; a conta `mfa` (fator removido) e a conta `op2` (sem uso).
+
+- `clA`: `76313ccf-9503-42f4-8745-7b4708fee4f4`
+- `clB`: `37c4b132-24ce-4431-b643-0cf74bc85e49`
+- `ctA`: `6369e01d-0859-4fb9-8ce0-7fd1b06f3295`
+- `ctB`: `3eb763be-0fb4-4a14-95ea-906073bb5183`
+- `e1`: `938d1068-0f28-4788-afa1-a3c376793eb4`
+- `e2`: `cdbcdd89-5c4f-429d-9fd5-a879cee316c9`
+- `e3`: `1680891d-3ded-4de2-ad51-b6ad8fcad74f`
+- `opA1`: `d5b2ded2-4a0a-44ac-822b-da17362e1cc6`
+- `opA2`: `237a0ab7-30f1-448c-9a60-e0b9b8a49e1d`
+- `opB1`: `bbfd01ab-7dd5-4d61-826f-c7ce3b43ccba`
+- `shDia`: `2f62b858-8f12-4bec-bf3f-65358e29af87`
+- `shNoite`: `6db57b4f-9dd9-4ec7-ba57-c9d81b30aa05`
+- `shDiaA2`: `67cbc773-70ac-460c-8ec2-ac479f27b3cc`
+- `shDiaB1`: `72430989-1ce5-4c42-8ef4-c950043c56f9`
+- `e4`: `383b4301-08e6-4937-96a1-ec509f8bbe41`
+- `e5`: `71e1f72a-9711-49cc-b51c-9805322fc379`
+- `fn1`: `ba0f1e78-0faa-4431-9402-07c11f9d3173`
+- `indRate999`: `f3c0f4db-ec43-448c-90f2-db14e326e31e`
+- `cS1`: `d91391e6-dd8c-4f1e-973d-4a8625a4871e`
+- `cS1key`: `97eac365-2a2c-40e6-9a34-e16780ab8c7d`
+- `cS2`: `d543b1c6-5d4d-4027-8df6-76ce7b001241`
+- `cS3`: `d4277b02-87a1-4de9-a80a-44f3bf296bb8`
+- `cS4`: `decb0076-22de-47c1-b8a7-ca1d6d505b9c`
+- `cS4b`: `6e26ab79-cbcf-4777-a862-2d2d38f1802a`
+- `cS6`: `d668bc24-58c5-44ab-ae74-11b3c2893cc9`
+- `cS5`: `8fb3442d-7cc6-40d6-94c6-656897e1fe77`
+- `invA`: `88cfeb04-6cf2-4cf7-8c69-90f43e7d6cf2`
+- `invB`: `940ebf67-1618-4c12-860e-3ce85415d349`
+- `invAid`: `88cfeb04-6cf2-4cf7-8c69-90f43e7d6cf2`
+- equipes (`operation_team`): `a5eb7d24-1f19-49d9-a830-af62d63f7ebf`, `988d5492-9de3-4a9b-8593-9afacdd047aa`, `0d764ce5-a886-4d63-9d87-498cc9cb80ff`, `71d98146-6314-450c-90e3-78d853bb49e9`, `e49aba7b-6006-400b-be43-7f3072f5c8c2`
+- turno avulso a limpar (08:00–08:00): `1b6a0451-3135-4e86-8762-a36e8d7d0b0a`
+- usuários de auth sintéticos: adm `4e1ff521-e91d-478a-8456-229d5ef554b8`, op `b86cd826-6c7f-41f4-9e49-a642a9f0f67b`, sem `ff78687e-7b1a-4f4b-ae9c-1adbb92e5f6f`, ambos `4f48fc2a-a954-46a3-954e-e4676fa95cfe`, op2 `8c469d0b-ac0c-4ff5-92c0-a383258d1ba7`, mfa `14367631-514f-408a-a466-da4315ee9dc2`
+
+## Sessão 13 (05/11/2026)
+
+**Resolução comercial:** estava OFF e a 045 confirmada (50 migrations); backup novo de
+dados de `public` antes. Ligada em HML (`alterar_resolucao_tarifas`, aceitando os
+contratos sem tarifa), usada em B02, C03 e C04 e **restaurada para OFF**, confirmado em
+`pricing_settings.tarifas_por_funcao = false`. As tarifas padrão do contrato A e a
+diária individual ficam cadastradas e inativas enquanto OFF.
+**Pré-condições vistas com a resolução ON:** turno com período diurno/noturno
+classificado; operação com local e coberturas; contrato sem tarifa recusa apontamento.
+**Navegador:** Chrome com o app local ligado ao HML, contas descartáveis `s11-nav*`.
+**Excel:** Microsoft Excel instalado, controlado por AppleScript; um travamento da
+automação (provável diálogo modal) exigiu reiniciar o aplicativo; não é falha do arquivo.
+
+### Achados adicionais
+
+- **G (P4).** No Dashboard, o cartão de margem por cliente do cliente B mostra receita
+  R$ 928,14, enquanto o Fechamento e o total do Dashboard usam 928,13 (o ajuste de
+  arredondamento acumulado de −0,01 fica fora do cartão por cliente).
+- **H (observação).** `valid_to` das tarifas é exclusivo (`[)`): uma tarifa de 10 a
+  12/11 cobre 10 e 11, não o dia 12. A interface deve deixar isso claro ao cadastrar.
+
+### Dados sintéticos adicionais (limpeza posterior)
+
+Serviço de Containers criado pela interface `63f0686b-61d8-444d-acca-3d42817e54fb`
+(com adicional e trilha); folha de 18/11 da operação A1; vigência acumulada do
+contrato B desde 01/11 e três lançamentos do colaborador 5 (03 a 05/11); tarifas
+padrão do contrato A (operador diurno `e7d77278-33bc-46dd-be1f-5507ac7d95c0`,
+noturno `8d228f66-3530-43e7-98a6-a96eef0a20c9`, conferente
+`421e4c2b-1bb7-4386-8c5d-37076ce200ee`); diária individual do colaborador 1 desde
+16/11; feriados de novembro (nacional 02 e 15, estadual 04, municipal 05); local da
+operação A2; contas `s11-navadm` e `s11-navop` (senhas rotacionadas). Fator MFA da
+conta `mfa` removido. Nada de Production foi tocado.

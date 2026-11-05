@@ -25,15 +25,15 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FIN-PR-13 — testes integrados e conciliação financeira.** Branch
-`feat/fin-pr-13-integracao-conciliacao`, worktree `/private/tmp/bs-fin-pr-13`, a partir
-da `main` `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. Implementação local concluída e
-PR [#100](https://github.com/therunnas/bslogistica/pull/100) aberto como Draft;
-Revisão independente da sessão 10 corrigiu quatro achados P2 com RED/GREEN;
-a matriz de homologação está em
-[Homologação integrada](docs/financeiro/homologacao-fin-pr-13.md).
-Validação final/CI e homologação posterior são o gate atual. O estado e a próxima ação exatos ficam no
-[HANDOFF](docs/HANDOFF.md).
+**Homologação integrada FIN-PR-11/12/13 em HML.** O PR
+[#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em
+`91513b91b11461ac48d8dfe6af118234bfb6fbc0` (CI de `main` verde). A matriz de 27 casos
+foi executada em HML nas sessões 12 e 13: 25 PASS, 1 PARCIAL (A05, convite por
+e-mail), 1 BLOQUEADO (E06, Dynamis), 0 FAIL
+([resultados](docs/financeiro/homologacao-fin-pr-13.md)). Resolução comercial de HML
+restaurada para OFF. Production segue na 034 com o código da
+`main` publicado; a decisão sobre esse risco é o primeiro passo. O estado e a próxima
+ação exatos ficam no [HANDOFF](docs/HANDOFF.md).
 
 **FIN-PR-12:** PR #99 mergeado por squash em `3e5b7b1`; CI de `main` e deploy
 automático de Production verdes. A exportação continua **não homologada** com o
@@ -51,9 +51,10 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 ### Fila
 
-1. **Concluir o PR Draft do FIN-PR-13:** CI, Preview e revisão; sem merge nesta sessão.
-2. **Homologação completa E2E** no Preview ligado ao HML, cobrindo FIN-PR-11
-   (nove fluxos de Containers), FIN-PR-12 e FIN-PR-13.
+1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
+   (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
+2. **Pendências da homologação:** convite por e-mail (A05, exige caixa de captura) e
+   planilha Dynamis (E06).
 3. Manual de utilização e preparação de Production (035–045 em Production é gate
    próprio, com backup novo).
 
