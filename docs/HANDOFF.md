@@ -10,88 +10,82 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                    |
-| ------------------------- | ------------------------------------------------------------------------ |
-| Etapa                     | WORKFLOW-01 — padronização definitiva do desenvolvimento                 |
-| Gate atual                | Revisão R1 concluída; aguardando autorização de merge do PR #97          |
-| Último gate concluído     | Gate 2 — validação local e CI no `HEAD validado`                         |
-| Worktree                  | `/private/tmp/bs-workflow-01`                                            |
-| Branch                    | `docs/workflow-01`                                                       |
-| Base                      | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)               |
-| HEAD validado             | `4e3b0ab565635fd1a7af894983f953975c48db25`; local = remoto no checkpoint |
-| Alterações não commitadas | Nenhuma                                                                  |
-| PR                        | [#97 — Draft](https://github.com/therunnas/bslogistica/pull/97)          |
-| Ambiente-alvo             | Nenhum ambiente remoto; somente repositório e CI sem secrets             |
-| Última ação comprovada    | Ajustes R1 em `4e3b0ab`, CI verde (run 42023101884)                      |
-| Próxima ação exata        | Usuário decide o merge do PR #97; até lá, Draft e sem merge              |
+| Campo                     | Valor                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| Etapa                     | FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis)                     |
+| Gate atual                | Gate 2 — validação local concluída; PR Draft aberto, CI do HEAD a conferir      |
+| Último gate concluído     | Gate 1 — desenvolvimento (implementação e testes)                               |
+| Worktree                  | `/private/tmp/bs-fin-pr-12`                                                     |
+| Branch                    | `feat/fin-pr-12-exportacao-dynamis`                                             |
+| Base                      | `314c08cb20e9a32dd10b4a0665e1be7dad108264` (`origin/main`)                      |
+| HEAD validado             | `145666a80dee79623a5aeb66510dd549bc069e41`; validado localmente, ainda sem push |
+| Alterações não commitadas | Nenhuma; este checkpoint vai no commit seguinte ao validado                     |
+| PR                        | Draft aberto nesta sessão (número em Evidências)                                |
+| Ambiente-alvo             | Nenhum ambiente remoto alterado; CI e Preview automáticos do PR                 |
+| Última ação comprovada    | Implementação, suíte nova 92/92, 65 suítes `test:*`, lint, TypeScript e build   |
+| Próxima ação exata        | Conferir CI e Preview do HEAD do PR; depois, revisão independente; sem merge    |
 
 ## Evidências
 
-- PR #96 mergeado por squash; `main` em `eb8cec9…` no preflight.
-- Production Vercel publicou o merge antes de a CI de `main` terminar.
-- `main` sem proteção/ruleset/check obrigatório na verificação de 05/11/2026.
-- Supabase HML e Production distintos, ambos com migration head 034.
-- Migrations 035–045 pendentes remotamente; migration 045 presente no Git.
-- Nenhuma homologação real dos Containers foi comprovada.
-- Commit `ae2f319` (sessão 01): TDD documental RED 2/4 e GREEN 4/4; 64 scripts
-  `test:*`, lint, TypeScript, Prettier, check documental e `git diff --check`
-  passaram localmente. Build Turbopack local bloqueado por `Operation not
-permitted` ao abrir porta interna; build Webpack local passou.
-- `0e1848a`, CI run 42019884284: `validar` (lint, TypeScript, `check:workflow`,
-  `test:workflow`, todas as suítes Node e build padrão) e `sql-local` com
-  sucesso. O build padrão está comprovado na CI, não localmente.
-- Revisão R1 (sessão 02, Claude Code): faltavam worktree, HEAD local/remoto,
-  alterações não commitadas, último gate e checkpoint de transferência entre
-  agentes. Ajustes em `WORKFLOW.md`, `AGENTS.md`, `CLAUDE.md`, neste arquivo e no
-  validador documental; RED 1/5 pelo campo `Worktree` ausente antes do GREEN.
-- `4e3b0ab`: localmente GREEN 5/5, `check:workflow`, 64/64 `test:*`, lint,
-  TypeScript, Prettier e `git diff --check`; build local não executado. CI run
-  42023101884: `validar` (inclui build padrão) e `sql-local` com sucesso.
+- HEAD validado localmente: `145666a` (commit `feat(fechamento): add client XLSX
+export (Dynamis model)`). A CI do HEAD publicado entra no checkpoint seguinte.
+- Funcionalidade: botão "Excel do cliente (.xlsx)" no Fechamento →
+  `POST /api/fechamento/xlsx-cliente` → `gerarXlsxDoCliente`. Detalhes no
+  [Estado do projeto](ESTADO_DO_PROJETO.md#fin-pr-12--excel-do-cliente-modelo-dynamis-05112026).
+- Arquivos: `src/lib/fechamento/exportacao-cliente.ts` (modelo e conferência),
+  `src/lib/fechamento/xlsx-cliente.ts` (arquivo), rota
+  `src/app/api/fechamento/xlsx-cliente/route.ts`, `download.ts` (rota por modelo),
+  `_exportar.tsx` (botão), `xlsx.ts` (só exporta auxiliares).
+- Testes locais: `test:fechamento-xlsx-cliente` 92/92 (fixture sintética, total
+  conferido à mão R$ 2.259,32); mutação "adicional fora do total" barrada;
+  `test:fechamento-xlsx` 279/279; 65/65 suítes `test:*`; lint, `tsc`, Prettier,
+  `git diff --check` e `npm run build` com variáveis inertes da CI.
+- Não executado: conferência no Microsoft Excel real (automação local não abriu
+  a pasta por diálogo do aplicativo) e qualquer teste com dados do HML.
 
 ## Migrations por ambiente
 
-- Local/CI: migrations até 045 versionadas e anteriormente testadas em instâncias
-  descartáveis; nenhum banco local foi resetado por WORKFLOW-01.
-- HML `qbnfcmrxmssnwkhaitgd`: migration remota mais recente 034.
-- Production `ehkduqokntemtmqzdrbd`: migration remota mais recente 034.
-- Não aplicar migrations nesta tarefa. A preparação de HML é o próximo trabalho
-  após a integração de WORKFLOW-01 e exige autorização específica.
+- Esta tarefa não cria nem aplica migration.
+- HML `qbnfcmrxmssnwkhaitgd`: 045 (aplicada em 05/11/2026, registro no PR #98).
+- Production `ehkduqokntemtmqzdrbd`: 034.
 
 ## Autorizações
 
-- editar documentação, template de PR e checks locais/CI sem credenciais;
-- commits e push normal em `docs/workflow-01`, com testes verdes;
-- consultar fatos mutáveis em modo somente leitura.
+- sessão 06: implementar FIN-PR-12, branch/worktree isolados, testes, lint,
+  TypeScript, build, commits, push, PR Draft, conferir CI e Preview, corrigir
+  falhas do próprio PR e atualizar documentação.
 
 ## Proibições
 
-- sem merge ou Ready for Review;
-- sem alteração de GitHub/Vercel/Supabase remoto;
-- sem migration, SQL remoto, deploy ou mudança de variável/flag;
-- sem regra financeira, Auth, RLS, RPC ou faturamento;
-- sem iniciar FIN-PR-12 ou FIN-PR-13.
+- sem merge;
+- sem alterar Production, migrations remotas, credenciais ou ambientes;
+- sem alterar regras financeiras aprovadas;
+- sem iniciar FIN-PR-13 antes de autorização;
+- sem criar contas de teste.
 
 ## Bloqueios e riscos
 
-- merge em `main` ainda pode publicar Production automaticamente; a contenção é
-  configuração administrativa futura, não parte deste PR. O próprio merge do
-  PR #97 dispara novo deploy de Production, com código de aplicação igual ao de
-  `eb8cec9`;
-- vínculo exato Preview ↔ HML e escopos de variáveis Vercel permanecem pendentes
-  de conferência autenticada;
-- HML está 11 migrations atrás do Git e não deve receber somente a 045;
-- backup/restauração integral de HML precisa ser comprovado antes da implantação.
+- PR #98 (documental, Draft) e este PR alteram `HANDOFF.md`, `PROGRESS.md` e
+  `ESTADO_DO_PROJETO.md`: o segundo a ser integrado precisa reconciliar esses três
+  arquivos, preservando os fatos dos dois;
+- fórmulas sem resultado gravado: dependem do recálculo ao abrir (pedido no
+  arquivo); visualizadores que não calculam mostram o subtotal vazio;
+- conciliação do Fechamento com o banco "não confere" não bloqueia o arquivo do
+  cliente (o interno também não bloqueia); a tela mostra o alerta crítico;
+- homologação de FIN-PR-11 e FIN-PR-12 pendente, prevista para depois do
+  FIN-PR-13;
+- merge em `main` publica Production antes da CI; contenção administrativa
+  pendente.
 
 ## Retomada
 
-Sequência preservada: **WORKFLOW-01 → preparação de HML → homologação de
-Containers (FIN-PR-11) → FIN-PR-12 → FIN-PR-13**.
+Sequência: **FIN-PR-12 (revisão e merge autorizado) → FIN-PR-13 → homologação
+completa E2E → manual de utilização → preparação de Production**.
 
 1. Reconciliar Git e GitHub conforme
    [Transferência entre agentes](WORKFLOW.md#reconciliação-na-retomada).
-2. Confirmar que WORKFLOW-01 continua sendo a única tarefa ativa e que os checks
-   do HEAD exato do PR #97 estão verdes.
-3. Merge do PR #97 só com autorização explícita do usuário.
-4. Integrado o PR, solicitar autorização separada para preparar HML (035–045) e
-   homologar FIN-PR-11 Containers; não iniciar FIN-PR-12/13 antes disso.
+2. Conferir CI e Preview do HEAD exato do PR do FIN-PR-12.
+3. Pedir revisão independente; merge só com autorização explícita.
+4. Abrir o arquivo de fixture no Excel na homologação e conferir SUBTOTAL com
+   filtro por colaborador.
 5. Se houver divergência, atualizar diagnóstico e este checkpoint antes de agir.

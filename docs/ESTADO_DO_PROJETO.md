@@ -5,6 +5,58 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-12 — Excel do cliente (modelo Dynamis, 05/11/2026)
+
+**Estado:** implementado e validado localmente na branch
+`feat/fin-pr-12-exportacao-dynamis` (base `main` `314c08c`); **não homologado**.
+A homologação funcional completa será feita depois do FIN-PR-13, de ponta a ponta,
+no Preview ligado ao HML. Nenhuma migration, regra financeira, RLS ou Auth mudou.
+
+**Ambientes (fatos do PR #98, ainda em Draft):** HML `qbnfcmrxmssnwkhaitgd` na
+045 desde 05/11/2026; Production `ehkduqokntemtmqzdrbd` na 034. Os nove fluxos de
+Containers (FIN-PR-11) continuam sem homologação.
+
+**O que existe:** no Fechamento, ao lado do "Baixar Excel (.xlsx)" interno, o botão
+"Excel do cliente (.xlsx)" chama `POST /api/fechamento/xlsx-cliente` — mesmo
+encadeamento de acesso admin, disponibilidade e assinatura de frescor da rota
+interna, leitura sob RLS pela sessão. O arquivo tem duas abas:
+
+- **Fechamento:** título "Fechamento – 1ª/2ª quinzena de mês/ano" (ou
+  "mês/ano", ou as datas do recorte), cliente e período; uma linha por diária, em
+  ordem de colaborador (pt-BR) e data; o ajuste de arredondamento previsto do
+  colaborador logo depois das diárias dele; cada serviço avulso (containers
+  inclusive) em linha própria; o ajuste já faturado no fim. Colunas: Colaborador,
+  Função, Data, Operação, Tipo do dia, Lançamento, Horas extras (h), Diária, Hora
+  extra, Domingo/feriado, Adicional e Total;
+- **Resumo por colaborador:** diárias, horas, componentes e total por
+  colaborador, mais as linhas de serviços avulsos e de ajuste já faturado.
+
+Nas duas: autofiltro em todas as colunas, linha `SUBTOTAL(109; …)` que acompanha
+o filtro, "Total do fechamento" fixo, datas `dd/mm/aaaa`, moeda `R$`, cabeçalho
+congelado e recálculo ao abrir. **Sem custo, resultado, margem, já faturado ou a
+faturar.** Texto do banco é sempre célula de texto; as únicas fórmulas são os
+SUBTOTAL montados pelo gerador.
+
+**Fonte de verdade:** os valores vêm do `FechamentoData` (núcleo e banco). O
+modelo só soma para apresentar e **recusa exportar** quando a soma das linhas não é
+a receita do Fechamento, quando um componente não fecha com o consolidado, quando
+os componentes de um lançamento não somam o cobrado ou quando as diárias do resumo
+divergem.
+
+**Validação local (05/11/2026):** suíte nova `test:fechamento-xlsx-cliente` com
+92 asserções sobre o arquivo real (fixture sintética V2 com domingo, sábado,
+substituto faturado, adicional diário, ajustes de arredondamento e dois containers;
+valores conferidos à mão: total R$ 2.259,32), incluindo textos hostis, período
+vazio, período só com serviços e a fixture ouro; teste de mutação (adicional fora do
+total) barrado. `test:fechamento-xlsx` 279/279 com quatro guardas atualizadas para
+a nova rota e o novo gerador. Todas as 65 suítes `test:*`, lint, TypeScript,
+Prettier, `git diff --check` e build de produção passaram. A conferência no
+Microsoft Excel real não foi concluída: a automação local não abriu a pasta
+(diálogo do aplicativo); fica para a homologação.
+
+**Não usar R$ 35.118,12** como resultado esperado de nenhum conjunto que não seja a
+quinzena Dynamis original: essa conciliação é do FIN-PR-13.
+
 ## Estado vigente — WORKFLOW-01 (05/11/2026)
 
 **Git:** [PR #96](https://github.com/therunnas/bslogistica/pull/96) mergeado por

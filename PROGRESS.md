@@ -25,27 +25,28 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**WORKFLOW-01 — padronização definitiva do desenvolvimento.** Branch
-`docs/workflow-01`, baseada em `main` no merge do PR #96, publicada no
-[PR Draft #97](https://github.com/therunnas/bslogistica/pull/97). Objetivo:
-integrar o fluxo normativo, inventário de ambientes, handoff e checks
-documentais, sem alterar ambiente remoto. O estado e a próxima ação exatos ficam no
-[HANDOFF](docs/HANDOFF.md).
+**FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis).** Branch
+`feat/fin-pr-12-exportacao-dynamis`, worktree `/private/tmp/bs-fin-pr-12`, base
+`main` em `314c08c`. Implementada e validada localmente; PR Draft aberto. O
+estado e a próxima ação exatos ficam no [HANDOFF](docs/HANDOFF.md).
 
-### Fila após WORKFLOW-01
+Decisão do usuário (05/11/2026): concluir primeiro as funcionalidades pendentes
+(FIN-PR-12 e FIN-PR-13) e fazer depois **uma homologação completa de ponta a
+ponta**, seguida do manual de utilização e da preparação de Production.
+Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
-1. Retomar **FIN-PR-11**: preparar HML, reconciliar migrations 035–045 e homologar
-   Containers, cada operação remota com autorização específica.
-2. **FIN-PR-12**: exportação específica de cliente — ainda não iniciado.
-3. **FIN-PR-13**: testes integrados, HML e conciliação — ainda não iniciado.
+### Fila
+
+1. **FIN-PR-13**: testes integrados, HML e conciliação — próximo.
+2. **Homologação completa E2E** no Preview ligado ao HML, cobrindo FIN-PR-11
+   (nove fluxos de Containers), FIN-PR-12 e FIN-PR-13.
+3. Manual de utilização e preparação de Production (035–045 em Production é gate
+   próprio, com backup novo).
 
 ### Pausadas
 
-- `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
-  lacunas documentais remanescentes depois da integração, sem reabrir auditorias
-  concluídas.
-- `CHECK-UP-REC-01` e `CHECK-UP-E2E-01`: aguardam o gate autorizado de preparação
-  de HML.
+- `DOC-MASTER-01/B2`: reavaliar só lacunas documentais remanescentes.
+- `CHECK-UP-E2E-01`: entra na homologação completa.
 - Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
 
 Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
@@ -148,7 +149,9 @@ para a última evidência de integração.
    automação da Vercel sem homologação real. Migration 045 continua ausente em
    HML/Production, que estavam na 034 no diagnóstico de 05/11. Próximo gate após
    WORKFLOW-01: preparar HML e homologar Containers.
-4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
+4. **FIN-PR-12 implementado (não homologado):** botão "Excel do cliente" no
+   Fechamento; [estado e evidências](docs/ESTADO_DO_PROJETO.md#fin-pr-12--excel-do-cliente-modelo-dynamis-05112026).
+   Escopo aprovado: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
    efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título
    “Fechamento – quinzena/mês”, ordem por colaborador/data e aba resumo por
