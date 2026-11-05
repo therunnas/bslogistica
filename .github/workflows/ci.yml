@@ -42,6 +42,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Validar workflow documental
+        run: npm run check:workflow
+
       - name: Teste dias-especiais
         run: npm run test:dias-especiais
 
@@ -225,6 +228,9 @@ jobs:
           npm run test:container-integracao
           npm run test:container-intencao
           npm run test:container-telas
+
+      - name: Teste workflow documental
+        run: npm run test:workflow
 
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio
