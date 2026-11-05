@@ -302,10 +302,25 @@ funções Conferente, Ajudante, Serviços Gerais e Operador, diárias de R$ 210 
   o ajuste: R$ 928,13. O centavo vem de arredondar 9,375 por linha (9,38 × 3 = 28,14) contra
   arredondar 28,125 uma vez (28,13). Nenhuma fatura foi afetada, e nenhum cálculo está errado:
   o cartão por cliente é uma soma de apontamentos, não a receita consolidada.
-- **I (P3, decisão pendente).** A margem do Dashboard usa a receita total (inclui adicionais
+- **I (corrigido no [PR #104](https://github.com/therunnas/bslogistica/pull/104), aberto).** A margem do Dashboard usa a receita total (inclui adicionais
   de serviço e Containers) contra um **custo que só soma os apontamentos**; o custo de Containers
   não entra. A margem do período fica superestimada quando há Containers. Não corrigido: depende
   de decisão da BS sobre onde exibir o custo de Containers.
 - **H (corrigido em PR separado).** Rótulos de vigência de tarifas e diárias individuais agora
   dizem "(fim exclusivo)".
 - **J (dependência).** O modelo de e-mail do convite pode consumir o link no GET (ver acima).
+
+## Sessão 15 (05/11/2026)
+
+- **Achado I:** o Dashboard e os Relatórios agora somam o custo dos serviços de Containers
+  (`cost_total_cents` do serviço, não cancelados, executados no período, sem duplicar o custo por
+  participante) ao custo do período. Reprodução no HML (novembro): custo R$ 2.327,18 → R$ 2.367,18,
+  margem R$ 4.643,15 → R$ 4.603,15, receita inalterada (R$ 6.970,33). O cartão "Margem por cliente"
+  passou a dizer que é só de apontamentos, o que também explica o centavo do achado G. Fatura,
+  custo persistido, Fechamento e migrations não mudaram. Mesma classe, fora deste PR: a prévia de
+  margem do Faturamento e o Fechamento ainda mostram custo só de apontamentos (a fatura emitida
+  já inclui os Containers).
+- **Achado H:** PR #102 mergeado (`b63d33b`).
+- **Achado J, configuração real de Auth lida** (somente leitura): ver
+  [plano de Production](../runbooks/producao-034-045.md), seção 1.2. O conteúdo dos modelos de e-mail
+  e a expiração continuam dependendo do administrador do Supabase.

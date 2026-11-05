@@ -21,6 +21,36 @@ condições comuns, em [Runbooks](README.md).
 - Motor por vigência ligado em Production desde 29/10 e resolução por função/período
   **desligada** (último relato; reconferir por leitura antes da janela).
 
+### 1.1 Inventário de Production lido em 05/11/2026 (somente leitura)
+
+Banco de 14 MB, **sem dados de negócio**: 0 clientes, contratos, colaboradores, operações,
+turnos, folhas, lançamentos, faturas e adicionais. Há 3 contas em `auth.users` (1 fator MFA),
+10 perfis, 9 papéis, 33 registros de auditoria administrativa e 1 de auditoria financeira. Motor
+por vigência ligado. Extensões: `btree_gist`, `pgcrypto`, `uuid-ossp`, `pg_stat_statements`,
+`supabase_vault`. Consequência: a verificação "valores iguais antes e depois" é trivial hoje
+(somas = 0) e o risco financeiro da implantação é baixo; o risco real é de **catálogo, grants,
+RLS e Auth**. Se alguém lançar dados antes da janela, a linha de base precisa ser refeita.
+
+### 1.2 Configuração de Auth lida em 05/11/2026 (somente leitura, `config pull --dry-run`)
+
+| Item                                             | HML `qbnfcmrxmssnwkhaitgd`                                         | Production `ehkduqokntemtmqzdrbd`                                            |
+| ------------------------------------------------ | ------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Site URL                                         | `https://bs-logistica-sistema-git-staging-bslogisticas.vercel.app` | `https://admin.bslogisticas.com.br`                                          |
+| URLs de redirecionamento adicionais              | nenhuma                                                            | nenhuma                                                                      |
+| Cadastro público (`enable_signup`)               | desligado                                                          | desligado                                                                    |
+| Confirmação de e-mail                            | ligada                                                             | ligada                                                                       |
+| Intervalo mínimo entre e-mails / limite por hora | 1 min / 30                                                         | 1 min / 30                                                                   |
+| SMTP                                             | Resend, `smtp.resend.com:465`, remetente de homologação            | Resend, `smtp.resend.com:587`, remetente `nao-responda@` do domínio de envio |
+| MFA TOTP                                         | inscrição e verificação ligadas                                    | inscrição e verificação ligadas                                              |
+
+**Não foi possível ler por este caminho** (dependem do administrador do Supabase, no Dashboard
+em Authentication): o **conteúdo** dos modelos de e-mail de **convite** e de **recuperação**
+(o link precisa apontar para `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`
+na recuperação; o convite precisa de um link que **não consuma o token no GET**, ver achado J);
+o **tempo de expiração** do link (`mailer_otp_exp`); a **autenticação do domínio de envio**
+(SPF/DKIM no provedor); e se o Site URL de HML (um Preview `git-staging`) é o ambiente que se quer
+usar nos links de homologação. Nada foi enviado nem alterado.
+
 ## 2. Princípios
 
 1. Aplicar **somente** migrations versionadas, **nunca** editar migration já aplicada.
@@ -57,6 +87,33 @@ condições comuns, em [Runbooks](README.md).
 4. Guardar o backup em local controlado pela BS; registrar quem o guarda.
 5. Registrar a data/hora do dump: o que for gravado depois dela **se perde** numa restauração
    completa. Por isso a janela não deve ter escrita de usuários.
+
+### 4.1 Backup realizado e restauração comprovada (05/11/2026)
+
+Feito **sem alterar Production** (dump com snapshot consistente; só leitura). Local:
+`~/bs-backups-producao/2026-11-05-034/` na máquina de quem executou, permissão 700, **fora do
+Git**; arquivos cifrados (AES-256-CBC com PBKDF2) e senha guardada no Chaveiro do macOS (item
+`bs-backup-producao-2026-11-05-034`). Conteúdo: esquema de `public`, dados de `public`, dados
+de `auth`, histórico `supabase_migrations` e papéis do cluster. Os SHA-256 dos arquivos em claro
+foram conferidos depois de decifrar (5/5), e o texto em claro foi apagado. **Falta uma segunda
+cópia em outro local protegido**, decisão da pessoa responsável: um backup só no notebook não
+é suficiente para a janela.
+
+Restauração em Supabase **local isolado** (projeto e portas próprios), nesta ordem: extensões
+`btree_gist`, `pgcrypto`, `uuid-ossp`; papéis; esquema de `public`; tabela e dados de
+`supabase_migrations`; dados de `public`; dados de `auth`. Ajustes necessários (registrar no
+procedimento real): executar como `supabase_admin` (donos de função e `SET ROLE` do papel
+`bslog_rpc_operacional`); criar as extensões antes do esquema (restrições de exclusão usam
+`gist` sobre `uuid`); criar `supabase_migrations.schema_migrations` antes dos dados; a tabela
+transitória `auth.one_time_tokens` diverge entre versões do GoTrue (a coluna `expires_at` não
+existe no local) e foi a **única** falha, sem impacto (são tokens efêmeros).
+
+Resultado: head `20261101120000`, **todas as contagens e somas iguais às de Production** (profiles
+10, user_roles 9, admin_audit_log 33, financial_terms_audit 1, auth.users 3, mfa_factors 1, demais
+tabelas 0, motor ligado), e **catálogo idêntico**: 21 tabelas, 120 funções, 65 gatilhos, 70 políticas,
+59 índices, 123 restrições, 21 tabelas com RLS e o mesmo `md5` do código de todas as funções
+de `public` (`9668570d9a589b4be7f3b5588b5276a1`). O backup é válido **enquanto Production
+não receber escrita**; qualquer cadastro novo exige um dump novo antes da janela.
 
 ## 5. Verificação de dependências e dados
 

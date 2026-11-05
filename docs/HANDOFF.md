@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | Finalização das pendências de HML e preparação para liberação (sessão 14)                                                                                                                         |
-| Gate atual                | Matriz E2E em HML fechada (27 PASS com ressalvas); aguarda revisão humana e decisão sobre Production                                                                                              |
-| Último gate concluído     | PR #101 (documental) mergeado em `e7f77b0`; A05 e E06 resolvidos; manual e plano de Production redigidos                                                                                          |
-| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                                                                                                         |
-| Branch                    | `docs/sessao-14-manual-e-producao` (a partir de `origin/main` `e7f77b0`); correção H em `fix/vigencia-fim-exclusivo`                                                                              |
-| Base                      | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (`origin/main`, squash do PR #101)                                                                                                                     |
-| HEAD validado             | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (main); esta etapa só altera documentação                                                                                                              |
-| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                                                                                            |
-| PR                        | [#101 — mergeado](https://github.com/therunnas/bslogistica/pull/101); [#102 — correção H, aberto](https://github.com/therunnas/bslogistica/pull/102); PR desta documentação, sem merge automático |
-| Ambiente-alvo             | Stack local isolada (e-mail capturado) e HML `qbnfcmrxmssnwkhaitgd` (045, resolução OFF); Production (034) só lida                                                                                |
-| Última ação comprovada    | Stack local encerrada; Production na 034, `/login` 200 e rotas protegidas redirecionando; HML sem alteração nesta sessão                                                                          |
-| Próxima ação exata        | Revisar os PRs, decidir o risco de Production e autorizar o plano 034 → 045 (backup novo primeiro)                                                                                                |
+| Campo                     | Valor                                                                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Etapa                     | Estabilização e pré-Production (sessão 15)                                                                                                                                                      |
+| Gate atual                | Backup de Production restaurado e verificado; PRs #103 (docs) e #104 (achado I) abertos; aguarda revisão e decisão de implantar                                                                 |
+| Último gate concluído     | PR #102 mergeado em `b63d33b`; backup novo de Production (034) criado, cifrado e restaurado em ambiente isolado                                                                                 |
+| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                                                                                                       |
+| Branch                    | `docs/sessao-14-manual-e-producao` (PR #103); correção I em `fix/dashboard-custo-containers` (PR #104)                                                                                          |
+| Base                      | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (`origin/main`, squash do PR #101)                                                                                                                   |
+| HEAD validado             | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (main); esta etapa só altera documentação                                                                                                            |
+| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                                                                                          |
+| PR                        | [#103](https://github.com/therunnas/bslogistica/pull/103) docs e [#104](https://github.com/therunnas/bslogistica/pull/104) achado I, ambos abertos, sem merge automático; #101 e #102 mergeados |
+| Ambiente-alvo             | Production (034) só lida e copiada (dump); HML e stacks locais isoladas; nada aplicado                                                                                                          |
+| Última ação comprovada    | Restauração do backup: head 034, contagens e catálogo idênticos aos de Production (md5 das funções igual)                                                                                       |
+| Próxima ação exata        | Revisar e mergear #103 e #104; segunda cópia do backup; confirmar modelos de e-mail no Dashboard; então autorizar 035–045                                                                       |
 
 ## Evidências
 
@@ -64,6 +64,14 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   novo achado I (margem do Dashboard sem custo de Containers) e dependência J (modelo de e-mail
   do convite). Manual de uso e plano 034 → 045 redigidos.
 
+- Sessão 15: PR #102 mergeado (`b63d33b`). Achado I corrigido no PR #104 (custo de Containers
+  na margem do Dashboard e dos Relatórios; 67/67 suítes, lint e tsc). Manual corrigido
+  (Presente/Falta/Substituição; Faturamento; Relatórios) e runbook corrigido (os scripts
+  `comparar-catalogo-*.sh` só operam no local). Config de Auth de HML e Production lida por
+  `supabase config pull --dry-run` (nada gravado). **Backup novo de Production** em
+  `~/bs-backups-producao/2026-11-05-034/` (cifrado, senha no Chaveiro) com restauração local
+  comprovada; Production não tem dados de negócio.
+
 ## Migrations por ambiente
 
 - Esta etapa não criou nem aplicou migration.
@@ -92,10 +100,10 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   desde o FIN-PR-01), mas o merge em `main` publica antes da CI. Opções: manter
   (a compatibilidade 034 → 045 está testada), conter por rollback na Vercel com
   acesso administrativo, ou preparar 035–045 em Production com backup novo.
-- Pendências reais: revisão humana; confirmar os **modelos de e-mail do Dashboard**
-  (convite e recuperação) em HML e Production; decisão sobre o achado I (custo de Containers
-  na margem do Dashboard) e merge do PR #102; decisão e autorização para implantar 035–045 em
-  Production, com backup novo e restaurável.
+- Pendências reais: revisão humana dos PRs #103 e #104; **segunda cópia** do backup em outro
+  local protegido; conferir no Dashboard do Supabase os **modelos de e-mail** de convite e
+  recuperação, a **expiração** do link e a autenticação do domínio de envio (ver runbook, 1.2);
+  decisão e autorização para implantar 035–045 em Production, com dump novo se houver escrita.
 - Dados sintéticos em HML, com faturas emitidas (imutáveis), exigem tarefa própria de
   limpeza. Regra de arredondamento da HE aprovada e documentada na sessão 13.
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
@@ -111,5 +119,5 @@ Production 035–045**.
    Vercel, registrando o deployment atual para reversão.
 3. Revisão humana da matriz, do [manual](MANUAL_DE_USO.md) e do
    [plano de Production](runbooks/producao-034-045.md); decidir o achado I e o PR #102.
-4. Confirmar os modelos de e-mail do Dashboard de HML e Production.
+4. Confirmar os modelos de e-mail do Dashboard de HML e Production (checklist no runbook).
 5. Não declarar o projeto finalizado.
