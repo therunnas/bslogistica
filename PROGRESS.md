@@ -26,9 +26,10 @@ faturamento por período e relatórios. Duas trilhas de uso:
 ## Tarefa ativa única
 
 **WORKFLOW-01 — padronização definitiva do desenvolvimento.** Branch
-`docs/workflow-01`, baseada em `main` no merge do PR #96. Objetivo: integrar o
-fluxo normativo, inventário de ambientes, handoff e checks documentais, sem
-alterar ambiente remoto. O estado e a próxima ação exatos ficam no
+`docs/workflow-01`, baseada em `main` no merge do PR #96, publicada no
+[PR Draft #97](https://github.com/therunnas/bslogistica/pull/97). Objetivo:
+integrar o fluxo normativo, inventário de ambientes, handoff e checks
+documentais, sem alterar ambiente remoto. O estado e a próxima ação exatos ficam no
 [HANDOFF](docs/HANDOFF.md).
 
 ### Fila após WORKFLOW-01

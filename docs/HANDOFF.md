@@ -9,16 +9,16 @@ estado factual detalhado permanece em
 
 ## Identificação
 
-| Campo                  | Valor                                                                                |
-| ---------------------- | ------------------------------------------------------------------------------------ |
-| Etapa                  | WORKFLOW-01 — padronização definitiva do desenvolvimento                             |
-| Gate atual             | Implementação e validação local antes do PR Draft                                    |
-| Branch                 | `docs/workflow-01`                                                                   |
-| Base                   | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)                           |
-| PR                     | Pendente de abertura nesta sessão                                                    |
-| Ambiente-alvo          | Nenhum ambiente remoto; somente repositório e CI sem secrets                         |
-| Última ação comprovada | Preflight e diagnóstico de Git, GitHub, Vercel e Supabase concluídos em modo leitura |
-| Próxima ação exata     | Validar documentação e controles, criar commits, push normal e abrir PR Draft        |
+| Campo                  | Valor                                                                      |
+| ---------------------- | -------------------------------------------------------------------------- |
+| Etapa                  | WORKFLOW-01 — padronização definitiva do desenvolvimento                   |
+| Gate atual             | PR Draft aberto; aguardar CI e revisão independente                        |
+| Branch                 | `docs/workflow-01`                                                         |
+| Base                   | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)                 |
+| PR                     | [#97 — Draft](https://github.com/therunnas/bslogistica/pull/97)            |
+| Ambiente-alvo          | Nenhum ambiente remoto; somente repositório e CI sem secrets               |
+| Última ação comprovada | Commits `9926622` e `ae2f319` publicados; PR #97 Draft aberto              |
+| Próxima ação exata     | Conferir CI do novo HEAD e solicitar revisão independente; não fazer merge |
 
 ## Evidências
 
@@ -28,6 +28,12 @@ estado factual detalhado permanece em
 - Supabase HML e Production distintos, ambos com migration head 034.
 - Migrations 035–045 pendentes remotamente; migration 045 presente no Git.
 - Nenhuma homologação real dos Containers foi comprovada.
+- TDD documental: RED com 2/4 testes falhando pelo motivo esperado; GREEN 4/4.
+- Todos os 64 scripts Node `test:*`, lint, TypeScript, Prettier, check documental
+  e `git diff --check` passaram.
+- Build padrão Turbopack ficou bloqueado por `Operation not permitted` ao abrir
+  porta interna, inclusive fora da sandbox. Build alternativo Webpack passou; o
+  build padrão da CI do PR é evidência separada e ainda precisa ser conferido.
 
 ## Migrations por ambiente
 
@@ -65,7 +71,9 @@ estado factual detalhado permanece em
 
 1. Ler [WORKFLOW.md](WORKFLOW.md) e [AMBIENTES.md](AMBIENTES.md).
 2. Conferir `git status`, `git rev-parse HEAD`, `origin/main` e o PR deste handoff.
-3. Confirmar que WORKFLOW-01 continua sendo a única tarefa ativa.
-4. Se o PR estiver integrado, solicitar autorização para preparar HML e homologar
+3. Confirmar que WORKFLOW-01 continua sendo a única tarefa ativa e revisar os
+   checks do HEAD exato do PR #97.
+4. Se o PR estiver integrado com autorização, solicitar autorização separada
+   para preparar HML e homologar
    FIN-PR-11 Containers; não iniciar FIN-PR-12/13 antes disso.
 5. Se houver divergência, atualizar diagnóstico e este checkpoint antes de agir.

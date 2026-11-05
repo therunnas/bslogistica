@@ -37,10 +37,23 @@ GitHub Environments `Preview` e `Production` existiam sem protection rules. A
 publicação automática de `main` é risco operacional aberto; sua contenção exige
 configuração administrativa futura e não faz parte do PR documental.
 
-**Tarefa ativa:** WORKFLOW-01, branch `docs/workflow-01`, criando o processo em
+**Tarefa ativa:** WORKFLOW-01, branch `docs/workflow-01`, publicada no
+[PR Draft #97](https://github.com/therunnas/bslogistica/pull/97). Os commits
+`9926622` e `ae2f319` criaram o processo em
 [WORKFLOW.md](WORKFLOW.md), o inventário em [AMBIENTES.md](AMBIENTES.md) e o
 checkpoint em [HANDOFF.md](HANDOFF.md), além de controles locais/CI sem secrets.
-O próximo gate depois da integração é autorização específica para preparar HML,
+
+**Validação local do WORKFLOW-01:** RED do validador com 2/4 casos falhando por
+campo obrigatório vazio e link local quebrado; GREEN 4/4. Todos os 64 scripts
+Node `test:*`, lint, TypeScript, Prettier, validação de referências e diff check
+passaram. O build padrão Turbopack permaneceu bloqueado por `Operation not
+permitted` ao abrir porta interna, inclusive fora da sandbox; o build alternativo
+Webpack passou. O build padrão e o job SQL da CI do PR são provas remotas
+separadas, ainda a conferir no novo HEAD. Nenhum SQL local ou remoto foi executado
+por esta etapa.
+
+Próximo gate: CI e revisão independente do PR #97, ainda Draft. Depois da
+integração autorizada, solicitar autorização específica para preparar HML,
 reconciliar 035–045 e homologar Containers. Não iniciar FIN-PR-12/13 antes desse
 gate.
 
