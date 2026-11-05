@@ -213,7 +213,7 @@ verificar(
 verificar(
   "T10. rótulo da vigência",
   [rotuloDaVigencia(TARIFAS[0]), rotuloDaVigencia(TARIFAS[1])],
-  ["desde 01/01/2026 até 01/04/2026", "desde 01/04/2026"],
+  ["desde 01/01/2026 até 01/04/2026 (fim exclusivo)", "desde 01/04/2026"],
 );
 verificar(
   "T11. pendência de classificação só com a resolução ligada; falta nunca é pendente",
