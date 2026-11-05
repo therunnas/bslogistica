@@ -7,7 +7,9 @@ reabrir decisões aprovadas nem transformar documentação em autorização.
 O inventário factual dos ambientes fica em [AMBIENTES.md](AMBIENTES.md), o
 checkpoint operacional atual em [HANDOFF.md](HANDOFF.md), o estado mutável do
 sistema em [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md) e a fila de trabalho em
-[PROGRESS.md](../PROGRESS.md).
+[PROGRESS.md](../PROGRESS.md). O formato obrigatório dos prompts de sessão está em
+[PADRAO_DE_PROMPTS.md](PADRAO_DE_PROMPTS.md); ele delimita a autorização da
+sessão, mas não dispensa nenhum gate deste documento.
 
 ## Princípios obrigatórios
 

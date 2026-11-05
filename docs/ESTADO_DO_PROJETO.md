@@ -5,7 +5,56 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
-## Estado vigente — WORKFLOW-01 (05/11/2026)
+## Estado vigente — FIN-PR-11, HML na 045 (05/11/2026)
+
+**Git:** [PR #97](https://github.com/therunnas/bslogistica/pull/97) (WORKFLOW-01)
+mergeado por squash em `314c08cb20e9a32dd10b4a0665e1be7dad108264`, condicionado ao
+head `3427d1c` com CI verde. CI de `main` no merge (run 42025322827): `validar` e
+`sql-local` com sucesso. FIN-PR-12 e FIN-PR-13 não foram iniciados.
+
+**Aplicação:** a Vercel publicou `314c08c` em Production
+(`dpl_ALDY5SPhRiWMiHW3qr6xDS3s74hk`, pronto às 12:14:11 UTC), de novo **antes**
+da CI de `main` (12:16:36 UTC). O merge alterou só documentação, CI e scripts de
+validação; o código de aplicação publicado é o mesmo de `eb8cec9`. O domínio
+respondeu 200 com CSP apontando para o Supabase de Production.
+
+**Banco:** HML `qbnfcmrxmssnwkhaitgd` na **045** (`20261112120000`) desde
+05/11/2026 13:03 UTC, por aplicação autorizada de 035–045 (sessão 05). Production
+`ehkduqokntemtmqzdrbd` continua na 034 (`20261101120000`), sem nenhuma alteração.
+
+**Backup:** `supabase backups list` vazio e PITR desligado em HML e Production.
+Em 05/11/2026 (sessão 03) foi gerado backup lógico cifrado do HML na 034 e
+restaurado em instância local descartável, com catálogo, ACL, RLS e contagens
+iguais ao HML; hash, cobertura e ajustes de restauração no [HANDOFF](HANDOFF.md).
+O último backup lógico de Production continua sendo o de 23/10/2026, anterior à
+`025` (ver "Backups de Production" adiante).
+
+**Preview → banco:** pela API da Vercel, `NEXT_PUBLIC_SUPABASE_URL` aponta para o
+HML no Preview de todas as branches e no override da branch `staging`, e para
+Production no escopo Production. O Preview genérico não tem `service_role` nem
+segredo de recuperação; os Containers não dependem deles. Detalhes e limites em
+[AMBIENTES.md](AMBIENTES.md#variáveis-por-escopo).
+
+**Risco de implantação:** a 036 troca a regra de HE e sábado para lançamentos
+novos ou editados (decisão do proprietário de 30/10/2026), sem recalcular linhas
+existentes; a 041 e a 042 nascem desligadas. Implantar 035–045 em Production é
+gate próprio, depois da homologação.
+
+**Migrations em HML:** preflight aprovado (projeto, head 034, backup e chave,
+concorrência), suíte de compatibilidade 034 → 045 com 665 asserções PASS e dry-run
+com exatamente 035–045. As 11 aplicaram em ordem, sem erro. Depois: histórico em
+50, linhas e valores financeiros existentes idênticos à linha de base, todas as
+31 tabelas de `public` com RLS, papel da RPC operacional preservado, tabelas e
+RPCs de Containers presentes e expostas pelo PostgREST, nenhuma ampliação de
+privilégio. Nenhum dado foi escrito no HML pelos testes. Detalhes no
+[HANDOFF](HANDOFF.md).
+
+**Containers:** schema disponível no HML; **não homologados**. Os 9 fluxos do
+roteiro exigem execução real no navegador, no Preview protegido por SSO.
+
+Próximo gate: homologação real de Containers no Preview ligado ao HML.
+
+## WORKFLOW-01 — histórico até o merge do PR #97 (05/11/2026)
 
 **Git:** [PR #96](https://github.com/therunnas/bslogistica/pull/96) mergeado por
 squash em `eb8cec9af11c4b0e314296ed776caf15c3764b5f`, HEAD de `main` confirmado no
@@ -37,7 +86,7 @@ GitHub Environments `Preview` e `Production` existiam sem protection rules. A
 publicação automática de `main` é risco operacional aberto; sua contenção exige
 configuração administrativa futura e não faz parte do PR documental.
 
-**Tarefa ativa:** WORKFLOW-01, branch `docs/workflow-01`, publicada no
+**Tarefa naquele momento:** WORKFLOW-01, branch `docs/workflow-01`, publicada no
 [PR Draft #97](https://github.com/therunnas/bslogistica/pull/97). Os commits
 `9926622` e `ae2f319` criaram o processo em
 [WORKFLOW.md](WORKFLOW.md), o inventário em [AMBIENTES.md](AMBIENTES.md) e o
@@ -57,10 +106,7 @@ ou remoto foi executado por esta etapa.
 continuidade ao HANDOFF, exigidos pelo validador. O HEAD validado vigente fica no
 [HANDOFF](HANDOFF.md).
 
-Próximo gate: CI do commit R1 e autorização de merge do PR #97, ainda Draft. Depois da
-integração autorizada, solicitar autorização específica para preparar HML,
-reconciliar 035–045 e homologar Containers. Não iniciar FIN-PR-12/13 antes desse
-gate.
+Commit R1 `4e3b0ab` e checkpoint `3427d1c` com CI verde; integrado em `314c08c`.
 
 ## FIN-PR-11C — containers na operação existente (histórico do PR #96 em 04/11/2026)
 
