@@ -19,9 +19,31 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+import { register } from "node:module";
+import { pathToFileURL } from "node:url";
+
+const hooks = `
+import { pathToFileURL } from "node:url";
+const SRC = ${JSON.stringify(pathToFileURL(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src") + path.sep).href)};
+export async function resolve(specifier, context, nextResolve) {
+  if (specifier.startsWith("@/")) return nextResolve(new URL(specifier.slice(2) + ".ts", SRC).href, context);
+  try {
+    return await nextResolve(specifier, context);
+  } catch (erro) {
+    const semExtensao = /^\\.\\.?\\//.test(specifier) && !/\\.[a-zA-Z0-9]+$/.test(specifier);
+    if (erro?.code === "ERR_MODULE_NOT_FOUND" && semExtensao) return nextResolve(specifier + ".ts", context);
+    throw erro;
+  }
+}
+`;
+register(`data:text/javascript,${encodeURIComponent(hooks)}`);
+process.env.NEXT_PUBLIC_SUPABASE_URL = "https://pg-simulado.invalid";
+process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "chave-inerte-apenas-de-teste";
+
 const ler = (p) => readFileSync(path.join(RAIZ, p), "utf8");
 const modulo = await import("../src/lib/custo-containers.ts");
 const { somarCustoDeContainers, ehSchemaSemContainers } = modulo;
+const { lerServicosDoPeriodo } = await import("../src/lib/custo-containers-dados.ts");
 
 const A = "5c4a0000-0000-4000-8000-0000000000a1";
 const B = "5c4a0000-0000-4000-8000-0000000000b1";
@@ -139,6 +161,7 @@ test("Dashboard e Relatórios somam o custo de Containers ao custo; o cartão po
 test("o hook só LÊ container_services (sem escrita, sem RPC) e usa o mesmo critério da receita", () => {
   const f = ler("src/lib/custo-containers-dados.ts");
   assert.match(f, /from\("container_services"\)/);
+  assert.match(f, /export async function lerServicosDoPeriodo/);
   assert.match(f, /gte\("executed_on"/);
   assert.match(f, /lte\("executed_on"/);
   assert.match(f, /is\("canceled_at", null\)/);
@@ -149,4 +172,64 @@ test("o hook só LÊ container_services (sem escrita, sem RPC) e usa o mesmo cri
 test("script npm e passo de CI", () => {
   assert.match(ler("package.json"), /"test:custo-containers"/);
   assert.match(ler(".github/workflows/ci.yml"), /npm run test:custo-containers/);
+});
+
+// ---- Compatibilidade com o schema 034 (Production): reproduz o PostgREST real sobre tabela inexistente.
+// Medido num banco restaurado do backup de Production (034): o GET devolve 404/PGRST205, mas o HEAD
+// de contagem devolve 204 SEM erro e com count nulo. Sem tratamento, o paginador lançava
+// CONTAGEM_INVALIDA e o Dashboard mostrava "custo de Containers indisponível" em Production.
+function clienteSem045() {
+  const consulta = (head) => {
+    const c = {
+      select: () => c,
+      gte: () => c,
+      lte: () => c,
+      is: () => c,
+      gt: () => c,
+      order: () => c,
+      limit: () => c,
+      then: (ok, ko) =>
+        Promise.resolve(
+          head
+            ? { data: null, error: null, count: null }
+            : {
+                data: null,
+                error: {
+                  code: "PGRST205",
+                  message:
+                    "Could not find the table 'public.container_services' in the schema cache",
+                },
+              },
+        ).then(ok, ko),
+    };
+    return c;
+  };
+  return { from: () => ({ select: (_c, opcoes) => consulta(opcoes?.head === true) }) };
+}
+test("schema 034 (sem container_services): o PostgREST real não vira erro, vira lista vazia", async () => {
+  assert.deepEqual(await lerServicosDoPeriodo(clienteSem045(), "2026-11-01", "2026-11-30"), []);
+});
+test("erro que NÃO é de tabela ausente continua sendo erro (permissão negada)", async () => {
+  const c = {
+    from: () => ({
+      select: () => {
+        const q = {
+          gte: () => q,
+          lte: () => q,
+          is: () => q,
+          gt: () => q,
+          order: () => q,
+          limit: () => q,
+          select: () => q,
+        };
+        q.then = (ok, ko) =>
+          Promise.resolve({
+            data: null,
+            error: { code: "42501", message: "permission denied for table container_services" },
+          }).then(ok, ko);
+        return q;
+      },
+    }),
+  };
+  await assert.rejects(() => lerServicosDoPeriodo(c, "2026-11-01", "2026-11-30"));
 });
