@@ -33,6 +33,7 @@ import { readFileSync } from "node:fs";
 
 import { agregarFechamento } from "../src/lib/fechamento/agregar.ts";
 import { baixarXlsx, ROTA_DO_XLSX } from "../src/lib/fechamento/download.ts";
+import { descreverErro } from "../src/lib/fechamento/http.ts";
 import {
   COLUNAS_DO_RESUMO,
   COLUNAS_DOS_LANCAMENTOS,
@@ -377,8 +378,8 @@ igual(
     "Beatriz Alves|2026-10-02|Diária — presente",
     `Beatriz Alves|-|${ROTULO_DO_AJUSTE_ACUMULADO}`,
     "Carlos Dias|2026-10-05|Diária — substituto",
-    "-|2026-10-07|Serviço avulso — Container 40 pés — descarga (ref. CNT-001)",
-    "-|2026-10-08|Serviço avulso — Container 20 pés — ova — 08/10/2026 a 09/10/2026",
+    "-|2026-10-07|Adicional de serviço — Container 40 pés — descarga (ref. CNT-001)",
+    "-|2026-10-08|Adicional de serviço — Container 20 pés — ova — 08/10/2026 a 09/10/2026",
     `-|-|${ROTULO_DO_AJUSTE_JA_FATURADO}`,
   ],
 );
@@ -422,7 +423,7 @@ igual(
     "2026-10-07",
     "CD Norte",
     null,
-    "Serviço avulso — Container 40 pés — descarga (ref. CNT-001)",
+    "Adicional de serviço — Container 40 pés — descarga (ref. CNT-001)",
     null,
     0,
     0,
@@ -475,6 +476,26 @@ verificar(
 );
 const decomposicao = structuredClone(dados);
 decomposicao.detalhes[0].extraCentavos += 1;
+igual(
+  "M16b. a recusa vira 422 dado-inconsistente (não 500), sem detalhe na resposta",
+  [
+    descreverErro(erroDe(() => tabelaDosLancamentos(adulterado))).status,
+    descreverErro(erroDe(() => tabelaDosLancamentos(adulterado))).corpo.erro.codigo,
+  ],
+  [422, "dado-inconsistente"],
+);
+verificar(
+  'M19. vocabulário do projeto: adicionais de serviço, nunca "serviço avulso"',
+  /servi[çc]o avulso/i.test(
+    JSON.stringify([lancamentos.linhas, resumo.linhas, ROTULO_DOS_SERVICOS]),
+  ),
+  false,
+);
+verificar(
+  "M20. linha do resumo: Adicionais de serviço",
+  ROTULO_DOS_SERVICOS,
+  "Adicionais de serviço",
+);
 verificar(
   "M17. componentes que não somam o cobrado: recusa a exportação",
   erroDe(() => tabelaDosLancamentos(decomposicao)) instanceof ErroDaExportacaoDoCliente,

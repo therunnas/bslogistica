@@ -53,7 +53,7 @@ function entregar(blob: Blob, nome: string) {
  *
  * O XLSX é gerado no servidor: daqui só saem o recorte e a assinatura dos dados
  * que a tela mostra. Há dois: o interno (com custo e margem) e o do cliente
- * (modelo Dynamis: lançamentos, serviços avulsos e resumo, sem custo nem
+ * (modelo Dynamis: lançamentos, adicionais de serviço e resumo, sem custo nem
  * margem). O CSV é montado a partir do MESMO `FechamentoData` que a tela
  * exibe (`exportacao.ts`), sem reconsultar nem recalcular.
  */
@@ -129,7 +129,7 @@ export function ExportarFechamento({
         className="h-10 rounded-xl"
         disabled={!disponivel || baixando !== null}
         onClick={() => void baixarExcel("cliente")}
-        title="Planilha para conferência do cliente: lançamentos, serviços avulsos e resumo por colaborador, sem custo nem margem."
+        title="Planilha para conferência do cliente: lançamentos, adicionais de serviço e resumo por colaborador, sem custo nem margem."
       >
         {baixando === "cliente" ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

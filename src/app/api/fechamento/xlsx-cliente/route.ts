@@ -27,7 +27,7 @@ import { gerarXlsxDoCliente } from "@/lib/fechamento/xlsx-cliente";
  * POST /api/fechamento/xlsx-cliente
  *
  * Corpo JSON: `{ cliente, inicio, fim, assinatura }` — o mesmo de `/api/fechamento/xlsx`. Devolve
- * o XLSX PARA O CLIENTE (modelo Dynamis): lançamentos por colaborador e data, serviços avulsos e
+ * o XLSX PARA O CLIENTE (modelo Dynamis): lançamentos por colaborador e data, adicionais de serviço e
  * resumo por colaborador, sem custo, resultado nem margem.
  *
  * Mesmo encadeamento da rota interna: acesso → disponibilidade → corpo → `carregarFechamento` →

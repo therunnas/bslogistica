@@ -8,7 +8,7 @@
  *
  *  - lançamento: diária, hora extra, domingo/feriado e adicional diário já decompostos pelo núcleo
  *    (`componentes-financeiros.ts` garante que a soma é o cobrado);
- *  - serviço avulso (adicional de serviço, inclusive container): uma linha própria cada;
+ *  - adicional de serviço (inclusive container, o serviço avulso do FIN-PR-11): uma linha cada;
  *  - arredondamento acumulado: o ajuste que o banco devolveu, por colaborador, e o já faturado.
  *
  * O que se soma aqui é só apresentação: o total de cada coluna e de cada colaborador, em centavos
@@ -21,6 +21,7 @@
 
 import { dateBR } from "../format";
 import { somarCentavos } from "./centavos";
+import { ErroDeDadoFinanceiro } from "./erros";
 import type { ColunaExportada, ValorExportado } from "./exportacao";
 import { diasDoMes, ehMesInteiro } from "./periodo";
 import {
@@ -31,8 +32,11 @@ import {
 } from "./tipos";
 import { centesimosDeHora } from "./valores";
 
-/** O arquivo não pode ser entregue: as somas não fecham com o Fechamento. */
-export class ErroDaExportacaoDoCliente extends Error {
+/**
+ * O arquivo não pode ser entregue: as somas não fecham com o Fechamento. É inconsistência de dado
+ * (422 `dado-inconsistente` na rota), não falha do servidor.
+ */
+export class ErroDaExportacaoDoCliente extends ErroDeDadoFinanceiro {
   constructor(mensagem: string) {
     super(mensagem);
     this.name = "ErroDaExportacaoDoCliente";
@@ -81,7 +85,7 @@ export function tituloDoFechamento(inicio: string, fim: string): string {
 
 export const ROTULO_DO_SUBTOTAL = "Subtotal (linhas visíveis no filtro)";
 export const ROTULO_DO_TOTAL_DO_FECHAMENTO = "Total do fechamento";
-export const ROTULO_DOS_SERVICOS = "Serviços avulsos";
+export const ROTULO_DOS_SERVICOS = "Adicionais de serviço";
 export const ROTULO_DO_AJUSTE_ACUMULADO = "Ajuste de arredondamento das horas extras";
 export const ROTULO_DO_AJUSTE_JA_FATURADO = "Ajuste de arredondamento já faturado";
 
@@ -186,7 +190,7 @@ function componentesDoLancamento(d: LinhaDetalhe): Componentes {
   return valores;
 }
 
-/** As linhas na ordem do cliente: colaborador, data; depois serviços avulsos e ajuste faturado. */
+/** As linhas na ordem do cliente: colaborador, data; depois adicionais de serviço e ajuste faturado. */
 function linhasDoCliente(dados: FechamentoData): LinhaDoCliente[] {
   const ordemDoColaborador = new Map(dados.colaboradores.map((c, i) => [c.employeeId, i]));
   const funcaoDoColaborador = new Map(dados.colaboradores.map((c) => [c.employeeId, c.funcao]));
@@ -274,7 +278,7 @@ function linhasDoCliente(dados: FechamentoData): LinhaDoCliente[] {
         s.inicio,
         s.operacaoId === null ? null : (nomeDaOperacao.get(s.operacaoId) ?? null),
         null,
-        `Serviço avulso — ${s.descricao}${referencia}${periodo}`,
+        `Adicional de serviço — ${s.descricao}${referencia}${periodo}`,
       ],
       horas: null,
       valores: { ...ZERO, adicional: s.valorCentavos },
@@ -326,7 +330,7 @@ function conferirTotais(dados: FechamentoData, total: Componentes): void {
 const SOMADAS_DOS_LANCAMENTOS = [6, 7, 8, 9, 10, 11] as const;
 const SOMADAS_DO_RESUMO = [2, 3, 4, 5, 6, 7, 8] as const;
 
-/** Aba de lançamentos: uma linha por diária, ajuste e serviço avulso. */
+/** Aba de lançamentos: uma linha por diária, ajuste e adicional de serviço. */
 export function tabelaDosLancamentos(dados: FechamentoData): TabelaDoCliente {
   const linhas = linhasDoCliente(dados);
   const total = linhas.reduce((soma, l) => somarComponentes(soma, l.valores), ZERO);
