@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                 |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Etapa                     | FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis)                                           |
-| Gate atual                | Gate 2 — revisão independente feita e defeitos corrigidos; aguarda CI do HEAD e aprovação do merge    |
-| Último gate concluído     | Gate 2 — validação local completa e compatibilidade 034 → 045 no `HEAD validado`                      |
-| Worktree                  | `/private/tmp/bs-fin-pr-12`                                                                           |
-| Branch                    | `feat/fin-pr-12-exportacao-dynamis`                                                                   |
-| Base                      | `a2fec9a3f336bec3cbf8d53cd35880a4625370de` (`origin/main`, merge do PR #98)                           |
-| HEAD validado             | `20092cf01560293ffcaffec3fc381a53d1140e53`; validado localmente, CI a registrar                       |
-| Alterações não commitadas | Nenhuma; este checkpoint vai no commit seguinte ao validado                                           |
-| PR                        | [#99 — Draft](https://github.com/therunnas/bslogistica/pull/99)                                       |
-| Ambiente-alvo             | Nenhum ambiente remoto alterado; CI e Preview automáticos do PR                                       |
-| Última ação comprovada    | Revisão por outro agente; 2 defeitos reproduzidos e corrigidos; 65/65 suítes; compatibilidade 685/685 |
-| Próxima ação exata        | Usuário decide o merge do PR #99; depois FIN-PR-13                                                    |
+| Campo                     | Valor                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Etapa                     | FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis)                                              |
+| Gate atual                | Gate 2 concluído — revisão independente feita, defeitos corrigidos, CI verde; aguarda aprovação do merge |
+| Último gate concluído     | Gate 2 — validação local, compatibilidade 034 → 045 e CI no `HEAD validado`                              |
+| Worktree                  | `/private/tmp/bs-fin-pr-12`                                                                              |
+| Branch                    | `feat/fin-pr-12-exportacao-dynamis`                                                                      |
+| Base                      | `a2fec9a3f336bec3cbf8d53cd35880a4625370de` (`origin/main`, merge do PR #98)                              |
+| HEAD validado             | `a01d604d18833a953d320319c99dd532cf895753`; local = remoto; CI run 42045812665 verde                     |
+| Alterações não commitadas | Nenhuma; este checkpoint vai no commit seguinte ao validado                                              |
+| PR                        | [#99 — Draft](https://github.com/therunnas/bslogistica/pull/99)                                          |
+| Ambiente-alvo             | Nenhum ambiente remoto alterado; CI e Preview automáticos do PR                                          |
+| Última ação comprovada    | CI verde no HEAD final; Preview `dpl_BTSSeJksJjfbkYokb79zGUVHD8Y5` READY (SSO)                           |
+| Próxima ação exata        | Usuário decide o merge do PR #99; depois FIN-PR-13                                                       |
 
 ## Evidências
 
