@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                          |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | Homologação em HML da integração FIN-PR-11/12/13 (sessões 11 e 12)                                             |
-| Gate atual                | Matriz E2E executada em HML: 17 PASS, 8 PARCIAL, 2 BLOQUEADO, 0 FAIL; aguarda decisões e itens de navegador    |
-| Último gate concluído     | PR #100 mergeado por squash; CI de `main` verde; matriz de 27 casos executada em HML                           |
-| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                      |
-| Branch                    | `docs/fin-pr-13-homologacao-hml` (a partir de `origin/main`; commit local, sem push)                           |
-| Base                      | `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (`origin/main`, squash do PR #100)                                  |
-| HEAD validado             | `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (código); este checkpoint só altera documentação                    |
-| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado         |
-| PR                        | [#100 — mergeado](https://github.com/therunnas/bslogistica/pull/100); sem PR para esta branch documental       |
-| Ambiente-alvo             | HML `qbnfcmrxmssnwkhaitgd` (045) com app local; Production `ehkduqokntemtmqzdrbd` (034) só lido, sem alteração |
-| Última ação comprovada    | Servidor local encerrado; dados sintéticos `E2E-S11` permanecem em HML; Production na 034 e `/login` 200       |
-| Próxima ação exata        | Decidir o risco de Production (código 045 sobre banco 034) e autorizar resolução ON e testes em navegador      |
+| Campo                     | Valor                                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Etapa                     | Homologação em HML da integração FIN-PR-11/12/13 (sessões 11 e 12)                                                     |
+| Gate atual                | Matriz E2E em HML: 25 PASS, 1 PARCIAL (A05), 1 BLOQUEADO (E06), 0 FAIL; aguarda revisão humana                         |
+| Último gate concluído     | PR #100 mergeado por squash; CI de `main` verde; matriz de 27 casos executada em HML (sessões 12 e 13)                 |
+| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                              |
+| Branch                    | `docs/fin-pr-13-homologacao-hml` (a partir de `origin/main`; PR documental)                                            |
+| Base                      | `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (`origin/main`, squash do PR #100)                                          |
+| HEAD validado             | `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (código); este checkpoint só altera documentação                            |
+| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                 |
+| PR                        | [#100 — mergeado](https://github.com/therunnas/bslogistica/pull/100); PR documental desta branch, sem merge automático |
+| Ambiente-alvo             | HML `qbnfcmrxmssnwkhaitgd` (045) com app local; Production `ehkduqokntemtmqzdrbd` (034) só lido, sem alteração         |
+| Última ação comprovada    | Resolução comercial de HML restaurada para OFF; dados sintéticos `E2E-S11` permanecem; Production na 034, `/login` 200 |
+| Próxima ação exata        | Decidir o risco de Production (código 045 sobre banco 034); fornecer Dynamis (E06) e revisão humana                    |
 
 ## Evidências
 
@@ -49,6 +49,11 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 - Execução: app Next local (porta 3100) ligado só ao HML, JWT reais, TOTP real.
   Resultados por caso e achados na matriz. Nenhum defeito financeiro encontrado;
   um achado de documentação (regra de arredondamento da HE) e quatro observações.
+- Sessão 13: resolução comercial ligada em HML só durante B02, C03 e C04 e restaurada
+  para OFF (verificado). Navegador real (Chrome): C05, D04, D05, D09 e fluxos de
+  recuperação. Microsoft Excel real (AppleScript): E03 e E04, com filtros aplicados.
+  A05: papel e auditoria pela interface; recuperação sem MFA e com um TOTP. Regra da HE
+  (15 → 30, 45 → 60) aprovada e corrigida em `ARQUITETURA.md`. Resultado 25/1/1/0.
 - Sem Preview da Vercel apontado para HML (sem acesso à Vercel). Dynamis continua
   indisponível: E06 BLOQUEADO, sem inferência.
 
@@ -80,23 +85,22 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   desde o FIN-PR-01), mas o merge em `main` publica antes da CI. Opções: manter
   (a compatibilidade 034 → 045 está testada), conter por rollback na Vercel com
   acesso administrativo, ou preparar 035–045 em Production com backup novo.
-- Pendentes por exigirem autorização ou ferramenta: resolução comercial ON (B02, C03
-  pagamento ×2, C04), navegador (D04, D05, D09, C05), Microsoft Excel (E03, E04),
-  e-mail real (A05) e planilha Dynamis (E06).
+- Pendentes: convite por e-mail (A05, exige envio real ou caixa de captura) e planilha
+  Dynamis (E06). Achados menores G (Dashboard por cliente 928,14 vs 928,13) e H
+  (`valid_to` exclusivo) sem tratamento.
 - Dados sintéticos em HML, com faturas emitidas (imutáveis), exigem tarefa própria de
-  limpeza. Arredondamento da HE (15 → 30, 45 → 60) aprovado e documentado na sessão 13.
+  limpeza. Regra de arredondamento da HE aprovada e documentada na sessão 13.
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
 
 ## Retomada
 
-Sequência: **decisão sobre Production → homologação dos itens pendentes (resolução
-ON, navegador, Excel, Dynamis) → manual de utilização → preparação controlada de
+Sequência: **decisão sobre Production → homologação dos itens pendentes (convite,
+Dynamis) → manual de utilização → preparação controlada de
 Production 035–045**.
 
 1. Confirmar `origin/main` em `91513b9` ou posterior e o head de HML (045).
 2. Decidir o risco de Production e, se for o caso, executar o rollback com acesso à
    Vercel, registrando o deployment atual para reversão.
-3. Obter autorização para ligar a resolução comercial em HML e repetir B02, C03 e C04.
-4. Executar no navegador, com credenciais de teste fornecidas pelo responsável, os
-   itens de interface e o Excel real; fornecer a Dynamis para E06.
+3. Revisão humana da matriz e do PR documental; decidir os achados G e H.
+4. Fornecer a Dynamis para E06 e definir como validar o convite por e-mail.
 5. Não declarar o projeto finalizado.

@@ -28,9 +28,10 @@ faturamento por período e relatórios. Duas trilhas de uso:
 **Homologação integrada FIN-PR-11/12/13 em HML.** O PR
 [#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em
 `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (CI de `main` verde). A matriz de 27 casos
-foi executada em HML na sessão 12: 17 PASS, 8 PARCIAL, 2 BLOQUEADO, 0 FAIL
-([resultados](docs/financeiro/homologacao-fin-pr-13.md)). Restam resolução comercial ON,
-itens de navegador, Excel real e Dynamis. Production segue na 034 com o código da
+foi executada em HML nas sessões 12 e 13: 25 PASS, 1 PARCIAL (A05, convite por
+e-mail), 1 BLOQUEADO (E06, Dynamis), 0 FAIL
+([resultados](docs/financeiro/homologacao-fin-pr-13.md)). Resolução comercial de HML
+restaurada para OFF. Production segue na 034 com o código da
 `main` publicado; a decisão sobre esse risco é o primeiro passo. O estado e a próxima
 ação exatos ficam no [HANDOFF](docs/HANDOFF.md).
 

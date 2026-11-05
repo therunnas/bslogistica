@@ -26,13 +26,17 @@ contas e dados sintéticos `E2E-S11`: admin, operacional, sem papel, admin+opera
 conta de MFA, dois clientes, dois contratos, cinco colaboradores, três operações, quatro
 turnos, calendário territorial sintético, sete serviços de Containers e duas faturas.
 
-**Execução (app local ligado só ao HML, sem Preview da Vercel):** 27 casos, 17 PASS,
-8 PARCIAL, 2 BLOQUEADO, 0 FAIL. Evidência por caso, achados e IDs para limpeza em
+**Execução (app local ligado só ao HML, sem Preview da Vercel):** 27 casos; sessão 12:
+17 PASS, 8 PARCIAL, 2 BLOQUEADO; sessão 13: 25 PASS, 1 PARCIAL (A05), 1 BLOQUEADO
+(E06), 0 FAIL. Evidência por caso, achados e IDs para limpeza em
 [Homologação integrada](financeiro/homologacao-fin-pr-13.md). Resumo: autenticação com
 TOTP real, isolamento do operacional, jornada e HE com esperados independentes, nove
 fluxos de Containers pelo banco, Fechamento por frequência, faturamento (mista e só
-Containers), imutabilidade do faturado e exportações lidas no XML. Não exercido:
-resolução ON, interface em navegador, Microsoft Excel, e-mail real e Dynamis.
+Containers), imutabilidade do faturado e exportações lidas no XML. A sessão 13
+ligou a resolução comercial em HML só para B02, C03 e C04 e a **restaurou para OFF**,
+exerceu a interface no Chrome real (C05, D04, D05, D09, recuperação) e abriu os `.xlsx`
+no Microsoft Excel real com filtros (E03, E04). Não exercido: convite por e-mail e
+Dynamis. A regra de HE (15 → 30, 45 → 60) foi corrigida em `ARQUITETURA.md`.
 **Não é homologação concluída nem declara o sistema finalizado.**
 
 ## FIN-PR-13 — integração e conciliação financeira (05/11/2026)
