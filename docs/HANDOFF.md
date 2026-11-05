@@ -10,88 +10,121 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                    |
-| ------------------------- | ------------------------------------------------------------------------ |
-| Etapa                     | WORKFLOW-01 — padronização definitiva do desenvolvimento                 |
-| Gate atual                | Revisão R1 concluída; aguardando autorização de merge do PR #97          |
-| Último gate concluído     | Gate 2 — validação local e CI no `HEAD validado`                         |
-| Worktree                  | `/private/tmp/bs-workflow-01`                                            |
-| Branch                    | `docs/workflow-01`                                                       |
-| Base                      | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)               |
-| HEAD validado             | `4e3b0ab565635fd1a7af894983f953975c48db25`; local = remoto no checkpoint |
-| Alterações não commitadas | Nenhuma                                                                  |
-| PR                        | [#97 — Draft](https://github.com/therunnas/bslogistica/pull/97)          |
-| Ambiente-alvo             | Nenhum ambiente remoto; somente repositório e CI sem secrets             |
-| Última ação comprovada    | Ajustes R1 em `4e3b0ab`, CI verde (run 42023101884)                      |
-| Próxima ação exata        | Usuário decide o merge do PR #97; até lá, Draft e sem merge              |
+| Campo                     | Valor                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| Etapa                     | FIN-PR-11 — preparação de HML e homologação de Containers                              |
+| Gate atual                | Gate 4 — preparação de HML: diagnóstico somente leitura concluído; aguarda autorização |
+| Último gate concluído     | Gate 6 e Gate 8 de WORKFLOW-01 — PR #97 integrado e encerrado                          |
+| Worktree                  | `/private/tmp/bs-workflow-01`                                                          |
+| Branch                    | `docs/fin-pr-11-preparacao-hml` (só documentação; sem push)                            |
+| Base                      | `314c08cb20e9a32dd10b4a0665e1be7dad108264` (`origin/main`)                             |
+| HEAD validado             | `314c08cb20e9a32dd10b4a0665e1be7dad108264` (`main`); CI run 42025322827 verde          |
+| Alterações não commitadas | Nenhuma; o commit local desta branch contém só documentação e o validador documental   |
+| PR                        | Nenhum aberto para esta branch; PR #97 mergeado                                        |
+| Ambiente-alvo             | HML `qbnfcmrxmssnwkhaitgd` e Preview ligado a ele, somente após autorização            |
+| Última ação comprovada    | Merge `314c08c`; diagnóstico de HML, Production, Preview e backup sem mutação          |
+| Próxima ação exata        | Pedir autorização para backup restaurável de HML e, depois, migrations 035–045 em HML  |
 
 ## Evidências
 
-- PR #96 mergeado por squash; `main` em `eb8cec9…` no preflight.
-- Production Vercel publicou o merge antes de a CI de `main` terminar.
-- `main` sem proteção/ruleset/check obrigatório na verificação de 05/11/2026.
-- Supabase HML e Production distintos, ambos com migration head 034.
-- Migrations 035–045 pendentes remotamente; migration 045 presente no Git.
-- Nenhuma homologação real dos Containers foi comprovada.
-- Commit `ae2f319` (sessão 01): TDD documental RED 2/4 e GREEN 4/4; 64 scripts
-  `test:*`, lint, TypeScript, Prettier, check documental e `git diff --check`
-  passaram localmente. Build Turbopack local bloqueado por `Operation not
-permitted` ao abrir porta interna; build Webpack local passou.
-- `0e1848a`, CI run 42019884284: `validar` (lint, TypeScript, `check:workflow`,
-  `test:workflow`, todas as suítes Node e build padrão) e `sql-local` com
-  sucesso. O build padrão está comprovado na CI, não localmente.
-- Revisão R1 (sessão 02, Claude Code): faltavam worktree, HEAD local/remoto,
-  alterações não commitadas, último gate e checkpoint de transferência entre
-  agentes. Ajustes em `WORKFLOW.md`, `AGENTS.md`, `CLAUDE.md`, neste arquivo e no
-  validador documental; RED 1/5 pelo campo `Worktree` ausente antes do GREEN.
-- `4e3b0ab`: localmente GREEN 5/5, `check:workflow`, 64/64 `test:*`, lint,
-  TypeScript, Prettier e `git diff --check`; build local não executado. CI run
-  42023101884: `validar` (inclui build padrão) e `sql-local` com sucesso.
+- PR #97 mergeado por squash em `314c08c` às 12:13:27 UTC, condicionado ao head
+  `3427d1c` com CI verde. CI de `main` no merge: `validar` e `sql-local` verdes.
+- Production `dpl_ALDY5SPhRiWMiHW3qr6xDS3s74hk` (`314c08c`) pronto às 12:14:11
+  UTC, antes da CI de `main` (12:16:36). Domínio 200, CSP com Supabase Production.
+- HML e Production `ACTIVE_HEALTHY`, histórico idêntico até a 034, sem migration
+  só remota; 035–045 pendentes nos dois.
+- `supabase backups list`: vazio e PITR desligado nos dois projetos.
+- API da Vercel: Preview (todas as branches e `staging`) → HML; Production →
+  Production. Preview genérico sem `service_role` e sem segredo de recuperação.
+- Containers não usam `service_role`; funcionam no Preview genérico.
+- Commit local desta branch: `PADRAO_DE_PROMPTS.md` novo, referências e estado
+  atualizados. RED do validador na árvore de `main` (3 erros esperados) antes do
+  GREEN; validação local registrada no relatório da sessão que o criou.
 
 ## Migrations por ambiente
 
-- Local/CI: migrations até 045 versionadas e anteriormente testadas em instâncias
-  descartáveis; nenhum banco local foi resetado por WORKFLOW-01.
-- HML `qbnfcmrxmssnwkhaitgd`: migration remota mais recente 034.
-- Production `ehkduqokntemtmqzdrbd`: migration remota mais recente 034.
-- Não aplicar migrations nesta tarefa. A preparação de HML é o próximo trabalho
-  após a integração de WORKFLOW-01 e exige autorização específica.
+- Local/CI: 001–045 versionadas e testadas em instâncias descartáveis.
+- HML `qbnfcmrxmssnwkhaitgd`: 034 (`20261101120000`).
+- Production `ehkduqokntemtmqzdrbd`: 034 (`20261101120000`).
+
+### Plano para HML (não executado)
+
+1. Autorização nominal: HML, ref `qbnfcmrxmssnwkhaitgd`, migrations 035–045.
+2. `CHECK-UP-REC-01`: dump lógico de HML (schemas e dados), cifrado, com hash
+   registrado, restaurado em Supabase local descartável e conferido por contagem
+   de linhas e catálogo. Sem isso, não seguir.
+3. Reconfirmar o head 034 imediatamente antes, com `env -u SUPABASE_ACCESS_TOKEN`
+   e sem o `SUPABASE_PROJECT_ID` do `.env` no ambiente.
+4. O `dry-run` deve listar exatamente as 11 migrations, de `20261102120000` a
+   `20261112120000`, nesta ordem; qualquer outra lista bloqueia.
+5. Aplicar 035–045 em sequência única. Dependências declaradas: 035 a 039
+   aplicadas juntas; depois 040 → 041 → 042 → 043 → 044 → 045. Falha interrompe;
+   reversão só pelos runbooks de [runbooks/README.md](runbooks/README.md), com
+   autorização.
+6. Verificar histórico (045), tabelas `container_*` com RLS, as RPCs
+   `registrar_servico_container` e `cancelar_servico_container`, donos e grants de
+   `bslog_rpc_operacional` inalterados e nenhum valor existente recalculado.
+7. Registrar o novo head aqui e em [AMBIENTES.md](AMBIENTES.md).
+
+Riscos: a 036 muda HE e sábado para lançamentos novos ou editados (decisão do
+proprietário de 30/10/2026); a 041 e a 042 nascem desligadas; nunca aplicar a
+045 isolada. Production é gate separado, depois da homologação.
+
+### Roteiro de homologação de Containers (navegador, Preview → HML)
+
+Pré-requisitos: schema 045 em HML; Preview do HEAD candidato confirmado em HML;
+conta `admin` de teste e, para o item 1, conta `operacional` de teste aprovadas.
+
+1. Acesso: `admin` vê Containers; `operacional` não abre `/containers`.
+2. Registro pelo menu: cliente, operação opcional, data, descrição, quantidade,
+   valor total e participantes com valor por pessoa; lista e detalhe conferem.
+3. Rateio explícito de um total entre participantes; nunca divisão automática.
+4. Atalho no cartão de Operações: cliente e operação preenchidos; URL com
+   operação inválida, repetida ou de outro cliente é bloqueada.
+5. Idempotência: duplo clique gera um registro; recarregar recupera a intenção.
+6. Recusas: quantidade zero, centavos inválidos, soma de participantes divergente.
+7. Cancelamento com motivo cancela a receita junto; adicional vinculado não se
+   cancela isoladamente; serviço faturado não se cancela.
+8. Fatura com diárias e container na mesma operação: adicional uma única vez;
+   fatura só com container válida; competência diferente da execução.
+9. Custo devido só em visões internas; receita não duplicada; auditoria registra
+   registro e cancelamento.
+
+Testes automatizados (CI e SQL local) não substituem nenhum item acima.
 
 ## Autorizações
 
-- editar documentação, template de PR e checks locais/CI sem credenciais;
-- commits e push normal em `docs/workflow-01`, com testes verdes;
-- consultar fatos mutáveis em modo somente leitura.
+- vigentes nesta sessão: inspeção somente leitura de GitHub, Vercel, Supabase HML
+  e Production, documentação e commit local de documentação.
 
 ## Proibições
 
-- sem merge ou Ready for Review;
-- sem alteração de GitHub/Vercel/Supabase remoto;
-- sem migration, SQL remoto, deploy ou mudança de variável/flag;
+- sem migration, SQL de escrita, backup/restauração remota ou mudança de
+  configuração sem autorização nominal;
+- sem alteração de Production;
+- sem push ou PR desta branch sem autorização;
 - sem regra financeira, Auth, RLS, RPC ou faturamento;
 - sem iniciar FIN-PR-12 ou FIN-PR-13.
 
 ## Bloqueios e riscos
 
-- merge em `main` ainda pode publicar Production automaticamente; a contenção é
-  configuração administrativa futura, não parte deste PR. O próprio merge do
-  PR #97 dispara novo deploy de Production, com código de aplicação igual ao de
-  `eb8cec9`;
-- vínculo exato Preview ↔ HML e escopos de variáveis Vercel permanecem pendentes
-  de conferência autenticada;
-- HML está 11 migrations atrás do Git e não deve receber somente a 045;
-- backup/restauração integral de HML precisa ser comprovado antes da implantação.
+- backup restaurável de HML inexistente (`CHECK-UP-REC-01`);
+- identidades de teste e natureza dos dados de HML (sintéticos ou não) não
+  conferidas;
+- merge em `main` publica Production antes da CI; contenção administrativa
+  pendente na Vercel/GitHub;
+- Production roda a interface de Containers sem o schema 045; o recurso fica
+  indisponível por desenho, sem homologação.
 
 ## Retomada
 
-Sequência preservada: **WORKFLOW-01 → preparação de HML → homologação de
-Containers (FIN-PR-11) → FIN-PR-12 → FIN-PR-13**.
+Sequência preservada: **preparação de HML → homologação de Containers
+(FIN-PR-11) → FIN-PR-12 → FIN-PR-13**. WORKFLOW-01 está encerrada.
 
 1. Reconciliar Git e GitHub conforme
    [Transferência entre agentes](WORKFLOW.md#reconciliação-na-retomada).
-2. Confirmar que WORKFLOW-01 continua sendo a única tarefa ativa e que os checks
-   do HEAD exato do PR #97 estão verdes.
-3. Merge do PR #97 só com autorização explícita do usuário.
-4. Integrado o PR, solicitar autorização separada para preparar HML (035–045) e
-   homologar FIN-PR-11 Containers; não iniciar FIN-PR-12/13 antes disso.
+2. Publicar esta branch só com autorização (push e PR documental).
+3. Com autorização, executar o plano de HML acima, um passo por vez.
+4. Homologar Containers pelo roteiro; registrar executor, data, HEAD, deployment
+   e migration head.
 5. Se houver divergência, atualizar diagnóstico e este checkpoint antes de agir.

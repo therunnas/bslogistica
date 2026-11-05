@@ -25,27 +25,25 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**WORKFLOW-01 — padronização definitiva do desenvolvimento.** Branch
-`docs/workflow-01`, baseada em `main` no merge do PR #96, publicada no
-[PR Draft #97](https://github.com/therunnas/bslogistica/pull/97). Objetivo:
-integrar o fluxo normativo, inventário de ambientes, handoff e checks
-documentais, sem alterar ambiente remoto. O estado e a próxima ação exatos ficam no
-[HANDOFF](docs/HANDOFF.md).
+**FIN-PR-11 — preparação de HML e homologação de Containers.** WORKFLOW-01 foi
+encerrada com o merge do [PR #97](https://github.com/therunnas/bslogistica/pull/97)
+em `314c08c`. O diagnóstico somente leitura de HML, Production, Preview e backup
+está concluído; cada operação remota seguinte (backup de HML, migrations 035–045,
+homologação) exige autorização específica. O estado e a próxima ação exatos ficam
+no [HANDOFF](docs/HANDOFF.md).
 
-### Fila após WORKFLOW-01
+### Fila
 
-1. Retomar **FIN-PR-11**: preparar HML, reconciliar migrations 035–045 e homologar
-   Containers, cada operação remota com autorização específica.
+1. **FIN-PR-11**: backup verificável de HML (`CHECK-UP-REC-01`), migrations
+   035–045 em HML e homologação de Containers no Preview ligado ao HML.
 2. **FIN-PR-12**: exportação específica de cliente — ainda não iniciado.
 3. **FIN-PR-13**: testes integrados, HML e conciliação — ainda não iniciado.
 
 ### Pausadas
 
 - `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
-  lacunas documentais remanescentes depois da integração, sem reabrir auditorias
-  concluídas.
-- `CHECK-UP-REC-01` e `CHECK-UP-E2E-01`: aguardam o gate autorizado de preparação
-  de HML.
+  lacunas documentais remanescentes, sem reabrir auditorias concluídas.
+- `CHECK-UP-E2E-01`: aguarda HML com schema 045 e identidades de teste aprovadas.
 - Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
 
 Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
@@ -118,10 +116,10 @@ ambiente e da resolução comercial estão centralizados nesse documento.
 - [x] **CHECK-UP-AMB-01 (somente leitura):** projetos HML/Production e migration
       heads identificados; limites da auditoria de Vercel e vínculo Preview/HML
       registrados em [Ambientes](docs/AMBIENTES.md).
-- [ ] **WORKFLOW-01:** integrar documentação e controles locais/CI; controles
-      administrativos de GitHub/Vercel continuam externos a este PR.
-- [ ] **CHECK-UP-REC-01:** conferir integridade, possibilidade de restauração
-      completa e dependências de recuperação antes de qualquer migration em HML.
+- [x] **WORKFLOW-01:** documentação e controles locais/CI integrados no PR #97
+      (`314c08c`); controles administrativos de GitHub/Vercel continuam externos.
+- [ ] **CHECK-UP-REC-01:** HML e Production sem backup gerenciado nem PITR
+      (05/11); falta produzir e restaurar backup de HML antes de qualquer migration.
 - [ ] **CHECK-UP-E2E-01:** concluir matriz real de papéis/MFA, recuperação e
       isolamento de dados, com contas e cenários de homologação aprovados.
 - [ ] **FIN-VAL:** integrar FIN-PR-11/12/13 separadamente e reconciliar cálculo,
@@ -146,8 +144,8 @@ para a última evidência de integração.
    containers (PRs #93–#96). O PR #96 foi mergeado por squash em
    `eb8cec9af11c4b0e314296ed776caf15c3764b5f`; a interface foi publicada pela
    automação da Vercel sem homologação real. Migration 045 continua ausente em
-   HML/Production, que estavam na 034 no diagnóstico de 05/11. Próximo gate após
-   WORKFLOW-01: preparar HML e homologar Containers.
+   HML/Production, que estavam na 034 no diagnóstico de 05/11. Próximo gate:
+   preparar HML e homologar Containers.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
    efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título

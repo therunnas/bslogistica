@@ -4,8 +4,9 @@ Inventário factual, sem credenciais, dos ambientes do painel. Cada afirmação 
 o limite da evidência. Mudanças de configuração exigem autorização própria e não
 são executadas por este documento.
 
-Última verificação: **05/11/2026**, durante WORKFLOW-01, por consultas somente
-leitura ao GitHub, Vercel HTTP/GitHub Deployments e Supabase CLI.
+Última verificação: **05/11/2026**, após o merge do PR #97 (`314c08c`), por
+consultas somente leitura ao GitHub, à API da Vercel (nomes, escopos e host do
+Supabase, sem chaves) e à Supabase CLI.
 
 ## Regra de classificação
 
@@ -25,9 +26,9 @@ vínculo explícito com o HML autorizado estiver comprovado.
 | ---------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------ |
 | Local      | Next.js local                                                                                       | Instância descartável por tarefa                       | Conforme reset local                 | Permitido apenas após comprovar isolamento                   |
 | CI         | GitHub Actions, jobs `validar` e `sql-local`                                                        | Supabase local efêmero no job SQL                      | Até a migration versionada no commit | Sem secrets nem vínculo remoto                               |
-| Preview    | Deployment automático de branch/PR; URL gerada protegida por Vercel SSO no PR #96                   | Destino exato do último Preview **não comprovado**     | Não comprovado                       | Existe, mas homologação real continua pendente               |
+| Preview    | Deployment automático de branch/PR; URL gerada protegida por Vercel SSO                             | HML `qbnfcmrxmssnwkhaitgd` pela configuração vigente   | 034 (o do HML)                       | Homologável para Containers após 035–045 em HML              |
 | HML        | Não há domínio Vercel distinto comprovado; pode servir de backend de Preview após vínculo explícito | `bs-logistica-homologacao`, ref `qbnfcmrxmssnwkhaitgd` | 034 — `20261101120000`               | Projeto distinto de Production; migrations 035–045 pendentes |
-| Production | Vercel `bs-logistica-sistema`, domínio `admin.bslogisticas.com.br`, deploy de `main`                | `bs-logistica-sistema`, ref `ehkduqokntemtmqzdrbd`     | 034 — `20261101120000`               | Frontend do PR #96 publicado; schema 045 indisponível        |
+| Production | Vercel `bs-logistica-sistema`, domínio `admin.bslogisticas.com.br`, deploy de `main`                | `bs-logistica-sistema`, ref `ehkduqokntemtmqzdrbd`     | 034 — `20261101120000`               | Frontend de `314c08c` publicado; schema 045 indisponível     |
 
 O repositório contém migrations até a **045**
 (`20261112120000_045_container_servico.sql`). Em HML e Production, a listagem
@@ -52,41 +53,51 @@ Ele não aplica migrations nem publica ambiente remoto.
 
 ## Vercel
 
-Evidências do PR #96:
+Projeto `bs-logistica-sistema` (`prj_K1OJ6G7AWnx6dQB1BDsy3HTELnCV`), time
+`bslogisticas`, plano Hobby.
 
-- Preview `7561695754`, head `3897423b…`: `success` em 05/11/2026 00:29:27 UTC;
-- Production `7571578582`, merge `eb8cec9…`: `success` em 05/11/2026 10:50:07 UTC;
-- CI de `main` terminou depois, às 10:51:57 UTC;
-- o domínio Production indicou na CSP o projeto Supabase de Production;
-- URLs geradas de Preview e Production responderam com proteção SSO da Vercel.
+Publicações observadas:
+
+| Merge               | Deployment Production              | Pronto (UTC) | CI de `main` concluída (UTC) |
+| ------------------- | ---------------------------------- | ------------ | ---------------------------- |
+| PR #96 — `eb8cec9…` | `dpl_8kLRFCBVHUeeyM1Rffn5wDsV5nQq` | 10:50:05     | 10:51:57                     |
+| PR #97 — `314c08c…` | `dpl_ALDY5SPhRiWMiHW3qr6xDS3s74hk` | 12:14:11     | 12:16:36                     |
+
+Nos dois casos o domínio foi publicado **antes** de a CI de `main` terminar. Após
+o PR #97, `admin.bslogisticas.com.br` respondeu 200 com CSP `connect-src`
+apontando para `ehkduqokntemtmqzdrbd`. URLs geradas respondem com proteção SSO.
 
 Configurações ainda pendentes de conferência no painel autenticado:
 
-- nomes e escopos efetivos das variáveis Preview/Production;
-- destino Supabase do Preview vigente;
 - Production Branch configurada nominalmente;
 - `Auto-assign Custom Production Domains`;
 - Deployment Checks e responsáveis por promoção.
 
-O comportamento observado comprova que o merge em `main` publicou o domínio de
-Production automaticamente. Até a contenção administrativa, merge e publicação
-continuam acoplados.
+Até a contenção administrativa, merge e publicação continuam acoplados.
 
-### Variáveis esperadas por nome
+### Variáveis por escopo
 
-Sem registrar valores:
+Lidas pela API da Vercel em 05/11/2026; registra-se só nome, escopo e o project
+ref do host Supabase (público, embutido no bundle), nunca chaves:
 
-| Nome                                   | Preview                                          | Production                      | Observação                                  |
-| -------------------------------------- | ------------------------------------------------ | ------------------------------- | ------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Deve apontar ao projeto de teste autorizado      | Projeto Production              | Escopo real pendente de auditoria           |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Chave publicável do mesmo projeto Preview/HML    | Chave publicável Production     | Não é segredo, mas não versionar valores    |
-| `SUPABASE_SERVICE_ROLE_KEY`            | Ausente salvo necessidade aprovada e server-side | Server-side                     | Nunca `NEXT_PUBLIC_*`; escopo real pendente |
-| `SENTRY_AUTH_TOKEN` e DSN relacionados | Não necessários para envio fora de Production    | Conforme integração server-side | Não revelar valores                         |
-| Flags financeiras `BS_*`               | Desligadas por padrão                            | Desligadas até autorização      | Ativação é gate separado                    |
+| Nome                                   | Preview (todas as branches) | Preview (branch `staging`) | Production             |
+| -------------------------------------- | --------------------------- | -------------------------- | ---------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | HML `qbnfcmrxmssnwkhaitgd`  | HML `qbnfcmrxmssnwkhaitgd` | `ehkduqokntemtmqzdrbd` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | presente                    | presente                   | presente               |
+| `SUPABASE_SERVICE_ROLE_KEY`            | **ausente**                 | presente (sensitive)       | presente (sensitive)   |
+| `PASSWORD_RECOVERY_PROOF_SECRET`       | **ausente**                 | presente (sensitive)       | presente (sensitive)   |
+| `SENTRY_AUTH_TOKEN`                    | ausente                     | ausente                    | presente (sensitive)   |
+| Flags financeiras `BS_*`               | nenhuma                     | nenhuma                    | nenhuma                |
+
+Limites: é a configuração vigente, aplicada no build; um deployment antigo pode
+ter sido construído com valores anteriores (variáveis do Preview atualizadas pela
+última vez em 23/10/2026). Não se comparou a chave publicável com o projeto.
+Preview de branch comum não tem `service_role` nem segredo de recuperação:
+administração de usuários e recuperação de senha só funcionam no Preview da
+branch `staging`. Os Containers não dependem dessas variáveis.
 
 O gate em `src/lib/ambiente.ts` impede Preview de usar a referência conhecida de
-Production, mas não prova sozinho que o destino seja HML nem que os dados sejam
-sintéticos.
+Production, mas não prova que os dados do HML sejam sintéticos.
 
 ## Supabase
 
@@ -96,6 +107,10 @@ sintéticos.
 - O conteúdo de Auth, a origem dos dados e a presença de dados reais em HML não
   foram inspecionados neste diagnóstico.
 - Nenhuma migration, SQL ou configuração foi aplicada durante WORKFLOW-01.
+- Backups gerenciados (05/11/2026): `supabase backups list` vazio e PITR
+  desligado em HML e em Production. Nenhum backup de HML está registrado; o último
+  backup lógico de Production é de 23/10/2026, anterior à `025` (ver
+  [Estado do projeto](ESTADO_DO_PROJETO.md)).
 
 Antes de usar HML para homologação:
 
