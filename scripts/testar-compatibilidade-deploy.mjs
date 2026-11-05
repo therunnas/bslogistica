@@ -15,8 +15,8 @@
  *      do app (com competência só no banco com a 038), leitura dos adicionais
  *   G  gerar_fatura pela sessão do admin, duas chamadas CONCORRENTES (só uma fatura); Fechamento de
  *      novo depois de faturar
- *   H  as rotas HTTP do Next (`/api/fechamento`, `/api/fechamento/xlsx`) e as páginas, com a sessão
- *      de verdade em cookie (se `BASE_URL` for informado)
+ *   H  as rotas HTTP do Next (`/api/fechamento`, `/api/fechamento/xlsx`, `/api/fechamento/xlsx-cliente`)
+ *      e as páginas, com a sessão de verdade em cookie (se `BASE_URL` for informado)
  *
  * A conta de admin é criada aqui, só no Auth local, e morre com o reset seguinte.
  */
@@ -62,6 +62,8 @@ import {
   montarRegistroDeDiaria,
 } from "../src/lib/diaria-individual.ts";
 import { interpretarPeriodoContratual, montarRegistro } from "../src/lib/vigencias-ui.ts";
+import { lerPlanilha, lerStringsCompartilhadas } from "./_fechamento-exportacao.mjs";
+import { lerZip } from "./_zip.mjs";
 
 const cenario = process.argv[2] ?? "?";
 const esperaComponentes = process.argv[3] === "com-componentes";
@@ -1226,6 +1228,50 @@ if (BASE_URL) {
     "H2. POST /api/fechamento/xlsx = 200, XLSX",
     [post.status, bytes.subarray(0, 2).toString("latin1")],
     [200, "PK"],
+  );
+  // FIN-PR-12: o Excel do cliente pela rota real, com a mesma sessão e a mesma assinatura.
+  const postCliente = await fetchLocal(`${BASE_URL}/api/fechamento/xlsx-cliente`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json", origin: BASE_URL },
+    body: JSON.stringify({
+      cliente: C,
+      inicio: filtros.inicio,
+      fim: filtros.fim,
+      assinatura: corpo?.meta?.assinatura,
+    }),
+    redirect: "manual",
+  });
+  const bytesCliente = Buffer.from(await postCliente.arrayBuffer());
+  verificar(
+    "H2b. POST /api/fechamento/xlsx-cliente = 200, XLSX",
+    [postCliente.status, bytesCliente.subarray(0, 2).toString("latin1")],
+    [200, "PK"],
+  );
+  let totalDoCliente = null;
+  let subtotalGravado = null;
+  let textosDoCliente = [];
+  if (postCliente.status === 200) {
+    const zip = lerZip(bytesCliente);
+    textosDoCliente = lerStringsCompartilhadas(zip.get("xl/sharedStrings.xml") ?? "");
+    const celulas = lerPlanilha(zip.get("xl/worksheets/sheet1.xml"), textosDoCliente);
+    const rotulo = [...celulas.entries()].find(([, c]) => c.texto === "Total do fechamento")?.[0];
+    const valor = rotulo ? celulas.get(`L${rotulo.slice(1)}`) : undefined;
+    totalDoCliente = valor?.tipo === "n" ? Math.round(Number(valor.bruto) * 100) : null;
+    // A linha de SUBTOTAL fica uma acima do total quando há dados; seu valor gravado (`<v>`) é
+    // o que pré-visualizações e o modo protegido mostram.
+    const linhaDoTotal = rotulo ? Number(rotulo.slice(1)) : 0;
+    const subtotal = celulas.get(`L${linhaDoTotal - 1}`);
+    subtotalGravado =
+      subtotal?.formula && subtotal.tipo === "n" ? Math.round(Number(subtotal.bruto) * 100) : null;
+  }
+  verificar(
+    "H2c. Excel do cliente: total do fechamento = receita do GET = SUBTOTAL gravado, sem custo, margem nem resultado",
+    [
+      totalDoCliente,
+      subtotalGravado,
+      textosDoCliente.some((t) => /custo|margem|resultado|lucro/i.test(t)),
+    ],
+    [corpo?.financeiro?.receitaCentavos ?? null, corpo?.financeiro?.receitaCentavos ?? null, false],
   );
   for (const pagina of [
     "/fechamento",

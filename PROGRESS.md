@@ -25,24 +25,37 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FIN-PR-11 — homologação de Containers.** HML recebeu 035–045 em 05/11/2026,
-após backup restaurado, compatibilidade e dry-run; verificações pós-migration
-aprovadas. Falta a homologação real no navegador. Production continua na 034 e
-qualquer implantação lá exige autorização específica. O estado e a próxima ação exatos ficam
-no [HANDOFF](docs/HANDOFF.md).
+**FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis).** Branch
+`feat/fin-pr-12-exportacao-dynamis`, worktree `/private/tmp/bs-fin-pr-12`. Implementada,
+revisada em R1 e reconciliada com a `main` depois do merge do PR #98 (`a2fec9a`);
+PR #99 em Draft, **não homologado**. O estado e a próxima ação exatos ficam no
+[HANDOFF](docs/HANDOFF.md).
+
+**FIN-PR-11:** HML recebeu 035–045 em 05/11/2026, após backup restaurado,
+compatibilidade e dry-run; verificações pós-migration aprovadas. Os nove fluxos de
+Containers continuam sem homologação real no navegador. Production continua na 034 e
+qualquer implantação lá exige autorização específica.
+
+Decisão do usuário (05/11/2026): concluir primeiro as funcionalidades pendentes
+(FIN-PR-12 e FIN-PR-13) e fazer depois **uma homologação completa de ponta a
+ponta**, seguida do manual de utilização e da preparação de Production.
+Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 ### Fila
 
-1. **FIN-PR-11**: homologação de Containers no Preview ligado ao HML (schema 045
-   já aplicado); depois, decisão sobre Production.
-2. **FIN-PR-12**: exportação específica de cliente — ainda não iniciado.
-3. **FIN-PR-13**: testes integrados, HML e conciliação — ainda não iniciado.
+1. **FIN-PR-13**: testes integrados, HML e conciliação — próximo, depois do merge
+   autorizado do PR #99.
+2. **Homologação completa E2E** no Preview ligado ao HML, cobrindo FIN-PR-11
+   (nove fluxos de Containers), FIN-PR-12 e FIN-PR-13.
+3. Manual de utilização e preparação de Production (035–045 em Production é gate
+   próprio, com backup novo).
 
 ### Pausadas
 
 - `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
   lacunas documentais remanescentes, sem reabrir auditorias concluídas.
-- `CHECK-UP-E2E-01`: HML já tem o schema 045; aguarda identidades de teste aprovadas.
+- `CHECK-UP-E2E-01`: HML já tem o schema 045; entra na homologação completa, com
+  identidades de teste aprovadas.
 - Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
 
 Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
@@ -143,9 +156,11 @@ para a última evidência de integração.
    containers (PRs #93–#96). O PR #96 foi mergeado por squash em
    `eb8cec9af11c4b0e314296ed776caf15c3764b5f`; a interface foi publicada pela
    automação da Vercel sem homologação real. Migration 045 continua ausente em
-   Production, que segue na 034; HML recebeu 035–045 em 05/11. Próximo gate:
-   homologar Containers no Preview ligado ao HML.
-4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
+   Production, que segue na 034; HML recebeu 035–045 em 05/11. Homologação dos
+   Containers incluída na homologação completa depois do FIN-PR-13.
+4. **FIN-PR-12 implementado (não homologado):** botão "Excel do cliente" no
+   Fechamento; [estado e evidências](docs/ESTADO_DO_PROJETO.md#fin-pr-12--excel-do-cliente-modelo-dynamis-05112026).
+   Escopo aprovado: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
    efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título
    “Fechamento – quinzena/mês”, ordem por colaborador/data e aba resumo por

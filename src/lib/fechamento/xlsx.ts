@@ -81,7 +81,7 @@ const COR_DO_CABECALHO = "#1F3A5F";
 const COR_DO_TOTAL = "#E5E7EB";
 const COR_DO_TEXTO_DO_CABECALHO = "#FFFFFF";
 
-type Estilo = Partial<{
+export type Estilo = Partial<{
   fontWeight: "bold";
   fontStyle: "italic";
   backgroundColor: string;
@@ -92,7 +92,7 @@ type Estilo = Partial<{
   wrap: boolean;
 }>;
 
-const ESTILO_DO_CABECALHO: Estilo = {
+export const ESTILO_DO_CABECALHO: Estilo = {
   fontWeight: "bold",
   backgroundColor: COR_DO_CABECALHO,
   textColor: COR_DO_TEXTO_DO_CABECALHO,
@@ -100,7 +100,7 @@ const ESTILO_DO_CABECALHO: Estilo = {
   wrap: true,
 };
 
-const ESTILO_DO_TOTAL: Estilo = {
+export const ESTILO_DO_TOTAL: Estilo = {
   fontWeight: "bold",
   backgroundColor: COR_DO_TOTAL,
   topBorderStyle: "thin",
@@ -170,7 +170,7 @@ interface AbaTabular {
 }
 
 /** Letra da coluna (1 → A). A tabela tem poucas colunas, nunca passa de Z. */
-function letraDaColuna(quantidade: number): string {
+export function letraDaColuna(quantidade: number): string {
   if (quantidade < 1 || quantidade > 26) throw new Error("Quantidade de colunas fora do previsto.");
   return String.fromCharCode(64 + quantidade);
 }
