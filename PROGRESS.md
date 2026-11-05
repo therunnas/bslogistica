@@ -51,9 +51,10 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 ### Fila
 
-1. **Concluir o PR Draft do FIN-PR-13:** CI, Preview e revisão; sem merge nesta sessão.
-2. **Homologação completa E2E** no Preview ligado ao HML, cobrindo FIN-PR-11
-   (nove fluxos de Containers), FIN-PR-12 e FIN-PR-13.
+1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
+   (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
+2. **Pendências da homologação:** convite por e-mail (A05, exige caixa de captura) e
+   planilha Dynamis (E06).
 3. Manual de utilização e preparação de Production (035–045 em Production é gate
    próprio, com backup novo).
 

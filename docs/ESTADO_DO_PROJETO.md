@@ -84,8 +84,8 @@ históricas por componente, preservando o motor aprovado.
 `feat/fin-pr-13-integracao-conciliacao`, baseada na `main`
 `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. O PR
 [#100](https://github.com/therunnas/bslogistica/pull/100) foi aberto como Draft no
-commit `fcd482f7cb34bc51441d3fc38df52bc36ab34f19`. Nenhum banco remoto, migration,
-secret ou configuração foi alterado.
+commit `fcd482f7cb34bc51441d3fc38df52bc36ab34f19` e mergeado depois (sessão 11,
+`91513b9`). Nesta fase, nenhum banco remoto, migration, secret ou configuração foi alterado.
 
 **FIN-PR-12 integrado:** o PR #99 foi marcado Ready e mergeado por squash somente
 depois da reconfirmação do HEAD autorizado
