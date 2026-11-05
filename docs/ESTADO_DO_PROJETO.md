@@ -5,7 +5,7 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
-## Estado vigente — FIN-PR-11, preparação de HML (05/11/2026)
+## Estado vigente — FIN-PR-11, HML na 045 (05/11/2026)
 
 **Git:** [PR #97](https://github.com/therunnas/bslogistica/pull/97) (WORKFLOW-01)
 mergeado por squash em `314c08cb20e9a32dd10b4a0665e1be7dad108264`, condicionado ao
@@ -18,10 +18,9 @@ da CI de `main` (12:16:36 UTC). O merge alterou só documentação, CI e scripts
 validação; o código de aplicação publicado é o mesmo de `eb8cec9`. O domínio
 respondeu 200 com CSP apontando para o Supabase de Production.
 
-**Banco:** HML `qbnfcmrxmssnwkhaitgd` e Production `ehkduqokntemtmqzdrbd`
-`ACTIVE_HEALTHY`, com histórico idêntico até a 034 (`20261101120000`), nenhuma
-migration só remota e 035–045 pendentes nos dois. Nenhuma migration, SQL ou
-configuração foi alterada.
+**Banco:** HML `qbnfcmrxmssnwkhaitgd` na **045** (`20261112120000`) desde
+05/11/2026 13:03 UTC, por aplicação autorizada de 035–045 (sessão 05). Production
+`ehkduqokntemtmqzdrbd` continua na 034 (`20261101120000`), sem nenhuma alteração.
 
 **Backup:** `supabase backups list` vazio e PITR desligado em HML e Production.
 Em 05/11/2026 (sessão 03) foi gerado backup lógico cifrado do HML na 034 e
@@ -41,11 +40,19 @@ novos ou editados (decisão do proprietário de 30/10/2026), sem recalcular linh
 existentes; a 041 e a 042 nascem desligadas. Implantar 035–045 em Production é
 gate próprio, depois da homologação.
 
-**Migrations em HML:** dry-run listou exatamente 035–045, em ordem; o ensaio das
-11 na cópia restaurada passou sem alterar valores existentes. Nada aplicado no HML.
+**Migrations em HML:** preflight aprovado (projeto, head 034, backup e chave,
+concorrência), suíte de compatibilidade 034 → 045 com 665 asserções PASS e dry-run
+com exatamente 035–045. As 11 aplicaram em ordem, sem erro. Depois: histórico em
+50, linhas e valores financeiros existentes idênticos à linha de base, todas as
+31 tabelas de `public` com RLS, papel da RPC operacional preservado, tabelas e
+RPCs de Containers presentes e expostas pelo PostgREST, nenhuma ampliação de
+privilégio. Nenhum dado foi escrito no HML pelos testes. Detalhes no
+[HANDOFF](HANDOFF.md).
 
-Próximo gate: autorização para aplicar 035–045 em HML. Plano e roteiro de
-homologação no [HANDOFF](HANDOFF.md).
+**Containers:** schema disponível no HML; **não homologados**. Os 9 fluxos do
+roteiro exigem execução real no navegador, no Preview protegido por SSO.
+
+Próximo gate: homologação real de Containers no Preview ligado ao HML.
 
 ## WORKFLOW-01 — histórico até o merge do PR #97 (05/11/2026)
 

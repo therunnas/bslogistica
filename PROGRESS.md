@@ -25,18 +25,16 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FIN-PR-11 — preparação de HML e homologação de Containers.** WORKFLOW-01 foi
-encerrada com o merge do [PR #97](https://github.com/therunnas/bslogistica/pull/97)
-em `314c08c`. O diagnóstico somente leitura de HML, Production, Preview e backup
-está concluído, e o backup cifrado de HML foi restaurado e conferido localmente;
-cada operação remota seguinte (migrations 035–045, homologação) exige
-autorização específica. O estado e a próxima ação exatos ficam
+**FIN-PR-11 — homologação de Containers.** HML recebeu 035–045 em 05/11/2026,
+após backup restaurado, compatibilidade e dry-run; verificações pós-migration
+aprovadas. Falta a homologação real no navegador. Production continua na 034 e
+qualquer implantação lá exige autorização específica. O estado e a próxima ação exatos ficam
 no [HANDOFF](docs/HANDOFF.md).
 
 ### Fila
 
-1. **FIN-PR-11**: migrations 035–045 em HML (backup e dry-run prontos) e
-   homologação de Containers no Preview ligado ao HML.
+1. **FIN-PR-11**: homologação de Containers no Preview ligado ao HML (schema 045
+   já aplicado); depois, decisão sobre Production.
 2. **FIN-PR-12**: exportação específica de cliente — ainda não iniciado.
 3. **FIN-PR-13**: testes integrados, HML e conciliação — ainda não iniciado.
 
@@ -44,7 +42,7 @@ no [HANDOFF](docs/HANDOFF.md).
 
 - `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
   lacunas documentais remanescentes, sem reabrir auditorias concluídas.
-- `CHECK-UP-E2E-01`: aguarda HML com schema 045 e identidades de teste aprovadas.
+- `CHECK-UP-E2E-01`: HML já tem o schema 045; aguarda identidades de teste aprovadas.
 - Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
 
 Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
@@ -145,8 +143,8 @@ para a última evidência de integração.
    containers (PRs #93–#96). O PR #96 foi mergeado por squash em
    `eb8cec9af11c4b0e314296ed776caf15c3764b5f`; a interface foi publicada pela
    automação da Vercel sem homologação real. Migration 045 continua ausente em
-   HML/Production, que estavam na 034 no diagnóstico de 05/11. Próximo gate:
-   preparar HML e homologar Containers.
+   Production, que segue na 034; HML recebeu 035–045 em 05/11. Próximo gate:
+   homologar Containers no Preview ligado ao HML.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
    efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título
