@@ -19,9 +19,19 @@ import { ErroDaApiDoFechamento, mensagemDoErro, type FiltrosDaBusca } from "./bu
 export const TIPO_DO_XLSX_ESPERADO =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+/** `interno`: o XLSX completo do Fechamento. `cliente`: o modelo do cliente, sem custo/margem. */
+export type ModeloDeXlsx = "interno" | "cliente";
+
+export const ROTA_DO_XLSX: Record<ModeloDeXlsx, string> = {
+  interno: "/api/fechamento/xlsx",
+  cliente: "/api/fechamento/xlsx-cliente",
+};
+
 export interface PedidoDeXlsx extends FiltrosDaBusca {
   /** `meta.assinatura` do fechamento que a tela está mostrando. */
   assinatura: string;
+  /** Ausente = `interno`. Muda só a rota; o corpo é o mesmo. */
+  modelo?: ModeloDeXlsx;
 }
 
 export interface OpcoesDoDownload {
@@ -41,7 +51,7 @@ export async function baixarXlsx(
 
   let resposta: Response;
   try {
-    resposta = await requisitar("/api/fechamento/xlsx", {
+    resposta = await requisitar(ROTA_DO_XLSX[pedido.modelo ?? "interno"], {
       method: "POST",
       credentials: "same-origin",
       cache: "no-store",

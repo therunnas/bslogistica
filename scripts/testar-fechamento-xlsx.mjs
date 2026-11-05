@@ -1162,16 +1162,16 @@ verificar(
   true,
 );
 verificar(
-  "U4. o XLSX envia só o recorte e a assinatura",
-  /clienteId: dados\.meta\.clienteId,\s*inicio: dados\.meta\.inicio,\s*fim: dados\.meta\.fim,\s*assinatura: dados\.meta\.assinatura,\s*\}\)/.test(
+  "U4. o XLSX envia só o recorte, a assinatura e o modelo (que escolhe a rota)",
+  /clienteId: dados\.meta\.clienteId,\s*inicio: dados\.meta\.inicio,\s*fim: dados\.meta\.fim,\s*assinatura: dados\.meta\.assinatura,\s*modelo,\s*\}\)/.test(
     exportar,
   ),
   true,
 );
 verificar(
-  "U5. o botão respeita 'disponivel' e o download em andamento",
-  (exportar.match(/disabled=\{!disponivel \|\| baixando\}/g) ?? []).length,
-  2,
+  "U5. os botões (Excel interno, Excel do cliente e CSV) respeitam 'disponivel' e o download em andamento",
+  (exportar.match(/disabled=\{!disponivel \|\| baixando !== null\}/g) ?? []).length,
+  3,
 );
 verificar(
   "U6. só 'com-lancamentos' e 'somente-financeiro' liberam a exportação",
@@ -1220,10 +1220,26 @@ const importaOGerador = arquivosDe(raiz)
   .filter((a) => /\.(ts|tsx)$/.test(a))
   .filter((a) => /from "[^"]*fechamento\/xlsx"/.test(readFileSync(a, "utf8")))
   .map((a) => a.replace(/\\/g, "/"));
+// O gerador interno é importado pelas duas rotas (a do cliente só usa `TIPO_DO_XLSX`). O gerador do
+// cliente o importa por caminho relativo (`./xlsx`), dentro de `lib/fechamento`, no servidor.
+const PODEM_IMPORTAR_O_GERADOR = [
+  "src/app/api/fechamento/xlsx/route.ts",
+  "src/app/api/fechamento/xlsx-cliente/route.ts",
+];
 verificar(
-  "U13. só o Route Handler importa o gerador de XLSX",
-  importaOGerador.length === 1 &&
-    importaOGerador[0].endsWith("src/app/api/fechamento/xlsx/route.ts"),
+  "U13. só os Route Handlers importam o gerador de XLSX",
+  importaOGerador.length === PODEM_IMPORTAR_O_GERADOR.length &&
+    PODEM_IMPORTAR_O_GERADOR.every((c) => importaOGerador.some((a) => a.endsWith(c))),
+  true,
+);
+const importaOGeradorDoCliente = arquivosDe(raiz)
+  .filter((a) => /\.(ts|tsx)$/.test(a))
+  .filter((a) => /from "[^"]*fechamento\/xlsx-cliente"/.test(readFileSync(a, "utf8")))
+  .map((a) => a.replace(/\\/g, "/"));
+verificar(
+  "U13b. só o Route Handler do cliente importa o gerador do cliente",
+  importaOGeradorDoCliente.length === 1 &&
+    importaOGeradorDoCliente[0].endsWith("src/app/api/fechamento/xlsx-cliente/route.ts"),
   true,
 );
 verificar(
@@ -1271,10 +1287,14 @@ verificar(
   true,
 );
 verificar(
-  "B8. só o Route Handler usa write-excel-file",
+  "B8. só os geradores de servidor usam write-excel-file",
   !arquivosDe(raiz)
     .filter(
-      (a) => /\.(ts|tsx)$/.test(a) && !a.replace(/\\/g, "/").endsWith("lib/fechamento/xlsx.ts"),
+      (a) =>
+        /\.(ts|tsx)$/.test(a) &&
+        !["lib/fechamento/xlsx.ts", "lib/fechamento/xlsx-cliente.ts"].some((g) =>
+          a.replace(/\\/g, "/").endsWith(g),
+        ),
     )
     .some((a) => /write-excel-file/.test(readFileSync(a, "utf8"))),
   true,
