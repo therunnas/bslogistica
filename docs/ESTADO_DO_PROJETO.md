@@ -48,11 +48,16 @@ campo obrigatório vazio e link local quebrado; GREEN 4/4. Todos os 64 scripts
 Node `test:*`, lint, TypeScript, Prettier, validação de referências e diff check
 passaram. O build padrão Turbopack permaneceu bloqueado por `Operation not
 permitted` ao abrir porta interna, inclusive fora da sandbox; o build alternativo
-Webpack passou. O build padrão e o job SQL da CI do PR são provas remotas
-separadas, ainda a conferir no novo HEAD. Nenhum SQL local ou remoto foi executado
-por esta etapa.
+Webpack passou. Na CI do HEAD `0e1848a` (run 42019884284), o build padrão, as
+suítes Node, o check documental e o job `sql-local` passaram. Nenhum SQL local
+ou remoto foi executado por esta etapa.
 
-Próximo gate: CI e revisão independente do PR #97, ainda Draft. Depois da
+**Revisão R1 (sessão 02):** acrescentou a transferência entre agentes ao
+[WORKFLOW.md](WORKFLOW.md#transferência-entre-agentes) e campos obrigatórios de
+continuidade ao HANDOFF, exigidos pelo validador. O HEAD validado vigente fica no
+[HANDOFF](HANDOFF.md).
+
+Próximo gate: CI do commit R1 e autorização de merge do PR #97, ainda Draft. Depois da
 integração autorizada, solicitar autorização específica para preparar HML,
 reconciliar 035–045 e homologar Containers. Não iniciar FIN-PR-12/13 antes desse
 gate.

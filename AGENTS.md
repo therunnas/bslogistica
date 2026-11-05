@@ -110,6 +110,10 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
 - Preview nunca usa Supabase, Auth ou credenciais de Production. O vínculo real
   entre deployment e banco precisa ser comprovado; não presumir que Preview e
   HML sejam equivalentes.
+- Codex CLI e Claude Code compartilham um único checkpoint, `docs/HANDOFF.md`.
+  Antes de transferir a sessão e ao retomá-la, seguir a seção “Transferência
+  entre agentes” do [Workflow](docs/WORKFLOW.md); memória própria da ferramenta
+  não é fonte de estado.
 - Ao concluir ou pausar uma etapa, atualizar o checkpoint em `docs/HANDOFF.md`,
   o estado factual em `docs/ESTADO_DO_PROJETO.md` e a fila em `PROGRESS.md`, sem
   duplicar históricos.

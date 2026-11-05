@@ -5,8 +5,12 @@ import { pathToFileURL } from "node:url";
 const CAMPOS_HANDOFF = [
   "Etapa",
   "Gate atual",
+  "Último gate concluído",
+  "Worktree",
   "Branch",
   "Base",
+  "HEAD validado",
+  "Alterações não commitadas",
   "PR",
   "Ambiente-alvo",
   "Última ação comprovada",
@@ -78,6 +82,11 @@ export function validarHandoff(markdown) {
     if (valor === "" || /^(?:-|tbd|a definir|indefinido|\?+)$/i.test(valor)) {
       erros.push(`docs/HANDOFF.md: campo obrigatório sem valor: ${campo}`);
     }
+  }
+
+  const headValidado = campos.get("HEAD validado") ?? "";
+  if (headValidado !== "" && !/\b[0-9a-f]{40}\b/.test(headValidado)) {
+    erros.push("docs/HANDOFF.md: HEAD validado precisa do SHA completo de 40 caracteres");
   }
   return erros;
 }

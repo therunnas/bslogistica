@@ -73,7 +73,8 @@ comprovado.
 1. Ler `AGENTS.md` e/ou `CLAUDE.md`.
 2. Ler `PROGRESS.md`, `docs/ESTADO_DO_PROJETO.md`, `docs/HANDOFF.md` e, quando
    houver ambiente remoto no escopo, `docs/AMBIENTES.md`.
-3. Confirmar remote, branch, HEAD, upstream, working tree, worktrees e PRs.
+3. Confirmar remote, branch, HEAD, upstream, working tree, worktrees e PRs,
+   conforme a [reconciliação na retomada](#reconciliação-na-retomada).
 4. Identificar a tarefa ativa, o gate em andamento e o ambiente-alvo.
 5. Comparar fatos mutáveis baratos de verificar com GitHub e o ambiente autorizado.
 6. Preservar trabalho local de terceiros e continuar do último checkpoint válido.
@@ -83,6 +84,48 @@ comprovado.
 - base e escopo confirmados;
 - próxima ação e proibições conhecidas;
 - divergências materiais resolvidas ou registradas como bloqueio.
+
+## Transferência entre agentes
+
+Codex CLI, Claude Code e outras sessões compartilham **um único checkpoint**:
+`docs/HANDOFF.md` no worktree da tarefa ativa. Memória própria da ferramenta,
+histórico de conversa e relatórios no chat não são fonte de estado; o Git e o
+GitHub prevalecem sobre qualquer um deles. Não é preciso commitar a cada comando,
+apenas registrar o checkpoint antes de transferir.
+
+### Checkpoint antes de transferir
+
+O agente que encerra ou pausa a sessão atualiza no HANDOFF:
+
+1. worktree (caminho absoluto) e branch;
+2. `HEAD validado`: SHA completo, informando se local e remoto coincidem;
+3. alterações não commitadas, por caminho, ou “Nenhuma”;
+4. último gate concluído e gate em andamento;
+5. testes executados, cada um vinculado ao SHA ou ao working tree em que rodou;
+6. próxima ação autorizada, proibições e bloqueios.
+
+Commit e push do checkpoint seguem a autorização vigente. Sem ela, o HANDOFF fica
+atualizado no working tree e aparece em “Alterações não commitadas”. Um checkpoint
+não pode registrar como concluído check que não rodou no SHA declarado.
+
+O commit que grava o checkpoint muda o HEAD. Por isso o HANDOFF registra o último
+SHA **validado**, e commits posteriores que alterem somente `docs/HANDOFF.md` não
+invalidam suas evidências. Qualquer outra diferença invalida.
+
+### Reconciliação na retomada
+
+1. `git worktree list` e `git status --short --branch` no worktree indicado.
+2. HEAD local com `git rev-parse HEAD`; HEAD remoto com
+   `git ls-remote origin refs/heads/<branch>` ou `gh pr view <n> --json headRefOid`.
+   O clone pode buscar só `main`: não confiar em `origin/<branch>` sem conferir.
+3. `git diff --stat <HEAD validado> HEAD`: se tocar algo além do HANDOFF, as
+   evidências registradas não valem para o HEAD atual.
+4. Alteração não commitada ausente do HANDOFF pertence a outro agente ou pessoa:
+   preservar, não commitar nem descartar, e reportar se afetar a tarefa.
+5. Conferir checks pelo SHA (`gh pr checks <n>` ou check-runs do commit), nunca
+   pela última execução visível.
+6. Divergência entre HANDOFF e Git/GitHub é registrada no próprio HANDOFF antes
+   de qualquer ação da tarefa.
 
 ## Gate 1 — desenvolvimento
 

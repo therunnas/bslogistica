@@ -5,20 +5,25 @@
 Checkpoint curto para retomar o trabalho sem depender de conversa anterior. O
 estado factual detalhado permanece em
 [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md), e a fila em
-[PROGRESS.md](../PROGRESS.md).
+[PROGRESS.md](../PROGRESS.md). Como gravar e reconciliar este checkpoint entre
+Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferência-entre-agentes).
 
 ## Identificação
 
-| Campo                  | Valor                                                                      |
-| ---------------------- | -------------------------------------------------------------------------- |
-| Etapa                  | WORKFLOW-01 — padronização definitiva do desenvolvimento                   |
-| Gate atual             | PR Draft aberto; aguardar CI e revisão independente                        |
-| Branch                 | `docs/workflow-01`                                                         |
-| Base                   | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)                 |
-| PR                     | [#97 — Draft](https://github.com/therunnas/bslogistica/pull/97)            |
-| Ambiente-alvo          | Nenhum ambiente remoto; somente repositório e CI sem secrets               |
-| Última ação comprovada | Commits `9926622` e `ae2f319` publicados; PR #97 Draft aberto              |
-| Próxima ação exata     | Conferir CI do novo HEAD e solicitar revisão independente; não fazer merge |
+| Campo                     | Valor                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| Etapa                     | WORKFLOW-01 — padronização definitiva do desenvolvimento                               |
+| Gate atual                | Revisão independente R1 do PR #97; ajustes R1 aguardando CI no novo HEAD               |
+| Último gate concluído     | Gate 2 — validação local e CI no `HEAD validado`                                       |
+| Worktree                  | `/private/tmp/bs-workflow-01`                                                          |
+| Branch                    | `docs/workflow-01`                                                                     |
+| Base                      | `eb8cec9af11c4b0e314296ed776caf15c3764b5f` (`origin/main`)                             |
+| HEAD validado             | `0e1848ae9cbdcf34a33497a20ef9fc66119b63ee`; local = remoto na retomada da sessão R1    |
+| Alterações não commitadas | Nenhuma além dos ajustes R1 deste checkpoint, entregues no commit seguinte ao validado |
+| PR                        | [#97 — Draft](https://github.com/therunnas/bslogistica/pull/97)                        |
+| Ambiente-alvo             | Nenhum ambiente remoto; somente repositório e CI sem secrets                           |
+| Última ação comprovada    | CI do PR verde em `0e1848a` (run 42019884284); revisão R1 aplicada no working tree     |
+| Próxima ação exata        | Conferir CI do commit R1 e registrar o novo `HEAD validado`; não fazer merge           |
 
 ## Evidências
 
@@ -28,12 +33,17 @@ estado factual detalhado permanece em
 - Supabase HML e Production distintos, ambos com migration head 034.
 - Migrations 035–045 pendentes remotamente; migration 045 presente no Git.
 - Nenhuma homologação real dos Containers foi comprovada.
-- TDD documental: RED com 2/4 testes falhando pelo motivo esperado; GREEN 4/4.
-- Todos os 64 scripts Node `test:*`, lint, TypeScript, Prettier, check documental
-  e `git diff --check` passaram.
-- Build padrão Turbopack ficou bloqueado por `Operation not permitted` ao abrir
-  porta interna, inclusive fora da sandbox. Build alternativo Webpack passou; o
-  build padrão da CI do PR é evidência separada e ainda precisa ser conferido.
+- Commit `ae2f319` (sessão 01): TDD documental RED 2/4 e GREEN 4/4; 64 scripts
+  `test:*`, lint, TypeScript, Prettier, check documental e `git diff --check`
+  passaram localmente. Build Turbopack local bloqueado por `Operation not
+permitted` ao abrir porta interna; build Webpack local passou.
+- `0e1848a`, CI run 42019884284: `validar` (lint, TypeScript, `check:workflow`,
+  `test:workflow`, todas as suítes Node e build padrão) e `sql-local` com
+  sucesso. O build padrão está comprovado na CI, não localmente.
+- Revisão R1 (sessão 02, Claude Code): faltavam worktree, HEAD local/remoto,
+  alterações não commitadas, último gate e checkpoint de transferência entre
+  agentes. Ajustes em `WORKFLOW.md`, `AGENTS.md`, `CLAUDE.md`, neste arquivo e no
+  validador documental; RED 1/5 pelo campo `Worktree` ausente antes do GREEN.
 
 ## Migrations por ambiente
 
@@ -47,7 +57,7 @@ estado factual detalhado permanece em
 ## Autorizações
 
 - editar documentação, template de PR e checks locais/CI sem credenciais;
-- criar branch, commits, push normal e PR Draft;
+- commits e push normal em `docs/workflow-01`, com testes verdes;
 - consultar fatos mutáveis em modo somente leitura.
 
 ## Proibições
@@ -61,7 +71,9 @@ estado factual detalhado permanece em
 ## Bloqueios e riscos
 
 - merge em `main` ainda pode publicar Production automaticamente; a contenção é
-  configuração administrativa futura, não parte deste PR;
+  configuração administrativa futura, não parte deste PR. O próprio merge do
+  PR #97 dispara novo deploy de Production, com código de aplicação igual ao de
+  `eb8cec9`;
 - vínculo exato Preview ↔ HML e escopos de variáveis Vercel permanecem pendentes
   de conferência autenticada;
 - HML está 11 migrations atrás do Git e não deve receber somente a 045;
@@ -69,11 +81,14 @@ estado factual detalhado permanece em
 
 ## Retomada
 
-1. Ler [WORKFLOW.md](WORKFLOW.md) e [AMBIENTES.md](AMBIENTES.md).
-2. Conferir `git status`, `git rev-parse HEAD`, `origin/main` e o PR deste handoff.
-3. Confirmar que WORKFLOW-01 continua sendo a única tarefa ativa e revisar os
-   checks do HEAD exato do PR #97.
-4. Se o PR estiver integrado com autorização, solicitar autorização separada
-   para preparar HML e homologar
-   FIN-PR-11 Containers; não iniciar FIN-PR-12/13 antes disso.
+Sequência preservada: **WORKFLOW-01 → preparação de HML → homologação de
+Containers (FIN-PR-11) → FIN-PR-12 → FIN-PR-13**.
+
+1. Reconciliar Git e GitHub conforme
+   [Transferência entre agentes](WORKFLOW.md#reconciliação-na-retomada).
+2. Confirmar que WORKFLOW-01 continua sendo a única tarefa ativa e que os checks
+   do HEAD exato do PR #97 estão verdes.
+3. Merge do PR #97 só com autorização explícita do usuário.
+4. Integrado o PR, solicitar autorização separada para preparar HML (035–045) e
+   homologar FIN-PR-11 Containers; não iniciar FIN-PR-12/13 antes disso.
 5. Se houver divergência, atualizar diagnóstico e este checkpoint antes de agir.

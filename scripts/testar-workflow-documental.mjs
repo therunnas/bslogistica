@@ -22,8 +22,12 @@ const handoffValido = `# Handoff ativo
 | --- | --- |
 | Etapa | WORKFLOW-01 |
 | Gate atual | Entrega em PR Draft |
+| Último gate concluído | Gate 1 — desenvolvimento |
+| Worktree | /tmp/bs-workflow-01 |
 | Branch | docs/workflow-01 |
 | Base | abc123 |
+| HEAD validado | 0e1848ae9cbdcf34a33497a20ef9fc66119b63ee; local = remoto |
+| Alterações não commitadas | Nenhuma |
 | PR | Pendente de abertura |
 | Ambiente-alvo | Nenhum ambiente remoto |
 | Última ação comprovada | Validação local concluída |
@@ -65,6 +69,22 @@ test("handoff incompleto recusa campo vazio e seção operacional ausente", () =
   const erros = validarHandoff(invalido);
   assert.ok(erros.some((erro) => erro.includes("Próxima ação exata")));
   assert.ok(erros.some((erro) => erro.includes("Proibições")));
+});
+
+test("handoff exige worktree, estado não commitado, último gate e SHA completo", () => {
+  const semContinuidade = handoffValido
+    .replace(/^\| Worktree \|.*\n/m, "")
+    .replace(/^\| Alterações não commitadas \|.*\n/m, "")
+    .replace(/^\| Último gate concluído \|.*\n/m, "")
+    .replace("0e1848ae9cbdcf34a33497a20ef9fc66119b63ee", "0e1848a");
+  const erros = validarHandoff(semContinuidade);
+  for (const campo of ["Worktree", "Alterações não commitadas", "Último gate concluído"]) {
+    assert.ok(
+      erros.some((erro) => erro.includes(campo)),
+      campo,
+    );
+  }
+  assert.ok(erros.some((erro) => erro.includes("HEAD validado") && erro.includes("SHA")));
 });
 
 test("referências locais quebradas falham sem tratar URL externa ou âncora como arquivo", () => {

@@ -102,6 +102,10 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 - Migration, deploy, promoção, variável, flag ou operação remota requer
   autorização específica para o ambiente-alvo. Uma autorização não se propaga
   ao gate seguinte.
+- Codex CLI e Claude Code compartilham um único checkpoint, `docs/HANDOFF.md`.
+  Antes de transferir a sessão e ao retomá-la, seguir “Transferência entre
+  agentes” em [docs/WORKFLOW.md](docs/WORKFLOW.md); a memória do Claude Code não
+  é fonte de estado e não substitui o HANDOFF.
 - Ao terminar ou pausar, atualizar `HANDOFF.md`, `ESTADO_DO_PROJETO.md` e
   `PROGRESS.md` conforme as responsabilidades documentais, sem copiar estado
   mutável para instruções permanentes.
