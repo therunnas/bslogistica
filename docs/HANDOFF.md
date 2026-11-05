@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Etapa                     | FIN-PR-13 — testes integrados e conciliação financeira                                                 |
-| Gate atual                | Implementação e validação local concluídas; preparar commit, push e PR Draft                           |
-| Último gate concluído     | Matriz local 034 → 045, 66 suítes, lint, TypeScript e build verdes                                     |
-| Worktree                  | `/private/tmp/bs-fin-pr-13`                                                                            |
-| Branch                    | `feat/fin-pr-13-integracao-conciliacao`                                                                |
-| Base                      | `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420` (`origin/main`, squash do PR #99)                           |
-| HEAD validado             | `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`; alterações validadas ainda não commitadas neste checkpoint |
-| Alterações não commitadas | Sim — implementação e documentação do FIN-PR-13 prontas para commit                                    |
-| PR                        | Draft a abrir na branch `feat/fin-pr-13-integracao-conciliacao`                                        |
-| Ambiente-alvo             | Nenhum remoto; somente Supabase local descartável e Preview automático futuro                          |
-| Última ação comprovada    | Build de produção passou após 66/66 suítes e 697/697 asserções de compatibilidade                      |
-| Próxima ação exata        | Revisar diff, commitar, fazer push, abrir PR Draft e conferir CI/Preview                               |
+| Campo                     | Valor                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------- |
+| Etapa                     | FIN-PR-13 — testes integrados e conciliação financeira                                       |
+| Gate atual                | PR Draft #100 aberto; aguarda CI, Preview e revisão no HEAD final                            |
+| Último gate concluído     | Matriz local 034 → 045, 66 suítes, lint, TypeScript e build verdes                           |
+| Worktree                  | `/private/tmp/bs-fin-pr-13`                                                                  |
+| Branch                    | `feat/fin-pr-13-integracao-conciliacao`                                                      |
+| Base                      | `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420` (`origin/main`, squash do PR #99)                 |
+| HEAD validado             | `fcd482f7cb34bc51441d3fc38df52bc36ab34f19`; local = remoto antes deste checkpoint documental |
+| Alterações não commitadas | Nenhuma antes deste checkpoint; esta atualização documental será o commit seguinte           |
+| PR                        | [#100 — Draft](https://github.com/therunnas/bslogistica/pull/100)                            |
+| Ambiente-alvo             | Nenhum remoto; somente Supabase local descartável e Preview automático futuro                |
+| Última ação comprovada    | Build de produção passou após 66/66 suítes e 697/697 asserções de compatibilidade            |
+| Próxima ação exata        | Publicar este checkpoint e conferir CI, CodeRabbit e Preview no HEAD final                   |
 
 ## Evidências
 
@@ -41,6 +41,8 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 - Integração local isolada: schemas 034, 037, 038, 039, 040, 041, 042, 043, 044 e
   045; 697 asserções, zero falhas. O cenário 045 registra Containers pela RPC,
   fecha, fatura e exporta pelas rotas reais; nos anteriores a capacidade não existe.
+- Commit de implementação `fcd482f7cb34bc51441d3fc38df52bc36ab34f19`; PR Draft
+  [#100](https://github.com/therunnas/bslogistica/pull/100).
 - Validação geral: 66/66 suítes `test:*`, lint, `tsc --noEmit`, workflow documental,
   Prettier e build de produção passaram.
 - Planilha original Dynamis: não encontrada nos worktrees nem na pasta local
@@ -82,8 +84,8 @@ Sequência: **PR Draft FIN-PR-13 → CI/Preview/revisão → homologação compl
 manual de utilização → preparação controlada de Production 035–045**.
 
 1. Confirmar branch, worktree e diff somente do FIN-PR-13.
-2. Criar commit e push; abrir PR como Draft, sem merge.
-3. Conferir `validar`, `sql-local`, CodeRabbit e Preview no HEAD final.
+2. Conferir `validar`, `sql-local`, CodeRabbit e Preview no HEAD final do PR #100.
+3. Corrigir somente falhas dentro do escopo e manter o PR em Draft, sem merge.
 4. Na homologação posterior, fornecer a planilha original Dynamis, calcular seu
    SHA-256, produzir os JSON de entrada e conciliar componente a componente.
 5. Manter as pendências de homologação; não declarar o projeto finalizado.

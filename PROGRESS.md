@@ -27,8 +27,9 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 **FIN-PR-13 — testes integrados e conciliação financeira.** Branch
 `feat/fin-pr-13-integracao-conciliacao`, worktree `/private/tmp/bs-fin-pr-13`, a partir
-da `main` `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. Implementação local concluída;
-PR Draft e CI são o gate atual. O estado e a próxima ação exatos ficam no
+da `main` `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. Implementação local concluída e
+PR [#100](https://github.com/therunnas/bslogistica/pull/100) aberto como Draft;
+CI, Preview e revisão são o gate atual. O estado e a próxima ação exatos ficam no
 [HANDOFF](docs/HANDOFF.md).
 
 **FIN-PR-12:** PR #99 mergeado por squash em `3e5b7b1`; CI de `main` e deploy
