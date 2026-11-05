@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | Estabilização e pré-Production (sessão 15)                                                                                                                                                      |
-| Gate atual                | Backup de Production restaurado e verificado; PRs #103 (docs) e #104 (achado I) abertos; aguarda revisão e decisão de implantar                                                                 |
-| Último gate concluído     | PR #102 mergeado em `b63d33b`; backup novo de Production (034) criado, cifrado e restaurado em ambiente isolado                                                                                 |
-| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                                                                                                       |
-| Branch                    | `docs/sessao-14-manual-e-producao` (PR #103); correção I em `fix/dashboard-custo-containers` (PR #104)                                                                                          |
-| Base                      | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (`origin/main`, squash do PR #101)                                                                                                                   |
-| HEAD validado             | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (main); esta etapa só altera documentação                                                                                                            |
-| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                                                                                          |
-| PR                        | [#103](https://github.com/therunnas/bslogistica/pull/103) docs e [#104](https://github.com/therunnas/bslogistica/pull/104) achado I, ambos abertos, sem merge automático; #101 e #102 mergeados |
-| Ambiente-alvo             | Production (034) só lida e copiada (dump); HML e stacks locais isoladas; nada aplicado                                                                                                          |
-| Última ação comprovada    | Restauração do backup: head 034, contagens e catálogo idênticos aos de Production (md5 das funções igual)                                                                                       |
-| Próxima ação exata        | Revisar e mergear #103 e #104; segunda cópia do backup; confirmar modelos de e-mail no Dashboard; então autorizar 035–045                                                                       |
+| Campo                     | Valor                                                                                                                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Etapa                     | Fechamento pré-Production (sessão 16)                                                                                                                                                         |
+| Gate atual                | Ensaio 034 → 045 e backup restaurado concluídos; parecer NO-GO condicional (4 itens não técnicos)                                                                                             |
+| Último gate concluído     | PR #104 mergeado em `071ea6d`; ensaio integral 034 → 045 sobre o banco restaurado, sem erro                                                                                                   |
+| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                                                                                                     |
+| Branch                    | `docs/sessao-14-manual-e-producao` (PR #103); margem do Fechamento/Faturamento em `fix/margem-containers-faturamento-fechamento` (PR #105)                                                    |
+| Base                      | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (`origin/main`, squash do PR #101)                                                                                                                 |
+| HEAD validado             | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (main); esta etapa só altera documentação                                                                                                          |
+| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                                                                                        |
+| PR                        | [#103](https://github.com/therunnas/bslogistica/pull/103) docs e [#105](https://github.com/therunnas/bslogistica/pull/105) margem, abertos, sem merge automático; #101, #102 e #104 mergeados |
+| Ambiente-alvo             | Production (034) só lida e copiada (dump); HML e stacks locais isoladas; nada aplicado                                                                                                        |
+| Última ação comprovada    | Banco restaurado migrado 034 → 045 (11 migrations, ~2,5 s), catálogo = HML, reversão ensaiada até 034                                                                                         |
+| Próxima ação exata        | Segunda cópia do backup; conferir e-mails no Dashboard; revisar #103/#105; só então pedir autorização da janela                                                                               |
 
 ## Evidências
 
@@ -71,6 +71,11 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   `supabase config pull --dry-run` (nada gravado). **Backup novo de Production** em
   `~/bs-backups-producao/2026-11-05-034/` (cifrado, senha no Chaveiro) com restauração local
   comprovada; Production não tem dados de negócio.
+
+- Sessão 16: #104 corrigido para o schema 034 (defeito medido no PostgREST real sobre o backup) e
+  mergeado (`071ea6d`); margem total no Fechamento e no Faturamento no PR #105; backup verificado e
+  restaurado (Auth funcional); ensaio integral 034 → 045 e reversão; checklists de e-mail e backup.
+  Parecer: NO-GO condicional (runbook, seção 11).
 
 ## Migrations por ambiente
 

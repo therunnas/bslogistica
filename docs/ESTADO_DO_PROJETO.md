@@ -5,6 +5,14 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## Sessão 16 (05/11/2026)
+
+PR #104 mergeado (`071ea6d`) após correção de compatibilidade com a 034. Backup de Production restaurado
+com Auth funcional; ensaio integral 034 → 045 e reversão sobre o banco restaurado, sem erro; margem total
+(apontamentos + Containers) no PR #105. Parecer: **NO-GO condicional** para Production. Production segue na 034.
+Detalhes em [plano de Production](runbooks/producao-034-045.md), [backup](runbooks/backup-production.md) e
+[checklist de e-mail](runbooks/checklist-email-supabase.md).
+
 ## Sessão 15 (05/11/2026)
 
 PR #102 mergeado (`b63d33b`). Achado I corrigido no PR #104 (custo de Containers na margem do

@@ -53,8 +53,9 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
    (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
-2. **Pendências:** revisão humana dos PRs #103 (documentação) e #104 (achado I); modelos de
-   e-mail do Dashboard; segunda cópia do backup de Production (feito e restaurado em 05/11).
+2. **Pendências:** revisão humana dos PRs #103 (documentação) e #105 (margem do Fechamento/Faturamento);
+   modelos de e-mail do Dashboard; segunda cópia do backup de Production (criado, restaurado e
+   ensaiado 034 → 045 em 05/11). Parecer atual: NO-GO condicional.
 3. [Manual de uso](docs/MANUAL_DE_USO.md) redigido; [plano de Production
    034 → 045](docs/runbooks/producao-034-045.md) redigido, **sem execução** (gate próprio,
    com backup novo).

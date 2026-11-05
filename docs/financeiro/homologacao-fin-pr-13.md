@@ -302,7 +302,7 @@ funções Conferente, Ajudante, Serviços Gerais e Operador, diárias de R$ 210 
   o ajuste: R$ 928,13. O centavo vem de arredondar 9,375 por linha (9,38 × 3 = 28,14) contra
   arredondar 28,125 uma vez (28,13). Nenhuma fatura foi afetada, e nenhum cálculo está errado:
   o cartão por cliente é uma soma de apontamentos, não a receita consolidada.
-- **I (corrigido no [PR #104](https://github.com/therunnas/bslogistica/pull/104), aberto).** A margem do Dashboard usa a receita total (inclui adicionais
+- **I (corrigido no [PR #104](https://github.com/therunnas/bslogistica/pull/104), mergeado em `071ea6d`).** A margem do Dashboard usa a receita total (inclui adicionais
   de serviço e Containers) contra um **custo que só soma os apontamentos**; o custo de Containers
   não entra. A margem do período fica superestimada quando há Containers. Não corrigido: depende
   de decisão da BS sobre onde exibir o custo de Containers.
@@ -324,3 +324,27 @@ funções Conferente, Ajudante, Serviços Gerais e Operador, diárias de R$ 210 
 - **Achado J, configuração real de Auth lida** (somente leitura): ver
   [plano de Production](../runbooks/producao-034-045.md), seção 1.2. O conteúdo dos modelos de e-mail
   e a expiração continuam dependendo do administrador do Supabase.
+
+## Sessão 16 (05/11/2026)
+
+- **PR #104 mergeado (`071ea6d`).** A revisão de compatibilidade com o schema 034 achou um defeito real:
+  num banco **restaurado do backup de Production**, para a tabela ausente o PostgREST responde GET com
+  404/`PGRST205` mas o HEAD de contagem com **204 sem erro e `count` nulo**; o paginador lançava
+  `CONTAGEM_INVALIDA` e o Dashboard mostraria "custo de Containers indisponível" em Production. Corrigido
+  com sondagem prévia, com teste RED/GREEN, antes do merge.
+- **Margem do Fechamento e da prévia do Faturamento (PR #105, aberto).** Definições: custo de apontamentos,
+  custo de Containers (`cost_total_cents` do serviço não cancelado do adicional do recorte), custo total e
+  margem total = receita total − custo total (igual ao `total_cost` da fatura). No HML (cliente A, 1ª quinzena
+  de outubro): Fechamento e Faturamento mostravam custo R$ 1.151,63 e margem R$ 2.630,88; a fatura emitida
+  guardou custo R$ 1.781,64 (margem R$ 2.000,87). Medido em PostgREST real: 034 → custo 0; 045 → R$ 550,01 nos
+  dois adicionais ativos (cancelado fora).
+- **Backup:** restaurado de novo a partir dos arquivos cifrados, com Auth funcional (login, MFA, recuperação com
+  e sem TOTP). `auth.one_time_tokens`: os 3 tokens pendentes de Production **só não restauravam por diferença
+  de versão do GoTrue** (falta da coluna `expires_at` no local); com a coluna criada, voltam todos.
+  Privilégios: o dump não reemite os `REVOKE`; restaurar em destino com privilégios padrão deixa `anon`,
+  `authenticated` e `service_role` com `ALL`. Procedimento de reconciliação em
+  [backup-production.md](../runbooks/backup-production.md).
+- **E-mail:** [checklist](../runbooks/checklist-email-supabase.md) para a conferência manual; DNS do domínio de
+  envio conferido por leitura (DKIM, SPF de retorno e DMARC publicados).
+- **Ensaio 034 → 045** sobre o banco restaurado e parecer **NO-GO condicional** em
+  [producao-034-045.md](../runbooks/producao-034-045.md), seções 5.1 e 11.

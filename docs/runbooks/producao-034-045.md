@@ -115,6 +115,11 @@ tabelas 0, motor ligado), e **catálogo idêntico**: 21 tabelas, 120 funções, 
 de `public` (`9668570d9a589b4be7f3b5588b5276a1`). O backup é válido **enquanto Production
 não receber escrita**; qualquer cadastro novo exige um dump novo antes da janela.
 
+### 4.2 Procedimento detalhado
+
+Criação, verificação, restauração (com os ajustes aprendidos) e a **segunda cópia** em destino
+independente estão em [backup-production.md](backup-production.md).
+
 ## 5. Verificação de dependências e dados
 
 - Os scripts `scripts/comparar-catalogo-*.sh` trabalham **somente no Supabase local** e comparam
@@ -127,6 +132,43 @@ não receber escrita**; qualquer cadastro novo exige um dump novo antes da janel
   localidade (044), unicidade por colaborador/operação/data, faturas existentes e vínculos.
 - Registrar contagens e somas financeiras **antes** (linha de base) para a comparação final.
 - Ler as flags: `financial_engine_settings`, `pricing_settings`.
+
+### 5.1 Ensaio integral 034 → 045 sobre o banco restaurado (05/11/2026, sem escrita em Production)
+
+Feito no Supabase **local isolado**, a partir do backup de Production restaurado (head 034, 21 tabelas,
+120 funções):
+
+1. `supabase db push --dry-run` listou exatamente as 11 migrations 035 → 045, na ordem numérica.
+2. `supabase db push` aplicou as 11 em cerca de **2,5 s** (sem erro). Head `20261112120000`, 50 registros.
+3. **Catálogo final igual ao do HML (045):** 31 tabelas, 183 funções, 94 gatilhos, 87 políticas,
+   89 índices, 220 restrições, RLS em 31 tabelas, e os mesmos hashes de corpo das funções, políticas,
+   gatilhos, privilégios de tabela e de coluna, donos e colunas. Diferença residual só em privilégios de
+   função, vinda da restauração (ver [backup](backup-production.md)).
+4. **Dados e flags:** contagens e somas inalteradas (10 perfis, 9 papéis, 33 + 1 auditorias, 3 contas, 1
+   fator MFA, 0 dados de negócio); **resolução comercial OFF** (`pricing_settings` nasce desligada);
+   motor por vigência continua ligado; as 4 funções-padrão (`administrativo`, `auxiliar_producao`,
+   `conferente`, `operador`) são semeadas pela 039; tabelas novas (Containers, tarifas, feriados
+   territoriais) vazias.
+5. **Recuperação ensaiada:** os 11 SQLs de reversão (`rollback-*.sql`) executados na ordem inversa
+   (045 → 035) rodaram sem erro e devolveram o banco a 21 tabelas e 120 funções, com a impressão
+   digital igual à de Production (034) em todos os hashes, menos privilégios de função (artefato).
+6. **Dois cuidados que o ensaio revelou:**
+   - `supabase db push` **não é atômico** quando o registro no histórico falha: com a tabela
+     `schema_migrations` sem permissão, a 035 criou as 6 funções `nucleo_*` e **não** gravou o histórico.
+     Em caso de falha no meio, conferir o catálogo antes de repetir; não reaplicar às cegas.
+   - Os SQLs de reversão **não** apagam `supabase_migrations.schema_migrations`: após reverter,
+     `delete from supabase_migrations.schema_migrations where version > '20261101120000'` (com autorização).
+7. **Reversão recusa dados:** com um serviço de Containers e adicionais com competência já gravados, os
+   SQLs `rollback-container-servico` e `rollback-periodo-contratual` **recusaram** executar (guardas
+   contra perda de dado). Isso é uma proteção, mas significa que, **depois que houver dado novo**, a
+   recuperação deixa de ser "rodar o rollback": passa a exigir decisão humana (preservar ou descartar).
+   Por isso a janela deve ocorrer **antes** de qualquer cadastro em Production.
+8. Compatibilidade do aplicativo: o Dashboard e os Relatórios, ao consultar `container_services`,
+   precisam tratar a tabela ausente em 034 (medido: GET 404/PGRST205 e HEAD 204 sem erro; corrigido no
+   PR #104). Repetir esse tipo de medição para qualquer leitura nova antes de publicar.
+
+O ensaio **não** prova: desempenho em Production, privilégios do papel `postgres` hospedado (o local é
+superusuário), nem a edição do aplicativo em navegador sobre esse banco.
 
 ## 6. Controle do deploy
 
@@ -187,3 +229,29 @@ backup não restaurar; (g) a janela estourar; (h) qualquer dúvida da pessoa res
   Containers na margem; Dynamis).
 - Manual de uso ([MANUAL_DE_USO](../MANUAL_DE_USO.md)) e treinamento antes de abrir Containers
   ao uso diário.
+
+## 11. Parecer GO / NO-GO (sessão 16, 05/11/2026)
+
+**NO-GO para executar hoje; GO técnico condicionado a quatro itens que não são de código.**
+
+Evidências técnicas a favor: backup novo cifrado, verificado e restaurado (catálogo e dados idênticos a
+Production); ensaio integral 034 → 045 sem erro (11 migrations, ~2,5 s) com catálogo final igual ao do HML;
+resolução comercial OFF e motor inalterado; reversão ensaiada (11 SQLs) até a estrutura de 034; Auth restaurado
+funcional (login, MFA, recuperação); leituras novas do aplicativo seguras em 034 e em 045 (medidas em
+PostgREST real); Production sem dados de negócio.
+
+Faltam, antes de pedir autorização de execução:
+
+1. **Segunda cópia do backup** em destino independente, decidido e autorizado pela BS
+   ([backup-production.md](backup-production.md), seção 4).
+2. **Modelos de e-mail do Dashboard** de convite e recuperação, expiração e Site URL conferidos por um
+   administrador ([checklist](checklist-email-supabase.md)), e a decisão sobre o primeiro acesso do convidado.
+3. **Revisão humana e merge** dos PRs de documentação e do PR #105 (margem do Fechamento/Faturamento);
+   nenhum deles muda o banco, e o #105 é seguro em 034, mas muda números exibidos.
+4. **Janela autorizada**, com dump novo imediatamente antes (se houver escrita), contas de teste de
+   Production autorizadas para o smoke autenticado, e a pessoa responsável presente.
+
+Riscos que permanecem mesmo com os quatro itens: o ensaio foi num Postgres local (superusuário), não prova
+privilégios do `postgres` hospedado (a aplicação em HML, em 05/11, é a evidência de que as migrations
+rodam no ambiente hospedado); o smoke autenticado em Production ainda não existe e só se faz depois da
+migração; e a restauração completa perderia dados escritos depois do dump.
