@@ -24,12 +24,12 @@ interna, leitura sob RLS pela sessão. O arquivo tem duas abas:
 - **Fechamento:** título "Fechamento – 1ª/2ª quinzena de mês/ano" (ou
   "mês/ano", ou as datas do recorte), cliente e período; uma linha por diária, em
   ordem de colaborador (pt-BR) e data; o ajuste de arredondamento previsto do
-  colaborador logo depois das diárias dele; cada serviço avulso (containers
+  colaborador logo depois das diárias dele; cada adicional de serviço (containers
   inclusive) em linha própria; o ajuste já faturado no fim. Colunas: Colaborador,
   Função, Data, Operação, Tipo do dia, Lançamento, Horas extras (h), Diária, Hora
   extra, Domingo/feriado, Adicional e Total;
 - **Resumo por colaborador:** diárias, horas, componentes e total por
-  colaborador, mais as linhas de serviços avulsos e de ajuste já faturado.
+  colaborador, mais as linhas de adicionais de serviço e de ajuste já faturado.
 
 Nas duas: autofiltro em todas as colunas, linha `SUBTOTAL(109; …)` que acompanha
 o filtro, "Total do fechamento" fixo, datas `dd/mm/aaaa`, moeda `R$`, cabeçalho
@@ -41,7 +41,7 @@ SUBTOTAL montados pelo gerador.
 modelo só soma para apresentar e **recusa exportar** quando a soma das linhas não é
 a receita do Fechamento, quando um componente não fecha com o consolidado, quando
 os componentes de um lançamento não somam o cobrado ou quando as diárias do resumo
-divergem.
+divergem. A recusa responde 422 `dado-inconsistente`, sem arquivo.
 
 **Validação local (05/11/2026):** suíte nova `test:fechamento-xlsx-cliente` com
 92 asserções sobre o arquivo real (fixture sintética V2 com domingo, sábado,
@@ -53,6 +53,18 @@ a nova rota e o novo gerador. Todas as 65 suítes `test:*`, lint, TypeScript,
 Prettier, `git diff --check` e build de produção passaram. A conferência no
 Microsoft Excel real não foi concluída: a automação local não abriu a pasta
 (diálogo do aplicativo); fica para a homologação.
+
+**Revisão R1 (sessão 07, mesmo agente que implementou — não é revisão
+independente no sentido do WORKFLOW):** sem achado crítico ou alto. Corrigidos:
+rótulo "Serviço avulso" trocado por "Adicional de serviço", o termo único do
+projeto para `billing_additionals`; erro de soma divergente passou de 500 genérico
+a 422 `dado-inconsistente`; a rota do cliente entrou na suíte de compatibilidade de
+deploy. Resultados: `test:fechamento-xlsx-cliente` 95/95; 65/65 suítes `test:*`;
+compatibilidade em cópia isolada, schemas 034 → 045, 685 asserções e 0 falhas —
+em **todos**, inclusive a 034 de Production, `POST /api/fechamento/xlsx-cliente`
+devolveu 200 com "Total do fechamento" igual à receita do `GET` e sem custo,
+margem nem resultado. Assinatura de frescor confirmada cobrindo lançamentos,
+adicionais e ajustes exibidos. Excel real continua não verificado.
 
 **Não usar R$ 35.118,12** como resultado esperado de nenhum conjunto que não seja a
 quinzena Dynamis original: essa conciliação é do FIN-PR-13.
