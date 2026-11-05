@@ -180,6 +180,9 @@ jobs:
       - name: Teste fechamento-xlsx-cliente
         run: npm run test:fechamento-xlsx-cliente
 
+      - name: Teste FIN-PR-13
+        run: npm run test:fin-pr-13
+
       - name: Teste apontamentos-c07
         run: npm run test:apontamentos-c07
 

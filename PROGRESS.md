@@ -25,11 +25,19 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FIN-PR-12 — exportação Excel no modelo do cliente (Dynamis).** Branch
-`feat/fin-pr-12-exportacao-dynamis`, worktree `/private/tmp/bs-fin-pr-12`. Implementada,
-revisada em R1 e reconciliada com a `main` depois do merge do PR #98 (`a2fec9a`);
-PR #99 em Draft, **não homologado**. O estado e a próxima ação exatos ficam no
+**FIN-PR-13 — testes integrados e conciliação financeira.** Branch
+`feat/fin-pr-13-integracao-conciliacao`, worktree `/private/tmp/bs-fin-pr-13`, a partir
+da `main` `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. Implementação local concluída e
+PR [#100](https://github.com/therunnas/bslogistica/pull/100) aberto como Draft;
+Revisão independente da sessão 10 corrigiu quatro achados P2 com RED/GREEN;
+a matriz de homologação está em
+[Homologação integrada](docs/financeiro/homologacao-fin-pr-13.md).
+Validação final/CI e homologação posterior são o gate atual. O estado e a próxima ação exatos ficam no
 [HANDOFF](docs/HANDOFF.md).
+
+**FIN-PR-12:** PR #99 mergeado por squash em `3e5b7b1`; CI de `main` e deploy
+automático de Production verdes. A exportação continua **não homologada** com o
+Excel real da Dynamis.
 
 **FIN-PR-11:** HML recebeu 035–045 em 05/11/2026, após backup restaurado,
 compatibilidade e dry-run; verificações pós-migration aprovadas. Os nove fluxos de
@@ -43,8 +51,7 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 ### Fila
 
-1. **FIN-PR-13**: testes integrados, HML e conciliação — próximo, depois do merge
-   autorizado do PR #99.
+1. **Concluir o PR Draft do FIN-PR-13:** CI, Preview e revisão; sem merge nesta sessão.
 2. **Homologação completa E2E** no Preview ligado ao HML, cobrindo FIN-PR-11
    (nove fluxos de Containers), FIN-PR-12 e FIN-PR-13.
 3. Manual de utilização e preparação de Production (035–045 em Production é gate
@@ -166,7 +173,13 @@ para a última evidência de integração.
    “Fechamento – quinzena/mês”, ordem por colaborador/data e aba resumo por
    colaborador. Não incluir custo, lucro ou margem. Preservar Faturamento,
    Fechamento e Relatórios separados, sem quarta aba global de exportações.
-5. FIN-PR-13: testes integrados, HML e conciliação com R$ 35.118,12.
+5. **FIN-PR-13 implementado localmente, conciliação real pendente:** o runner
+   integrado cobre apontamentos, diárias, HE, adicionais, Containers, fechamento,
+   faturamento e os dois XLSX em banco local descartável. A base comercial aceita
+   proveniência por arquivo e SHA-256 e compara cada componente sem tolerância. A
+   modelo comercial Dynamis ainda não está acessível nas fontes locais autorizadas;
+   portanto R$ 35.118,12 não foi usado como resultado de fixture e a conciliação
+   real segue pendente.
 
 ### Fase B — ativação controlada
 

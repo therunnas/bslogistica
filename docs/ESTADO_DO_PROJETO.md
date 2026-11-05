@@ -5,10 +5,96 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## FIN-PR-13 — integração e conciliação financeira (05/11/2026)
+
+### Revisão independente — sessão 10
+
+Retomada no HEAD `39e7262f0dd0b7a63a17b58eb902034a670ec15a`, sem alterações
+parciais posteriores. CI run `42069242206` e Preview `7579772555` verdes;
+CodeRabbit havia pulado a revisão. Outro agente, em contexto separado e somente
+leitura, revisou código e contratos e reproduziu quatro achados **P2**, sem
+crítico/alto identificado: ajuste negativo legítimo recusado; snapshot serializado
+sem validação suficiente (frações que se anulam, versão/detalhes/lastro e contagens
+inconsistentes); duplicidades e IDs de Containers sem correspondência; SHA-256
+apenas declarado, sem verificação dos bytes pelo CLI.
+
+Correções com RED/GREEN: ajustes signed com lastro; centavos inteiros seguros
+validados antes das somas; conferência de versão, detalhes/consolidado, contagens,
+colaboradores e ajustes; duplicidade e vínculos ausentes recusados; datas civis
+inválidas/invertidas recusadas; CLI verifica arquivo-fonte pelo hash (caminho
+relativo ao JSON da base) e códigos 0/1/2. A suíte também confere no XML real o
+total e a receita do Container. O revisor repetiu as reproduções e aprovou o delta
+final no working tree. Revisão por agente do mesmo modelo não substitui revisão
+humana ou homologação. Nenhuma regra comercial, migration, grant ou RLS mudou.
+
+Validação da sessão 10 no working tree revisado: 66/66 suítes, lint,
+TypeScript, Prettier, workflow documental, diff check e build aprovados. A matriz
+local 034–045 está sendo repetida; seu resultado final e o novo HEAD de CI ficam
+no HANDOFF ao encerrar.
+
+Preparada [matriz E2E](financeiro/homologacao-fin-pr-13.md), com 27 casos,
+os nove fluxos de Containers, critérios/evidências e distinção entre uso de dados
+existentes (a confirmar) e preparação controlada em HML. Todos continuam NÃO
+EXECUTADOS. Preview comum não tem secrets de administração/recuperação; esses
+casos exigem candidato com capacidade comprovada e autorização específica.
+
+O arquivo `Dynamis Controle de jornada 2026 (1).xlsx` foi esclarecido pelo usuário
+como **modelo comercial de referência**, não especificação das regras atuais.
+Nova busca local autorizada não encontrou cópia: **modelo externo ainda não
+acessível**. Não se inferiram abas/fórmulas nem se forçou equivalência com V2.
+A falta do modelo não bloqueia a revisão técnica do PR; limita a comparação
+comercial e a validação real do Excel. O plano registra como explicar diferenças
+históricas por componente, preservando o motor aprovado.
+
+**Estado:** implementação e validação local concluídas na branch
+`feat/fin-pr-13-integracao-conciliacao`, baseada na `main`
+`3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. O PR
+[#100](https://github.com/therunnas/bslogistica/pull/100) foi aberto como Draft no
+commit `fcd482f7cb34bc51441d3fc38df52bc36ab34f19`. Nenhum banco remoto, migration,
+secret ou configuração foi alterado.
+
+**FIN-PR-12 integrado:** o PR #99 foi marcado Ready e mergeado por squash somente
+depois da reconfirmação do HEAD autorizado
+`9b98b072a146d347a966c64c7c8c7a57669ed91b`, CI verde e estado mergeável. A
+`main` resultante é `3e5b7b17858fddfcd7fe7f5d96aeff8e6581f420`. O run de CI de `main`
+`42051545919` terminou verde; o deployment automático de Production
+`7577211847` terminou `success`, o domínio redirecionou `/` para `/login` e
+`/login` respondeu 200 com CSP ligado ao projeto de Production. Isso não homologa
+o Excel real.
+
+**O que foi implementado:** `conciliacao-comercial.ts` valida uma base externa com
+arquivo e SHA-256, cliente, período, quantidades, total e componentes em centavos:
+diárias, horas extras, domingo/feriado, adicional diário, outros adicionais,
+Containers e ajustes. A comparação é exata, informa diferenças por componente e
+nunca corrige valores. `conciliar-fin-pr-13.mjs` recebe três JSON locais (base,
+`FechamentoData` e IDs dos adicionais vinculados a Containers), imprime o relatório
+e retorna código diferente de zero quando há divergência ou entrada inválida.
+
+**Prova integrada local:** fixture deliberadamente diferente da Dynamis e stack
+Supabase descartável isolada por `project_id` e portas. A matriz 034, 037, 038,
+039, 040, 041, 042, 043, 044 e 045 passou com **697 asserções e zero falhas**.
+No 045, a RPC real registrou um serviço de dois Containers, receita de R$ 45,67,
+custo distribuído de R$ 30,03 e dois participantes; o fechamento separou esse
+valor de R$ 12,34 em outro adicional, a fatura conciliou itens/receita/custo e os
+XLSX interno e do cliente foram gerados pelas rotas reais. Nos schemas anteriores,
+a capacidade de Containers permaneceu ausente de modo seguro. As 66 suítes
+`test:*`, lint, TypeScript, workflow documental, Prettier e build também passaram.
+
+**Base Dynamis:** a planilha original de 01–15/09/2026 não foi encontrada nos
+worktrees do projeto nem na pasta local autorizada do projeto. Só existem as
+referências documentais de 141 apontamentos, 14 colaboradores e R$ 35.118,12
+(R$ 33.050,00 em diárias e R$ 2.068,12 em horas extras). Esses números **não foram
+usados como esperado de fixture sintética**. A conciliação real e a validação no
+Excel continuam pendentes até a fonte original ser fornecida com procedência e
+hash verificáveis.
+
+**Pendências preservadas:** nove fluxos reais de Containers, Excel real, jornada
+completa de cadastro a faturamento, matriz de segurança/permissões, manual de uso
+e preparação controlada de Production 035–045. O projeto não está finalizado.
+
 ## FIN-PR-12 — Excel do cliente (modelo Dynamis, 05/11/2026)
 
-**Estado:** implementado e validado localmente na branch
-`feat/fin-pr-12-exportacao-dynamis` (base `main` `314c08c`); **não homologado**.
+**Estado:** mergeado pelo PR #99 em `3e5b7b1`; **não homologado**.
 A homologação funcional completa será feita depois do FIN-PR-13, de ponta a ponta,
 no Preview ligado ao HML. Nenhuma migration, regra financeira, RLS ou Auth mudou.
 

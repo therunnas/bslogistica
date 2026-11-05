@@ -32,6 +32,7 @@ import {
   classificarErroContainer,
   lerVinculoAdicionalContainer,
 } from "../src/lib/container-servico-dados.ts";
+import { registrarServicoContainer } from "../src/lib/container-servico-backend.ts";
 
 import { montarRegistroDeAdicional } from "../src/lib/adicionais.ts";
 import { montarCargaDaRpc } from "../src/lib/apontamentos-salvar.ts";
@@ -39,6 +40,8 @@ import { carregarFechamento, dependenciasComSupabase } from "../src/lib/fechamen
 import { verificarDisponibilidade } from "../src/lib/fechamento/disponibilidade.ts";
 import { csvDoFechamento } from "../src/lib/fechamento/exportacao.ts";
 import { gerarXlsxDoFechamento } from "../src/lib/fechamento/xlsx.ts";
+import { gerarXlsxDoCliente } from "../src/lib/fechamento/xlsx-cliente.ts";
+import { extrairComponentesDoFechamento } from "../src/lib/fechamento/conciliacao-comercial.ts";
 import { lerTabelaPaginada } from "../src/lib/paginacao.ts";
 import { montarLinhas } from "../src/lib/ledger-estado.ts";
 import { lerResumoFinanceiro } from "../src/lib/resumo-financeiro.ts";
@@ -247,6 +250,13 @@ const somaCobrada = Math.round(
     ),
   ) * 100,
 );
+const somaCusto = Math.round(
+  Number(
+    psql(
+      `select coalesce(sum(cost_amount), 0) from public.timesheet_entries where status <> 'absent';`,
+    ),
+  ) * 100,
+);
 const temColunas = psql(
   `select count(*) from information_schema.columns where table_name = 'timesheet_entries' and column_name = 'calc_version';`,
 );
@@ -412,6 +422,44 @@ verificar(
   ],
   ["string", esperaPeriodo],
 );
+const CONTAINER_CENTAVOS = cenario === "banco-045" ? 4567 : 0;
+const CUSTO_CONTAINER_CENTAVOS = cenario === "banco-045" ? 3003 : 0;
+let adicionalDeContainer = null;
+if (cenario === "banco-045") {
+  const servicoId = await registrarServicoContainer(
+    cliente,
+    {
+      clienteId: C,
+      operacaoId: "5c39e000-0000-4000-8000-0000000000a1",
+      solicitadoEm: "2026-03-09",
+      executadoEm: "2026-03-10",
+      descricao: "Descarga de dois containers — cenário integrado FIN-PR-13",
+      quantidade: 2,
+      totalCobrado: "45,67",
+      referencia: "SINTETICO-FIN-PR-13",
+      participantes: [
+        { colaboradorId: "5c39f000-0000-4000-8000-000000000001", valorDevido: "10,01" },
+        { colaboradorId: "5c39f000-0000-4000-8000-000000000002", valorDevido: "20,02" },
+      ],
+      modalidadeCusto: "total_distribuido",
+      totalDistribuido: "30,03",
+      competenciaCobranca: { inicio: "2026-03-01", fim: "2026-03-15" },
+    },
+    "5c45b000-0000-4000-8000-000000000013",
+    "Cenário local integrado FIN-PR-13",
+  );
+  const servico = await cliente
+    .from("container_services")
+    .select("billing_additional_id,revenue_cents,cost_total_cents")
+    .eq("id", servicoId)
+    .single();
+  adicionalDeContainer = servico.data?.billing_additional_id ?? null;
+  verificar(
+    "P4b. Containers: registro real cria uma receita e congela o custo distribuído",
+    [servico.error?.message ?? servico.data?.revenue_cents, servico.data?.cost_total_cents],
+    [4567, 3003],
+  );
+}
 const listaAdicionais = await cliente.from("billing_additionals").select("*").eq("client_id", C);
 verificar(
   "P5. leitura dos adicionais como a tela faz (select *)",
@@ -419,17 +467,42 @@ verificar(
     listaAdicionais.error?.message ?? listaAdicionais.data.length,
     "billing_period_start" in (listaAdicionais.data?.[0] ?? {}),
   ],
-  [1, esperaPeriodo],
+  [cenario === "banco-045" ? 2 : 1, esperaPeriodo],
 );
 const comAdicional = await carregarFechamento(filtros, dependenciasComSupabase(cliente));
 verificar(
   "P6. Fechamento da 1ª quinzena traz o adicional (pela competência na 038, pela execução antes)",
   [
-    comAdicional.adicionais.map((a) => a.valorCentavos),
+    comAdicional.adicionais.map((a) => a.valorCentavos).sort((a, b) => a - b),
     comAdicional.adicionais[0]?.competenciaInicio ?? null,
   ],
-  [[ADICIONAL_CENTAVOS], esperaPeriodo ? "2026-03-01" : null],
+  [
+    cenario === "banco-045" ? [ADICIONAL_CENTAVOS, CONTAINER_CENTAVOS] : [ADICIONAL_CENTAVOS],
+    esperaPeriodo ? "2026-03-01" : null,
+  ],
 );
+const xlsxComAdicional = await gerarXlsxDoFechamento(comAdicional);
+const xlsxClienteComAdicional = await gerarXlsxDoCliente(comAdicional);
+verificar(
+  "P6b. Fechamento com adicionais gera os dois XLSX reais",
+  [
+    xlsxComAdicional.subarray(0, 2).toString("latin1"),
+    xlsxClienteComAdicional.subarray(0, 2).toString("latin1"),
+  ],
+  ["PK", "PK"],
+);
+if (cenario === "banco-045") {
+  const componentes = extrairComponentesDoFechamento(comAdicional, [adicionalDeContainer]);
+  verificar(
+    "P6c. Conciliação separa Containers dos demais adicionais e fecha a receita",
+    [
+      componentes.containersCentavos,
+      componentes.outrosAdicionaisCentavos,
+      Object.values(componentes).reduce((total, valor) => total + valor, 0),
+    ],
+    [CONTAINER_CENTAVOS, ADICIONAL_CENTAVOS, comAdicional.financeiro.receitaCentavos],
+  );
+}
 if (esperaPeriodo) {
   const mes = await cliente.rpc("gerar_fatura", {
     _client_id: C,
@@ -471,7 +544,7 @@ if (esperaPeriodo) {
       antigoCruza.error?.code,
       Number(
         psql(
-          `select count(*) from public.billing_additionals where client_id = '${C}' and period_start = date '2026-03-10';`,
+          `select count(*) from public.billing_additionals where client_id = '${C}' and period_start = date '2026-03-10' and period_end = date '2026-03-20' and description = 'Adicional do app antigo';`,
         ),
       ),
     ],
@@ -609,16 +682,25 @@ const itens = Number(
 const total = Number(
   psql(`select total_amount from public.invoices where id = '${fatura.data?.id}';`),
 );
+const custoDaFatura = Number(
+  psql(`select total_cost from public.invoices where id = '${fatura.data?.id}';`),
+);
+const totalComAdicionais = somaCobrada + ADICIONAL_CENTAVOS + CONTAINER_CENTAVOS;
 verificar(
-  "G2. Σ itens = total da fatura = Σ cobrado + adicional",
-  [centavos(itens), centavos(total)],
-  [somaCobrada + ADICIONAL_CENTAVOS, somaCobrada + ADICIONAL_CENTAVOS],
+  "G2. Σ itens = total da fatura; custo inclui apenas o custo congelado de Containers",
+  [centavos(itens), centavos(total), centavos(custoDaFatura)],
+  [totalComAdicionais, totalComAdicionais, somaCusto + CUSTO_CONTAINER_CENTAVOS],
 );
 const depois = await carregarFechamento(filtros, dependenciasComSupabase(cliente));
 verificar(
   "G3. Fechamento depois de faturar: tudo já faturado",
-  [depois.jaFaturado.faturadoCentavos, depois.aFaturar.faturadoCentavos],
-  [somaCobrada, 0],
+  [
+    depois.jaFaturado.faturadoCentavos,
+    depois.aFaturar.faturadoCentavos,
+    depois.financeiro.jaFaturadoCentavos,
+    depois.financeiro.aFaturarCentavos,
+  ],
+  [somaCobrada, 0, totalComAdicionais, 0],
 );
 
 // ---------------------------------------------------------------------------
