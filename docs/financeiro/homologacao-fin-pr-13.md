@@ -151,11 +151,11 @@ Esperados calculados à parte, em centavos, a partir das regras documentadas
 
 ### Achados
 
-- **A (P3, documentação/decisão comercial).** `docs/ARQUITETURA.md` descreve o
-  arredondamento diário da HE como "até 15 descarta; 16 a 45 vira 30; 46 a 59 vira a
-  hora seguinte". O núcleo V2 (`nucleo_arredondar_he_diaria`) e o `ESTADO_DO_PROJETO.md`
-  usam fronteiras inclusivas (15 min vira 30; 45 min vira 60). O HML seguiu o núcleo V2.
-  A BS precisa confirmar qual fronteira vale; o C02 é PASS pela regra do `ESTADO`.
+- **A (resolvido, documentação).** `docs/ARQUITETURA.md` descrevia o arredondamento
+  diário da HE como "até 15 descarta; 16 a 45 vira 30; 46 a 59 vira a hora seguinte",
+  divergente do núcleo V2. A regra V2 aprovada é 15 min = 30 min e 45 min = 60 min de
+  HE; o texto foi corrigido na sessão 13 e o núcleo não foi alterado. O C02 é PASS por
+  essa regra.
 - **B (observação).** Com a resolução OFF, domingo e o feriado nacional confirmado no
   calendário foram cobrados como "Dia comum" (200,00), embora a consulta do calendário os
   classifique como domingo/feriado. É o comportamento "OFF preserva regra anterior"; o

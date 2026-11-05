@@ -84,7 +84,7 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   pagamento ×2, C04), navegador (D04, D05, D09, C05), Microsoft Excel (E03, E04),
   e-mail real (A05) e planilha Dynamis (E06).
 - Dados sintéticos em HML, com faturas emitidas (imutáveis), exigem tarefa própria de
-  limpeza. Confirmar com a BS a fronteira de arredondamento da HE (achado A).
+  limpeza. Arredondamento da HE (15 → 30, 45 → 60) aprovado e documentado na sessão 13.
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
 
 ## Retomada

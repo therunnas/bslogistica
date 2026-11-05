@@ -314,8 +314,9 @@ A migration `030` acrescenta as regras definitivas da BS, configuradas por
 vigência do contrato:
 
 - **Cobrança:** a saída antecipada também é proporcional. A hora extra cobrada é
-  arredondada nos minutos residuais de cada hora (até 15 descarta; 16 a 45 vira 30;
-  46 a 59 vira a hora seguinte). No modo `diario` isso acontece no próprio
+  arredondada nos minutos residuais de cada hora (até 14 descarta; 15 a 44 vira 30;
+  45 a 59 vira a hora seguinte: 15 min = 30 min e 45 min = 60 min de HE, regra V2
+  aprovada, a mesma de `nucleo_arredondar_he_diaria`). No modo `diario` isso acontece no próprio
   apontamento, depois da tolerância. No modo `acumulado`, o apontamento guarda os
   minutos brutos e o fechamento arredonda a soma do período uma vez, com item
   próprio na fatura. No sábado, a jornada de referência pode ser menor (ex.: 4 h),
