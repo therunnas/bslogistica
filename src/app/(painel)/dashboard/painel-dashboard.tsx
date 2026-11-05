@@ -45,6 +45,8 @@ import { useRegrasDaBs, useRegrasDefinitivas } from "@/lib/vigencias-dados";
 import { somarAdicionais } from "@/lib/adicionais";
 import { useAdicionaisDoPeriodo } from "@/lib/adicionais-dados";
 import { useResumoFinanceiro } from "@/lib/regras-definitivas-dados";
+import { somarCustoDeContainers } from "@/lib/custo-containers";
+import { useCustoDeContainers } from "@/lib/custo-containers-dados";
 import { descricaoDaReceita } from "@/lib/resumo-financeiro";
 
 const INPUT_CLASS =
@@ -65,6 +67,8 @@ export function PainelDashboard() {
   // com o ajuste de arredondamento acumulado separado. Antes dela, vale a soma local de antes.
   const regrasDefinitivas = useRegrasDefinitivas();
   const resumo = useResumoFinanceiro(start, end, regrasDefinitivas);
+  // O custo dos serviços de Containers entra na margem (a receita deles já está no resumo).
+  const containers = useCustoDeContainers(start, end, true);
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
 
@@ -80,7 +84,8 @@ export function PainelDashboard() {
     const apontamentos = resumo.data?.receitaApontamentos ?? sumBy(period, (row) => row.billed);
     const revenue = resumo.data?.receita ?? apontamentos + totalAdicionais;
 
-    const cost = sumBy(period, (row) => row.cost);
+    const cost =
+      sumBy(period, (row) => row.cost) + somarCustoDeContainers(containers.data ?? [], start, end);
 
     return {
       dailies: sumBy(period, (row) => row.dailies),
@@ -92,7 +97,7 @@ export function PainelDashboard() {
       margin: revenue - cost,
       marginPct: marginPct(revenue, cost),
     };
-  }, [period, totalAdicionais, resumo.data]);
+  }, [period, totalAdicionais, resumo.data, containers.data, start, end]);
 
   const activeEmployees = useMemo(
     () =>
@@ -242,7 +247,11 @@ export function PainelDashboard() {
             <Kpi
               label="Custo"
               value={brl(kpis.cost)}
-              description="Custo de mão de obra"
+              description={
+                containers.isError
+                  ? "Custo de mão de obra (custo de Containers indisponível)"
+                  : "Custo de mão de obra e de Containers"
+              }
               icon={WalletCards}
             />
 
@@ -492,7 +501,8 @@ export function PainelDashboard() {
                     </CardTitle>
 
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Resultado financeiro consolidado por cliente.
+                      Resultado dos apontamentos por cliente (sem adicionais, Containers e ajuste de
+                      arredondamento).
                     </p>
                   </div>
 
@@ -519,7 +529,7 @@ export function PainelDashboard() {
                             </p>
 
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {num(client.diarias, 0)} diárias · receita {brl(client.receita)}
+                              {num(client.diarias, 0)} diárias · apontamentos {brl(client.receita)}
                             </p>
                           </div>
 
