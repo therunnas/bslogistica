@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | Homologação em HML da integração FIN-PR-11/12/13 (sessões 11 e 12)                                                     |
-| Gate atual                | Matriz E2E em HML: 25 PASS, 1 PARCIAL (A05), 1 BLOQUEADO (E06), 0 FAIL; aguarda revisão humana                         |
-| Último gate concluído     | PR #100 mergeado por squash; CI de `main` verde; matriz de 27 casos executada em HML (sessões 12 e 13)                 |
-| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                              |
-| Branch                    | `docs/fin-pr-13-homologacao-hml` (a partir de `origin/main`; PR documental)                                            |
-| Base                      | `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (`origin/main`, squash do PR #100)                                          |
-| HEAD validado             | `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (código); este checkpoint só altera documentação                            |
-| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                 |
-| PR                        | [#100 — mergeado](https://github.com/therunnas/bslogistica/pull/100); PR documental desta branch, sem merge automático |
-| Ambiente-alvo             | HML `qbnfcmrxmssnwkhaitgd` (045) com app local; Production `ehkduqokntemtmqzdrbd` (034) só lido, sem alteração         |
-| Última ação comprovada    | Resolução comercial de HML restaurada para OFF; dados sintéticos `E2E-S11` permanecem; Production na 034, `/login` 200 |
-| Próxima ação exata        | Decidir o risco de Production (código 045 sobre banco 034); fornecer Dynamis (E06) e revisão humana                    |
+| Campo                     | Valor                                                                                                                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Etapa                     | Fechamento pré-Production (sessão 16)                                                                                                                                                         |
+| Gate atual                | Ensaio 034 → 045 e backup restaurado concluídos; parecer NO-GO condicional (4 itens não técnicos)                                                                                             |
+| Último gate concluído     | PR #104 mergeado em `071ea6d`; ensaio integral 034 → 045 sobre o banco restaurado, sem erro                                                                                                   |
+| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                                                                                                     |
+| Branch                    | `docs/sessao-14-manual-e-producao` (PR #103); margem do Fechamento/Faturamento em `fix/margem-containers-faturamento-fechamento` (PR #105)                                                    |
+| Base                      | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (`origin/main`, squash do PR #101)                                                                                                                 |
+| HEAD validado             | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (main); esta etapa só altera documentação                                                                                                          |
+| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                                                                                        |
+| PR                        | [#103](https://github.com/therunnas/bslogistica/pull/103) docs e [#105](https://github.com/therunnas/bslogistica/pull/105) margem, abertos, sem merge automático; #101, #102 e #104 mergeados |
+| Ambiente-alvo             | Production (034) só lida e copiada (dump); HML e stacks locais isoladas; nada aplicado                                                                                                        |
+| Última ação comprovada    | Banco restaurado migrado 034 → 045 (11 migrations, ~2,5 s), catálogo = HML, reversão ensaiada até 034                                                                                         |
+| Próxima ação exata        | Segunda cópia do backup; conferir e-mails no Dashboard; revisar #103/#105; só então pedir autorização da janela                                                                               |
 
 ## Evidências
 
@@ -57,6 +57,26 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 - Sem Preview da Vercel apontado para HML (sem acesso à Vercel). Dynamis continua
   indisponível: E06 BLOQUEADO, sem inferência.
 
+- Sessão 14: PR #101 mergeado por squash em `e7f77b0` (CI verde no HEAD `1371f07`; só
+  documentação). A05 fechado em stack local isolada com captura de e-mail; E06 executado com
+  a planilha Dynamis (SHA-256 `2b211d4c…18f7`, comparação por componente, sem paridade);
+  achado G explicado sem alterar código; H corrigido no PR #102 (rótulos "fim exclusivo");
+  novo achado I (margem do Dashboard sem custo de Containers) e dependência J (modelo de e-mail
+  do convite). Manual de uso e plano 034 → 045 redigidos.
+
+- Sessão 15: PR #102 mergeado (`b63d33b`). Achado I corrigido no PR #104 (custo de Containers
+  na margem do Dashboard e dos Relatórios; 67/67 suítes, lint e tsc). Manual corrigido
+  (Presente/Falta/Substituição; Faturamento; Relatórios) e runbook corrigido (os scripts
+  `comparar-catalogo-*.sh` só operam no local). Config de Auth de HML e Production lida por
+  `supabase config pull --dry-run` (nada gravado). **Backup novo de Production** em
+  `~/bs-backups-producao/2026-11-05-034/` (cifrado, senha no Chaveiro) com restauração local
+  comprovada; Production não tem dados de negócio.
+
+- Sessão 16: #104 corrigido para o schema 034 (defeito medido no PostgREST real sobre o backup) e
+  mergeado (`071ea6d`); margem total no Fechamento e no Faturamento no PR #105; backup verificado e
+  restaurado (Auth funcional); ensaio integral 034 → 045 e reversão; checklists de e-mail e backup.
+  Parecer: NO-GO condicional (runbook, seção 11).
+
 ## Migrations por ambiente
 
 - Esta etapa não criou nem aplicou migration.
@@ -85,9 +105,10 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   desde o FIN-PR-01), mas o merge em `main` publica antes da CI. Opções: manter
   (a compatibilidade 034 → 045 está testada), conter por rollback na Vercel com
   acesso administrativo, ou preparar 035–045 em Production com backup novo.
-- Pendentes: convite por e-mail (A05, exige envio real ou caixa de captura) e planilha
-  Dynamis (E06). Achados menores G (Dashboard por cliente 928,14 vs 928,13) e H
-  (`valid_to` exclusivo) sem tratamento.
+- Pendências reais: revisão humana dos PRs #103 e #104; **segunda cópia** do backup em outro
+  local protegido; conferir no Dashboard do Supabase os **modelos de e-mail** de convite e
+  recuperação, a **expiração** do link e a autenticação do domínio de envio (ver runbook, 1.2);
+  decisão e autorização para implantar 035–045 em Production, com dump novo se houver escrita.
 - Dados sintéticos em HML, com faturas emitidas (imutáveis), exigem tarefa própria de
   limpeza. Regra de arredondamento da HE aprovada e documentada na sessão 13.
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
@@ -101,6 +122,7 @@ Production 035–045**.
 1. Confirmar `origin/main` em `91513b9` ou posterior e o head de HML (045).
 2. Decidir o risco de Production e, se for o caso, executar o rollback com acesso à
    Vercel, registrando o deployment atual para reversão.
-3. Revisão humana da matriz e do PR documental; decidir os achados G e H.
-4. Fornecer a Dynamis para E06 e definir como validar o convite por e-mail.
+3. Revisão humana da matriz, do [manual](MANUAL_DE_USO.md) e do
+   [plano de Production](runbooks/producao-034-045.md); decidir o achado I e o PR #102.
+4. Confirmar os modelos de e-mail do Dashboard de HML e Production (checklist no runbook).
 5. Não declarar o projeto finalizado.

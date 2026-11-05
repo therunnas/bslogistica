@@ -5,6 +5,31 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## Sessão 16 (05/11/2026)
+
+PR #104 mergeado (`071ea6d`) após correção de compatibilidade com a 034. Backup de Production restaurado
+com Auth funcional; ensaio integral 034 → 045 e reversão sobre o banco restaurado, sem erro; margem total
+(apontamentos + Containers) no PR #105. Parecer: **NO-GO condicional** para Production. Production segue na 034.
+Detalhes em [plano de Production](runbooks/producao-034-045.md), [backup](runbooks/backup-production.md) e
+[checklist de e-mail](runbooks/checklist-email-supabase.md).
+
+## Sessão 15 (05/11/2026)
+
+PR #102 mergeado (`b63d33b`). Achado I corrigido no PR #104 (custo de Containers na margem do
+Dashboard e dos Relatórios). Backup novo de Production (034) criado e **restaurado em ambiente
+isolado** com catálogo e contagens idênticos; Production não tem dados de negócio e não foi
+alterada. Config de Auth de HML e Production lida (somente leitura); modelos de e-mail e
+expiração dependem do administrador. Evidências no [plano de Production](runbooks/producao-034-045.md).
+
+## Sessão 14 (05/11/2026)
+
+PR documental #101 mergeado (`e7f77b0`). A05 fechado em stack local isolada com captura de
+e-mail; E06 executado com a planilha Dynamis (comparação por componente, sem paridade);
+achado G explicado, H corrigido no PR #102, I e J registrados. Manual de uso e plano de
+Production 034 → 045 redigidos, sem execução. Production segue na 034. Detalhes em
+[Homologação integrada](financeiro/homologacao-fin-pr-13.md),
+[Manual de uso](MANUAL_DE_USO.md) e [plano de Production](runbooks/producao-034-045.md).
+
 ## Integração do FIN-PR-13 e homologação em HML (sessões 11 e 12, 05/11/2026)
 
 **Merge:** PR #100 marcado Ready e mergeado por squash com `--match-head-commit` no HEAD
