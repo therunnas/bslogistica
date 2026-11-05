@@ -41,6 +41,8 @@ import {
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { adicionalElegivel, somarAdicionais } from "@/lib/adicionais";
 import { CHAVE_DOS_ADICIONAIS, useAdicionais } from "@/lib/adicionais-dados";
+import { somarCustoDosAdicionais } from "@/lib/custo-containers";
+import { useCustoDeContainersDoCliente } from "@/lib/custo-containers-dados";
 import { CHAVE_DOS_AJUSTES, useAjustesDeArredondamento } from "@/lib/regras-definitivas-dados";
 import { marginPct, round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
@@ -186,6 +188,13 @@ export function PainelFaturamento() {
     Math.round((ajustes.data ?? []).reduce((acc, a) => acc + Math.round(a.ajuste * 100), 0)) / 100;
   const ajustesProntos = !regrasDefinitivas || ajustes.isSuccess;
   const totalAFaturar = round2(totals.billed + totalAdicionais + totalAjustes);
+  // Custo dos serviços de Containers dos adicionais que entram nesta fatura (o mesmo da fatura emitida).
+  const containers = useCustoDeContainersDoCliente(selectedClient, true);
+  const custoContainers = somarCustoDosAdicionais(
+    containers.data ?? [],
+    adicionaisElegiveis.map((a) => a.id),
+  );
+  const custoTotal = round2(totals.cost + custoContainers);
   const semNadaParaGerar =
     (!period.length && !adicionaisElegiveis.length) ||
     !adicionaisProntos ||
@@ -476,11 +485,15 @@ export function PainelFaturamento() {
 
             <Resumo
               label="Margem"
-              value={brl(totalAFaturar - totals.cost)}
+              value={brl(totalAFaturar - custoTotal)}
               description={`${num(
-                marginPct(totalAFaturar, totals.cost),
+                marginPct(totalAFaturar, custoTotal),
                 1,
-              )}% · custo ${brl(totals.cost)}`}
+              )}% · custo ${brl(custoTotal)}${
+                custoContainers > 0
+                  ? ` (apontamentos ${brl(totals.cost)} + Containers ${brl(custoContainers)})`
+                  : ""
+              }`}
               icon={TrendingUp}
             />
           </div>

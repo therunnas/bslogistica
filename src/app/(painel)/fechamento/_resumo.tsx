@@ -163,15 +163,19 @@ export function ResumoDoFechamento({ dados }: { dados: FechamentoData }) {
 
         <CartaoResumo
           rotulo="Custo previsto"
-          valor={moeda(c.custoCentavos)}
-          descricao="Valor devido aos colaboradores (previsto)"
+          valor={moeda(f.custoCentavos)}
+          descricao={
+            f.custoContainersCentavos > 0
+              ? `Apontamentos ${moeda(f.custoApontamentosCentavos)} + Containers ${moeda(f.custoContainersCentavos)} (valor devido, previsto)`
+              : "Valor devido aos colaboradores (previsto)"
+          }
           icon={WalletCards}
         />
 
         <CartaoResumo
           rotulo="Resultado"
           valor={moeda(f.resultadoCentavos)}
-          descricao="Receita total menos custo previsto"
+          descricao="Receita total menos custo previsto total"
           icon={TrendingUp}
         />
 

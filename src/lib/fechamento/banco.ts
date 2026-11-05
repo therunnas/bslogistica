@@ -20,7 +20,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/integrations/supabase/types";
 
-import { centavosDeNumeric } from "./centavos";
+import { centavosDeNumeric, somarCentavos } from "./centavos";
+import { ehSchemaSemContainers } from "../custo-containers";
 import { ErroDeDadoDoFechamento } from "./erros";
 import { ErroDeLeituraDoFechamento, type FiltroDoFechamento } from "./leitura";
 import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./periodo";
@@ -178,6 +179,31 @@ export function lerAdicionais(linhas: unknown): AdicionalDoFechamento[] {
   });
 }
 
+/**
+ * Custo dos serviços de Containers dos adicionais do recorte (migration 045). Lê só o necessário e
+ * recusa dado fora do formato: lista, id de adicional repetido, centavos negativos ou não inteiros.
+ * Serviço de adicional fora do recorte não entra. A leitura vazia é custo zero.
+ */
+export function lerCustoDeContainers(linhas: unknown, adicionalIds: readonly string[]): number {
+  if (!Array.isArray(linhas)) {
+    throw new ErroDeDadoDoFechamento("custo de Containers: esperada uma lista.");
+  }
+  const ids = new Set(adicionalIds);
+  const vistos = new Set<string>();
+  let total = 0;
+  linhas.forEach((linha, i) => {
+    const r = registro(linha, `custo de Containers ${i}`);
+    const adicionalId = texto(r["billing_additional_id"], `custo de Containers ${i}: adicional`);
+    const centavos = inteiroNaoNegativo(r["cost_total_cents"], `custo de Containers ${i}: custo`);
+    if (vistos.has(adicionalId)) {
+      throw new ErroDeDadoDoFechamento(`custo de Containers ${i}: adicional repetido.`);
+    }
+    vistos.add(adicionalId);
+    if (ids.has(adicionalId)) total = somarCentavos(total, centavos, "custo de Containers");
+  });
+  return total;
+}
+
 /** A linha única de `competencia_de_cobranca` (migration 038): a frequência do cliente no mês. */
 export function lerFrequencia(linhas: unknown): FrequenciaDeFechamento {
   if (!Array.isArray(linhas) || linhas.length !== 1) {
@@ -213,6 +239,11 @@ export interface FonteDoBanco {
   ajustesFaturados(filtro: FiltroDoFechamento): Promise<unknown>;
   /** Só num banco com a migration 038 (`competencia_de_cobranca`). */
   frequencia?(filtro: FiltroDoFechamento): Promise<unknown>;
+  /**
+   * Serviços de Containers (045) dos adicionais dados, com o custo. Banco sem a 045 devolve lista vazia.
+   * Ausente = o custo de Containers é zero.
+   */
+  custoDeContainers?(filtro: FiltroDoFechamento, adicionalIds: readonly string[]): Promise<unknown>;
 }
 
 /**
@@ -315,6 +346,46 @@ export function criarFonteDoBancoSupabase(
     },
   };
 
+  fonte.custoDeContainers = async ({ clienteId }, adicionalIds) => {
+    if (adicionalIds.length === 0) return [];
+    // `container_services` ainda não está nos tipos gerados: leitura tipada à mão.
+    type Consulta = PromiseLike<{
+      data: unknown[] | null;
+      error: { code?: string; message: string } | null;
+      count?: number | null;
+    }> & {
+      eq(c: string, v: string): Consulta;
+      in(c: string, v: readonly string[]): Consulta;
+      is(c: string, v: null): Consulta;
+      limit(n: number): Consulta;
+      select(c: string, o?: { count?: "exact" }): Consulta;
+    };
+    const tabela = () =>
+      (supabase as unknown as { from(t: string): Consulta }).from("container_services");
+    // Banco sem a 045 (Production na 034): o GET devolve PGRST205, e o HEAD, 204 sem erro.
+    const sonda = await tabela().select("id").limit(1);
+    if (sonda.error) {
+      if (ehSchemaSemContainers(sonda.error)) return [];
+      throw falha("os serviços de Containers", sonda.error.message);
+    }
+    const linhas: unknown[] = [];
+    for (let i = 0; i < adicionalIds.length; i += 100) {
+      const parte = adicionalIds.slice(i, i + 100);
+      const { data, error, count } = await tabela()
+        .select("billing_additional_id, cost_total_cents", { count: "exact" })
+        .eq("client_id", clienteId)
+        .is("canceled_at", null)
+        .in("billing_additional_id", parte)
+        .limit(TETO_DE_LINHAS_AUXILIARES);
+      if (error) throw falha("os serviços de Containers", error.message);
+      if (count === null || count === undefined || (data ?? []).length !== count) {
+        throw falha("os serviços de Containers", "a leitura não pôde ser provada completa.");
+      }
+      linhas.push(...(data ?? []));
+    }
+    return linhas;
+  };
+
   if (periodoContratual) {
     fonte.frequencia = async ({ clienteId, inicio }) => {
       const { data, error } = await supabase.rpc("competencia_de_cobranca", {
@@ -342,11 +413,23 @@ export async function buscarDadosDoBanco(
     fonte.frequencia ? fonte.frequencia(filtro) : Promise.resolve(undefined),
   ]);
 
+  const adicionaisLidos = lerAdicionais(adicionais);
+  const custoContainers = fonte.custoDeContainers
+    ? lerCustoDeContainers(
+        await fonte.custoDeContainers(
+          filtro,
+          adicionaisLidos.map((a) => a.id),
+        ),
+        adicionaisLidos.map((a) => a.id),
+      )
+    : 0;
+
   return {
     resumo: lerResumoDoBanco(resumo),
     ajustesPrevistos: lerAjustesAcumulados(ajustes),
     saldoDeHoras: lerSaldoDeHoras(saldo),
-    adicionais: lerAdicionais(adicionais),
+    adicionais: adicionaisLidos,
+    custoContainersCentavos: custoContainers,
     ajustesFaturados: lerAjustesFaturados(faturados),
     ...(fonte.frequencia ? { frequencia: lerFrequencia(frequencia) } : {}),
   };

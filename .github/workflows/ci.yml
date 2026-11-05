@@ -228,6 +228,9 @@ jobs:
       - name: Teste custo-containers
         run: npm run test:custo-containers
 
+      - name: Teste margem-containers
+        run: npm run test:margem-containers
+
       - name: Teste container-backend
         run: npm run test:container-backend
 
