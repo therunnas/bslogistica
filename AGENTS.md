@@ -4,7 +4,9 @@ Subconjunto essencial e permanente das regras do projeto. A versão completa, pa
 Claude Code, é o [CLAUDE.md](CLAUDE.md); as regras compartilhadas **não podem se
 contradizer**. Detalhes em [README](README.md) ·
 [Arquitetura](docs/ARQUITETURA.md) · [Segurança](docs/SEGURANCA.md) ·
-[Estado do projeto](docs/ESTADO_DO_PROJETO.md) · [Progresso](PROGRESS.md).
+[Workflow](docs/WORKFLOW.md) · [Ambientes](docs/AMBIENTES.md) ·
+[Handoff](docs/HANDOFF.md) · [Estado do projeto](docs/ESTADO_DO_PROJETO.md) ·
+[Progresso](PROGRESS.md).
 
 ## Projeto
 
@@ -89,6 +91,28 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
   [PROGRESS.md](PROGRESS.md).
 - Não commitar, fazer push, abrir PR ou fazer merge sem aval explícito. Nunca
   `force push`, nunca alterar `main` diretamente.
+
+## Fluxo obrigatório e retomada
+
+- Em toda sessão, ler este arquivo, `PROGRESS.md`,
+  [Estado do projeto](docs/ESTADO_DO_PROJETO.md) e
+  [Handoff](docs/HANDOFF.md); ler [Ambientes](docs/AMBIENTES.md) antes de qualquer
+  operação que dependa de Preview, HML ou Production.
+- Seguir os gates de [Workflow](docs/WORKFLOW.md): desenvolvimento isolado →
+  validação local/CI → Preview → HML/homologação → integração → Production →
+  encerramento. Não avançar sem concluir o gate atual e obter a autorização que
+  o próximo exige.
+- Manter uma única tarefa de implementação ativa. Não reabrir decisão aprovada
+  nem repetir auditoria válida sem divergência factual.
+- **CI verde não é homologação. Merge não é autorização de Production.** Deploy,
+  migration, ativação e promoção exigem autorização própria e evidência do
+  ambiente-alvo.
+- Preview nunca usa Supabase, Auth ou credenciais de Production. O vínculo real
+  entre deployment e banco precisa ser comprovado; não presumir que Preview e
+  HML sejam equivalentes.
+- Ao concluir ou pausar uma etapa, atualizar o checkpoint em `docs/HANDOFF.md`,
+  o estado factual em `docs/ESTADO_DO_PROJETO.md` e a fila em `PROGRESS.md`, sem
+  duplicar históricos.
 
 ## Validação obrigatória
 

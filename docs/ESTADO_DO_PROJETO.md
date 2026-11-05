@@ -5,10 +5,50 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
-## FIN-PR-11C — containers na operação existente (04/11/2026)
+## Estado vigente — WORKFLOW-01 (05/11/2026)
 
-Continuação do [PR #96](https://github.com/therunnas/bslogistica/pull/96), mantido
-**Draft e não mergeado**, na branch `feat/fin-pr-11c-interface-containers`, checkout
+**Git:** [PR #96](https://github.com/therunnas/bslogistica/pull/96) mergeado por
+squash em `eb8cec9af11c4b0e314296ed776caf15c3764b5f`, HEAD de `main` confirmado no
+início do WORKFLOW-01. FIN-PR-11A/B/C estão integrados no código. FIN-PR-12 e
+FIN-PR-13 não foram iniciados.
+
+**Aplicação:** a integração Git da Vercel publicou o merge do PR #96 em Production.
+O deployment Production terminou às 10:50:07 UTC, antes da CI de `main`, que
+terminou às 10:51:57 UTC. O PR possuía CI anterior aprovada, mas não houve
+homologação real do fluxo de Containers antes da publicação. Merge, deploy do
+frontend e disponibilidade do schema são evidências distintas.
+
+**Banco:** consultas remotas somente leitura confirmaram dois projetos Supabase
+distintos e saudáveis: Production `ehkduqokntemtmqzdrbd` e HML
+`qbnfcmrxmssnwkhaitgd`. Em ambos, a migration remota mais recente é a 034
+(`20261101120000`). O Git contém 035–045; a migration 045 e suas dependências não
+estão disponíveis remotamente. Nenhuma migration, SQL, flag ou configuração foi
+alterada neste diagnóstico.
+
+**Preview/HML:** o Preview do PR #96 concluiu com sucesso e sua URL gerada estava
+protegida por Vercel SSO. O destino Supabase efetivo desse Preview e os escopos
+nominais das variáveis Vercel não foram comprovados. HML existe como projeto
+separado, mas não se presume que todo Preview esteja vinculado a ele nem que seu
+Auth/dados sejam adequados para homologação. Nenhum dos projetos Supabase possui
+branch de Preview configurada.
+
+**Controles:** `main` estava sem proteção, ruleset ou checks obrigatórios. Os
+GitHub Environments `Preview` e `Production` existiam sem protection rules. A
+publicação automática de `main` é risco operacional aberto; sua contenção exige
+configuração administrativa futura e não faz parte do PR documental.
+
+**Tarefa ativa:** WORKFLOW-01, branch `docs/workflow-01`, criando o processo em
+[WORKFLOW.md](WORKFLOW.md), o inventário em [AMBIENTES.md](AMBIENTES.md) e o
+checkpoint em [HANDOFF.md](HANDOFF.md), além de controles locais/CI sem secrets.
+O próximo gate depois da integração é autorização específica para preparar HML,
+reconciliar 035–045 e homologar Containers. Não iniciar FIN-PR-12/13 antes desse
+gate.
+
+## FIN-PR-11C — containers na operação existente (histórico do PR #96 em 04/11/2026)
+
+Registro anterior ao merge do [PR #96](https://github.com/therunnas/bslogistica/pull/96),
+que naquele checkpoint estava **Draft e não mergeado**, na branch
+`feat/fin-pr-11c-interface-containers`, checkout
 `/private/tmp/bs-fin-pr-11c`. HEAD de entrada confirmado com working tree limpa:
 `bb9ec2c96cdb653edfbfef2cffcecb6ed0a4ae72`; base main preservada:
 `10bcfd83a42409c477a7df584cca279a1368f216`. O HEAD publicado deste incremento
@@ -71,7 +111,8 @@ da CI e exceção para fontes públicas. O build padrão da CI deve ser conferid
 no novo SHA como evidência distinta. Não houve mudança de configuração para
 mascarar a restrição ambiental.
 
-**Ambientes e continuidade:** migrations 001–045, domínio/adaptador, RPCs, RLS,
+**Ambientes e continuidade naquele checkpoint:** migrations 001–045,
+domínio/adaptador, RPCs, RLS,
 grants, faturamento e dependências foram preservados; mudaram somente o atalho,
 a rota/formulário, três suítes e estes dois documentos. Não houve SQL/reset local,
 migration remota, alteração de flags/credenciais/ambientes ou deploy manual.

@@ -6,6 +6,11 @@ testes e das dependências, em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJET
 o modelo de segurança, em [docs/SEGURANCA.md](docs/SEGURANCA.md). O histórico
 detalhado de cada mudança está no Git — este arquivo não o repete.
 
+O checkpoint executável da sessão seguinte fica em
+[docs/HANDOFF.md](docs/HANDOFF.md), o processo obrigatório em
+[docs/WORKFLOW.md](docs/WORKFLOW.md) e o inventário de ambientes em
+[docs/AMBIENTES.md](docs/AMBIENTES.md).
+
 ## Objetivo
 
 Painel interno de gestão de mão de obra terceirizada: clientes e contratos,
@@ -17,6 +22,33 @@ faturamento por período e relatórios. Duas trilhas de uso:
 - **Operacional** — recebe convite, entra, vê **somente** as operações que lhe
   foram atribuídas, registra presença e horários, e **não** vê financeiro nem
   telas administrativas.
+
+## Tarefa ativa única
+
+**WORKFLOW-01 — padronização definitiva do desenvolvimento.** Branch
+`docs/workflow-01`, baseada em `main` no merge do PR #96. Objetivo: integrar o
+fluxo normativo, inventário de ambientes, handoff e checks documentais, sem
+alterar ambiente remoto. O estado e a próxima ação exatos ficam no
+[HANDOFF](docs/HANDOFF.md).
+
+### Fila após WORKFLOW-01
+
+1. Retomar **FIN-PR-11**: preparar HML, reconciliar migrations 035–045 e homologar
+   Containers, cada operação remota com autorização específica.
+2. **FIN-PR-12**: exportação específica de cliente — ainda não iniciado.
+3. **FIN-PR-13**: testes integrados, HML e conciliação — ainda não iniciado.
+
+### Pausadas
+
+- `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
+  lacunas documentais remanescentes depois da integração, sem reabrir auditorias
+  concluídas.
+- `CHECK-UP-REC-01` e `CHECK-UP-E2E-01`: aguardam o gate autorizado de preparação
+  de HML.
+- Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
+
+Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
+de encerramento ou pausa com motivo.
 
 ## Marcos concluídos
 
@@ -82,12 +114,11 @@ ambiente e da resolução comercial estão centralizados nesse documento.
 
 ### Gate documental e diagnóstico antes das próximas implementações
 
-- [ ] **DOC-MASTER-01/B2:** consolidar referências e distinguir fatos atuais,
-      checkpoints históricos e pendências; não duplicar estado mutável fora de
-      [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
-- [ ] **CHECK-UP-AMB-01 (somente leitura):** identificar URL/projeto real de
-      Preview, HML e Production, isolamento entre bancos, migrations presentes,
-      políticas, secrets por escopo e flags; registrar evidências sem expor valores.
+- [x] **CHECK-UP-AMB-01 (somente leitura):** projetos HML/Production e migration
+      heads identificados; limites da auditoria de Vercel e vínculo Preview/HML
+      registrados em [Ambientes](docs/AMBIENTES.md).
+- [ ] **WORKFLOW-01:** integrar documentação e controles locais/CI; controles
+      administrativos de GitHub/Vercel continuam externos a este PR.
 - [ ] **CHECK-UP-REC-01:** conferir integridade, possibilidade de restauração
       completa e dependências de recuperação antes de qualquer migration em HML.
 - [ ] **CHECK-UP-E2E-01:** concluir matriz real de papéis/MFA, recuperação e
@@ -110,12 +141,12 @@ para a última evidência de integração.
    antes do FIN-PR-11. Resultados de validação, pendências e limites de autorização
    ficam exclusivamente em
    [Estado do projeto](docs/ESTADO_DO_PROJETO.md#fin-pr-10--calendário-territorial-nacional-histórico-do-pr-90).
-3. **FIN-PR-11A e FIN-PR-11B integrados no Git:** domínio e backend de containers
-   (PRs #94 e #95), após o desenho do PR #93. **FIN-PR-11C:** cadastro de containers
-   pela operação existente, mantendo o menu geral e a recuperação segura da intenção;
-   [evidências, limites por ambiente e próximo gate](docs/ESTADO_DO_PROJETO.md#fin-pr-11c--containers-na-operação-existente-04112026).
-   Integração da interface depende de revisão independente e autorização específica;
-   aplicação remota da migration 045 não é presumida.
+3. **FIN-PR-11A/B/C integrados no Git:** desenho, domínio, backend e interface de
+   containers (PRs #93–#96). O PR #96 foi mergeado por squash em
+   `eb8cec9af11c4b0e314296ed776caf15c3764b5f`; a interface foi publicada pela
+   automação da Vercel sem homologação real. Migration 045 continua ausente em
+   HML/Production, que estavam na 034 no diagnóstico de 05/11. Próximo gate após
+   WORKFLOW-01: preparar HML e homologar Containers.
 4. FIN-PR-12: exportação no modelo de cliente Dynamis. Filtros em todas as
    colunas; `SUBTOTAL` dinâmico; diária, HE, adicional e total, com adicional
    efetivamente somado; datas `dd/mm/aaaa`, moeda brasileira, título
@@ -393,8 +424,10 @@ falharDepoisDeVerificar()` da Server Action de recuperação.
 ## Como retomar
 
 1. Leia o [CLAUDE.md](CLAUDE.md).
-2. Leia este arquivo e, antes de qualquer mudança de autorização, a seção
+2. Leia o [HANDOFF](docs/HANDOFF.md) e confirme tarefa, gate e autorização.
+3. Leia este arquivo e, antes de qualquer mudança de autorização, a seção
    "Superfície operacional" e "RLS e banco" de [docs/SEGURANCA.md](docs/SEGURANCA.md).
-3. Confira `git status` e o `HEAD`.
-4. Não reaudite o projeto inteiro sem necessidade.
-5. Se o estado real divergir do que está escrito, **pare e reporte**.
+4. Confira `git status`, `HEAD`, PR e o ambiente pertinente.
+5. Não reaudite o projeto inteiro sem necessidade.
+6. Se o estado real divergir do que está escrito, atualize o diagnóstico antes de
+   executar a operação afetada.
