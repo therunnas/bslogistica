@@ -39,6 +39,8 @@ import type { AvisoDoLedger } from "@/lib/ledger-estado";
 import { somarAdicionais } from "@/lib/adicionais";
 import { useAdicionaisDoPeriodo } from "@/lib/adicionais-dados";
 import { useResumoFinanceiro } from "@/lib/regras-definitivas-dados";
+import { somarCustoDeContainers } from "@/lib/custo-containers";
+import { useCustoDeContainers } from "@/lib/custo-containers-dados";
 import { descricaoDaReceita } from "@/lib/resumo-financeiro";
 import { useRegrasDaBs, useRegrasDefinitivas } from "@/lib/vigencias-dados";
 
@@ -140,6 +142,7 @@ export function PainelRelatorios() {
   }, [period]);
 
   const resumo = useResumoFinanceiro(start, end, regrasDefinitivas);
+  const containers = useCustoDeContainers(start, end, true);
   const adicionais = useAdicionaisDoPeriodo(start, end, regrasBs && !regrasDefinitivas);
   const totalAdicionais = somarAdicionais(adicionais.data ?? []);
 
@@ -147,7 +150,8 @@ export function PainelRelatorios() {
     const apontamentos = resumo.data?.receitaApontamentos ?? sumBy(period, (row) => row.billed);
     const billed = resumo.data?.receita ?? apontamentos + totalAdicionais;
 
-    const cost = sumBy(period, (row) => row.cost);
+    const cost =
+      sumBy(period, (row) => row.cost) + somarCustoDeContainers(containers.data ?? [], start, end);
 
     return {
       dailies: sumBy(period, (row) => row.dailies),
@@ -158,7 +162,7 @@ export function PainelRelatorios() {
       cost,
       margin: billed - cost,
     };
-  }, [period, totalAdicionais, resumo.data]);
+  }, [period, totalAdicionais, resumo.data, containers.data, start, end]);
 
   function exportCsv() {
     if (!exibicao.podeAgir) return;

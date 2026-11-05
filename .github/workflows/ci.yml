@@ -225,6 +225,9 @@ jobs:
       - name: Teste container-servico
         run: npm run test:container-servico
 
+      - name: Teste custo-containers
+        run: npm run test:custo-containers
+
       - name: Teste container-backend
         run: npm run test:container-backend
 
