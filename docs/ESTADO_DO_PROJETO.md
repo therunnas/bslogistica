@@ -5,6 +5,36 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## Integração do FIN-PR-13 e homologação em HML (sessões 11 e 12, 05/11/2026)
+
+**Merge:** PR #100 marcado Ready e mergeado por squash com `--match-head-commit` no HEAD
+autorizado `a391079671539ddd89b8e2cd910adb65d68c9a74`; `main` =
+`91513b91b11461ac48d8dfe6af118234bfb6fbc0`. CI de `main` (run `42077946742`: `validar` e
+`sql-local`) verde. A Vercel publicou Production (`7581007010`, `success`) antes do fim
+da CI. `/login` respondeu 200.
+
+**Production `ehkduqokntemtmqzdrbd`:** head 034 (`20261101120000`), lido em transação
+`READ ONLY`; nada alterado. Roda código da `main` (045). Rollback não executado: sem
+acesso à Vercel e sem candidato comprovadamente compatível melhor que o atual. O último
+deploy anterior a qualquer migration 035+ é o de `3f5125c` (`7441801844`, 30/10). A
+`main` tem a suíte de compatibilidade 034 → 045 (697 asserções) e a CI não acessa
+Production. Smoke não destrutivo: rotas protegidas redirecionam para `/login`.
+
+**HML `qbnfcmrxmssnwkhaitgd`:** head 045 (50 migrations), resolução comercial OFF,
+motor por vigência ligado. Dump de dados de `public` antes das escritas. Preparados
+contas e dados sintéticos `E2E-S11`: admin, operacional, sem papel, admin+operacional,
+conta de MFA, dois clientes, dois contratos, cinco colaboradores, três operações, quatro
+turnos, calendário territorial sintético, sete serviços de Containers e duas faturas.
+
+**Execução (app local ligado só ao HML, sem Preview da Vercel):** 27 casos, 17 PASS,
+8 PARCIAL, 2 BLOQUEADO, 0 FAIL. Evidência por caso, achados e IDs para limpeza em
+[Homologação integrada](financeiro/homologacao-fin-pr-13.md). Resumo: autenticação com
+TOTP real, isolamento do operacional, jornada e HE com esperados independentes, nove
+fluxos de Containers pelo banco, Fechamento por frequência, faturamento (mista e só
+Containers), imutabilidade do faturado e exportações lidas no XML. Não exercido:
+resolução ON, interface em navegador, Microsoft Excel, e-mail real e Dynamis.
+**Não é homologação concluída nem declara o sistema finalizado.**
+
 ## FIN-PR-13 — integração e conciliação financeira (05/11/2026)
 
 ### Revisão independente — sessão 10
