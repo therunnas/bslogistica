@@ -4,7 +4,10 @@ Este arquivo é carregado em toda sessão. Contém apenas o que **não muda**: r
 invariantes e fluxo de trabalho. O estado atual de Production, de testes e de
 migrations vive em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md); a etapa
 atual e as decisões em aberto, em [PROGRESS.md](PROGRESS.md). Leia este arquivo e
-o `PROGRESS.md` antes de agir.
+o `PROGRESS.md` antes de agir. A retomada operacional começa em
+[docs/HANDOFF.md](docs/HANDOFF.md); o fluxo obrigatório e o inventário de
+ambientes ficam em [docs/WORKFLOW.md](docs/WORKFLOW.md) e
+[docs/AMBIENTES.md](docs/AMBIENTES.md).
 
 `AGENTS.md` traz um subconjunto menor, para agentes que não leem este arquivo. Os
 dois não precisam ser iguais, mas **as regras que compartilham não podem se
@@ -80,6 +83,32 @@ identidade exclusiva e sem secrets ou vínculo remoto.
 
 Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
 `--fix` — o formatador reescreve arquivos que não fazem parte da tarefa.
+
+## Fluxo de trabalho
+
+- Uma sessão começa lendo este arquivo, `PROGRESS.md`,
+  `docs/ESTADO_DO_PROJETO.md` e `docs/HANDOFF.md`, depois confirma Git, PR e o
+  ambiente pertinente. Não repetir auditoria aprovada sem divergência nova.
+- Existe uma tarefa de implementação ativa por vez. Trabalho futuro e pausado
+  fica em `PROGRESS.md` com ordem e motivo.
+- O processo completo está em [docs/WORKFLOW.md](docs/WORKFLOW.md): branch
+  isolada, testes locais/CI, Preview, HML/homologação, aprovação, integração,
+  Production e encerramento.
+- **CI verde não é homologação; merge não é autorização de Production.** Código,
+  deploy, migration e ativação são estados distintos.
+- Preview precisa de destino Supabase de teste comprovado e nunca pode usar
+  Production. Não presumir que Preview e HML sejam o mesmo ambiente; conferir
+  [docs/AMBIENTES.md](docs/AMBIENTES.md).
+- Migration, deploy, promoção, variável, flag ou operação remota requer
+  autorização específica para o ambiente-alvo. Uma autorização não se propaga
+  ao gate seguinte.
+- Codex CLI e Claude Code compartilham um único checkpoint, `docs/HANDOFF.md`.
+  Antes de transferir a sessão e ao retomá-la, seguir “Transferência entre
+  agentes” em [docs/WORKFLOW.md](docs/WORKFLOW.md); a memória do Claude Code não
+  é fonte de estado e não substitui o HANDOFF.
+- Ao terminar ou pausar, atualizar `HANDOFF.md`, `ESTADO_DO_PROJETO.md` e
+  `PROGRESS.md` conforme as responsabilidades documentais, sem copiar estado
+  mutável para instruções permanentes.
 
 ## Auth
 
@@ -302,10 +331,13 @@ authenticated` e injetar as claims com `set_config`.
 - **Não commitar, fazer push ou merge sem aval explícito** quando a tarefa tiver
   ponto de aprovação. Apresentar o resultado e aguardar.
 - Nunca `force push`, nunca alterar `main` diretamente.
-- Deploy pela Vercel a partir de `main`. Production tem as variáveis
-  `NEXT_PUBLIC_SUPABASE_*`; **Preview não tem, de propósito** — e por isso o build
-  de Preview falha. Não conectar Preview ao banco de produção para deixar o check
-  verde.
+- A Vercel pode criar Preview por branch e Production a partir de `main`, mas
+  essa automação não concede aprovação. Se o merge publicar o domínio
+  automaticamente, concluir homologação e autorização antes do merge ou conter
+  a promoção automática administrativamente.
+- Preview usa URL e chave publicável próprias do projeto de teste autorizado. Se
+  o destino não estiver comprovado, o gate de homologação permanece bloqueado;
+  nunca conectar Preview ao banco de Production para deixar o check verde.
 
 ## Método
 
@@ -324,6 +356,9 @@ authenticated` e injetar as claims com `set_config`.
 | ------------------------------------------------------ | ------------------------------------------------- |
 | [README.md](README.md)                                 | porta de entrada: instalação, comandos            |
 | [PROGRESS.md](PROGRESS.md)                             | **etapa atual, riscos abertos e próximos passos** |
+| [docs/WORKFLOW.md](docs/WORKFLOW.md)                   | gates normativos de desenvolvimento e publicação  |
+| [docs/AMBIENTES.md](docs/AMBIENTES.md)                 | inventário factual de ambientes e vínculos        |
+| [docs/HANDOFF.md](docs/HANDOFF.md)                     | checkpoint curto para a próxima sessão            |
 | [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md) | fotografia factual: Production, testes, módulos   |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md)             | organização do código e fluxo de dados            |
 | [docs/SEGURANCA.md](docs/SEGURANCA.md)                 | modelo de segurança e riscos residuais            |
