@@ -8,9 +8,18 @@
  * do hook de leitura. NADA aqui acessa rede, banco ou Production.
  *
  * REGRA TESTADA. O custo de Containers é `cost_total_cents` do SERVIÇO (nunca a soma dos
- * participantes, que é o mesmo valor), dos serviços NÃO cancelados executados no período, o mesmo
- * critério do adicional de receita (`period_start/period_end` = data da execução). Soma-se em
- * centavos inteiros. Custo persistido, fatura e Fechamento não mudam.
+ * participantes, que é o mesmo valor), dos serviços NÃO cancelados cujo adicional (também não
+ * cancelado) tem a COMPETÊNCIA DE COBRANÇA inteira dentro do período:
+ * `coalesce(billing_period_start, period_start) >= início` e
+ * `coalesce(billing_period_end, period_end) <= fim` — o predicado de `resumo_financeiro_periodo`
+ * (migration 038), que reconhece a receita desse mesmo adicional. Soma-se em centavos inteiros.
+ *
+ * MUDANÇA DE CRITÉRIO (S19C-DEF-005, aprovada pelo responsável em 05/11/2026). O PR #104 somava pela
+ * data de EXECUÇÃO, supondo que a receita também usava a execução; desde a 038 a receita usa a
+ * competência. No HML, 01–15/10 do cliente A: um serviço executado em 16/10 com cobrança na 1ª
+ * quinzena tinha a receita no período e o custo fora dele, e a margem dos Relatórios aparecia como
+ * R$ 2.300,88 contra R$ 2.000,87 da fatura. A data de execução continua preservada no serviço; só
+ * deixa de decidir o período do custo. Custo persistido, fatura, Fechamento e banco não mudam.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -42,44 +51,118 @@ process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "chave-inerte-apenas-de-teste
 
 const ler = (p) => readFileSync(path.join(RAIZ, p), "utf8");
 const modulo = await import("../src/lib/custo-containers.ts");
-const { somarCustoDeContainers, ehSchemaSemContainers } = modulo;
-const { lerServicosDoPeriodo } = await import("../src/lib/custo-containers-dados.ts");
+const { somarCustoDeContainers, somarCustoDosAdicionais, ehSchemaSemContainers } = modulo;
+const { lerServicosAtivos } = await import("../src/lib/custo-containers-dados.ts");
 
 const A = "5c4a0000-0000-4000-8000-0000000000a1";
 const B = "5c4a0000-0000-4000-8000-0000000000b1";
-const s = (o) => ({
-  id: crypto.randomUUID(),
-  client_id: A,
-  operation_id: null,
-  executed_on: "2026-10-09",
-  cost_total_cents: 0,
-  canceled_at: null,
-  ...o,
-});
+const Q1 = { billing_period_start: "2026-10-01", billing_period_end: "2026-10-15" };
+const Q2 = { billing_period_start: "2026-10-16", billing_period_end: "2026-10-31" };
+const MES = { billing_period_start: "2026-10-01", billing_period_end: "2026-10-31" };
+/** Serviço com o adicional embutido como o PostgREST devolve (`billing_additionals(...)`). */
+const s = ({ competencia = Q1, adicionalCancelado = null, ...o } = {}) => {
+  const executed_on = o.executed_on ?? "2026-10-09";
+  return {
+    id: crypto.randomUUID(),
+    client_id: A,
+    operation_id: null,
+    executed_on,
+    cost_total_cents: 0,
+    canceled_at: null,
+    billing_additional_id: crypto.randomUUID(),
+    ...o,
+    billing_additionals:
+      competencia === undefined
+        ? null
+        : {
+            period_start: executed_on,
+            period_end: executed_on,
+            canceled_at: adicionalCancelado,
+            ...competencia,
+          },
+  };
+};
 
-// Cenário do HML (cliente A, 1ª quinzena de outubro): quatro serviços ativos, um cancelado e um de 2ª quinzena.
+// Cenário do HML (outubro). Cliente A quinzenal: quatro serviços ativos da 1ª quinzena (um deles
+// EXECUTADO em 16/10 com cobrança na 1ª), um cancelado e um da 2ª. Cliente B mensal.
 const SERVICOS = [
   s({ cost_total_cents: 25000 }),
-  s({ cost_total_cents: 30001, executed_on: "2026-10-16" }), // competência 1ª, execução 16/10: ver nota abaixo
+  s({ cost_total_cents: 30001, executed_on: "2026-10-16", competencia: Q1 }),
   s({ cost_total_cents: 2000, executed_on: "2026-10-12" }),
   s({ cost_total_cents: 6000, executed_on: "2026-10-12" }),
   s({ cost_total_cents: 5000, executed_on: "2026-10-12", canceled_at: "2026-10-13T00:00:00Z" }),
-  s({ cost_total_cents: 4000, executed_on: "2026-10-21" }),
-  s({ client_id: B, cost_total_cents: 30000, executed_on: "2026-10-20" }),
+  s({ cost_total_cents: 4000, executed_on: "2026-10-21", competencia: Q2 }),
+  s({ client_id: B, cost_total_cents: 30000, executed_on: "2026-10-20", competencia: MES }),
 ];
 
-test("soma os serviços ativos executados no período, em reais exatos", () => {
-  // 01–15/10: 250,00 + 20,00 + 60,00 = 330,00 (cancelado e execuções fora do período ficam de fora)
-  assert.equal(somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-15"), 330);
+test("soma pela competência de cobrança do adicional, em reais exatos", () => {
+  // 01–15/10: 250,00 + 300,01 (executado 16/10, cobrado na 1ª) + 20,00 + 60,00 = 630,01.
+  // O mensal do cliente B (01–31/10) não cabe inteiro na quinzena: fica de fora, como a receita.
+  assert.equal(somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-15"), 630.01);
+  assert.equal(somarCustoDeContainers(SERVICOS, "2026-10-16", "2026-10-31"), 40);
   assert.equal(
     somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-31"),
-    330 + 300.01 + 40 + 300,
+    Math.round((630.01 + 40 + 300) * 100) / 100,
   );
 });
 
-test("serviço cancelado nunca entra no custo", () => {
+test("regressão S19C-DEF-005: executado em 16/10 e cobrado em 01–15/10 entra na 1ª quinzena", () => {
+  const servico = [s({ cost_total_cents: 30001, executed_on: "2026-10-16", competencia: Q1 })];
+  assert.equal(somarCustoDeContainers(servico, "2026-10-01", "2026-10-15"), 300.01);
+  assert.equal(somarCustoDeContainers(servico, "2026-10-16", "2026-10-31"), 0);
+  // A data de execução é preservada; só não decide o período.
+  assert.equal(servico[0].executed_on, "2026-10-16");
+});
+
+test("competência parcialmente dentro do filtro não entra (mesmo critério da receita)", () => {
+  // S19B: executado 06/11, cobrança 01–15/11. Filtro 05–06/11: nem receita nem custo.
+  const servico = [
+    s({
+      cost_total_cents: 17000,
+      executed_on: "2026-11-06",
+      competencia: { billing_period_start: "2026-11-01", billing_period_end: "2026-11-15" },
+    }),
+  ];
+  assert.equal(somarCustoDeContainers(servico, "2026-11-05", "2026-11-06"), 0);
+  assert.equal(somarCustoDeContainers(servico, "2026-11-01", "2026-11-15"), 170);
+});
+
+test("adicional sem competência (anterior à 038) usa o período do próprio adicional", () => {
+  const legado = [s({ cost_total_cents: 1000, competencia: {} })];
+  assert.equal(somarCustoDeContainers(legado, "2026-10-09", "2026-10-09"), 10);
+  assert.equal(somarCustoDeContainers(legado, "2026-10-10", "2026-10-31"), 0);
+});
+
+test("serviço cancelado ou adicional cancelado nunca entra no custo", () => {
   const cancelado = [s({ cost_total_cents: 999, canceled_at: "2026-10-10T00:00:00Z" })];
   assert.equal(somarCustoDeContainers(cancelado, "2026-10-01", "2026-10-31"), 0);
+  const adicionalCancelado = [
+    s({ cost_total_cents: 999, adicionalCancelado: "2026-10-10T00:00:00Z" }),
+  ];
+  assert.equal(somarCustoDeContainers(adicionalCancelado, "2026-10-01", "2026-10-31"), 0);
+});
+
+test("equivalência com Fechamento e Faturamento: mesmo total pelo adicional do recorte", () => {
+  // Fechamento e prévia do Faturamento somam o custo dos serviços dos adicionais do recorte
+  // (escolhidos pela competência). Com o mesmo recorte, o total tem de ser idêntico.
+  for (const [inicio, fim] of [
+    ["2026-10-01", "2026-10-15"],
+    ["2026-10-16", "2026-10-31"],
+    ["2026-10-01", "2026-10-31"],
+  ]) {
+    const doRecorte = SERVICOS.filter(
+      (x) =>
+        x.canceled_at === null &&
+        x.billing_additionals.canceled_at === null &&
+        x.billing_additionals.billing_period_start >= inicio &&
+        x.billing_additionals.billing_period_end <= fim,
+    ).map((x) => x.billing_additional_id);
+    assert.equal(
+      somarCustoDeContainers(SERVICOS, inicio, fim),
+      somarCustoDosAdicionais(SERVICOS, doRecorte),
+      `${inicio}–${fim}`,
+    );
+  }
 });
 
 test("centavos: nunca erro de ponto flutuante", () => {
@@ -112,17 +195,21 @@ test("sem duplicidade: o custo é o do serviço, não o dos participantes", () =
   assert.equal(somarCustoDeContainers(comParticipantes, "2026-10-01", "2026-10-31"), 250);
 });
 
-test("paridade com a fatura do HML: margem do período = receita − (apontamentos + containers)", () => {
-  const receita = 3782.51;
+test("paridade com a fatura do HML: margem 01–15/10 = R$ 2.000,87, não R$ 2.300,88", () => {
+  const receita = 3782.51; // resumo_financeiro_periodo: apontamentos 2.862,50 + adicionais 920,01
   const custoApontamentos = 1151.63;
-  const containers = somarCustoDeContainers(
-    [25000, 30001, 2000, 6000].map((c) => s({ cost_total_cents: c, executed_on: "2026-10-12" })),
-    "2026-10-01",
-    "2026-10-15",
-  );
+  const containers = somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-15");
   assert.equal(containers, 630.01);
   assert.equal(Math.round((custoApontamentos + containers) * 100) / 100, 1781.64); // total_cost da fatura emitida em HML
-  assert.equal(Math.round((receita - custoApontamentos - containers) * 100) / 100, 2000.87);
+  const margem = Math.round((receita - custoApontamentos - containers) * 100) / 100;
+  assert.equal(margem, 2000.87);
+  assert.notEqual(margem, 2300.88); // valor exibido antes da correção (custo pela execução)
+});
+
+test("adicional não lido (embed ausente) não some com o custo: cai na data de execução", () => {
+  const semEmbed = [{ ...s({ cost_total_cents: 1234 }), billing_additionals: null }];
+  assert.equal(somarCustoDeContainers(semEmbed, "2026-10-09", "2026-10-09"), 12.34);
+  assert.equal(somarCustoDeContainers(semEmbed, "2026-10-10", "2026-10-31"), 0);
 });
 
 test("schema sem containers (Production 034) não é erro: reconhece o código ou a mensagem", () => {
@@ -158,12 +245,17 @@ test("Dashboard e Relatórios somam o custo de Containers ao custo; o cartão po
   assert.match(dash, /sem adicionais, Containers e ajuste de arredondamento/);
 });
 
-test("o hook só LÊ container_services (sem escrita, sem RPC) e usa o mesmo critério da receita", () => {
+test("o hook só LÊ container_services (sem escrita, sem RPC) com a competência do adicional", () => {
   const f = ler("src/lib/custo-containers-dados.ts");
   assert.match(f, /from\("container_services"\)/);
-  assert.match(f, /export async function lerServicosDoPeriodo/);
-  assert.match(f, /gte\("executed_on"/);
-  assert.match(f, /lte\("executed_on"/);
+  assert.match(f, /export async function lerServicosAtivos\(db: ClienteDeLeitura\)/);
+  // A competência vem do adicional embutido; a execução não recorta mais no servidor.
+  assert.match(
+    f,
+    /billing_additionals\(period_start, period_end, billing_period_start, billing_period_end, canceled_at\)/,
+  );
+  assert.doesNotMatch(f, /gte\("executed_on"/);
+  assert.doesNotMatch(f, /lte\("executed_on"/);
   assert.match(f, /is\("canceled_at", null\)/);
   assert.ok(!/\.(insert|update|delete|upsert|rpc)\(/.test(f));
   assert.match(f, /ehSchemaSemContainers/);
@@ -207,7 +299,7 @@ function clienteSem045() {
   return { from: () => ({ select: (_c, opcoes) => consulta(opcoes?.head === true) }) };
 }
 test("schema 034 (sem container_services): o PostgREST real não vira erro, vira lista vazia", async () => {
-  assert.deepEqual(await lerServicosDoPeriodo(clienteSem045(), "2026-11-01", "2026-11-30"), []);
+  assert.deepEqual(await lerServicosAtivos(clienteSem045()), []);
 });
 test("erro que NÃO é de tabela ausente continua sendo erro (permissão negada)", async () => {
   const c = {
@@ -231,5 +323,5 @@ test("erro que NÃO é de tabela ausente continua sendo erro (permissão negada)
       },
     }),
   };
-  await assert.rejects(() => lerServicosDoPeriodo(c, "2026-11-01", "2026-11-30"));
+  await assert.rejects(() => lerServicosAtivos(c));
 });
