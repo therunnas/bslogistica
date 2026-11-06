@@ -427,7 +427,7 @@ export function AppShell({
             </div>
           </header>
 
-          <div className="relative min-w-0 overflow-hidden">
+          <div className="relative min-w-0 overflow-clip">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -top-64 right-[-14rem] h-[34rem] w-[34rem] rounded-full bg-primary/[0.04] blur-[130px]"

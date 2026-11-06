@@ -33,7 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/lib/notificacoes";
-import { dateBR } from "@/lib/format";
+import { instanteBR } from "@/lib/format";
 import type { Papel, UsuarioAdministrativo } from "@/lib/admin-usuarios/tipos";
 
 import { faseDaListagem, feedbackDoConvite, ROTULO_PAPEL, situacaoDoUsuario } from "./_dominio";
@@ -167,8 +167,8 @@ export function PainelUsuarios() {
                     <TableCell>
                       <BadgeDeSituacao usuario={usuario} />
                     </TableCell>
-                    <TableCell>{dateBR(usuario.criadoEm)}</TableCell>
-                    <TableCell>{dateBR(usuario.ultimoLoginEm)}</TableCell>
+                    <TableCell>{instanteBR(usuario.criadoEm)}</TableCell>
+                    <TableCell>{instanteBR(usuario.ultimoLoginEm)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => setSelecionado(usuario)}>
                         <Settings className="size-4" />

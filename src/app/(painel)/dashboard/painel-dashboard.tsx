@@ -333,6 +333,8 @@ export function PainelDashboard() {
                     />
 
                     <YAxis
+                      tickFormatter={brl}
+                      width={110}
                       axisLine={false}
                       tickLine={false}
                       tick={{
@@ -460,7 +462,7 @@ export function PainelDashboard() {
                       innerRadius={58}
                       outerRadius={90}
                       paddingAngle={4}
-                      label
+                      label={({ value }) => brl(Number(value))}
                     >
                       {byType.map((item, index) => (
                         <Cell

@@ -187,7 +187,7 @@ export function HistoricoDeVigencias({
 
   return (
     <section
-      className="rounded-xl border border-border bg-secondary/20 p-4"
+      className="min-w-0 rounded-xl border border-border bg-secondary/20 p-4"
       aria-label={ROTULO_DO_TIPO[tipo]}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
