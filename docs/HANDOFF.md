@@ -8,20 +8,20 @@ restantes; sem nova funcionalidade. Este checkpoint supera os relatos histórico
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Etapa                     | Testes / homologação funcional; continuidade documental, S19G                                          |
-| Gate atual                | NO-GO; 137 controles ainda não testados                                                                |
-| Último gate concluído     | 79/79 suítes, lint e TypeScript locais; CI do novo candidato ainda será conferida                      |
-| Worktree                  | `/private/tmp/bs-session-19`                                                                           |
-| Branch                    | `fix/session-19-dashboard-currency`                                                                    |
-| Base                      | `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                             |
-| HEAD validado             | `058b3619e5b34f1b13087b718074af6cb1c0ddd9`; correção de jornada, com documentação S19G no working tree |
-| Alterações não commitadas | Documentos de continuidade e livro sanitizado; caminhos no Git status da sessão                        |
-| PR                        | [#106](https://github.com/therunnas/bslogistica/pull/106), aberto Draft; sem merge                     |
-| Ambiente-alvo             | Local × HML qbnfcmrxmssnwkhaitgd; staging estável e Production fora do escopo                          |
-| Última ação comprovada    | S19F preservada por hashes; jornada revisada e 79 suítes reexecutadas S19G                             |
-| Próxima ação exata        | Publicar documentação/correção; conferir CI no HEAD remoto; retomar apenas os 137 pendentes            |
+| Campo                     | Valor                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------- |
+| Etapa                     | Testes / homologação funcional; continuidade documental, S19G                                |
+| Gate atual                | NO-GO; 137 controles ainda não testados                                                      |
+| Último gate concluído     | CI de da1bd6f aprovada: validar, sql-local e build Turbopack; homologação ainda NO-GO        |
+| Worktree                  | `/private/tmp/bs-session-19`                                                                 |
+| Branch                    | `fix/session-19-dashboard-currency`                                                          |
+| Base                      | `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                   |
+| HEAD validado             | `da1bd6f4bad9cb8ed5c80598e4a66800224def00`; atualização posterior somente neste HANDOFF      |
+| Alterações não commitadas | Nenhuma após publicar o commit de encerramento deste HANDOFF; conferir git status            |
+| PR                        | [#106](https://github.com/therunnas/bslogistica/pull/106), aberto Draft; sem merge           |
+| Ambiente-alvo             | Local × HML qbnfcmrxmssnwkhaitgd; staging estável e Production fora do escopo                |
+| Última ação comprovada    | Correção/documentação publicadas; CI exata aprovada; HML 045 revalidado em READ ONLY         |
+| Próxima ação exata        | Restabelecer host de navegador; renovar sessão sintética; retomar os 137 NÃO TESTADOS no HML |
 
 O commit que publica este checkpoint muda o HEAD. Conferir o SHA remoto do PR e
 os checks desse SHA; não inferir aprovação pelo SHA citado no histórico.
@@ -38,17 +38,25 @@ os checks desse SHA; não inferir aprovação pelo SHA citado no histórico.
 - Jornada: RED S19F com oito falhas antes da correção, GREEN 21/21; recusa zero,
   negativos e não finitos; preserva 4/7,5/8 e metadados legados sem reenviar finanças.
   Nova execução S19G: 79/79 suítes, lint e TypeScript PASS. Sem nova alteração de código.
+  Os cinco testes documentais, check:workflow, Prettier e diff check também passaram.
 - Build Webpack HML e UI da jornada aprovados S19F; arquivos de código idênticos
-  por hash na retomada. Turbopack será conferido na CI do **novo** HEAD.
-- CI de `55d2153` é histórica, não aprova o candidato S19G. Atualizar após o push.
+  por hash na retomada. Turbopack foi conferido na CI S19G identificada abaixo.
+- Publicados: `058b361` (jornada) e `da1bd6f` (continuidade/livro).
+- CI de `da1bd6f4bad9cb8ed5c80598e4a66800224def00`:
+  [run 42219723390](https://github.com/therunnas/bslogistica/actions/runs/42219723390),
+  `validar` e `sql-local` SUCCESS. Log: Next.js 16.4.1 (Turbopack), compilação em
+  14,6 s. Não usar checks de `55d2153` para aprovar S19G.
+- O commit seguinte atualiza somente este HANDOFF. A CI do HEAD que o publica
+  deve ser conferida no GitHub pelo SHA exato, inclusive se o código não mudou.
 
 ## Migrations por ambiente
 
 - Local: aplicativo em 127.0.0.1:3202 e ponte sintética em 127.0.0.1:3203 observados
   em LISTEN S19G. Backend exclusivamente HML conforme configuração comprovada S19F.
   Não há Supabase local nesta homologação. Não presumir serviços ativos na retomada.
-- HML `qbnfcmrxmssnwkhaitgd`: última leitura S19F, 50 migrations, head
-  `20261112120000` (045). Nenhuma migration aplicada S19F/S19G.
+- HML `qbnfcmrxmssnwkhaitgd`: leitura S19G em transação READ ONLY confirma
+  50 migrations, head `20261112120000` (045), motor ativo. Nenhuma migration aplicada.
+  SQL/resultado locais: `s19g/hml-preflight.sql` e `.out` no diretório de evidências.
 - Staging estável: última referência S19, `38b4349`; não revalidado nem publicado
   por esta sessão. Preview do PR é distinto; push pode gerar Preview automático.
 - Production: última referência histórica 034, não consultada nem alterada S19G.
@@ -69,8 +77,12 @@ Não alterar fator HE inferior a 1 nem criar trava de competência faturada sem 
 
 ## Bloqueios e riscos
 
-- Host de navegador indisponível na retomada: `The browser access host is unavailable`.
-  Fallback nativo em diagnóstico; não enfraquecer autenticação/CSP/grants para usá-lo.
+- Host de navegador indisponível em duas verificações S19G:
+  `The browser access host is unavailable`. Inventário sem navegadores; getBrowser
+  também recusa. Fallback nativo exibiu `The user changed /Applications/Google Chrome.app`
+  durante ação; catálogo fechou sem confirmação de gravação. Não há novo PASS S19G.
+  Coordenar uso exclusivo da janela e restaurar integração antes de mutações reais.
+  Não enfraquecer autenticação/CSP/grants; não trocar para credencial real.
 - Cookie do harness sintético dura 900 s; renovar antes de cada bloco longo.
   Recusa de operação S19F com cookie expirado deixou de ocorrer após renovação:
   não é defeito de produto confirmado. Dados sintéticos S19F permanecem preservados.
@@ -78,7 +90,9 @@ Não alterar fator HE inferior a 1 nem criar trava de competência faturada sem 
   regime territorial indisponível no legado, fluxos Auth/TOTP/recuperação sem prova
   permitida. Bloqueio não equivale a PASS nem aprova módulo inteiro.
 - Decisões pendentes: fator HE < 1 e lançamentos novos em competência faturada.
-- Publicação da correção e CI não substituem homologação funcional.
+- Publicação da correção e CI não substituem homologação funcional. Cobertura
+  recalculada do livro: 283/0/64/137; resultados mantidos porque nenhuma jornada
+  nova teve execução confiável nesta sessão.
 
 ## Retomada
 
