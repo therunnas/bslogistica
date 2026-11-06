@@ -83,6 +83,14 @@ Nenhum procedimento deste índice presume que FIN-PR-10 esteja integrado.
   mantendo o schema. Não equivale a remover migrations. Exige autorização,
   sessão administrativa válida, piso de MFA, motivo e controles descritos.
 
+## Limpeza dos dados sintéticos do HML
+
+- [Limpeza do HML](limpeza-hml-sintetico.md): plano, inventário, ensaio local e autorização exigida para esvaziar os
+  dados de negócio sintéticos do HML preservando Auth, esquema, RLS, grants e configurações. O SQL
+  [limpeza-hml-sintetico.sql](limpeza-hml-sintetico.sql) é **fail-closed** e, por padrão, só faz o ensaio a seco;
+  [hml-impressao-digital.sql](hml-impressao-digital.sql) é somente leitura. Ensaiado apenas em cópia local restaurada;
+  **nunca executado no HML**. Autorização de leitura ou de ensaio local não autoriza a execução remota.
+
 Os requisitos de backup, ensaio, catálogo e autorização são condições de uso,
 não declarações de que HML ou Production os satisfazem. Atualizações executáveis
 nos SQL, novos ensaios ou execução em ambientes exigem escopo próprio.
