@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { dateBR, instanteDataHoraBR } from "@/lib/format";
 import { PageHeader } from "../_components/app-shell";
 import { cancelarContainerAction, carregarContainerAction } from "./_acoes";
 import { dinheiroContainer } from "./lista-containers";
@@ -123,8 +124,8 @@ export function DetalheDoContainer({ id }: { id: string }) {
   const campos = [
     ["Cliente", servico.cliente_nome],
     ["Operação", servico.operacao_nome ?? "Sem operação"],
-    ["Solicitação", servico.requested_on],
-    ["Execução", servico.executed_on],
+    ["Solicitação", dateBR(servico.requested_on)],
+    ["Execução", dateBR(servico.executed_on)],
     ["Quantidade", `${servico.quantity} container(s)`],
     ["Referência", servico.reference ?? "Não informada"],
     ["Receita negociada", dinheiroContainer(servico.revenue_cents)],
@@ -133,7 +134,7 @@ export function DetalheDoContainer({ id }: { id: string }) {
       "Modalidade de custo",
       servico.cost_mode === "por_pessoa" ? "Por pessoa" : "Total distribuído",
     ],
-    ["Competência de cobrança", `${competencia.inicio} a ${competencia.fim}`],
+    ["Competência de cobrança", `${dateBR(competencia.inicio)} a ${dateBR(competencia.fim)}`],
   ];
   return (
     <div className="space-y-6">
@@ -193,7 +194,8 @@ export function DetalheDoContainer({ id }: { id: string }) {
           {auditoria.map((evento) => (
             <div key={evento.id}>
               <p className="font-medium">
-                {evento.action === "registered" ? "Registro" : "Cancelamento"} · {evento.created_at}
+                {evento.action === "registered" ? "Registro" : "Cancelamento"} ·{" "}
+                {instanteDataHoraBR(evento.created_at)}
               </p>
               <p className="text-sm text-muted-foreground">{evento.reason}</p>
             </div>

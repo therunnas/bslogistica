@@ -1,9 +1,28 @@
-# Estado do projeto
+# Histórico do projeto
 
-Fotografia factual do sistema de **BS Soluções Logísticas**. É a **fonte única**
-dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
-estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
-Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
+Registros datados de BS Soluções Logísticas. Cada seção descreve o estado na
+respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação:
+[HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
+Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
+
+## Sessão 19F (06/11/2026)
+
+Homologação funcional **NO-GO**: 283 PASS / 0 FAIL / 64 BLOQUEADO / 137 NÃO TESTADO,
+484 controles com livro explícito por ID. PR [#106](https://github.com/therunnas/bslogistica/pull/106)
+aberto Draft no HEAD `55d2153fe49eebf71f4f1d26be14b99479a07bba`, igual ao local.
+Jornada zero corrigida no working tree S19F com RED8 falhas/GREEN21 testes e UI.
+79/79 suítes, lint, TypeScript e build Webpack HML aprovados. CI remota do HEAD
+anterior à correção local: `validar` e `sql-local` PASS.
+
+HML `qbnfcmrxmssnwkhaitgd` revalidado em READ ONLY: 50 migrations, head 045.
+Nenhuma migration, regra global, RLS/grant, Production ou staging estável alterados.
+Preview remoto tem check Vercel success; runtime autenticado não revalidado S19F.
+Execução interrompida por host de navegador indisponível e fallback nativo
+inconsistente; testes restantes não foram promovidos a PASS.
+
+Resultados, dados sintéticos alterados, decisões e limitações estão na
+[matriz S19](homologacao-sessao-19.md). Retomada pelo [HANDOFF](HANDOFF.md) e
+[Estado atual](continuidade/ESTADO_ATUAL.md). Sem commit/push/merge/publicação S19F.
 
 ## Sessão 16 (05/11/2026)
 

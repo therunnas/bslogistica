@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "../_components/app-shell";
+import { ConfirmarAcaoIrreversivel } from "../_components/confirmar-acao-irreversivel";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,7 @@ import {
   validarPeriodoDoTurno,
 } from "@/lib/funcoes";
 import { useFuncoes } from "@/lib/funcoes-dados";
+import { validarOperacaoAvulsa } from "@/lib/operacao-avulsa";
 import { useCriarComVigencia, useEstadoDoMotor, useFuncoesTurno } from "@/lib/vigencias-dados";
 import {
   hojeEmSaoPaulo,
@@ -148,6 +150,8 @@ export function PainelOperacoes() {
 
   const saveShift = useSaveRow("shifts");
   const removeShift = useDeleteRow("shifts");
+  const [operacaoParaExcluir, setOperacaoParaExcluir] = useState<Operation | null>(null);
+  const [turnoParaExcluir, setTurnoParaExcluir] = useState<Shift | null>(null);
 
   const [opOpen, setOpOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
@@ -470,6 +474,7 @@ export function PainelOperacoes() {
   // alterado por esta lógica: segue exatamente o que o usuário escolheu no formulário.
   const valorTravado =
     modoDeValor !== "direta" && (Boolean(opForm.id) || modoDeValor === "bloqueada");
+  const errosDaAvulsa = validarOperacaoAvulsa(opForm, { valorTravado });
 
   function submitOperation() {
     const payload: Record<string, unknown> = {
@@ -747,7 +752,7 @@ export function PainelOperacoes() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => removeOperation.mutate(operation.id)}
+                      onClick={() => setOperacaoParaExcluir(operation)}
                       aria-label={`Excluir ${operation.name}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -850,7 +855,7 @@ export function PainelOperacoes() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                  onClick={() => removeShift.mutate(shift.id)}
+                                  onClick={() => setTurnoParaExcluir(shift)}
                                   aria-label={`Excluir turno ${shift.name}`}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -1089,6 +1094,14 @@ export function PainelOperacoes() {
             </div>
           </div>
 
+          {errosDaAvulsa.length > 0 && (
+            <ul role="alert" className="space-y-1 text-sm text-destructive">
+              {errosDaAvulsa.map((erro) => (
+                <li key={erro}>{erro}</li>
+              ))}
+            </ul>
+          )}
+
           <DialogFooter className="mt-2 border-t border-border pt-5">
             <Button
               type="button"
@@ -1106,6 +1119,7 @@ export function PainelOperacoes() {
               disabled={
                 !opForm.name ||
                 !opForm.client_id ||
+                errosDaAvulsa.length > 0 ||
                 saveOperation.isPending ||
                 criarOperacaoComVigencia.isPending
               }
@@ -1552,6 +1566,32 @@ export function PainelOperacoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmarAcaoIrreversivel
+        open={operacaoParaExcluir !== null}
+        onOpenChange={(aberto) => !aberto && setOperacaoParaExcluir(null)}
+        titulo="Excluir operação"
+        descricao={`Excluir a operação "${operacaoParaExcluir?.name ?? ""}"? O cadastro é apagado e a exclusão não pode ser desfeita. Operação com apontamentos ou histórico não pode ser excluída.`}
+        rotuloConfirmar="Excluir operação"
+        onConfirmar={() => {
+          const alvo = operacaoParaExcluir;
+          setOperacaoParaExcluir(null);
+          if (alvo) removeOperation.mutate(alvo.id);
+        }}
+      />
+
+      <ConfirmarAcaoIrreversivel
+        open={turnoParaExcluir !== null}
+        onOpenChange={(aberto) => !aberto && setTurnoParaExcluir(null)}
+        titulo="Excluir turno"
+        descricao={`Excluir o turno "${turnoParaExcluir?.name ?? ""}"? O cadastro é apagado e a exclusão não pode ser desfeita. Turno referenciado por folha de apontamento não pode ser excluído.`}
+        rotuloConfirmar="Excluir turno"
+        onConfirmar={() => {
+          const alvo = turnoParaExcluir;
+          setTurnoParaExcluir(null);
+          if (alvo) removeShift.mutate(alvo.id);
+        }}
+      />
     </div>
   );
 }

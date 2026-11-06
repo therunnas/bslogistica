@@ -8,13 +8,28 @@
  * REGRAS (apresentação/agregação, nada persistido muda):
  *   - O custo de um serviço é `cost_total_cents` do próprio serviço. Os custos por participante
  *     somam exatamente esse valor e NÃO entram de novo: seria duplicidade.
- *   - Entram os serviços não cancelados executados dentro do período, o mesmo critério do
- *     adicional de receita (`period_start/period_end` = data da execução).
+ *   - Entram os serviços não cancelados cujo adicional, também não cancelado, tem a COMPETÊNCIA DE
+ *     COBRANÇA inteira dentro do período: `coalesce(billing_period_start, period_start) >= início`
+ *     e `coalesce(billing_period_end, period_end) <= fim`. É o predicado com que
+ *     `resumo_financeiro_periodo` (038) reconhece a receita do mesmo adicional, e o recorte que
+ *     Fechamento e prévia do Faturamento já usam (custo dos serviços dos adicionais do recorte).
+ *     A data de execução fica preservada no serviço e não decide o período (S19C-DEF-005: o
+ *     critério anterior, pela execução, deslocava custo e receita de quinzena). Só se o adicional
+ *     não vier na leitura o serviço cai na própria data de execução, para não sumir com o custo.
  *   - A soma é em centavos inteiros e só no fim vira reais.
  *   - Não calcula receita, fatura nem Fechamento. A fatura já soma o custo do serviço uma vez.
  *
  * Sem importações em tempo de execução: a suíte Node executa este arquivo.
  */
+
+/** Adicional do serviço como o PostgREST embute (`billing_additionals(...)`). */
+export interface AdicionalDoServico {
+  period_start: string;
+  period_end: string;
+  billing_period_start?: string | null;
+  billing_period_end?: string | null;
+  canceled_at: string | null;
+}
 
 export interface ServicoComCusto {
   id: string;
@@ -23,20 +38,28 @@ export interface ServicoComCusto {
   executed_on: string;
   cost_total_cents: number;
   canceled_at: string | null;
+  billing_additionals?: AdicionalDoServico | null;
+}
+
+/** Competência de cobrança em que o custo do serviço é reconhecido (a mesma da receita). */
+function competenciaDoServico(s: ServicoComCusto): { inicio: string; fim: string } | null {
+  const a = s.billing_additionals;
+  if (a === null || a === undefined) return { inicio: s.executed_on, fim: s.executed_on };
+  if (a.canceled_at !== null) return null;
+  return {
+    inicio: a.billing_period_start ?? a.period_start,
+    fim: a.billing_period_end ?? a.period_end,
+  };
 }
 
 function dentroDoPeriodo(s: ServicoComCusto, inicio: string, fim: string): boolean {
-  return (
-    inicio <= fim &&
-    s.canceled_at === null &&
-    s.executed_on >= inicio &&
-    s.executed_on <= fim &&
-    Number.isSafeInteger(s.cost_total_cents) &&
-    s.cost_total_cents >= 0
-  );
+  if (inicio > fim || s.canceled_at !== null) return false;
+  if (!Number.isSafeInteger(s.cost_total_cents) || s.cost_total_cents < 0) return false;
+  const competencia = competenciaDoServico(s);
+  return competencia !== null && competencia.inicio >= inicio && competencia.fim <= fim;
 }
 
-/** Custo total dos serviços ativos executados no período, em reais. */
+/** Custo total dos serviços ativos cuja competência de cobrança cabe no período, em reais. */
 export function somarCustoDeContainers(
   servicos: readonly ServicoComCusto[],
   inicio: string,

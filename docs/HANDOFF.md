@@ -2,127 +2,106 @@
 
 <!-- workflow-handoff:v1 -->
 
-Checkpoint curto para retomar o trabalho sem depender de conversa anterior. O
-estado factual detalhado permanece em
-[ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md), e a fila em
-[PROGRESS.md](../PROGRESS.md). Como gravar e reconciliar este checkpoint entre
-Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferência-entre-agentes).
+**Fonte principal do estado atual. Sessão 19G, 06/11/2026. NO-GO.**
+SDLC: Testes / homologação funcional. Objetivo: continuidade confiável e controles
+restantes; sem nova funcionalidade. Este checkpoint supera os relatos históricos.
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                                                                                         |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | Fechamento pré-Production (sessão 16)                                                                                                                                                         |
-| Gate atual                | Ensaio 034 → 045 e backup restaurado concluídos; parecer NO-GO condicional (4 itens não técnicos)                                                                                             |
-| Último gate concluído     | PR #104 mergeado em `071ea6d`; ensaio integral 034 → 045 sobre o banco restaurado, sem erro                                                                                                   |
-| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                                                                                                     |
-| Branch                    | `docs/sessao-14-manual-e-producao` (PR #103); margem do Fechamento/Faturamento em `fix/margem-containers-faturamento-fechamento` (PR #105)                                                    |
-| Base                      | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (`origin/main`, squash do PR #101)                                                                                                                 |
-| HEAD validado             | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (main); esta etapa só altera documentação                                                                                                          |
-| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                                                                                        |
-| PR                        | [#103](https://github.com/therunnas/bslogistica/pull/103) docs e [#105](https://github.com/therunnas/bslogistica/pull/105) margem, abertos, sem merge automático; #101, #102 e #104 mergeados |
-| Ambiente-alvo             | Production (034) só lida e copiada (dump); HML e stacks locais isoladas; nada aplicado                                                                                                        |
-| Última ação comprovada    | Banco restaurado migrado 034 → 045 (11 migrations, ~2,5 s), catálogo = HML, reversão ensaiada até 034                                                                                         |
-| Próxima ação exata        | Segunda cópia do backup; conferir e-mails no Dashboard; revisar #103/#105; só então pedir autorização da janela                                                                               |
+| Campo                     | Valor                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------- |
+| Etapa                     | Testes / homologação funcional; continuidade documental, S19G                                |
+| Gate atual                | NO-GO; 137 controles ainda não testados                                                      |
+| Último gate concluído     | CI de da1bd6f aprovada: validar, sql-local e build Turbopack; homologação ainda NO-GO        |
+| Worktree                  | `/private/tmp/bs-session-19`                                                                 |
+| Branch                    | `fix/session-19-dashboard-currency`                                                          |
+| Base                      | `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                   |
+| HEAD validado             | `da1bd6f4bad9cb8ed5c80598e4a66800224def00`; atualização posterior somente neste HANDOFF      |
+| Alterações não commitadas | Nenhuma após publicar o commit de encerramento deste HANDOFF; conferir git status            |
+| PR                        | [#106](https://github.com/therunnas/bslogistica/pull/106), aberto Draft; sem merge           |
+| Ambiente-alvo             | Local × HML qbnfcmrxmssnwkhaitgd; staging estável e Production fora do escopo                |
+| Última ação comprovada    | Correção/documentação publicadas; CI exata aprovada; HML 045 revalidado em READ ONLY         |
+| Próxima ação exata        | Restabelecer host de navegador; renovar sessão sintética; retomar os 137 NÃO TESTADOS no HML |
+
+O commit que publica este checkpoint muda o HEAD. Conferir o SHA remoto do PR e
+os checks desse SHA; não inferir aprovação pelo SHA citado no histórico.
 
 ## Evidências
 
-- Sessão 11: PR #100 marcado Ready e mergeado por squash com `--match-head-commit`
-  no HEAD autorizado `a391079671539ddd89b8e2cd910adb65d68c9a74`, depois de reconfirmar
-  CI, Preview, `CLEAN` e ausência de revisões bloqueantes. `main` =
-  `91513b91b11461ac48d8dfe6af118234bfb6fbc0`; CI de `main` (run `42077946742`)
-  verde; deploy automático de Production `7581007010` em `success`.
-- Sessão 12, Production: sem acesso à Vercel (sem CLI, token ou MCP), então nenhum
-  rollback foi tentado. Não há candidato comprovadamente melhor: o último deploy
-  anterior a qualquer migration 035+ é o de `3f5125c` (30/10, deployment
-  `7441801844`), que descartaria os PRs FIN-PR-01 a 13 sem prova adicional; a `main`
-  tem suíte de compatibilidade 034 → 045 (697 asserções) e Production já recebeu vários
-  deploys nesse estado. Smoke não destrutivo: `/login` e `/esqueci-senha` 200;
-  `/dashboard`, `/fechamento`, `/containers`, `/operacional`, `/faturamento` e `/mfa`
-  redirecionam para `/login`; `POST /api/fechamento/xlsx-cliente` sem sessão responde 405.
-  `max(version)` em Production = `20261101120000` (034), lido em transação `READ ONLY`.
-- Sessão 12, HML: head `20261112120000` (045), 50 migrations, confirmado por leitura.
-  Dump de dados de `public` antes das escritas. Contas e dados sintéticos
-  `E2E-S11` (lista de IDs em
-  [Homologação integrada](financeiro/homologacao-fin-pr-13.md)). Resolução
-  comercial permaneceu **OFF**; o motor por vigência já estava ligado.
-- Execução: app Next local (porta 3100) ligado só ao HML, JWT reais, TOTP real.
-  Resultados por caso e achados na matriz. Nenhum defeito financeiro encontrado;
-  um achado de documentação (regra de arredondamento da HE) e quatro observações.
-- Sessão 13: resolução comercial ligada em HML só durante B02, C03 e C04 e restaurada
-  para OFF (verificado). Navegador real (Chrome): C05, D04, D05, D09 e fluxos de
-  recuperação. Microsoft Excel real (AppleScript): E03 e E04, com filtros aplicados.
-  A05: papel e auditoria pela interface; recuperação sem MFA e com um TOTP. Regra da HE
-  (15 → 30, 45 → 60) aprovada e corrigida em `ARQUITETURA.md`. Resultado 25/1/1/0.
-- Sem Preview da Vercel apontado para HML (sem acesso à Vercel). Dynamis continua
-  indisponível: E06 BLOQUEADO, sem inferência.
-
-- Sessão 14: PR #101 mergeado por squash em `e7f77b0` (CI verde no HEAD `1371f07`; só
-  documentação). A05 fechado em stack local isolada com captura de e-mail; E06 executado com
-  a planilha Dynamis (SHA-256 `2b211d4c…18f7`, comparação por componente, sem paridade);
-  achado G explicado sem alterar código; H corrigido no PR #102 (rótulos "fim exclusivo");
-  novo achado I (margem do Dashboard sem custo de Containers) e dependência J (modelo de e-mail
-  do convite). Manual de uso e plano 034 → 045 redigidos.
-
-- Sessão 15: PR #102 mergeado (`b63d33b`). Achado I corrigido no PR #104 (custo de Containers
-  na margem do Dashboard e dos Relatórios; 67/67 suítes, lint e tsc). Manual corrigido
-  (Presente/Falta/Substituição; Faturamento; Relatórios) e runbook corrigido (os scripts
-  `comparar-catalogo-*.sh` só operam no local). Config de Auth de HML e Production lida por
-  `supabase config pull --dry-run` (nada gravado). **Backup novo de Production** em
-  `~/bs-backups-producao/2026-11-05-034/` (cifrado, senha no Chaveiro) com restauração local
-  comprovada; Production não tem dados de negócio.
-
-- Sessão 16: #104 corrigido para o schema 034 (defeito medido no PostgREST real sobre o backup) e
-  mergeado (`071ea6d`); margem total no Fechamento e no Faturamento no PR #105; backup verificado e
-  restaurado (Auth funcional); ensaio integral 034 → 045 e reversão; checklists de e-mail e backup.
-  Parecer: NO-GO condicional (runbook, seção 11).
+- Fonte versionada por ID: [livro dos controles](continuidade/controles-sessao-19.json).
+  **283 PASS / 0 FAIL / 64 BLOQUEADO / 137 NÃO TESTADO**, total 484, herdados da S19F
+  sem novos PASS por inspeção. [Matriz e histórico](homologacao-sessao-19.md).
+- S19F preservada: hashes dos 11 arquivos locais e seis artefatos do checkpoint
+  conferidos na retomada; nenhum foi descartado. O livro agora é publicado com a
+  documentação. Os relatos por caso/ação são sanitizados; logs, screenshots e
+  dumps brutos em `/private/tmp/bs-session-19-evidence` continuam **somente locais**.
+- Jornada: RED S19F com oito falhas antes da correção, GREEN 21/21; recusa zero,
+  negativos e não finitos; preserva 4/7,5/8 e metadados legados sem reenviar finanças.
+  Nova execução S19G: 79/79 suítes, lint e TypeScript PASS. Sem nova alteração de código.
+  Os cinco testes documentais, check:workflow, Prettier e diff check também passaram.
+- Build Webpack HML e UI da jornada aprovados S19F; arquivos de código idênticos
+  por hash na retomada. Turbopack foi conferido na CI S19G identificada abaixo.
+- Publicados: `058b361` (jornada) e `da1bd6f` (continuidade/livro).
+- CI de `da1bd6f4bad9cb8ed5c80598e4a66800224def00`:
+  [run 42219723390](https://github.com/therunnas/bslogistica/actions/runs/42219723390),
+  `validar` e `sql-local` SUCCESS. Log: Next.js 16.4.1 (Turbopack), compilação em
+  14,6 s. Não usar checks de `55d2153` para aprovar S19G.
+- O commit seguinte atualiza somente este HANDOFF. A CI do HEAD que o publica
+  deve ser conferida no GitHub pelo SHA exato, inclusive se o código não mudou.
 
 ## Migrations por ambiente
 
-- Esta etapa não criou nem aplicou migration.
-- HML `qbnfcmrxmssnwkhaitgd`: 045; escritas apenas de dados sintéticos pelas RPCs e
-  tabelas da própria aplicação, e uma transação com `ROLLBACK` (último admin).
-- Production `ehkduqokntemtmqzdrbd`: 034; apenas leitura do head. Sem backup recente
-  (último lógico: 23/10/2026).
+- Local: aplicativo em 127.0.0.1:3202 e ponte sintética em 127.0.0.1:3203 observados
+  em LISTEN S19G. Backend exclusivamente HML conforme configuração comprovada S19F.
+  Não há Supabase local nesta homologação. Não presumir serviços ativos na retomada.
+- HML `qbnfcmrxmssnwkhaitgd`: leitura S19G em transação READ ONLY confirma
+  50 migrations, head `20261112120000` (045), motor ativo. Nenhuma migration aplicada.
+  SQL/resultado locais: `s19g/hml-preflight.sql` e `.out` no diretório de evidências.
+- Staging estável: última referência S19, `38b4349`; não revalidado nem publicado
+  por esta sessão. Preview do PR é distinto; push pode gerar Preview automático.
+- Production: última referência histórica 034, não consultada nem alterada S19G.
+- [Inventário histórico](AMBIENTES.md): fatos datados, não prova de estado corrente.
 
 ## Autorizações
 
-- sessão 11: ready e squash merge do PR #100 condicionados ao HEAD exato;
-- sessão 12: proteger Production (rollback só com candidato comprovado), preparar HML
-  com identidades e dados sintéticos, executar a matriz de 27 casos e atualizar a
-  documentação. Nenhuma foi usada para alterar Production.
+Prompt explícito S19G: consolidar documentação, revisar/testar jornada zero,
+criar commits e enviar à branch do PR Draft #106; conferir CI no novo HEAD,
+incluindo Turbopack. Retomar testes exclusivamente no HML com mecanismo sintético
+seguro. A autorização de commit/push substitui a proibição histórica da S19F.
 
 ## Proibições
 
-- sem migration em Production, dados de Production ou alteração de variáveis de Production;
-- sem ligar a resolução comercial em HML sem autorização específica;
-- sem e-mails reais, pagamentos externos, dados pessoais reais ou alteração de usuários reais;
-- sem inferir regra comercial nem usar R$ 35.118,12 como fixture de outra base.
+Sem merge, Production, migrations, publicação no staging estável, mudança de regra
+comercial global, alteração de faturas/fechamentos existentes ou credenciais reais.
+Não alterar fator HE inferior a 1 nem criar trava de competência faturada sem decisão.
 
 ## Bloqueios e riscos
 
-- **Production roda código 045 sobre banco 034.** Não é novidade desta sessão (vem
-  desde o FIN-PR-01), mas o merge em `main` publica antes da CI. Opções: manter
-  (a compatibilidade 034 → 045 está testada), conter por rollback na Vercel com
-  acesso administrativo, ou preparar 035–045 em Production com backup novo.
-- Pendências reais: revisão humana dos PRs #103 e #104; **segunda cópia** do backup em outro
-  local protegido; conferir no Dashboard do Supabase os **modelos de e-mail** de convite e
-  recuperação, a **expiração** do link e a autenticação do domínio de envio (ver runbook, 1.2);
-  decisão e autorização para implantar 035–045 em Production, com dump novo se houver escrita.
-- Dados sintéticos em HML, com faturas emitidas (imutáveis), exigem tarefa própria de
-  limpeza. Regra de arredondamento da HE aprovada e documentada na sessão 13.
-- Manual de utilização e preparação de Production 035–045 são gates posteriores.
+- Host de navegador indisponível em duas verificações S19G:
+  `The browser access host is unavailable`. Inventário sem navegadores; getBrowser
+  também recusa. Fallback nativo exibiu `The user changed /Applications/Google Chrome.app`
+  durante ação; catálogo fechou sem confirmação de gravação. Não há novo PASS S19G.
+  Coordenar uso exclusivo da janela e restaurar integração antes de mutações reais.
+  Não enfraquecer autenticação/CSP/grants; não trocar para credencial real.
+- Cookie do harness sintético dura 900 s; renovar antes de cada bloco longo.
+  Recusa de operação S19F com cookie expirado deixou de ocorrer após renovação:
+  não é defeito de produto confirmado. Dados sintéticos S19F permanecem preservados.
+- 64 controles bloqueados possuem motivo no livro: inclui ativação global vedada,
+  regime territorial indisponível no legado, fluxos Auth/TOTP/recuperação sem prova
+  permitida. Bloqueio não equivale a PASS nem aprova módulo inteiro.
+- Decisões pendentes: fator HE < 1 e lançamentos novos em competência faturada.
+- Publicação da correção e CI não substituem homologação funcional. Cobertura
+  recalculada do livro: 283/0/64/137; resultados mantidos porque nenhuma jornada
+  nova teve execução confiável nesta sessão.
 
 ## Retomada
 
-Sequência: **decisão sobre Production → homologação dos itens pendentes (convite,
-Dynamis) → manual de utilização → preparação controlada de
-Production 035–045**.
-
-1. Confirmar `origin/main` em `91513b9` ou posterior e o head de HML (045).
-2. Decidir o risco de Production e, se for o caso, executar o rollback com acesso à
-   Vercel, registrando o deployment atual para reversão.
-3. Revisão humana da matriz, do [manual](MANUAL_DE_USO.md) e do
-   [plano de Production](runbooks/producao-034-045.md); decidir o achado I e o PR #102.
-4. Confirmar os modelos de e-mail do Dashboard de HML e Production (checklist no runbook).
-5. Não declarar o projeto finalizado.
+1. Conferir status/HEAD/PR Draft e CI exata; ler este checkpoint e o livro versionado.
+2. Confirmar serviços locais e HML. Renovar sessão sintética S19B pela ponte local,
+   sem criar identidades nem usar conta real. Não alterar o produto para autenticar.
+3. Testar seletores da vigência contratual (`vigencias.tsx:334`) e valor-hora de HE
+   paga (`vigencias.tsx:347`); são IDs/locais do inventário, não linhas atuais.
+4. Seguir os 137 NÃO TESTADOS, priorizando Apontamentos, Colaboradores/equipes,
+   Containers, Fechamento e operações. Cada PASS exige caso/ação/resultado próprios.
+5. Se automação falhar, registrar diagnóstico real e manter resultados pendentes.
+   Atualizar HANDOFF, livro e relatório de publicação antes de encerrar.

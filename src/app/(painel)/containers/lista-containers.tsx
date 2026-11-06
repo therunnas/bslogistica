@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { dateBR } from "@/lib/format";
 import { PageHeader } from "../_components/app-shell";
 import { carregarContainersAction, carregarFormularioContainerAction } from "./_acoes";
 import type { ServicoContainerLista } from "@/lib/container-servico-dados";
@@ -160,7 +161,7 @@ export function ListaContainers() {
                     {s.description}
                   </Link>
                   <p className="text-sm text-muted-foreground">
-                    {s.cliente_nome} · {s.executed_on} · {s.quantity} container(s)
+                    {s.cliente_nome} · {dateBR(s.executed_on)} · {s.quantity} container(s)
                   </p>
                   <p className="text-sm">
                     Receita {dinheiroContainer(s.revenue_cents)} · Custo{" "}

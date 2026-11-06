@@ -9,9 +9,11 @@ import {
 import { lerConsultaPaginada } from "@/lib/paginacao";
 
 /**
- * Leitura (só leitura) dos serviços de Containers do período, para somar o custo à margem do
- * Dashboard e dos Relatórios. Mesmo critério do adicional de receita: não cancelados, executados
- * no período. Banco sem a 045 devolve lista vazia, não erro. Nenhuma escrita, nenhuma RPC.
+ * Leitura (só leitura) dos serviços de Containers, para somar o custo à margem do Dashboard e dos
+ * Relatórios. Lê os serviços não cancelados com o adicional embutido; quem decide o período é a
+ * competência de cobrança do adicional (`somarCustoDeContainers`), o mesmo critério da receita.
+ * A competência pode ficar fora das datas de execução, então a execução não recorta no servidor.
+ * Banco sem a 045 devolve lista vazia, não erro. Nenhuma escrita, nenhuma RPC.
  */
 interface ConsultaDeServicos<T> extends PromiseLike<{
   data: T[] | null;
@@ -39,13 +41,13 @@ export interface ClienteDeLeitura {
 
 export const CHAVE_DO_CUSTO_DE_CONTAINERS = ["custo-containers"] as const;
 
-/** Lê os serviços do período. Banco sem a 045 (Production na 034) devolve lista vazia. */
-export async function lerServicosDoPeriodo(
-  db: ClienteDeLeitura,
-  inicio: string,
-  fim: string,
-): Promise<ServicoComCusto[]> {
-  const colunas = "id, client_id, operation_id, executed_on, cost_total_cents, canceled_at";
+/**
+ * Lê os serviços ativos com o adicional. O recorte do período é de `somarCustoDeContainers`, pela
+ * competência. Banco sem a 045 (Production na 034) devolve lista vazia.
+ */
+export async function lerServicosAtivos(db: ClienteDeLeitura): Promise<ServicoComCusto[]> {
+  const colunas =
+    "id, client_id, operation_id, executed_on, cost_total_cents, canceled_at, billing_additionals(period_start, period_end, billing_period_start, billing_period_end, canceled_at)";
   // Sondagem de uma linha ANTES de paginar. Num banco sem a 045 (Production na 034) o GET devolve
   // 404/PGRST205, mas o HEAD de contagem devolve 204 sem erro e com count nulo: o paginador
   // lançaria CONTAGEM_INVALIDA. Medido em banco restaurado do backup de Production.
@@ -60,8 +62,6 @@ export async function lerServicosDoPeriodo(
         let q = db
           .from("container_services")
           .select<ServicoComCusto>(colunas)
-          .gte("executed_on", inicio)
-          .lte("executed_on", fim)
           .is("canceled_at", null);
         if (depoisDe !== null) q = q.gt("id", depoisDe);
         return q.order("id", { ascending: true }).limit(limite);
@@ -70,8 +70,6 @@ export async function lerServicosDoPeriodo(
         db
           .from("container_services")
           .select("id", { count: "exact", head: true })
-          .gte("executed_on", inicio)
-          .lte("executed_on", fim)
           .is("canceled_at", null),
     );
   } catch (erro) {
@@ -125,9 +123,10 @@ export function useCustoDeContainersDoCliente(clienteId: string, habilitado: boo
 
 export function useCustoDeContainers(inicio: string, fim: string, habilitado: boolean) {
   return useQuery({
-    queryKey: [...CHAVE_DO_CUSTO_DE_CONTAINERS, inicio, fim],
+    // A leitura não depende do período (o recorte é pela competência, em memória): uma só chave.
+    queryKey: [...CHAVE_DO_CUSTO_DE_CONTAINERS, "ativos"],
     enabled: habilitado && inicio !== "" && fim !== "" && inicio <= fim,
     queryFn: (): Promise<ServicoComCusto[]> =>
-      lerServicosDoPeriodo(criarClienteNavegador() as unknown as ClienteDeLeitura, inicio, fim),
+      lerServicosAtivos(criarClienteNavegador() as unknown as ClienteDeLeitura),
   });
 }

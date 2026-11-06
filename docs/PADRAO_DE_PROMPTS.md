@@ -17,7 +17,9 @@ dúvida, vale o prompt original.
 
 ## Cabeçalho obrigatório
 
-Os seis campos abaixo abrem todo prompt, nesta ordem, um por linha:
+O cabeçalho fica fora do bloco de código; o prompt de execução fica em um único
+bloco copiável. MODELO, EFFORT, ETAPA e SESSÃO são obrigatórios; ESTILO e SKILL
+são usados quando aplicáveis. A tabela descreve os campos:
 
 | Campo    | Conteúdo                                                                            | Exemplo                              |
 | -------- | ----------------------------------------------------------------------------------- | ------------------------------------ |
@@ -28,7 +30,7 @@ Os seis campos abaixo abrem todo prompt, nesta ordem, um por linha:
 | `SKILL`  | Skills ou procedimentos que o agente deve carregar; `nenhuma` quando não houver     | `test-driven-development`            |
 | `SESSÃO` | Número sequencial da sessão dentro da etapa                                         | `03`                                 |
 
-Campo ausente ou vazio torna o prompt incompleto: o agente registra a lacuna e
+Campo obrigatório ausente ou vazio torna o prompt incompleto: o agente registra a lacuna e
 segue a interpretação mais conservadora, sem ampliar autorização.
 
 ## Corpo obrigatório
@@ -89,14 +91,19 @@ Commit e push do checkpoint seguem a autorização do prompt.
 
 ## Modelo
 
-```text
 MODELO: <agente — modelo>
+
 EFFORT: <low | medium | high | xhigh | max>
+
 ETAPA: <ID da tarefa> — <gate>
-ESTILO: <execução autônoma por PR | revisão independente | diagnóstico | documento>
-SKILL: <skills ou "nenhuma">
+
 SESSÃO: <NN>
 
+ESTILO: <quando aplicável>
+
+SKILL: <quando aplicável>
+
+```text
 REPOSITÓRIO: therunnas/bslogistica
 PR: <#n ou "nenhum">
 BRANCH: <branch>

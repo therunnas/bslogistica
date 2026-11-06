@@ -1,8 +1,8 @@
 # BS Soluções Logísticas — instruções permanentes
 
 Este arquivo é carregado em toda sessão. Contém apenas o que **não muda**: regras,
-invariantes e fluxo de trabalho. O estado atual de Production, de testes e de
-migrations vive em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md); a etapa
+invariantes e fluxo de trabalho. O estado atual vive em [docs/HANDOFF.md](docs/HANDOFF.md); o histórico de Production,
+testes e migrations está em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md); a etapa
 atual e as decisões em aberto, em [PROGRESS.md](PROGRESS.md). Leia este arquivo e
 o `PROGRESS.md` antes de agir. A retomada operacional começa em
 [docs/HANDOFF.md](docs/HANDOFF.md); o fluxo obrigatório e o inventário de
@@ -107,7 +107,8 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   agentes” em [docs/WORKFLOW.md](docs/WORKFLOW.md); a memória do Claude Code não
   é fonte de estado e não substitui o HANDOFF.
 - Prompts de sessão seguem [docs/PADRAO_DE_PROMPTS.md](docs/PADRAO_DE_PROMPTS.md):
-  cabeçalho `MODELO`/`EFFORT`/`ETAPA`/`ESTILO`/`SKILL`/`SESSÃO`, prompt único e
+  cabeçalho `MODELO`/`EFFORT`/`ETAPA`/`SESSÃO` fora do bloco; `ESTILO` e `SKILL`
+  quando aplicáveis; prompt único e
   execução autônoma por PR, sem atravessar gates sem autorização nominal.
 - Ao terminar ou pausar, atualizar `HANDOFF.md`, `ESTADO_DO_PROJETO.md` e
   `PROGRESS.md` conforme as responsabilidades documentais, sem copiar estado
@@ -363,10 +364,18 @@ authenticated` e injetar as claims com `set_config`.
 | [docs/AMBIENTES.md](docs/AMBIENTES.md)                 | inventário factual de ambientes e vínculos        |
 | [docs/HANDOFF.md](docs/HANDOFF.md)                     | checkpoint curto para a próxima sessão            |
 | [docs/PADRAO_DE_PROMPTS.md](docs/PADRAO_DE_PROMPTS.md) | formato obrigatório dos prompts de sessão         |
-| [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md) | fotografia factual: Production, testes, módulos   |
+| [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md) | histórico datado: Production, testes, módulos     |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md)             | organização do código e fluxo de dados            |
 | [docs/SEGURANCA.md](docs/SEGURANCA.md)                 | modelo de segurança e riscos residuais            |
 | [docs/divida-tecnica/](docs/divida-tecnica/)           | histórico das dívidas já resolvidas, com índice   |
 
-Estado mutável tem **uma única fonte**: `ESTADO_DO_PROJETO.md`. Não o repita em
-outros arquivos; aponte para ele.
+Estado atual tem **uma única fonte**: `docs/HANDOFF.md`. O livro versionado
+referenciado nele contém os resultados por controle. `ESTADO_DO_PROJETO.md` é
+histórico datado; não concorre com o checkpoint.
+
+## Continuidade entre agentes
+
+Retome por [Estado atual](docs/continuidade/ESTADO_ATUAL.md) e pelo checkpoint
+único [HANDOFF](docs/HANDOFF.md). Siga o
+[Protocolo de trabalho](docs/continuidade/PROTOCOLO_DE_TRABALHO.md) para o ciclo
+ChatGPT → usuário → executor → usuário → ChatGPT e o formato dos prompts.

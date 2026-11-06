@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "../_components/app-shell";
+import { ConfirmarAcaoIrreversivel } from "../_components/confirmar-acao-irreversivel";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,7 @@ export function PainelColaboradores() {
   const modoDeCusto = modoDeEdicaoDeTaxa(estadoDoMotor);
   const regrasBs = useRegrasDaBs();
   const remove = useDeleteRow("employees");
+  const [colaboradorParaExcluir, setColaboradorParaExcluir] = useState<Employee | null>(null);
   // Catálogo de funções (migration 039): só com o anúncio do banco.
   const funcoesHabilitadas = useFuncoesTurno();
   const funcoes = useFuncoes(funcoesHabilitadas);
@@ -397,7 +399,7 @@ export function PainelColaboradores() {
                             variant="ghost"
                             size="icon"
                             className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => remove.mutate(employee.id)}
+                            onClick={() => setColaboradorParaExcluir(employee)}
                             aria-label={`Excluir ${employee.name}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -669,6 +671,19 @@ export function PainelColaboradores() {
           erro={funcoes.isError}
         />
       ) : null}
+
+      <ConfirmarAcaoIrreversivel
+        open={colaboradorParaExcluir !== null}
+        onOpenChange={(aberto) => !aberto && setColaboradorParaExcluir(null)}
+        titulo="Excluir colaborador"
+        descricao={`Excluir o colaborador "${colaboradorParaExcluir?.name ?? ""}"? O cadastro é apagado e a exclusão não pode ser desfeita. Colaborador com apontamentos ou vigências em uso não pode ser excluído: nesse caso, inative-o.`}
+        rotuloConfirmar="Excluir colaborador"
+        onConfirmar={() => {
+          const alvo = colaboradorParaExcluir;
+          setColaboradorParaExcluir(null);
+          if (alvo) remove.mutate(alvo.id);
+        }}
+      />
     </div>
   );
 }

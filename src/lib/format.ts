@@ -27,6 +27,33 @@ export function dateBR(iso: string | null | undefined) {
   return `${d}/${m}/${y}`;
 }
 
+const dataNoFusoDaOperacao = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+/** Instante (timestamptz em UTC) -> dia em Brasília. Para colunas date, use dateBR. */
+export function instanteBR(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const instante = new Date(iso);
+  return Number.isNaN(instante.getTime()) ? "—" : dataNoFusoDaOperacao.format(instante);
+}
+
+const horaNoFusoDaOperacao = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Instante (timestamptz em UTC) -> "dd/mm/aaaa hh:mm" em Brasília. */
+export function instanteDataHoraBR(iso: string | null | undefined) {
+  const dia = instanteBR(iso);
+  return dia === "—" ? dia : `${dia} ${horaNoFusoDaOperacao.format(new Date(iso as string))}`;
+}
+
 export const todayISO = () => {
   const d = new Date();
   const off = d.getTimezoneOffset();

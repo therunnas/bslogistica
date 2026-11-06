@@ -31,7 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { attendanceLabel, marginPct } from "@/lib/billing";
-import { montarCsv } from "@/lib/csv";
+import { csvDeRelatorio } from "@/lib/relatorios-csv";
 import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
@@ -167,33 +167,7 @@ export function PainelRelatorios() {
   function exportCsv() {
     if (!exibicao.podeAgir) return;
 
-    const header = [
-      "Data",
-      "Cliente",
-      "Operação",
-      "Turno",
-      "Colaborador",
-      "Presença",
-      "Trabalhado (min)",
-      "Hora extra (min)",
-      "Receita",
-      "Custo",
-    ];
-
-    const lines = period.map((row) => [
-      row.date,
-      row.clientName,
-      row.operationName,
-      row.shiftName,
-      row.employeeName,
-      attendanceLabel[row.status],
-      row.workedMinutes,
-      row.overtimeMinutes,
-      row.billed.toFixed(2),
-      row.cost.toFixed(2),
-    ]);
-
-    const csv = montarCsv(header, lines);
+    const csv = csvDeRelatorio(period, attendanceLabel);
 
     const url = URL.createObjectURL(
       new Blob([`\uFEFF${csv}`], {
