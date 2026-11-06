@@ -8,20 +8,20 @@ restantes; sem nova funcionalidade. Este checkpoint supera os relatos histórico
 
 ## Identificação
 
-| Campo                     | Valor                                                                                        |
-| ------------------------- | -------------------------------------------------------------------------------------------- |
-| Etapa                     | Testes / homologação funcional; continuidade documental, S19G                                |
-| Gate atual                | NO-GO; 137 controles ainda não testados                                                      |
-| Último gate concluído     | CI de da1bd6f aprovada: validar, sql-local e build Turbopack; homologação ainda NO-GO        |
-| Worktree                  | `/private/tmp/bs-session-19`                                                                 |
-| Branch                    | `fix/session-19-dashboard-currency`                                                          |
-| Base                      | `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                   |
-| HEAD validado             | `da1bd6f4bad9cb8ed5c80598e4a66800224def00`; atualização posterior somente neste HANDOFF      |
-| Alterações não commitadas | Nenhuma após publicar o commit de encerramento deste HANDOFF; conferir git status            |
-| PR                        | [#106](https://github.com/therunnas/bslogistica/pull/106), aberto Draft; sem merge           |
-| Ambiente-alvo             | Local × HML qbnfcmrxmssnwkhaitgd; staging estável e Production fora do escopo                |
-| Última ação comprovada    | Correção/documentação publicadas; CI exata aprovada; HML 045 revalidado em READ ONLY         |
-| Próxima ação exata        | Restabelecer host de navegador; renovar sessão sintética; retomar os 137 NÃO TESTADOS no HML |
+| Campo                     | Valor                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| Etapa                     | Testes / homologação funcional; continuidade documental, S19G                            |
+| Gate atual                | NO-GO; 137 controles ainda não testados                                                  |
+| Último gate concluído     | CI de da1bd6f aprovada: validar, sql-local e build Turbopack; homologação ainda NO-GO    |
+| Worktree                  | `/private/tmp/bs-session-19`                                                             |
+| Branch                    | `fix/session-19-dashboard-currency`                                                      |
+| Base                      | `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                               |
+| HEAD validado             | `da1bd6f4bad9cb8ed5c80598e4a66800224def00`; atualização posterior somente neste HANDOFF  |
+| Alterações não commitadas | Nenhuma após publicar o commit de encerramento deste HANDOFF; conferir git status        |
+| PR                        | [#106](https://github.com/therunnas/bslogistica/pull/106), aberto Draft; sem merge       |
+| Ambiente-alvo             | Local × HML qbnfcmrxmssnwkhaitgd; staging estável e Production fora do escopo            |
+| Última ação comprovada    | S20B: backup do HML e ensaio local do expurgo (35 PASS); nada executado no HML remoto    |
+| Próxima ação exata        | Autorização escrita para a limpeza do HML (seção 8 do runbook); depois homologar do zero |
 
 O commit que publica este checkpoint muda o HEAD. Conferir o SHA remoto do PR e
 os checks desse SHA; não inferir aprovação pelo SHA citado no histórico.
@@ -105,3 +105,22 @@ Não alterar fator HE inferior a 1 nem criar trava de competência faturada sem 
    Containers, Fechamento e operações. Cada PASS exige caso/ação/resultado próprios.
 5. Se automação falhar, registrar diagnóstico real e manter resultados pendentes.
    Atualizar HANDOFF, livro e relatório de publicação antes de encerrar.
+
+## Limpeza do HML (S20B, 06/11/2026)
+
+Fonte detalhada: [runbook](runbooks/limpeza-hml-sintetico.md). Resumo do estado:
+
+- **Nada foi executado no HML remoto.** Só leituras `READ ONLY` e um dump somente leitura. O HML ficou idêntico
+  (impressão digital) antes e depois.
+- Backup cifrado do HML (head 045) criado e restaurado em Supabase local isolado; cópia local coincide em 65 de 67
+  campos de catálogo, com as duas diferenças conhecidas documentadas. Segunda cópia feita **na mesma máquina**:
+  destino independente aguarda decisão da BS. Sem backup gerenciado nem PITR: o dump é a única recuperação.
+- Expurgo ensaiado só na cópia local: `scripts/hml-limpeza-ensaio-local.sh` com 35 PASS, 0 FAIL (413 → 53 linhas;
+  Auth, perfis, papéis, migrations, RLS, grants, funções e gatilhos intactos, inclusive o gatilho legado que já
+  estava desabilitado).
+- Branch `docs/hml-limpeza-runbook` (base `5246e8d`, PR de documentação sobre o #106). Conferir o SHA remoto e a CI
+  do SHA exato; não inferir aprovação por este texto.
+- Decisões comerciais ainda abertas (não decididas aqui): arredondamento 15/45 no modo acumulado, estado de
+  ativação da resolução de tarifas e do calendário, folha aberta/competência no Faturamento.
+- Riscos: desabilitar gatilhos de proteção (mitigado por guardas e ensaio); recuperação depende de uma só máquina;
+  a API de gerenciamento só foi exercitada em leitura. A execução remota exige autorização específica.
