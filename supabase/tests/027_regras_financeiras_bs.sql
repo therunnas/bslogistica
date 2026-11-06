@@ -384,7 +384,8 @@ select pg_temp.registrar('H7. fatura só de adicional (C2, serviço fechado 16-3
   (select total_dailies::text || '|' || total_amount::text || '|' || total_cost::text || '|'
           || (select count(*)::text from public.invoice_items where invoice_id = i.id)
      from public.invoices i where i.client_id = '5c29c000-0000-4000-8000-0000000000c2'));
-select pg_temp.registrar('H8. a fatura com adicional não se apaga (o vínculo é lastro)', '23503',
+-- 046: antes só a FK (23503) barrava a exclusão; agora a guarda explícita de imutabilidade responde 42501.
+select pg_temp.registrar('H8. a fatura com adicional não se apaga (o vínculo é lastro)', '42501',
   pg_temp.erro_de($q$delete from public.invoices where client_id = '5c29c000-0000-4000-8000-0000000000c2'$q$));
 select pg_temp.registrar('H9. sem apontamento nem adicional elegível: P0002 (inalterado)', 'erro P0002',
   pg_temp.adm($q$select (public.gerar_fatura('5c29c000-0000-4000-8000-0000000000c2', '2026-04-01', '2026-04-15')).id::text$q$));

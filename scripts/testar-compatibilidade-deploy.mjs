@@ -69,6 +69,8 @@ import { lerPlanilha, lerStringsCompartilhadas } from "./_fechamento-exportacao.
 import { lerZip } from "./_zip.mjs";
 
 const cenario = process.argv[2] ?? "?";
+// A 046 (imutabilidade de fatura) não muda nenhuma leitura nem RPC do app: o comportamento esperado é o da 045.
+const COM_045 = cenario === "banco-045" || cenario === "banco-046";
 const esperaComponentes = process.argv[3] === "com-componentes";
 const esperaPeriodo = process.argv[4] === "com-periodo";
 const esperaFuncoes = process.argv[5] === "com-funcoes";
@@ -170,7 +172,7 @@ try {
 verificar(
   "C11. containers distinguem schema anterior à 045 sem executar RPC de escrita",
   erroContainers === null ? "disponivel" : classificarErroContainer(erroContainers).codigo,
-  cenario === "banco-045" ? "disponivel" : "indisponivel",
+  COM_045 ? "disponivel" : "indisponivel",
 );
 const vinculoSemContainer = await lerVinculoAdicionalContainer(
   cliente,
@@ -204,7 +206,7 @@ insert into public.employee_cost_terms (employee_id, valid_from, daily_cost, act
     from generate_series(1, 6) i;
 `);
 // FIN10: cobertura exclusivamente sintética no Supabase local descartável.
-if (cenario === "banco-044" || cenario === "banco-045") {
+if (cenario === "banco-044" || cenario === "banco-045" || cenario === "banco-046") {
   psql(`
 insert into public.municipality_catalog (code, name, state_code, official_url)
   values ('4200000', 'MUNICIPIO_TESTE_044', 'SC',
@@ -422,10 +424,10 @@ verificar(
   ],
   ["string", esperaPeriodo],
 );
-const CONTAINER_CENTAVOS = cenario === "banco-045" ? 4567 : 0;
-const CUSTO_CONTAINER_CENTAVOS = cenario === "banco-045" ? 3003 : 0;
+const CONTAINER_CENTAVOS = COM_045 ? 4567 : 0;
+const CUSTO_CONTAINER_CENTAVOS = COM_045 ? 3003 : 0;
 let adicionalDeContainer = null;
-if (cenario === "banco-045") {
+if (COM_045) {
   const servicoId = await registrarServicoContainer(
     cliente,
     {
@@ -467,7 +469,7 @@ verificar(
     listaAdicionais.error?.message ?? listaAdicionais.data.length,
     "billing_period_start" in (listaAdicionais.data?.[0] ?? {}),
   ],
-  [cenario === "banco-045" ? 2 : 1, esperaPeriodo],
+  [COM_045 ? 2 : 1, esperaPeriodo],
 );
 const comAdicional = await carregarFechamento(filtros, dependenciasComSupabase(cliente));
 verificar(
@@ -477,7 +479,7 @@ verificar(
     comAdicional.adicionais[0]?.competenciaInicio ?? null,
   ],
   [
-    cenario === "banco-045" ? [ADICIONAL_CENTAVOS, CONTAINER_CENTAVOS] : [ADICIONAL_CENTAVOS],
+    COM_045 ? [ADICIONAL_CENTAVOS, CONTAINER_CENTAVOS] : [ADICIONAL_CENTAVOS],
     esperaPeriodo ? "2026-03-01" : null,
   ],
 );
@@ -491,7 +493,7 @@ verificar(
   ],
   ["PK", "PK"],
 );
-if (cenario === "banco-045") {
+if (COM_045) {
   const componentes = extrairComponentesDoFechamento(comAdicional, [adicionalDeContainer]);
   verificar(
     "P6c. Conciliação separa Containers dos demais adicionais e fecha a receita",
@@ -1170,7 +1172,7 @@ if (!esperaDiaria) {
 }
 
 // FIN-PR-09: o cenário novo exercita o mesmo app com domingo V2 e corrida bônus/fatura.
-if (cenario === "banco-043" || cenario === "banco-044" || cenario === "banco-045") {
+if (cenario === "banco-043" || cenario === "banco-044" || COM_045) {
   const liga = await cliente.rpc("alterar_resolucao_tarifas", {
     p_ativar: true,
     p_reason: "ESPECIAL_TESTE",
