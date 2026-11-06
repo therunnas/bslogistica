@@ -1,7 +1,7 @@
 # Homologação integral — sessão 19
 
 Data: 05/11/2026. SDLC: **Testes**, com correção pontual em Desenvolvimento.
-**Status geral: NÃO HOMOLOGADO — recomendação NO-GO.** Jornada operacional principal concluída na UI local × HML; 11 defeitos encontrados nas sessões 19C–19E foram corrigidos (RED/GREEN e UI). Pela matriz explícita (S19E): 216 PASS, 1 FAIL, 40 BLOQUEADO e 227 NÃO TESTADO de 484. Login com senha e TOTP real seguem BLOQUEADOS; CI e Preview do candidato pendentes de evidência.
+**Status geral: NÃO HOMOLOGADO — recomendação NO-GO.** Jornada operacional principal concluída na UI local × HML; 11 defeitos encontrados nas sessões 19C–19E foram corrigidos (RED/GREEN e UI). Pela matriz explícita (S19E): 233 PASS, 1 FAIL, 40 BLOQUEADO e 210 NÃO TESTADO de 484. CI do PR Draft #106 verde (incl. build Turbopack); Preview isolado no HML verificado sem sessão. Login com senha e TOTP real seguem BLOQUEADOS.
 
 ## Baseline e isolamento
 
@@ -184,7 +184,7 @@ Ambiente: igual ao da 19C, com rebuilds Webpack 7 e 8 do harness. Casos S19D-* e
 
 ## Sessão 19E — matriz por evidência explícita e regras aprovadas
 
-**Matriz corrigida.** A associação por rótulo foi substituída por um livro de evidências explícito: `s19e/livro_evidencias.py` gera `s19e/controles-status.json`. Cada controle entra pelo `id` estável do inventário (arquivo:linha + rótulo), com caso, ação observada e resultado próprios, sem herdar resultado de controle-irmão; uma ambiguidade aborta a geração. Controles apenas vistos, ou com valor padrão não alterado, ficam NÃO TESTADOS. Recontagem antes da S19E: 189 PASS (eram 248). **Depois da S19E: 216 PASS, 1 FAIL, 40 BLOQUEADO e 227 NÃO TESTADO, de 484.**
+**Matriz corrigida.** A associação por rótulo foi substituída por um livro de evidências explícito: `s19e/livro_evidencias.py` gera `s19e/controles-status.json`. Cada controle entra pelo `id` estável do inventário (arquivo:linha + rótulo), com caso, ação observada e resultado próprios, sem herdar resultado de controle-irmão; uma ambiguidade aborta a geração. Controles apenas vistos, ou com valor padrão não alterado, ficam NÃO TESTADOS. Recontagem antes da S19E: 189 PASS (eram 248). **Depois da S19E: 233 PASS, 1 FAIL, 40 BLOQUEADO e 210 NÃO TESTADO, de 484.**
 
 **Regras aprovadas, implementadas com RED/GREEN e confirmadas na UI:**
 
@@ -214,6 +214,10 @@ Ambiente: igual ao da 19C, com rebuilds Webpack 7 e 8 do harness. Casos S19D-* e
 4. registro de adicional com competência já faturada.
 
 Hoje o banco só imobiliza a linha **faturada**. Uma linha nova ou não faturada (p.ex. falta → presente) numa competência já faturada é aceita e fica "a faturar" sem fatura possível, porque `gerar_fatura` recusa a repetição. **Proposta (requer migration e autorização):** restrição no banco (trigger em `timesheet_entries`/`billing_additionals` e checagem nas RPCs) que recuse INSERT/UPDATE que altere valor quando houver fatura do cliente cobrindo a data/competência, com mensagem orientando a fatura complementar. Não foi implementada.
+
+**CI e Preview.** PR Draft #106, HEAD `95eec9e`: `validar` PASS (lint, TypeScript, 79 suítes e build **Turbopack** com placeholders, "Compiled successfully in 11.7s"), `sql-local` PASS e Vercel Preview PASS. O Preview (atrás do SSO da Vercel) aponta **somente** para o HML: os scripts e a CSP `connect-src` não citam outro projeto, e a rota protegida sem sessão redireciona para /login. Os testes autenticados no Preview estão BLOQUEADOS porque exigem login com senha. Divergência documental: o CLAUDE.md afirma que o Preview não tem `NEXT_PUBLIC_*`, mas o Preview deste PR está configurado para o HML.
+
+**Containers (S19E).** Filtros da lista e variações do novo serviço: rateio "Total distribuído" com soma exata, competência específica, Voltar e corrigir, remover participante e abandono sem registro (UI-010/011). OBS-S19E-01: o link "Novo serviço" da lista reabre a tela "Serviço registrado" do registro anterior.
 
 **Autenticação.** Login com senha, TOTP real, envio de e-mail de recuperação e redefinição continuam **BLOQUEADOS**: não há mecanismo de credencial de teste que não passe pelo agente nem caixa de e-mail isolada no HML. O fator TOTP pendente da conta `s19b-admin` não tem caminho legítimo de limpeza pela UI (Cancelar não remove; um novo cadastro o substitui), por isso foi mantido e documentado.
 
