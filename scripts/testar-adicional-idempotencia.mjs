@@ -9,7 +9,7 @@
  *      dados diferentes, nova abertura do formulário ou sucesso geram outra;
  *   B  o TRANSPORTE chama a RPC idempotente; só cai na antiga quando a nova NÃO EXISTE (banco
  *      anterior à 047, PGRST202); nenhum outro erro contorna a proteção;
- *   C  a chave vive só em memória (nada de storage, cookie ou URL) e nenhum valor fica no navegador;
+ *   C  módulos puros não acessam storage global; recuperação persiste somente marcador opaco;
  *   D  a integração: hook, formulário, constantes e tipos.
  */
 
@@ -231,7 +231,7 @@ if (registro.erroDeImport) {
   verificar("o erro da RPC antiga (fallback) também é propagado", erroDaAntiga, "42501");
 }
 
-console.log("C. A chave vive só em memória");
+console.log("C. Módulos puros não acessam armazenamento global");
 for (const arquivo of ["src/lib/adicional-intencao.ts", "src/lib/adicionais-registro.ts"]) {
   let fonte = "";
   try {
@@ -260,7 +260,7 @@ verificar(
 const dados = ler("src/lib/adicionais-dados.ts");
 verificar(
   "o hook usa o transporte e a intenção",
-  [/registrarAdicional\(/.test(dados), /intencaoParaTentativa\(/.test(dados)],
+  [/registrarAdicional\(/.test(dados), /executarIntencaoDeAdicional\(/.test(dados)],
   [true, true],
 );
 verificar(
@@ -269,27 +269,21 @@ verificar(
   false,
 );
 verificar(
-  "o hook reinicia a intenção no sucesso e expõe reiniciarIntencao",
-  [
-    /reiniciarIntencao/.test(dados),
-    /onSuccess[\s\S]{0,200}intencao\.current\s*=\s*null/.test(dados),
-  ],
+  "o hook preserva marcador no fechamento e usa recuperação persistente",
+  [!/reiniciarIntencao/.test(dados), /storage: sessionStorage/.test(dados)],
   [true, true],
 );
 verificar(
-  "chave recusada (23505) descarta a intenção: nunca insistir com a chave que o banco recusou",
-  [
-    registro.CODIGO_DE_CHAVE_REUTILIZADA,
-    /CODIGO_DE_CHAVE_REUTILIZADA[\s\S]{0,200}intencao\.current\s*=\s*null/.test(dados),
-  ],
+  "chave recusada (23505) preserva a intenção para reconciliação",
+  [registro.CODIGO_DE_CHAVE_REUTILIZADA, !/intencao\.current\s*=\s*null/.test(dados)],
   ["23505", true],
 );
 const tela = ler("src/app/(painel)/faturamento/adicionais.tsx");
 verificar(
-  "o formulário reinicia a intenção ao abrir e ao fechar",
+  "o formulário não descarta a intenção ao abrir e ao fechar",
   [
-    /function abrirNovo\(\)[\s\S]{0,400}registrar\.reiniciarIntencao\(\)/.test(tela),
-    /onOpenChange=\{[^}]*reiniciarIntencao/.test(tela),
+    !/function abrirNovo\(\)[\s\S]{0,400}registrar\.reiniciarIntencao\(\)/.test(tela),
+    !/onOpenChange=\{[^}]*reiniciarIntencao/.test(tela),
   ],
   [true, true],
 );

@@ -13,7 +13,7 @@ import { RPC_ADICIONAIS } from "./adicionais";
 export const CODIGO_DA_RPC_AUSENTE = "PGRST202";
 export const CODIGO_DE_CHAVE_REUTILIZADA = "23505";
 export const MENSAGEM_CHAVE_REUTILIZADA =
-  "Este envio repete uma tentativa anterior com dados diferentes. Feche o formulário e registre o adicional de novo.";
+  "Esta intenção já foi usada com outros dados. Confira o registro anterior antes de iniciar outra operação.";
 
 export type ErroDaRpc = { code?: string; message?: string } | null;
 export type ChamadaDeRpc = (
@@ -52,6 +52,7 @@ export async function registrarAdicional(
   chamar: ChamadaDeRpc,
   params: Parametros,
   chave: string,
+  marcarLegado: () => void = () => {},
 ): Promise<string> {
   const args = argumentosDoRegistro(params);
   const nova = await chamar(RPC_ADICIONAIS.registrar, { p_idempotency_key: chave, ...args });
@@ -59,6 +60,7 @@ export async function registrarAdicional(
   if (nova.error.code !== CODIGO_DA_RPC_AUSENTE) throw nova.error;
 
   // Banco anterior à 047: só aqui a RPC antiga (sem chave) é chamada.
+  marcarLegado();
   const antiga = await chamar(RPC_ADICIONAIS.registrarAntiga, args);
   if (antiga.error !== null) throw antiga.error;
   return idDaResposta(antiga.data);

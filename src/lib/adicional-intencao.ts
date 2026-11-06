@@ -4,13 +4,11 @@
  * A CHAVE de idempotência identifica a INTENÇÃO "registrar este adicional", não a tela nem o clique:
  *   - duplo clique, reenvio e retry depois de timeout reutilizam a MESMA chave (o banco devolve o
  *     adicional que já gravou, sem duplicar);
- *   - dados diferentes são outra intenção e recebem outra chave (se a chave fosse reutilizada, o banco
- *     recusaria com 23505);
- *   - uma operação legítima nova (formulário reaberto ou registro bem-sucedido) parte do zero: o chamador
- *     descarta a intenção e a próxima tentativa gera chave nova.
+ *   - dados diferentes não descartam marcador pendente: primeiro reconciliar, sem gerar outra chave;
+ *   - uma operação legítima nova parte do zero somente após confirmação/reconciliação da anterior.
  *
- * Só memória: este módulo não toca storage, cookie, URL nem rede. A assinatura guarda os parâmetros em forma
- * canônica apenas dentro da instância do hook, pelo mesmo tempo de vida do estado do formulário.
+ * A assinatura de payload abaixo só existe em memória. O fluxo de recuperação persiste exclusivamente
+ * chave e indicação de fallback legado, por identidade, antes do envio; nunca persiste valores ou motivos.
  */
 
 export type IntencaoDeAdicional = { readonly chave: string; readonly assinatura: string };
@@ -28,8 +26,8 @@ export function assinaturaDoRegistro(params: Parametros): string {
 }
 
 /**
- * A intenção a usar nesta tentativa: a atual, se os dados são os mesmos; senão uma nova.
- * `atual = null` significa "operação nova" (formulário recém-aberto, sucesso anterior ou chave recusada).
+ * Comparação em memória mantida para os testes do contrato original. Não autoriza o envio:
+ * a barreira de recuperação abaixo prevalece sobre qualquer chave nova deste helper.
  */
 export function intencaoParaTentativa(
   atual: IntencaoDeAdicional | null,
@@ -39,4 +37,106 @@ export function intencaoParaTentativa(
   const assinatura = assinaturaDoRegistro(params);
   if (atual !== null && atual.assinatura === assinatura) return atual;
   return { chave: gerarChave(), assinatura };
+}
+
+type StorageDeIntencao = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type Marcador = { chave: string; legado: boolean };
+const emEnvio = new Set<string>();
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MARCADOR_INVALIDO = "Intenção inválida: reconciliação administrativa necessária.";
+
+/**
+ * SQLSTATEs que `registrar_adicional` (038, a RPC legada) levanta por contrato. Um erro com um destes códigos
+ * chegou do banco com a transação DESFEITA: nada foi gravado, então a tentativa pode ser corrigida e repetida.
+ * Qualquer outro desfecho (timeout, rede, gateway, PGRST*, classe 08) é DESCONHECIDO e continua bloqueando.
+ */
+const RECUSAS_TRANSACIONAIS_LEGADO = new Set([
+  "22023",
+  "23505",
+  "23514",
+  "23P01",
+  "28000",
+  "40001",
+  "42501",
+  "55000",
+  "P0002",
+]);
+
+function lerMarcador(bruto: string): Marcador {
+  let marcador: unknown;
+  try {
+    marcador = JSON.parse(bruto);
+  } catch {
+    throw new Error(MARCADOR_INVALIDO);
+  }
+  const m = marcador as Marcador | null;
+  if (
+    typeof m !== "object" ||
+    m === null ||
+    Object.keys(m).sort().join() !== "chave,legado" ||
+    typeof m.chave !== "string" ||
+    !UUID.test(m.chave) ||
+    typeof m.legado !== "boolean"
+  ) {
+    throw new Error(MARCADOR_INVALIDO);
+  }
+  return { chave: m.chave, legado: m.legado };
+}
+
+/** Persiste só chave/modo por identidade. Ausência na 047 permite SOMENTE a mesma chave.
+ * No legado, ausência não prova que um envio em andamento não vai confirmar: bloqueia.
+ * Registro localizado encerra a tentativa com aviso, exigindo outra ação explícita para criar outro.
+ */
+export async function executarIntencaoDeAdicional(deps: {
+  storage: StorageDeIntencao;
+  userId: string;
+  gerar: () => string;
+  consultar: (chave: string) => Promise<string | null>;
+  registrar: (chave: string, marcarLegado: () => void) => Promise<string>;
+}): Promise<string> {
+  if (!UUID.test(deps.userId)) throw new Error("Sessão inválida.");
+  const key = `bs:adicional:intencao:v1:${deps.userId}`;
+  if (emEnvio.has(key)) throw new Error("Aguarde a confirmação do envio em andamento.");
+  emEnvio.add(key);
+  try {
+    const bruto = deps.storage.getItem(key);
+    let marcador: Marcador;
+    if (bruto !== null) {
+      marcador = lerMarcador(bruto);
+      if (marcador.legado) {
+        throw new Error(
+          "Envio anterior sem confirmação no banco legado. Reconciliação administrativa necessária antes de registrar outro adicional.",
+        );
+      }
+      const localizado = await deps.consultar(marcador.chave);
+      if (localizado !== null) {
+        deps.storage.removeItem(key);
+        throw new Error(
+          `O adicional anterior já foi registrado (${localizado}). Confira a lista. Para uma operação distinta, faça um novo envio.`,
+        );
+      }
+    } else {
+      marcador = { chave: deps.gerar(), legado: false };
+      if (!UUID.test(marcador.chave)) throw new Error("Chave inválida.");
+    }
+    deps.storage.setItem(key, JSON.stringify(marcador));
+    let id: string;
+    try {
+      id = await deps.registrar(marcador.chave, () => {
+        marcador.legado = true;
+        deps.storage.setItem(key, JSON.stringify(marcador));
+      });
+    } catch (erro) {
+      // Recusa SQL explícita é transacional, portanto não confirmou a gravação.
+      const code =
+        typeof erro === "object" && erro !== null ? (erro as { code?: string }).code : undefined;
+      if (marcador.legado && RECUSAS_TRANSACIONAIS_LEGADO.has(code ?? ""))
+        deps.storage.removeItem(key);
+      throw erro;
+    }
+    deps.storage.removeItem(key);
+    return id;
+  } finally {
+    emEnvio.delete(key);
+  }
 }

@@ -203,7 +203,6 @@ export function AdicionaisDoPeriodo({
     id === null ? "—" : (operacoes.find((o) => o.id === id)?.name ?? "—");
 
   function abrirNovo() {
-    registrar.reiniciarIntencao();
     setOperacaoId("");
     setInicioNovo(inicio);
     setFimNovo(fim);
@@ -368,7 +367,6 @@ export function AdicionaisDoPeriodo({
       <Dialog
         open={novoOpen}
         onOpenChange={(aberto) => {
-          if (!aberto) registrar.reiniciarIntencao();
           setNovoOpen(aberto);
         }}
       >

@@ -49,7 +49,7 @@
     "test:implantacao-vigencias": "node --experimental-strip-types scripts/testar-implantacao-vigencias.mjs",
     "test:vigencias-paginacao": "node --experimental-strip-types scripts/testar-vigencias-paginacao.mjs",
     "test:regras-bs": "node --experimental-strip-types scripts/testar-regras-bs.mjs",
-    "test:adicional-idempotencia": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-adicional-idempotencia.mjs",
+    "test:adicional-idempotencia": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-adicional-idempotencia.mjs && node --experimental-strip-types --test scripts/testar-adicional-recuperacao.mjs",
     "test:regras-definitivas": "node --experimental-strip-types scripts/testar-regras-definitivas.mjs",
     "test:fechamento-leitura": "node --experimental-strip-types scripts/testar-fechamento-leitura.mjs",
     "test:fechamento-dominio": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fechamento-dominio.mjs",

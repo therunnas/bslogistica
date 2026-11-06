@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { RPC_ADICIONAIS, montarRegistroDeAdicional, type Adicional } from "@/lib/adicionais";
-import { intencaoParaTentativa, type IntencaoDeAdicional } from "@/lib/adicional-intencao";
+import { executarIntencaoDeAdicional } from "@/lib/adicional-intencao";
 import {
   CODIGO_DE_CHAVE_REUTILIZADA,
   MENSAGEM_CHAVE_REUTILIZADA,
@@ -101,42 +100,49 @@ function codigoDoErro(erro: unknown): string | undefined {
 
 /**
  * Registra o adicional pela RPC idempotente (047). A CHAVE acompanha a intenção: o duplo clique e o retry
- * depois de um erro ou timeout reutilizam a mesma chave, e o banco devolve o adicional já gravado em vez
- * de duplicá-lo. Dados diferentes, formulário reaberto ou sucesso começam outra intenção. A chave vive só
- * em memória (useRef), nunca em storage, cookie ou URL.
+ * depois de um erro ou timeout reconciliam a mesma chave. Só o marcador opaco sobrevive à navegação;
+ * payload e valores permanecem na memória. Fechar o formulário não encerra uma intenção pendente.
  */
 export function useRegistrarAdicional() {
   const queryClient = useQueryClient();
-  const intencao = useRef<IntencaoDeAdicional | null>(null);
   const mutation = useMutation({
     mutationFn: async (f: FormularioDeAdicional) => {
       const params = montarRegistroDeAdicional(f);
-      const atual = intencaoParaTentativa(intencao.current, params);
-      intencao.current = atual;
-      return registrarAdicional(chamarRpc, params, atual.chave);
+      const db = cliente();
+      const { data, error } = await db.auth.getUser();
+      if (error || !data.user) throw new Error("Não foi possível confirmar a sessão.");
+      return executarIntencaoDeAdicional({
+        storage: sessionStorage,
+        userId: data.user.id,
+        gerar: () => crypto.randomUUID(),
+        consultar: async (chave) => {
+          const resposta = await db
+            .from("billing_additionals")
+            .select("id")
+            .eq("idempotency_key", chave)
+            .maybeSingle();
+          if (resposta.error) throw resposta.error;
+          return resposta.data?.id ?? null;
+        },
+        registrar: (chave, marcarLegado) =>
+          registrarAdicional(chamarRpc, params, chave, marcarLegado),
+      });
     },
     onSuccess: () => {
-      intencao.current = null;
       invalidar(queryClient);
       toast.success("Adicional registrado.");
     },
     onError: (erro: unknown) => {
+      invalidar(queryClient);
       if (codigoDoErro(erro) === CODIGO_DE_CHAVE_REUTILIZADA) {
-        // O banco recusou esta chave para estes dados: nunca insistir nela.
-        intencao.current = null;
+        // O marcador continua pendente: a próxima tentativa deve reconciliar a chave.
         toast.error(MENSAGEM_CHAVE_REUTILIZADA);
         return;
       }
       toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro));
     },
   });
-  return {
-    ...mutation,
-    /** Nova operação: a próxima tentativa gera chave nova (formulário aberto ou fechado). */
-    reiniciarIntencao: () => {
-      intencao.current = null;
-    },
-  };
+  return mutation;
 }
 
 export function useCancelarAdicional() {

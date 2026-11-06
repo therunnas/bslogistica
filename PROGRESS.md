@@ -25,7 +25,7 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FIN-20D — idempotência dos adicionais:** implementação e validação local sobre a 046 concluídas; Gate 2 em finalização com PR Draft e CI no SHA final. Próximo gate: revisão e Preview/HML com vínculo comprovado e autorização própria para a 047. A homologação integrada abaixo permanece como contexto anterior, sem reabertura nesta tarefa.
+**FIN-20D-R1 — revisão final dos adicionais:** reconciliação após resposta perdida e fechamento/reload em validação local, no PR Draft #109. Próxima ação: CI do novo SHA e revisão humana; Preview/HML exigem gate próprio. A homologação integrada abaixo permanece como contexto anterior, sem reabertura nesta tarefa.
 
 **Homologação integrada FIN-PR-11/12/13 em HML.** O PR
 [#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em

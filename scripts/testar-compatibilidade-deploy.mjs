@@ -36,6 +36,7 @@ import { registrarServicoContainer } from "../src/lib/container-servico-backend.
 
 import { montarRegistroDeAdicional } from "../src/lib/adicionais.ts";
 import { registrarAdicional } from "../src/lib/adicionais-registro.ts";
+import { executarIntencaoDeAdicional } from "../src/lib/adicional-intencao.ts";
 import { montarCargaDaRpc } from "../src/lib/apontamentos-salvar.ts";
 import { carregarFechamento, dependenciasComSupabase } from "../src/lib/fechamento/carregar.ts";
 import { verificarDisponibilidade } from "../src/lib/fechamento/disponibilidade.ts";
@@ -431,6 +432,38 @@ verificar(
   ["string", esperaPeriodo],
 );
 if (COM_047) {
+  const marcadores = new Map();
+  let envios = 0;
+  const recuperar = {
+    storage: {
+      getItem: (k) => marcadores.get(k) ?? null,
+      setItem: (k, v) => marcadores.set(k, v),
+      removeItem: (k) => marcadores.delete(k),
+    },
+    userId: (await cliente.auth.getUser()).data.user.id,
+    gerar: () => CHAVE_P4,
+    consultar: async (chave) => {
+      const r = await cliente
+        .from("billing_additionals")
+        .select("id")
+        .eq("idempotency_key", chave)
+        .maybeSingle();
+      if (r.error) throw r.error;
+      return r.data?.id ?? null;
+    },
+    registrar: async (chave) => {
+      envios++;
+      await registrarAdicional(chamarRpc, paramsAdicional, chave);
+      throw new Error("Resposta perdida depois da confirmação real do servidor");
+    },
+  };
+  await executarIntencaoDeAdicional(recuperar).catch(() => {});
+  const recuperada = await executarIntencaoDeAdicional({ ...recuperar }).catch((e) => e);
+  verificar(
+    "R1. commit real, resposta perdida e nova instância: reconcilia sem segundo envio",
+    [envios, /já foi registrado/.test(recuperada.message), marcadores.size],
+    [1, true, 0],
+  );
   const reenvio = await registrarAdicional(chamarRpc, paramsAdicional, CHAVE_P4).catch((e) => e);
   verificar(
     "P4b. 047: o reenvio com a MESMA chave devolve o mesmo adicional, sem duplicar",
