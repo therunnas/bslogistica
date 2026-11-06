@@ -1,5 +1,11 @@
 # Estado do projeto
 
+## FIN-20D — validação local em 06/11/2026
+
+Migration 047 e frontend implementados sobre o head `b7d311f` do PR #108. Chave obrigatória e payload normalizado persistidos, unicidade e trava por cliente; replay devolve o mesmo ID sem novo adicional/auditoria, conflito recebe 23505. Intenção de retry mantida em memória no formulário. Containers preserva sua própria idempotência; faturas seguem protegidas pela 046.
+
+Evidência local: RED no snapshot 046; GREEN 63 SQL e 34 Node focais; 48 suítes SQL, 69 suítes Node, lint, TypeScript, build e compatibilidade 034–047 aprovados; concorrência de adicionais 128/128 e faturas 41/41. Rollback sem uso e recusa com histórico ensaiados. Banco superusuário local não comprova privilégios hospedados. Homologação e implantação remotas pendentes de gates próprios.
+
 Fotografia factual do sistema de **BS Soluções Logísticas**. É a **fonte única**
 dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.

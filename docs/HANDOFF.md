@@ -1,5 +1,20 @@
 # Handoff ativo
 
+## FIN-20D — checkpoint de 06/11/2026
+
+- Etapa: Desenvolvimento / Testes, Gate 2; próxima ação: revisão do PR Draft e CI no SHA final.
+- Worktree: `/private/tmp/bs-fin-20d`; branch: `fix/fin-20d-idempotencia-adicionais`.
+- Base e HEAD validado antes do commit: `b7d311f59a2700bc33b2d692a0d2ab8fc5e416c2`, head do PR #108; validações abaixo sobre o working tree da FIN-20D.
+- Retomada: implementação 047, frontend e testes já existiam sem commit; stack `bs-fin20d-local` já estava na 047. Todo esse trabalho foi preservado. O checkpoint anterior abaixo pertence à sessão 16 e não descreve esta branch.
+- RED: snapshot 046 isolado, suíte 047 com 58 falhas em 69 verificações; GREEN: 63 verificações SQL aprovadas. Node focal 34/34.
+- Regressões: 48 suítes SQL; 69 suítes Node (a asserção estrutural de período contratual foi ajustada para o transporte extraído e repetida: 36/36); lint, TypeScript, build, compatibilidade 034–047 e concorrência de adicionais 128/128 e faturas 41/41.
+- Rollback 047 → 046 ensaiado sem uso; recusa histórico idempotente. Os grants explícitos restauram somente authenticated. Não remove registros financeiros nem histórico de migrations.
+- Alterações não commitadas: migration/teste 047, intenção/transporte/hook/tela/tipos de adicionais, runners/CI/testes relacionados e os três checkpoints/runbook. O artefato `supabase/.branches/_current_branch` foi criado pelo CLI e não deve ser versionado.
+- Limites: nenhum acesso ou alteração de HML/Production, migration remota ou merge. Novo app funciona em schema anterior via fallback; app antigo é recusado após a 047. Publicar app antes da migration em gate autorizado.
+- PR #107: limpeza HML em branch independente; não executada. Integração futura deve conciliar HANDOFF e índice de runbooks, sem executar limpeza.
+
+## Checkpoint histórico da sessão 16
+
 <!-- workflow-handoff:v1 -->
 
 Checkpoint curto para retomar o trabalho sem depender de conversa anterior. O
