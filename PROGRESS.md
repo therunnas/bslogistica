@@ -25,51 +25,30 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**Homologação integrada FIN-PR-11/12/13 em HML.** O PR
-[#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em
-`91513b91b11461ac48d8dfe6af118234bfb6fbc0` (CI de `main` verde). A matriz de 27 casos
-foi executada em HML nas sessões 12 a 14: 27 PASS (A05 e E06 fechados na sessão 14,
-com ressalvas registradas), 0 FAIL
-([resultados](docs/financeiro/homologacao-fin-pr-13.md)). Resolução comercial de HML
-restaurada para OFF. Production segue na 034 com o código da
-`main` publicado; a decisão sobre esse risco é o primeiro passo. O estado e a próxima
-ação exatos ficam no [HANDOFF](docs/HANDOFF.md).
+**Sessão 19 — homologação integral do sistema.** A correção monetária do Dashboard
+está implementada em branch isolada. A homologação continua **BLOQUEADA** pelas
+jornadas visuais ainda sem prova e pelas limitações do candidato local.
+Resultados e escopo real na [matriz da sessão 19](docs/homologacao-sessao-19.md);
+checkpoint de retomada no [HANDOFF](docs/HANDOFF.md).
 
-**FIN-PR-12:** PR #99 mergeado por squash em `3e5b7b1`; CI de `main` e deploy
-automático de Production verdes. A exportação continua **não homologada** com o
-Excel real da Dynamis.
+### Fazer agora
 
-**FIN-PR-11:** HML recebeu 035–045 em 05/11/2026, após backup restaurado,
-compatibilidade e dry-run; verificações pós-migration aprovadas. Os nove fluxos de
-Containers continuam sem homologação real no navegador. Production continua na 034 e
-qualquer implantação lá exige autorização específica.
+Resolver o candidato executável e disponibilizar sessão sintética no navegador
+para exercer formulários, filtros, paginação, recarga, erros e responsividade
+por módulo. Preservar as provas recentes de Auth/RLS/MFA, financeiro e exportação,
+repetindo somente o que mudar.
 
-Decisão do usuário (05/11/2026): concluir primeiro as funcionalidades pendentes
-(FIN-PR-12 e FIN-PR-13) e fazer depois **uma homologação completa de ponta a
-ponta**, seguida do manual de utilização e da preparação de Production.
-Nenhuma funcionalidade é declarada homologada só por testes automatizados.
+### Não fazer ainda
 
-### Fila
+Não promover código, aplicar migrations em Production, ativar regras, alterar
+faturas/fechamentos existentes nem limpar dados sintéticos sem o gate próprio.
+Commit/push/PR e publicação da correção aguardam autorização específica.
 
-1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
-   (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
-2. **Pendências:** revisão humana dos PRs #103 (documentação) e #105 (margem do Fechamento/Faturamento);
-   modelos de e-mail do Dashboard; segunda cópia do backup de Production (criado, restaurado e
-   ensaiado 034 → 045 em 05/11). Parecer atual: NO-GO condicional.
-3. [Manual de uso](docs/MANUAL_DE_USO.md) redigido; [plano de Production
-   034 → 045](docs/runbooks/producao-034-045.md) redigido, **sem execução** (gate próprio,
-   com backup novo).
+### Critério de conclusão
 
-### Pausadas
-
-- `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
-  lacunas documentais remanescentes, sem reabrir auditorias concluídas.
-- `CHECK-UP-E2E-01`: HML já tem o schema 045; entra na homologação completa, com
-  identidades de teste aprovadas.
-- Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
-
-Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
-de encerramento ou pausa com motivo.
+Todos os cenários críticos com evidência PASS no ambiente autorizado, sem defeito
+bloqueante conhecido. As pendências de e-mail, backup e janela de Production
+continuam no gate separado dos runbooks; não entram como implementação ativa.
 
 ## Marcos concluídos
 

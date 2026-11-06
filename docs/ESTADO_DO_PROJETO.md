@@ -5,6 +5,16 @@ dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
 Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
 
+## Sessão 19 (05/11/2026)
+
+Homologação integral **BLOQUEADA**, com baseline remota `main`/`staging` em
+`38b43490a8e0913c62a4ee6047ef48a8288ca0dc` e HML 045 confirmado por leitura.
+Correção de moeda do Dashboard implementada e validada localmente na branch
+`fix/session-19-dashboard-currency`, sem commit, PR ou publicação.
+Resultados, matriz por módulo, dados sintéticos criados, limites dos builds e
+próximas ações estão na [matriz da sessão 19](homologacao-sessao-19.md).
+Production não foi consultada nem modificada nesta sessão.
+
 ## Sessão 16 (05/11/2026)
 
 PR #104 mergeado (`071ea6d`) após correção de compatibilidade com a 034. Backup de Production restaurado
