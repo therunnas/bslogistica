@@ -53,7 +53,7 @@ insert into public.clients(id,name) select ('5c47c000-0000-4000-8000-'||lpad(n::
 SQL
 [ $? -eq 0 ] || { echo "falha ao preparar fixtures"; exit 3; }
 
-sql_adicional() { printf "select public.registrar_adicional('%s'::uuid,'2026-02-01','2026-02-15','Adicional de corrida',100.00)::text;" "$(cli "$1")"; }
+sql_adicional() { printf "select public.registrar_adicional_idempotente(gen_random_uuid(),'%s'::uuid,'2026-02-01','2026-02-15','Adicional de corrida',100.00)::text;" "$(cli "$1")"; }
 sql_container() { printf "select public.registrar_servico_container(jsonb_build_object('clienteId','%s','operacaoId',null,'solicitadoEm','2026-02-02','executadoEm','2026-02-03','descricao','Container de corrida','quantidade',1,'receitaCentavos',10000,'custoTotalCentavos',2000,'referencia','CONC-047','modalidadeCusto','total_distribuido','competenciaCobranca',null,'participantes',jsonb_build_array(jsonb_build_object('colaboradorId','5c47f000-0000-4000-8000-000000000001','custoCentavos',1000),jsonb_build_object('colaboradorId','5c47f000-0000-4000-8000-000000000002','custoCentavos',1000))),gen_random_uuid(),'corrida 047')::text;" "$(cli "$1")"; }
 sql_fatura() { printf "select (public.gerar_fatura('%s'::uuid,'2026-02-01','2026-02-15')).id::text;" "$(cli "$1")"; }
 

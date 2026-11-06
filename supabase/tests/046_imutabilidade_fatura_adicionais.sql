@@ -97,7 +97,7 @@ begin
   insert into _ids values(k, r::uuid);
 end; $$;
 create function pg_temp.adicional(k text, cliente integer, inicio date, fim date, valor numeric) returns void language sql as $$
-  select pg_temp.guardar(k, pg_temp.adm(format('select public.registrar_adicional(%L::uuid,%L::date,%L::date,%L,%s)::text',
+  select pg_temp.guardar(k, pg_temp.adm(format('select public.registrar_adicional_idempotente(gen_random_uuid(),%L::uuid,%L::date,%L::date,%L,%s)::text',
     pg_temp.cli(cliente), inicio, fim, 'Etiquetagem sintética 046 '||k, valor)))
 $$;
 create function pg_temp.container(k text, cliente integer) returns void language sql as $$

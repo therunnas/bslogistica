@@ -170,7 +170,7 @@ $$;
 
 create or replace function pg_temp.adicional(_cliente text, _ini text, _fim text, _motivo text, _valor text, _ref text default null, _op text default null)
 returns text language sql as $$
-  select pg_temp.adm(format('select public.registrar_adicional(%L, %L, %L, %L, %s, %L, %L)::text',
+  select pg_temp.adm(format('select public.registrar_adicional_idempotente(gen_random_uuid(), %L, %L, %L, %L, %s, %L, %L)::text',
     '5c29c000-0000-4000-8000-0000000000' || _cliente, _ini, _fim, _motivo, _valor, _ref,
     case when _op is null then null else '5c29e000-0000-4000-8000-0000000000' || _op end))
 $$;
@@ -309,7 +309,7 @@ create temporary table _adic (k text primary key, id text);
 insert into _adic values ('A1', pg_temp.adicional('c1', '2026-03-01', '2026-03-15', 'Etiquetagem de 2.000 volumes', '350', 'OS 123', 'a1'));
 -- FIN-PR-05 (038): execução que atravessa quinzenas exige a competência de cobrança (sem ela, a RPC
 -- recusa). A2 é cobrado na 2ª quinzena: continua fora da fatura da 1ª, que é o que H5 mede.
-insert into _adic values ('A2', pg_temp.adm($q$select public.registrar_adicional('5c29c000-0000-4000-8000-0000000000c1', '2026-03-10', '2026-03-20', 'Separação de pedidos', 100, null, null, '2026-03-16', '2026-03-31')::text$q$));
+insert into _adic values ('A2', pg_temp.adm($q$select public.registrar_adicional_idempotente(gen_random_uuid(), '5c29c000-0000-4000-8000-0000000000c1', '2026-03-10', '2026-03-20', 'Separação de pedidos', 100, null, null, '2026-03-16', '2026-03-31')::text$q$));
 insert into _adic values ('A3', pg_temp.adicional('c1', '2026-03-05', '2026-03-05', 'Contêiner 40 pés', '500', 'CNT-9'));
 insert into _adic values ('A4', pg_temp.adicional('c2', '2026-03-16', '2026-03-31', 'Carreta completa (serviço fechado)', '400', null, 'a4'));
 
@@ -325,8 +325,8 @@ select pg_temp.registrar('G2. validações: operação de outro cliente, valor z
   || '|' || pg_temp.adicional('c1', '2026-03-15', '2026-03-01', 'x', '10')
   || '|' || pg_temp.adicional('ff', '2026-03-01', '2026-03-15', 'x', '10'));
 select pg_temp.registrar('G3. operacional e admin em AAL1 não registram adicional (42501)', 'erro 42501|erro 42501',
-  pg_temp.ope($q$select public.registrar_adicional('5c29c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15', 'x', 10)::text$q$)
-  || '|' || pg_temp.adm1($q$select public.registrar_adicional('5c29c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15', 'x', 10)::text$q$));
+  pg_temp.ope($q$select public.registrar_adicional_idempotente(gen_random_uuid(), '5c29c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15', 'x', 10)::text$q$)
+  || '|' || pg_temp.adm1($q$select public.registrar_adicional_idempotente(gen_random_uuid(), '5c29c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15', 'x', 10)::text$q$));
 select pg_temp.registrar('G4. API direta: admin não insere, não altera e não apaga adicional (42501); operacional lê 0 linhas', 'erro 42501|erro 42501|erro 42501|0',
   pg_temp.adm($q$with x as (insert into public.billing_additionals (client_id, period_start, period_end, description, amount) values ('5c29c000-0000-4000-8000-0000000000c1', '2026-03-01', '2026-03-15', 'x', 10) returning 1) select count(*)::text from x$q$)
   || '|' || pg_temp.adm(format($q$with x as (update public.billing_additionals set amount = 1 where id = %L returning 1) select count(*)::text from x$q$, (select id from _adic where k = 'A1')))
@@ -459,11 +459,12 @@ select pg_temp.registrar('K2. adicionais: RLS ligada, só SELECT para authentica
   || '|' || has_table_privilege('authenticated', 'public.billing_additionals', 'INSERT')::text
   || '|' || has_table_privilege('service_role', 'public.billing_additionals', 'SELECT')::text
   || '|' || has_table_privilege('bslog_rpc_operacional', 'public.billing_additionals', 'SELECT')::text);
-select pg_temp.registrar('K3. RPCs novas: authenticated executa, anon não; internas sem EXECUTE de API', 'true|false|false|false',
-  has_function_privilege('authenticated', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
-  || '|' || has_function_privilege('anon', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
+select pg_temp.registrar('K3. RPCs novas: authenticated executa, anon não; internas (inclusive a registrar_adicional legada, desde a 047) sem EXECUTE de API', 'true|false|false|false|false',
+  has_function_privilege('authenticated', 'public.registrar_adicional_idempotente(uuid, uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
+  || '|' || has_function_privilege('anon', 'public.registrar_adicional_idempotente(uuid, uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
   || '|' || has_function_privilege('authenticated', 'public.recusar_entrada_igual_saida()', 'EXECUTE')::text
-  || '|' || has_function_privilege('authenticated', 'public.proteger_adicional()', 'EXECUTE')::text);
+  || '|' || has_function_privilege('authenticated', 'public.proteger_adicional()', 'EXECUTE')::text
+  || '|' || has_function_privilege('authenticated', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid, date, date, uuid, jsonb)', 'EXECUTE')::text);
 select pg_temp.registrar('K4. o motor antigo (010) não foi alterado e gerar_fatura não cita o motor novo', '0|0',
   (select count(*)::text from pg_proc where pronamespace = 'public'::regnamespace and proname = 'derivar_valores_financeiros'
      and (prosrc ilike '%ot_hourly%' or prosrc ilike '%_base_cost%'))
