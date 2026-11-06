@@ -2,6 +2,8 @@
 
 ## FIN-20D — checkpoint de 06/11/2026
 
+Implementação commitada e publicada em `ad92d56fbaeb506c272ed2d0494aac3ce1f8170f`, local/remoto iguais. [PR Draft #109](https://github.com/therunnas/bslogistica/pull/109), base `fix/fin-20c-imutabilidade-faturas` (#108). CI run `42288534263` iniciou nesse SHA; resultado final precisa ser consultado. Este commit posterior altera somente HANDOFF. Alterações não commitadas: nenhuma; marcador do CLI preservado em `/private/tmp/fin20d-cli-branches-preserved`. Próxima ação: conferir CI do HEAD do PR e realizar revisão; Preview/HML só após gate próprio.
+
 - Etapa: Desenvolvimento / Testes, Gate 2; próxima ação: revisão do PR Draft e CI no SHA final.
 - Worktree: `/private/tmp/bs-fin-20d`; branch: `fix/fin-20d-idempotencia-adicionais`.
 - Base e HEAD validado antes do commit: `b7d311f59a2700bc33b2d692a0d2ab8fc5e416c2`, head do PR #108; validações abaixo sobre o working tree da FIN-20D.
