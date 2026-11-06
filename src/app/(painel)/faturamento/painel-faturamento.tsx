@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "../_components/app-shell";
+import { ConfirmarAcaoIrreversivel } from "../_components/confirmar-acao-irreversivel";
 import { AdicionaisDoPeriodo } from "./adicionais";
 import { ArredondamentoAcumulado } from "./arredondamento";
 
@@ -85,6 +86,7 @@ export function PainelFaturamento() {
   const rows = linhasParaExibicao(ledger);
 
   const [clientId, setClientId] = useState("");
+  const [confirmarFatura, setConfirmarFatura] = useState(false);
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
 
@@ -350,13 +352,25 @@ export function PainelFaturamento() {
             <Button
               type="button"
               className="h-10 rounded-xl"
-              onClick={() => generate.mutate()}
+              onClick={() => setConfirmarFatura(true)}
               disabled={semNadaParaGerar || !exibicao.podeAgir || generate.isPending}
             >
               <FileText className="h-4 w-4" />
 
               {generate.isPending ? "Gerando..." : "Gerar fatura"}
             </Button>
+
+            <ConfirmarAcaoIrreversivel
+              open={confirmarFatura}
+              onOpenChange={setConfirmarFatura}
+              titulo="Emitir fatura"
+              descricao={`Emitir a fatura de ${clientName(selectedClient)} para ${dateBR(start)} a ${dateBR(end)}, no total de ${brl(totalAFaturar)}? Os lançamentos e adicionais do período ficam vinculados a ela e a emissão não pode ser desfeita pela interface.`}
+              rotuloConfirmar="Emitir fatura"
+              onConfirmar={() => {
+                setConfirmarFatura(false);
+                generate.mutate();
+              }}
+            />
           </div>
         }
       />

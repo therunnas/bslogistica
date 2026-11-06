@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
   CalendarRange,
@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "../_components/app-shell";
+import { erroDoPeriodoDoContrato } from "@/lib/contrato-periodo";
+import { ConfirmarAcaoIrreversivel } from "../_components/confirmar-acao-irreversivel";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,6 +140,8 @@ export function PainelClientes() {
   const diariaGenericaSemEfeito = tarifasPorFuncao === "disponivel" && resolucaoDeTarifas === true;
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");
+  const [clienteParaExcluir, setClienteParaExcluir] = useState<Client | null>(null);
+  const [contratoParaExcluir, setContratoParaExcluir] = useState<Contract | null>(null);
 
   const [clientOpen, setClientOpen] = useState(false);
   const [contractOpen, setContractOpen] = useState(false);
@@ -201,7 +205,10 @@ export function PainelClientes() {
     setClientOpen(true);
   }
 
-  function submitClient() {
+  function submitClient(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+
     const payload: Record<string, unknown> = {
       name: clientForm.name,
       doc: clientForm.doc || null,
@@ -238,6 +245,8 @@ export function PainelClientes() {
     setParametros030({ ...PARAMETROS_030_INICIAIS });
     setContractOpen(true);
   }
+
+  const erroDoPeriodo = erroDoPeriodoDoContrato(contractForm.valid_from, contractForm.valid_to);
 
   function submitContract() {
     const payload: Record<string, unknown> = {
@@ -457,7 +466,7 @@ export function PainelClientes() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => removeClient.mutate(client.id)}
+                              onClick={() => setClienteParaExcluir(client)}
                               aria-label={`Excluir ${client.name}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -638,7 +647,7 @@ export function PainelClientes() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => removeContract.mutate(contract.id)}
+                              onClick={() => setContratoParaExcluir(contract)}
                               aria-label={`Excluir ${contract.name}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -683,7 +692,7 @@ export function PainelClientes() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <form id="client-form" onSubmit={submitClient} className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label>Nome</Label>
 
@@ -798,7 +807,7 @@ export function PainelClientes() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          </form>
 
           <DialogFooter className="mt-2 border-t border-border pt-5">
             <Button
@@ -811,9 +820,9 @@ export function PainelClientes() {
             </Button>
 
             <Button
-              type="button"
+              type="submit"
+              form="client-form"
               className="rounded-xl"
-              onClick={submitClient}
               disabled={!clientForm.name}
             >
               Salvar cliente
@@ -1019,6 +1028,12 @@ export function PainelClientes() {
             </div>
           </div>
 
+          {erroDoPeriodo && (
+            <p role="alert" className="text-sm text-destructive">
+              {erroDoPeriodo}
+            </p>
+          )}
+
           {camposDa030.length > 0 ? (
             <div className="space-y-3 rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground">
@@ -1117,6 +1132,7 @@ export function PainelClientes() {
                 !contractForm.client_id ||
                 (modoDeTaxa === "bloqueada" && !contractForm.id) ||
                 errosDa030.length > 0 ||
+                erroDoPeriodo !== null ||
                 saveContract.isPending ||
                 criarContratoComVigencia.isPending
               }
@@ -1136,6 +1152,32 @@ export function PainelClientes() {
           colaboradores={colaboradoresDoContrato}
         />
       ) : null}
+
+      <ConfirmarAcaoIrreversivel
+        open={clienteParaExcluir !== null}
+        onOpenChange={(aberto) => !aberto && setClienteParaExcluir(null)}
+        titulo="Excluir cliente"
+        descricao={`Excluir o cliente "${clienteParaExcluir?.name ?? ""}"? O cadastro é apagado e a exclusão não pode ser desfeita. Cliente com histórico faturado não pode ser excluído: nesse caso, inative-o.`}
+        rotuloConfirmar="Excluir cliente"
+        onConfirmar={() => {
+          const alvo = clienteParaExcluir;
+          setClienteParaExcluir(null);
+          if (alvo) removeClient.mutate(alvo.id);
+        }}
+      />
+
+      <ConfirmarAcaoIrreversivel
+        open={contratoParaExcluir !== null}
+        onOpenChange={(aberto) => !aberto && setContratoParaExcluir(null)}
+        titulo="Excluir contrato"
+        descricao={`Excluir o contrato "${contratoParaExcluir?.name ?? ""}"? O cadastro é apagado e a exclusão não pode ser desfeita. Contrato já usado em apontamento não pode ser excluído: nesse caso, inative-o ou encerre a vigência.`}
+        rotuloConfirmar="Excluir contrato"
+        onConfirmar={() => {
+          const alvo = contratoParaExcluir;
+          setContratoParaExcluir(null);
+          if (alvo) removeContract.mutate(alvo.id);
+        }}
+      />
     </div>
   );
 }
