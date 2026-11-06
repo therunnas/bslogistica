@@ -44,7 +44,7 @@ const base = {
   notes: "",
 };
 
-function clientPanel(client) {
+function clientPanel(client, { contract, motor = "desligado" } = {}) {
   const saved = [];
   const visual = new Proxy({}, { get: (_, name) => name });
   const query = () => ({ data: [] });
@@ -55,7 +55,9 @@ function clientPanel(client) {
         useState: (initial) => [
           initial && typeof initial === "object" && "contact_name" in initial
             ? { ...base, ...client }
-            : initial,
+            : initial && typeof initial === "object" && "shift_hours" in initial
+              ? { ...initial, ...contract }
+              : initial,
           () => {},
         ],
       };
@@ -85,7 +87,7 @@ function clientPanel(client) {
         useSaveRow: (table) => ({
           isPending: false,
           mutate: (payload) => {
-            assert.equal(table, "clients", "este teste só permite salvar cliente");
+            assert.equal(table, contract ? "contracts" : "clients");
             saved.push(payload);
           },
         }),
@@ -93,8 +95,14 @@ function clientPanel(client) {
       },
       "@/lib/funcoes-dados": { useFuncoes: query },
       "@/lib/vigencias-dados": {
-        useCriarComVigencia: () => ({ isPending: false }),
-        useEstadoDoMotor: () => ({ tag: "desligado" }),
+        useCriarComVigencia: (tipo) => ({
+          isPending: false,
+          mutate: (payload) => {
+            assert.equal(tipo, "contrato");
+            saved.push(payload);
+          },
+        }),
+        useEstadoDoMotor: () => ({ tag: motor }),
         useFuncoesTurno: () => false,
         usePeriodoContratual: () => false,
         useRegrasDefinitivas: () => false,
@@ -186,4 +194,51 @@ test("clique e teclado submetem o mesmo form nativo com e-mail opcional", () => 
   assert.notEqual(email.props.required, true, "o e-mail continua opcional");
   const cancel = all.find((n) => n.type === "Button" && n.props.children === "Cancelar");
   assert.equal(cancel.props.type, "button", "cancelar não submete o formulário");
+});
+
+// Exercita o botão e o handler reais: remover a guarda de jornada volta a enviar 8 para zero.
+function contractSubmission(contract, motor = "desligado") {
+  const panel = clientPanel(
+    {},
+    {
+      contract: { name: "Contrato sintético", client_id: "client-test", ...contract },
+      motor,
+    },
+  );
+  const all = nodes(panel.tree);
+  const save = all.find((n) => n.type === "Button" && n.props.children === "Salvar contrato");
+  assert.ok(save);
+  save.props.onClick();
+  return { ...panel, all, save };
+}
+
+for (const motor of ["desligado", "ligado"]) {
+  for (const shift_hours of [0, -1, NaN, Infinity]) {
+    test(`contrato ${motor}: jornada ${shift_hours} bloqueia botão e envio sem converter para 8`, () => {
+      const panel = contractSubmission({ shift_hours }, motor);
+      assert.deepEqual(panel.saved, [], "jornada inválida não deve alcançar persistência");
+      assert.equal(panel.save.props.disabled, true);
+      assert.ok(panel.all.some((n) => n.props?.role === "alert"));
+    });
+  }
+  for (const shift_hours of [4, 7.5, 8]) {
+    test(`contrato ${motor}: jornada válida ${shift_hours} é preservada`, () => {
+      const panel = contractSubmission({ shift_hours }, motor);
+      assert.equal(panel.saved.length, 1);
+      const payload = motor === "ligado" ? panel.saved[0].linha : panel.saved[0];
+      assert.equal(payload.shift_hours, shift_hours);
+    });
+  }
+}
+
+test("contrato legado: edição de metadados com motor ligado não regrava condições financeiras", () => {
+  const panel = contractSubmission(
+    { id: "contract-legacy", shift_hours: 7.5, ot_factor: 0.5 },
+    "ligado",
+  );
+  assert.equal(panel.saved.length, 1);
+  assert.equal(panel.saved[0].id, "contract-legacy");
+  assert.equal(panel.saved[0].name, "Contrato sintético");
+  assert.equal("shift_hours" in panel.saved[0], false);
+  assert.equal("ot_factor" in panel.saved[0], false);
 });

@@ -248,7 +248,13 @@ export function PainelClientes() {
 
   const erroDoPeriodo = erroDoPeriodoDoContrato(contractForm.valid_from, contractForm.valid_to);
 
+  const erroDaJornada =
+    !taxaTravada && (!Number.isFinite(contractForm.shift_hours) || contractForm.shift_hours <= 0)
+      ? "Informe uma jornada da diária maior que zero."
+      : null;
+
   function submitContract() {
+    if (erroDaJornada !== null) return;
     const payload: Record<string, unknown> = {
       client_id: contractForm.client_id,
       name: contractForm.name,
@@ -261,7 +267,7 @@ export function PainelClientes() {
     // contrato novo precisa delas como valores iniciais. Nunca com o estado desconhecido.
     if (modoDeTaxa === "direta" || (!contractForm.id && modoDeTaxa === "por-vigencia")) {
       payload["daily_rate"] = Number(contractForm.daily_rate) || 0;
-      payload["shift_hours"] = Number(contractForm.shift_hours) || 8;
+      payload["shift_hours"] = Number(contractForm.shift_hours);
       payload["ot_factor"] = Number(contractForm.ot_factor) || 1;
       payload["ot_tolerance_min"] = Number(contractForm.ot_tolerance_min) || 0;
     }
@@ -948,6 +954,11 @@ export function PainelClientes() {
                 }
                 className={INPUT_CLASS}
               />
+              {erroDaJornada && (
+                <p role="alert" className="text-sm text-destructive">
+                  {erroDaJornada}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Dia útil e sábado seguem a regra fixa da BS: jornada de 8 horas (sábado com
                 referência de 4 horas). Este valor só vale para domingo e feriado, enquanto a regra
@@ -1133,6 +1144,7 @@ export function PainelClientes() {
                 (modoDeTaxa === "bloqueada" && !contractForm.id) ||
                 errosDa030.length > 0 ||
                 erroDoPeriodo !== null ||
+                erroDaJornada !== null ||
                 saveContract.isPending ||
                 criarContratoComVigencia.isPending
               }
