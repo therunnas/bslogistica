@@ -116,7 +116,7 @@ assert not any(isinstance(n, ast.Attribute) and n.attr == 'run' for n in ast.wal
   assert.equal(result.status, 0, result.stderr);
 });
 
-test("compatibilidade mantém nove cenários pinados e acrescenta 045", () => {
+test("compatibilidade mantém nove cenários pinados e acrescenta 045 e 046", () => {
   const shell = source("scripts/testar-compatibilidade-deploy.sh");
   const start = shell.indexOf('echo "=== Cenário 1:');
   const end = shell.indexOf("\nif grep -qiE", start);
@@ -143,9 +143,10 @@ test("compatibilidade mantém nove cenários pinados e acrescenta 045", () => {
       "20261110120000",
       "20261111120000",
       "20261112120000",
+      "20261113120000",
     ],
   );
-  assert.equal(result.stdout.split("\n").filter((line) => line.startsWith("RUN ")).length, 10);
+  assert.equal(result.stdout.split("\n").filter((line) => line.startsWith("RUN ")).length, 11);
 });
 
 test("deadline externo também encerra grupo criado por helper descendente", () => {

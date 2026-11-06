@@ -334,6 +334,18 @@ os testes asseveram isso na forma dos arquivos.
   `timesheet_entries` com `invoice_id` recusa `UPDATE` e `DELETE`, inclusive o
   `SET NULL` da FK. O vínculo só nasce em execução como `postgres`, contexto de
   `gerar_fatura`: `authenticated` (admin incluído) e `service_role` não o criam.
+- **Fatura emitida é imutável com qualquer lastro** (migration `046`, FIN-20C). Antes, só o apontamento
+  vinculado congelava `invoices` e `invoice_items`: uma fatura cujo lastro era só adicional avulso ou serviço
+  de container (`billing_additionals.invoice_id`) podia ser editada, apagada ou forjada pela API. Agora o
+  adicional vinculado também congela a fatura (`UPDATE`, `DELETE` e itens), o `TRUNCATE` em massa o
+  considera, e `anon`, `authenticated` e `service_role` perderam `INSERT`, `UPDATE`, `DELETE` e `TRUNCATE`
+  nessas tabelas (a escrita é só `gerar_fatura`; a aplicação só lê). As guardas são `SECURITY DEFINER` para
+  que "a fatura tem lastro?" não dependa da RLS de quem escreve. Rollback e limites em
+  [rollback-imutabilidade-faturas.sql](runbooks/rollback-imutabilidade-faturas.sql). Limites conhecidos, fora
+  da 046: `postgres` direto continua fora da fronteira; `admin_audit_log` segue adulterável por
+  `service_role` (um gatilho append-only que preserva o `INSERT` do backend e o `ON DELETE SET NULL` foi
+  validado em cópia local; fica para migration própria); e conta que criou ou cancelou adicional faturado
+  **não é removível do Auth** porque o `SET NULL` da FK é recusado por `proteger_adicional` (igual antes da 046) — use a revogação de identidade, não a remoção.
 - **A fronteira é a API da aplicação.** O gatilho mede `current_user`, então não
   distingue `gerar_fatura` de uma sessão `postgres` escrevendo à mão. Sessão
   `postgres` direta e superusuário ficam fora; nenhuma proteção aqui promete o

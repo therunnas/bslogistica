@@ -10,13 +10,14 @@
 #      ligada: a individual prevalece, HE sobre ela, adicional separado, faturamento concorrente).
 #   8) até a 043 — dias especiais V2;
 #   9) até a 044 — calendário territorial.
-#  10) até a 045 — backend de containers e interface administrativa.
+#  10) até a 045 — backend de containers e interface administrativa;
+#  11) até a 046 — imutabilidade de fatura sem apontamento e escrita direta revogada (o app só lê as tabelas).
 #
 # NUNCA toca Production nem homologação: Supabase local descartável (`supabase start`,
 # `db reset --local`) e um `next start` local apontado para ele. Cria uma conta de admin SÓ no Auth
 # local, que some no reset seguinte. Não roda na CI (precisa de Docker).
 #
-# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 045)
+# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 046)
 
 set -euo pipefail
 
@@ -118,10 +119,14 @@ echo "=== Cenário 10: banco até a 045 (containers) ==="
 supa db reset --local --version 20261112120000 >/dev/null 2>&1
 rodar "banco-045" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
 
+echo "=== Cenário 11: banco até a 046 (imutabilidade de fatura; escrita direta revogada) ==="
+supa db reset --local --version 20261113120000 >/dev/null 2>&1
+rodar "banco-046" "com-componentes" "com-periodo" "com-funcoes" "com-snap" "com-tarifas" "com-diaria"
+
 if grep -qiE "unhandled|TypeError|ReferenceError" "$tmp/next.log"; then
   echo "FALHOU: o servidor Next registrou erro:" >&2
   grep -iE "unhandled|TypeError|ReferenceError" "$tmp/next.log" | head -10 >&2
   exit 1
 fi
 echo ""
-echo "PASS: compatibilidade local com os schemas 034, 037, 038, 039, 040, 041, 042, 043, 044 e 045, incluindo páginas de containers e ausência segura da capacidade antes da 045. Isso não comprova o schema de Production."
+echo "PASS: compatibilidade local com os schemas 034, 037, 038, 039, 040, 041, 042, 043, 044, 045 e 046, incluindo páginas de containers e ausência segura da capacidade antes da 045. Isso não comprova o schema de Production."
