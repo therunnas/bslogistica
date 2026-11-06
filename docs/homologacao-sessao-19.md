@@ -1,7 +1,20 @@
-# Homologação integral — sessão 19
+# Evidências e histórico da homologação — sessão 19
 
 Data: 05/11/2026. SDLC: **Testes**, com correção pontual em Desenvolvimento.
-**Status geral: NÃO HOMOLOGADO — recomendação NO-GO.** Jornada operacional principal concluída na UI local × HML; 11 defeitos encontrados nas sessões 19C–19E foram corrigidos (RED/GREEN e UI). Pela matriz explícita (S19E): 233 PASS, 1 FAIL, 40 BLOQUEADO e 210 NÃO TESTADO de 484. CI do PR Draft #106 verde (incl. build Turbopack); Preview isolado no HML verificado sem sessão. Login com senha e TOTP real seguem BLOQUEADOS.
+**Checkpoint ativo e estado atual: [HANDOFF](HANDOFF.md).**
+Resultados individuais: [livro versionado dos 484 controles](continuidade/controles-sessao-19.json).
+As seções abaixo são históricas, válidas apenas para a sessão, código e ambiente
+indicados. Não competem com o checkpoint. Arquivos em `/private/tmp` citados nos
+relatos são locais; o livro sanitizado é a evidência publicada para retomada.
+
+## Sessão 19G — consolidação e publicação
+
+S19F preservada por hashes. Livro dos 484 controles sanitizado e versionado, sem
+novos PASS por inspeção. A correção de jornada foi reexecutada nas 79 suítes, lint e
+TypeScript. Commit da correção: `058b3619e5b34f1b13087b718074af6cb1c0ddd9`.
+A CI do novo HEAD será conferida após o push; a CI histórica de 55d2153 não o aprova.
+Protocolo integrado às instruções dos dois agentes; cabeçalho fora do bloco e um
+único prompt copiável. HANDOFF é a fonte principal; índices/históricos apontam a ele.
 
 ## Baseline e isolamento
 
@@ -221,17 +234,106 @@ Hoje o banco só imobiliza a linha **faturada**. Uma linha nova ou não faturada
 
 **Autenticação.** Login com senha, TOTP real, envio de e-mail de recuperação e redefinição continuam **BLOQUEADOS**: não há mecanismo de credencial de teste que não passe pelo agente nem caixa de e-mail isolada no HML. O fator TOTP pendente da conta `s19b-admin` não tem caminho legítimo de limpeza pela UI (Cancelar não remove; um novo cadastro o substitui), por isso foi mantido e documentado.
 
+## Sessão 19F — controles restantes e jornada zero (06/11/2026)
+
+SDLC: **Testes**, com correção pontual em Desenvolvimento. Retomada no worktree
+`/private/tmp/bs-session-19`, branch `fix/session-19-dashboard-currency`, HEAD
+`55d2153fe49eebf71f4f1d26be14b99479a07bba`, limpo antes das alterações S19F e igual
+ao PR Draft #106. O diretório inicial `/private/tmp/bs-fin-pr-09` estava em outra
+branch com exclusões locais; foi preservado. HANDOFF anterior descrevia a S19
+inicial: reconciliado com Git/PR e os checkpoints explícitos S19C–S19E.
+
+**Matriz individual.** Baseline 233/1/40/210 → **283 PASS / 0 FAIL / 64 BLOQUEADO /
+137 NÃO TESTADO**, total 484. São 49 novos PASS, a falha de jornada convertida em
+PASS e 24 controles antes pendentes classificados BLOQUEADOS. Livro S19E intacto;
+74 entradas próprias por ID em `s19f/ui-cases.json`, refletidas em
+`s19f/controles-status.json`, com ação, resultado, código e ambiente individuais.
+O `s19f/checkpoint-s19f.json` contém contagens por módulo e SHA-256 dos artefatos.
+Não há aprovação por herança de rótulo ou aprovação de módulo inteiro.
+
+**S19F-DEF-001 — jornada contratual zero.** A causa era o fallback
+`Number(contractForm.shift_hours) || 8`. A correção recusa valor não finito ou
+menor/igual a zero antes de enviar condição financeira; mostra alerta e desabilita
+Salvar. O payload envia o valor válido sem fallback. Edição de metadados com
+condição financeira travada continua sem reenviar esses campos. Nenhum contrato
+ou snapshot legado foi regravado; fator HE inferior a 1 não foi alterado.
+
+RED: 8 falhas nos handlers reais; GREEN: 21/21 casos, com motor ligado/desligado,
+zero/negativo/NaN/Infinity, valores 4/7,5/8 preservados e metadados legados.
+UI S19F-UI-002: zero mostra “Informe uma jornada da diária maior que zero.” e
+bloqueia Salvar;8 remove alerta e libera. Cadastro abandonado sem gravar.
+Revisão independente dos dois arquivos: sem findings, 21 testes repetidos PASS.
+
+**Cobertura nova UI local × HML.** Casos S19F-UI-001…050 no livro individual:
+lista/abas de contratos e clientes, telefone sintético persistido, opções iniciais
+de sábado/feriado/arredondamento/fechamento; tarifas e diária individual futuras,
+seu cancelamento e persistência; X dos diálogos; edição de observação e seleção
+contratual de operação; nova vigência de valor acordado, validações, fechamento
+exclusive, motivo e abandono de aposentadoria/nova versão; seis campos da vigência
+contratual com erros e valores válidos. Parâmetros contratuais desta última prova
+não foram registrados. A guia de teste criada pela S19F foi fechada sem submissão.
+
+**Dados sintéticos adicionados/alterados nesta sessão, preservados:**
+
+- cliente S19B: telefone `00000000000`;
+- contrato S19B: tarifa Diurno da função E2E-S11, R$ 300,00 desde 07/11;
+- contrato S19B: diária individual do Colab 1, R$ 310,00 desde 07/11;
+- operação fixa S19B: observação identificando a prova S19F;
+- avulsa S19B: valor acordado futuro R$ 320,00 de 07/11 a 08/11 (exclusive), versão
+  anterior R$ 300,00 encerrada em 07/11. Não houve aposentadoria nem exclusão.
+
+Resolução comercial permaneceu desligada. Nenhuma regra global, migration, RLS,
+grant, política, fatura ou fechamento foi alterado.
+
+**Limites identificados.** Ligar resolução comercial (1 controle) é vedado S19F.
+Os23 controles do formulário/lista de feriados e cobertura territorial
+(`calendario-territorial.tsx:194–473`) não são oferecidos no regime legado da UI;
+o componente só os renderiza com regime territorial. Ativar esse regime mudaria
+regra global. Esses 24 controles têm motivo individual de BLOQUEADO, nunca PASS.
+As localidades operacionais são independentes e seus 5 controles restantes não
+foram aprovados por esse diagnóstico.
+
+A recusa `permission denied for table operations` ao editar observação foi
+registrada durante cookie expirado do harness (900s). Leitura confirmou papel
+admin, grants e ausência da gravação naquele instante. Após renovar a sessão,
+salvamento e reabertura em guia limpa confirmaram a observação persistida.
+Diagnóstico em `s19f/operations-session-diagnosis.json`; sem defeito de produto
+confirmado nem alteração de permissões.
+
+**Ambiente e validação.** HML revalidado por SELECT em transação READ ONLY:
+50 migrations, head 045 (`20261112120000`). Harness S19B reiniciado com identidades
+existentes, sem criar conta; bundle reconstruído com HML público e sem chave
+administrativa no cliente. 79/79 suítes, lint, TypeScript e build Webpack PASS;
+workflow, Prettier e diff check conferidos no fechamento. SQL local destrutivo não
+repetido, sem alteração de banco. CI remota no SHA 55d2153: `validar` e `sql-local`
+PASS, run 42207509552; Vercel/CodeRabbit success. Isso não é CI do working tree S19F.
+Preview autenticado e seu runtime corrente não foram revalidados nesta sessão;
+não transferir a evidência local para Preview. Production não acessada.
+
+**Bloqueio de execução e retomada.** O host de navegador retornou
+`The browser access host is unavailable`; fallback nativo apresentou
+`noWindowsAvailable`, estados atrasados e ações sem confirmação confiável.
+Os 137 restantes ficaram NÃO TESTADOS. Restabelecer a automação e a sessão sintética,
+começar pelos seletores da nova vigência contratual e pelo valor-hora de HE paga,
+e seguir a fila do checkpoint. Continuidade em [Estado atual](continuidade/ESTADO_ATUAL.md),
+[Protocolo](continuidade/PROTOCOLO_DE_TRABALHO.md) e [HANDOFF](HANDOFF.md).
+
 ## Pendências e próxima execução
 
-1. Resolver a restrição do build padrão e a falha de inicialização do candidato local, ou obter publicação aprovada do candidato em Preview/staging. Compilação Webpack isolada não satisfaz o gate visual.
-2. Disponibilizar uma sessão sintética segura no navegador de staging. A sessão já aberta não foi confirmada como sintética e não foi usada para mutações, logout ou mudança de segurança. Os testes autenticados novos ocorreram por HTTP/Auth/RPC, não por essa sessão.
-3. Exercitar formulários e ações de cada módulo na UI: campos obrigatórios, validações, mensagens de erro, filtros, paginação, recarga, estados de falha, navegação e responsividade. Todas essas dimensões permanecem BLOQUEADAS quando não há prova específica acima. Carregamento HTML/redirect de todas as 27 rotas está coberto, mas não seu comportamento autenticado completo.
-4. Conferir convite/recuperação com transporte e templates remotos aprovados, sem destinatários reais. A prova anterior com caixa local capturada não valida a entrega/expiração do staging.
-5. Reutilizar a evidência válida do Excel nativo/layout anterior; repetir apenas o que divergir. O novo par de arquivos foi inspecionado em XML, sem reexportar ou alterar seus bytes; a interação com filtros no Excel nativo não foi repetida.
-6. Manter emissão/imutabilidade histórica preservadas. Qualquer novo teste destrutivo exige preparação específica e dados novos; os runners com reset não foram executados.
-7. Revisar o diff e autorizar separadamente commit/push/PR/publicação quando necessário. Não foi atravessado gate remoto para publicar a correção.
+1. Restabelecer automação confiável do navegador, conferir processos locais e renovar
+   sessão sintética antes de cada bloco que ultrapasse 900s.
+2. Retomar os 137 controles NÃO TESTADOS do livro S19F, começando por seletores de
+   vigência contratual e valor-hora pago; depois Containers, Apontamentos,
+   Colaboradores/equipes, operações e ações restantes. Não repetir PASS S19C–S19F.
+3. Decidir separadamente fator HE inferior a 1, bloqueio de lançamentos em competência
+   faturada e eventual ativação de calendário/resolução comercial. Sem migration ou
+   alteração global nesta autorização.
+4. Concluir fluxos de login/TOTP, convite/recuperação/e-mail em mecanismo de teste
+   autorizado e isolado; preservar as limitações anteriores.
+5. Correção S19F permanece local; commit/push/publicação dependem de ordem própria.
+   Manter PR #106 Draft. Sem merge, Production ou publicação sobre staging estável.
 
-**Critério de saída não atingido:** faltam jornadas críticas completas na interface e confirmação visual da correção em staging. Nenhum módulo inteiro foi declarado homologado.
+**Critério de saída não atingido:**137 não testados e64 bloqueados. NO-GO.
 
 ## Evidências locais e reprodução
 

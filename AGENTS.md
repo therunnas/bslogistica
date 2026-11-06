@@ -61,8 +61,9 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
 ## Migrations e banco
 
 - **Nunca editar migration já aplicada**, nem para corrigir. Criar nova com
-  `supabase migration new <nome>`. O estado de Production está em
-  [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md).
+  `supabase migration new <nome>`. A última verificação de Production está no
+  [HANDOFF](docs/HANDOFF.md), com históricos datados no
+  [Estado do projeto](docs/ESTADO_DO_PROJETO.md).
 - **Não alterar RLS, policies, grants ou triggers** fora de tarefa com esse escopo
   explícito.
 - **Nunca `supabase config push`**: apagaria a configuração real de Auth. Nunca
@@ -115,7 +116,8 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
   entre agentes” do [Workflow](docs/WORKFLOW.md); memória própria da ferramenta
   não é fonte de estado.
 - Prompts de sessão seguem o [Padrão de prompts](docs/PADRAO_DE_PROMPTS.md):
-  cabeçalho `MODELO`/`EFFORT`/`ETAPA`/`ESTILO`/`SKILL`/`SESSÃO`, prompt único e
+  cabeçalho `MODELO`/`EFFORT`/`ETAPA`/`SESSÃO` fora do bloco; `ESTILO` e `SKILL`
+  quando aplicáveis; prompt único e
   execução autônoma por PR, sem atravessar gates sem autorização nominal.
 - Ao concluir ou pausar uma etapa, atualizar o checkpoint em `docs/HANDOFF.md`,
   o estado factual em `docs/ESTADO_DO_PROJETO.md` e a fila em `PROGRESS.md`, sem
@@ -132,3 +134,10 @@ npm run build
 
 Várias suítes asseveram a **forma literal** do código. Erro de Prettier se corrige
 à mão, não com `--fix`.
+
+## Continuidade entre agentes
+
+Retome por [Estado atual](docs/continuidade/ESTADO_ATUAL.md) e pelo checkpoint
+único [HANDOFF](docs/HANDOFF.md). Siga o
+[Protocolo de trabalho](docs/continuidade/PROTOCOLO_DE_TRABALHO.md) para o ciclo
+ChatGPT → usuário → executor → usuário → ChatGPT e o formato dos prompts.

@@ -1,8 +1,8 @@
 # BS Soluções Logísticas — Progresso
 
 Andamento do projeto: marcos concluídos, etapa atual e próximas etapas. Regras
-permanentes ficam em [CLAUDE.md](CLAUDE.md); o estado factual de Production, dos
-testes e das dependências, em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md);
+permanentes ficam em [CLAUDE.md](CLAUDE.md); o estado atual no [HANDOFF](docs/HANDOFF.md) e o histórico em
+[docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md);
 o modelo de segurança, em [docs/SEGURANCA.md](docs/SEGURANCA.md). O histórico
 detalhado de cada mudança está no Git — este arquivo não o repete.
 
@@ -25,30 +25,30 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**Sessão 19 — homologação integral do sistema.** A correção monetária do Dashboard
-está implementada em branch isolada. A homologação continua **BLOQUEADA** pelas
-jornadas visuais ainda sem prova e pelas limitações do candidato local.
-Resultados e escopo real na [matriz da sessão 19](docs/homologacao-sessao-19.md);
-checkpoint de retomada no [HANDOFF](docs/HANDOFF.md).
+**S19G — continuidade documental e retomada da homologação, SDLC: Testes.**
+Estado, contagens, HEAD e ambiente corrente ficam exclusivamente no
+[HANDOFF](docs/HANDOFF.md); resultados por controle no
+[livro versionado](docs/continuidade/controles-sessao-19.json).
 
 ### Fazer agora
 
-Resolver o candidato executável e disponibilizar sessão sintética no navegador
-para exercer formulários, filtros, paginação, recarga, erros e responsividade
-por módulo. Preservar as provas recentes de Auth/RLS/MFA, financeiro e exportação,
-repetindo somente o que mudar.
+Publicar correção de jornada e continuidade no PR Draft #106, conferir CI no novo
+HEAD e retomar controles sem evidência no HML. Diagnosticar o navegador se necessário.
 
 ### Não fazer ainda
 
-Não promover código, aplicar migrations em Production, ativar regras, alterar
-faturas/fechamentos existentes nem limpar dados sintéticos sem o gate próprio.
-Commit/push/PR e publicação da correção aguardam autorização específica.
+Sem merge, Production, migrations, publicação em staging estável ou mudança de regra
+comercial global. Decisões de HE < 1 e competência faturada continuam pendentes.
 
 ### Critério de conclusão
 
-Todos os cenários críticos com evidência PASS no ambiente autorizado, sem defeito
-bloqueante conhecido. As pendências de e-mail, backup e janela de Production
-continuam no gate separado dos runbooks; não entram como implementação ativa.
+Cobertura funcional com evidências individuais no ambiente autorizado; resolver
+bloqueios ou obter decisão explícita. CI verde não conclui homologação.
+
+### Próxima etapa
+
+ChatGPT revisa o relatório retornado pelo usuário e prepara o próximo prompt,
+conforme [protocolo](docs/continuidade/PROTOCOLO_DE_TRABALHO.md).
 
 ## Marcos concluídos
 
