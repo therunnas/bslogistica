@@ -41,7 +41,9 @@ export function intencaoParaTentativa(
 
 type StorageDeIntencao = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type Marcador = { chave: string; legado: boolean };
-const emEnvio = new Set<string>();
+type GerenciadorDeLocks = Pick<LockManager, "request">;
+/** Executa `fn` com exclusão mútua nomeada entre TODAS as abas da origem, ou falha sem executá-la. */
+export type Exclusao = <T>(nome: string, fn: () => Promise<T>) => Promise<T>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MARCADOR_INVALIDO = "Intenção inválida: reconciliação administrativa necessária.";
 
@@ -61,6 +63,29 @@ const RECUSAS_TRANSACIONAIS_LEGADO = new Set([
   "55000",
   "P0002",
 ]);
+
+/**
+ * Exclusão entre abas por Web Locks: o lock é por usuário, nunca espera (`ifAvailable`) e é solto pelo próprio
+ * navegador quando a aba fecha. Sem a API, ou com qualquer falha ao obtê-lo, nada é enviado: sem exclusão
+ * não há como afirmar que duas abas não enviarão a mesma intenção ao mesmo tempo.
+ */
+export function criarExclusaoEntreAbas(locks: GerenciadorDeLocks | undefined): Exclusao {
+  return async (nome, fn) => {
+    if (!locks) {
+      throw new Error(
+        "Este navegador não permite garantir um único envio entre abas. Nada foi enviado.",
+      );
+    }
+    return locks.request(nome, { ifAvailable: true }, async (lock) => {
+      if (lock === null) {
+        throw new Error(
+          "Há um envio de adicional em andamento (outra aba ou clique anterior). Aguarde a confirmação.",
+        );
+      }
+      return fn();
+    });
+  };
+}
 
 function lerMarcador(bruto: string): Marcador {
   let marcador: unknown;
@@ -83,22 +108,22 @@ function lerMarcador(bruto: string): Marcador {
   return { chave: m.chave, legado: m.legado };
 }
 
-/** Persiste só chave/modo por identidade. Ausência na 047 permite SOMENTE a mesma chave.
+/** Persiste só chave/modo por identidade, em armazenamento que sobrevive ao fechamento da aba e é
+ * compartilhado entre abas; a exclusão entre elas é de `deps.exclusivo`. Ausência na 047 permite SOMENTE a mesma chave.
  * No legado, ausência não prova que um envio em andamento não vai confirmar: bloqueia.
  * Registro localizado encerra a tentativa com aviso, exigindo outra ação explícita para criar outro.
  */
 export async function executarIntencaoDeAdicional(deps: {
   storage: StorageDeIntencao;
   userId: string;
+  exclusivo: Exclusao;
   gerar: () => string;
   consultar: (chave: string) => Promise<string | null>;
   registrar: (chave: string, marcarLegado: () => void) => Promise<string>;
 }): Promise<string> {
   if (!UUID.test(deps.userId)) throw new Error("Sessão inválida.");
   const key = `bs:adicional:intencao:v1:${deps.userId}`;
-  if (emEnvio.has(key)) throw new Error("Aguarde a confirmação do envio em andamento.");
-  emEnvio.add(key);
-  try {
+  return deps.exclusivo(key, async () => {
     const bruto = deps.storage.getItem(key);
     let marcador: Marcador;
     if (bruto !== null) {
@@ -136,7 +161,5 @@ export async function executarIntencaoDeAdicional(deps: {
     }
     deps.storage.removeItem(key);
     return id;
-  } finally {
-    emEnvio.delete(key);
-  }
+  });
 }

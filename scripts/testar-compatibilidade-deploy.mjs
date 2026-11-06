@@ -441,6 +441,7 @@ if (COM_047) {
       removeItem: (k) => marcadores.delete(k),
     },
     userId: (await cliente.auth.getUser()).data.user.id,
+    exclusivo: (_nome, fn) => fn(),
     gerar: () => CHAVE_P4,
     consultar: async (chave) => {
       const r = await cliente

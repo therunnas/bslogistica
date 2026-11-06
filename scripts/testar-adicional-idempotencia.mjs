@@ -269,9 +269,14 @@ verificar(
   false,
 );
 verificar(
-  "o hook preserva marcador no fechamento e usa recuperação persistente",
-  [!/reiniciarIntencao/.test(dados), /storage: sessionStorage/.test(dados)],
-  [true, true],
+  "o hook preserva marcador no fechamento, persiste além da aba e exclui envios entre abas",
+  [
+    !/reiniciarIntencao/.test(dados),
+    /storage: localStorage/.test(dados),
+    !/sessionStorage/.test(dados),
+    /exclusivo: criarExclusaoEntreAbas\(navigator\.locks\)/.test(dados),
+  ],
+  [true, true, true, true],
 );
 verificar(
   "chave recusada (23505) preserva a intenção para reconciliação",

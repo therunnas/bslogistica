@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { RPC_ADICIONAIS, montarRegistroDeAdicional, type Adicional } from "@/lib/adicionais";
-import { executarIntencaoDeAdicional } from "@/lib/adicional-intencao";
+import { criarExclusaoEntreAbas, executarIntencaoDeAdicional } from "@/lib/adicional-intencao";
 import {
   CODIGO_DE_CHAVE_REUTILIZADA,
   MENSAGEM_CHAVE_REUTILIZADA,
@@ -112,7 +112,8 @@ export function useRegistrarAdicional() {
       const { data, error } = await db.auth.getUser();
       if (error || !data.user) throw new Error("Não foi possível confirmar a sessão.");
       return executarIntencaoDeAdicional({
-        storage: sessionStorage,
+        storage: localStorage,
+        exclusivo: criarExclusaoEntreAbas(navigator.locks),
         userId: data.user.id,
         gerar: () => crypto.randomUUID(),
         consultar: async (chave) => {
