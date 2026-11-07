@@ -20,7 +20,10 @@
  */
 
 export const RPC_ADICIONAIS = {
-  registrar: "registrar_adicional",
+  /** Idempotente (migration 047): a chave identifica a intenção. */
+  registrar: "registrar_adicional_idempotente",
+  /** Sem chave: só existe para a janela anterior à 047; depois dela a API não a executa. */
+  registrarAntiga: "registrar_adicional",
   cancelar: "cancelar_adicional",
 } as const;
 

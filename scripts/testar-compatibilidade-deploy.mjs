@@ -23,7 +23,7 @@
 
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -35,6 +35,8 @@ import {
 import { registrarServicoContainer } from "../src/lib/container-servico-backend.ts";
 
 import { montarRegistroDeAdicional } from "../src/lib/adicionais.ts";
+import { registrarAdicional } from "../src/lib/adicionais-registro.ts";
+import { executarIntencaoDeAdicional } from "../src/lib/adicional-intencao.ts";
 import { montarCargaDaRpc } from "../src/lib/apontamentos-salvar.ts";
 import { carregarFechamento, dependenciasComSupabase } from "../src/lib/fechamento/carregar.ts";
 import { verificarDisponibilidade } from "../src/lib/fechamento/disponibilidade.ts";
@@ -69,6 +71,10 @@ import { lerPlanilha, lerStringsCompartilhadas } from "./_fechamento-exportacao.
 import { lerZip } from "./_zip.mjs";
 
 const cenario = process.argv[2] ?? "?";
+// A 046 (imutabilidade de fatura) não muda nenhuma leitura nem RPC do app: o comportamento esperado é o da 045.
+const COM_045 = cenario === "banco-045" || cenario === "banco-046" || cenario === "banco-047";
+// A 047 fecha a RPC antiga de adicional e cria a idempotente: o app novo usa a nova e só cai na antiga se ela não existir.
+const COM_047 = cenario === "banco-047";
 const esperaComponentes = process.argv[3] === "com-componentes";
 const esperaPeriodo = process.argv[4] === "com-periodo";
 const esperaFuncoes = process.argv[5] === "com-funcoes";
@@ -170,7 +176,7 @@ try {
 verificar(
   "C11. containers distinguem schema anterior à 045 sem executar RPC de escrita",
   erroContainers === null ? "disponivel" : classificarErroContainer(erroContainers).codigo,
-  cenario === "banco-045" ? "disponivel" : "indisponivel",
+  COM_045 ? "disponivel" : "indisponivel",
 );
 const vinculoSemContainer = await lerVinculoAdicionalContainer(
   cliente,
@@ -204,7 +210,12 @@ insert into public.employee_cost_terms (employee_id, valid_from, daily_cost, act
     from generate_series(1, 6) i;
 `);
 // FIN10: cobertura exclusivamente sintética no Supabase local descartável.
-if (cenario === "banco-044" || cenario === "banco-045") {
+if (
+  cenario === "banco-044" ||
+  cenario === "banco-045" ||
+  cenario === "banco-046" ||
+  cenario === "banco-047"
+) {
   psql(`
 insert into public.municipality_catalog (code, name, state_code, official_url)
   values ('4200000', 'MUNICIPIO_TESTE_044', 'SC',
@@ -401,31 +412,115 @@ const formAdicional = {
   ...(periodoContratual ? { competencia: { inicio: "2026-03-01", fim: "2026-03-15" } } : {}),
 };
 const paramsAdicional = montarRegistroDeAdicional(formAdicional);
-const registrouAdicional = await cliente.rpc("registrar_adicional", {
-  p_client_id: paramsAdicional.p_client_id,
-  p_period_start: paramsAdicional.p_period_start,
-  p_period_end: paramsAdicional.p_period_end,
-  p_description: paramsAdicional.p_description,
-  p_amount: paramsAdicional.p_amount,
-  ...("p_billing_period_start" in paramsAdicional
-    ? {
-        p_billing_period_start: paramsAdicional.p_billing_period_start,
-        p_billing_period_end: paramsAdicional.p_billing_period_end,
-      }
-    : {}),
-});
+const CHAVE_P4 = randomUUID();
+const chamarRpc = (nome, args) => cliente.rpc(nome, args);
+let registrouAdicional;
+try {
+  registrouAdicional = {
+    data: await registrarAdicional(chamarRpc, paramsAdicional, CHAVE_P4),
+    error: null,
+  };
+} catch (erro) {
+  registrouAdicional = { data: null, error: erro };
+}
 verificar(
-  "P4. adicional pela RPC (Serviços adicionais), com competência só no banco com a 038",
+  "P4. adicional pelo TRANSPORTE do app (RPC idempotente; a antiga só em banco sem a 047), com competência só no banco com a 038",
   [
     registrouAdicional.error?.message ?? typeof registrouAdicional.data,
     "p_billing_period_start" in paramsAdicional,
   ],
   ["string", esperaPeriodo],
 );
-const CONTAINER_CENTAVOS = cenario === "banco-045" ? 4567 : 0;
-const CUSTO_CONTAINER_CENTAVOS = cenario === "banco-045" ? 3003 : 0;
+if (COM_047) {
+  const marcadores = new Map();
+  let envios = 0;
+  const recuperar = {
+    storage: {
+      getItem: (k) => marcadores.get(k) ?? null,
+      setItem: (k, v) => marcadores.set(k, v),
+      removeItem: (k) => marcadores.delete(k),
+    },
+    userId: (await cliente.auth.getUser()).data.user.id,
+    exclusivo: (_nome, fn) => fn(),
+    gerar: () => CHAVE_P4,
+    consultar: async (chave) => {
+      const r = await cliente
+        .from("billing_additionals")
+        .select("id")
+        .eq("idempotency_key", chave)
+        .maybeSingle();
+      if (r.error) throw r.error;
+      return r.data?.id ?? null;
+    },
+    registrar: async (chave) => {
+      envios++;
+      await registrarAdicional(chamarRpc, paramsAdicional, chave);
+      throw new Error("Resposta perdida depois da confirmação real do servidor");
+    },
+  };
+  await executarIntencaoDeAdicional(recuperar).catch(() => {});
+  const recuperada = await executarIntencaoDeAdicional({ ...recuperar }).catch((e) => e);
+  verificar(
+    "R1. commit real, resposta perdida e nova instância: reconcilia sem segundo envio",
+    [envios, /já foi registrado/.test(recuperada.message), marcadores.size],
+    [1, true, 0],
+  );
+  const reenvio = await registrarAdicional(chamarRpc, paramsAdicional, CHAVE_P4).catch((e) => e);
+  verificar(
+    "P4b. 047: o reenvio com a MESMA chave devolve o mesmo adicional, sem duplicar",
+    [
+      reenvio === registrouAdicional.data,
+      Number(
+        psql(
+          `select count(*) from public.billing_additionals where idempotency_key = '${CHAVE_P4}'`,
+        ),
+      ),
+    ],
+    [true, 1],
+  );
+  const outroPayload = await registrarAdicional(
+    chamarRpc,
+    { ...paramsAdicional, p_amount: Number(paramsAdicional.p_amount) + 1 },
+    CHAVE_P4,
+  ).catch((e) => e);
+  verificar(
+    "P4c. 047: a mesma chave com outro valor é recusada (23505)",
+    outroPayload?.code,
+    "23505",
+  );
+  const antigaDireta = await cliente.rpc("registrar_adicional", {
+    p_client_id: paramsAdicional.p_client_id,
+    p_period_start: paramsAdicional.p_period_start,
+    p_period_end: paramsAdicional.p_period_end,
+    p_description: "Chamada do app ANTIGO, sem chave",
+    p_amount: 1,
+  });
+  verificar(
+    "P4d. 047 + app ANTIGO (RPC sem chave): recusado (42501) e nada gravado (transição documentada)",
+    [
+      antigaDireta.error?.code,
+      Number(
+        psql(
+          `select count(*) from public.billing_additionals where description = 'Chamada do app ANTIGO, sem chave'`,
+        ),
+      ),
+    ],
+    ["42501", 0],
+  );
+} else {
+  const novaAusente = await cliente.rpc("registrar_adicional_idempotente", {
+    p_idempotency_key: randomUUID(),
+  });
+  verificar(
+    "P4e. banco anterior à 047 + app NOVO: a RPC idempotente não existe (PGRST202) e o transporte usou a antiga",
+    novaAusente.error?.code,
+    "PGRST202",
+  );
+}
+const CONTAINER_CENTAVOS = COM_045 ? 4567 : 0;
+const CUSTO_CONTAINER_CENTAVOS = COM_045 ? 3003 : 0;
 let adicionalDeContainer = null;
-if (cenario === "banco-045") {
+if (COM_045) {
   const servicoId = await registrarServicoContainer(
     cliente,
     {
@@ -467,7 +562,7 @@ verificar(
     listaAdicionais.error?.message ?? listaAdicionais.data.length,
     "billing_period_start" in (listaAdicionais.data?.[0] ?? {}),
   ],
-  [cenario === "banco-045" ? 2 : 1, esperaPeriodo],
+  [COM_045 ? 2 : 1, esperaPeriodo],
 );
 const comAdicional = await carregarFechamento(filtros, dependenciasComSupabase(cliente));
 verificar(
@@ -477,7 +572,7 @@ verificar(
     comAdicional.adicionais[0]?.competenciaInicio ?? null,
   ],
   [
-    cenario === "banco-045" ? [ADICIONAL_CENTAVOS, CONTAINER_CENTAVOS] : [ADICIONAL_CENTAVOS],
+    COM_045 ? [ADICIONAL_CENTAVOS, CONTAINER_CENTAVOS] : [ADICIONAL_CENTAVOS],
     esperaPeriodo ? "2026-03-01" : null,
   ],
 );
@@ -491,7 +586,7 @@ verificar(
   ],
   ["PK", "PK"],
 );
-if (cenario === "banco-045") {
+if (COM_045) {
   const componentes = extrairComponentesDoFechamento(comAdicional, [adicionalDeContainer]);
   verificar(
     "P6c. Conciliação separa Containers dos demais adicionais e fecha a receita",
@@ -520,7 +615,8 @@ if (esperaPeriodo) {
   });
   // App ANTIGO contra o banco 038: o cadastro de adicional não envia competência.
   const antigo = (inicio, fim) =>
-    cliente.rpc("registrar_adicional", {
+    cliente.rpc(COM_047 ? "registrar_adicional_idempotente" : "registrar_adicional", {
+      ...(COM_047 ? { p_idempotency_key: randomUUID() } : {}),
       p_client_id: C,
       p_period_start: inicio,
       p_period_end: fim,
@@ -1170,7 +1266,7 @@ if (!esperaDiaria) {
 }
 
 // FIN-PR-09: o cenário novo exercita o mesmo app com domingo V2 e corrida bônus/fatura.
-if (cenario === "banco-043" || cenario === "banco-044" || cenario === "banco-045") {
+if (cenario === "banco-043" || cenario === "banco-044" || COM_045) {
   const liga = await cliente.rpc("alterar_resolucao_tarifas", {
     p_ativar: true,
     p_reason: "ESPECIAL_TESTE",

@@ -364,7 +364,12 @@ export function AdicionaisDoPeriodo({
         )}
       </CardContent>
 
-      <Dialog open={novoOpen} onOpenChange={setNovoOpen}>
+      <Dialog
+        open={novoOpen}
+        onOpenChange={(aberto) => {
+          setNovoOpen(aberto);
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Novo adicional de serviço</DialogTitle>
