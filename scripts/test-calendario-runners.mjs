@@ -124,7 +124,7 @@ test("compatibilidade mantém nove cenários pinados e acrescenta 045, 046 e 047
     "bash",
     [
       "-c",
-      `set -euo pipefail\nexec 3>&1\nsupa(){ printf 'RESET %s\\n' "$*" >&3; }\nrodar(){ printf 'RUN %s\\n' "$*"; }\n${shell.slice(start, end)}`,
+      `set -euo pipefail\nexec 3>&1\nsupa(){ printf 'RESET %s\\n' "$*" >&3; }\nresetar(){ supa db reset --local --version "$1"; }\nrodar(){ printf 'RUN %s\\n' "$*"; }\n${shell.slice(start, end)}`,
     ],
     { encoding: "utf8", timeout: 2000 },
   );
@@ -148,6 +148,42 @@ test("compatibilidade mantém nove cenários pinados e acrescenta 045, 046 e 047
     ],
   );
   assert.equal(result.stdout.split("\n").filter((line) => line.startsWith("RUN ")).length, 12);
+});
+
+test("compatibilidade: todo reset espera o PostgREST recarregar o schema, sem espera fixa", () => {
+  const shell = source("scripts/testar-compatibilidade-deploy.sh");
+  const funcao = shell.match(/\nresetar\(\) \{\n([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(funcao, /supa db reset --local --version "\$1"/);
+  assert.match(funcao, /python3 scripts\/_aguardar_postgrest\.py "\$API_URL" "\$CONTAINER"/);
+  assert.doesNotMatch(funcao, /\bsleep\b/);
+  // Nenhum reset fora de `resetar`, e os 12 cenários passam por ela.
+  assert.equal(shell.match(/supa db reset/g)?.length, 1);
+  assert.equal(shell.match(/^resetar \d{14}$/gm)?.length, 12);
+  assert.match(shell, /JWT_SECRET CONTAINER=/);
+});
+
+test("verificador do PostgREST recusa alvo que não seja local", () => {
+  const helper = join(root, "scripts/_aguardar_postgrest.py");
+  const env = { ...process.env, ANON_KEY: "x", JWT_SECRET: "y" };
+  for (const [api, container] of [
+    ["https://exemplo.supabase.co", "supabase_db_x"],
+    ["http://10.0.0.5:54321", "supabase_db_x"],
+    ["http://127.0.0.1:54321", "postgres"],
+  ]) {
+    const r = spawnSync("python3", [helper, api, container, "1"], {
+      env,
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    assert.equal(r.status, 2, `${api} ${container}: ${r.stderr}`);
+    assert.match(r.stderr, /Recusado/);
+  }
+  const semSegredo = spawnSync("python3", [helper, "http://127.0.0.1:1", "supabase_db_x"], {
+    env: { ...process.env, ANON_KEY: "", JWT_SECRET: "" },
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  assert.equal(semSegredo.status, 2);
 });
 
 test("deadline externo também encerra grupo criado por helper descendente", () => {

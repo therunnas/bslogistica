@@ -25,7 +25,7 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FIN-20D-R2 — proteção de intenções entre abas:** marcador opaco persistente e exclusão entre abas em validação no PR Draft #109 (R1 em c011a71 com CI aprovada). Próxima ação: CI do novo SHA e revisão humana; persistência no servidor (migration 048) só com desenho aprovado e autorização própria; Preview/HML exigem gate próprio. A homologação integrada abaixo permanece como contexto anterior, sem reabertura nesta tarefa.
+**QA-20D — estabilidade do runner de compatibilidade:** manutenção de teste em PR Draft próprio sobre #109, aguardando revisão; não altera produto. **FIN-20D-R2 — proteção de intenções entre abas:** marcador opaco persistente e exclusão entre abas em validação no PR Draft #109 (R1 em c011a71 com CI aprovada). Próxima ação: CI do novo SHA e revisão humana; persistência no servidor (migration 048) só com desenho aprovado e autorização própria; Preview/HML exigem gate próprio. A homologação integrada abaixo permanece como contexto anterior, sem reabertura nesta tarefa.
 
 **Homologação integrada FIN-PR-11/12/13 em HML.** O PR
 [#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em

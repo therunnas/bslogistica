@@ -4,20 +4,20 @@
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | FIN-20D-R2 — proteção de intenções entre abas                                                                                   |
-| Gate atual                | Gate 2 — validação local concluída; CI do SHA da R2 e revisão humana; PR Draft #109                                             |
-| Último gate concluído     | FIN-20D-R1: CI 42302585169 aprovada em c011a71bbc2fb5a43a8124f1ae3126c6fc23347f                                                 |
-| Worktree                  | /private/tmp/bs-fin-20d                                                                                                         |
-| Branch                    | fix/fin-20d-idempotencia-adicionais                                                                                             |
-| Base                      | PR #108, b7d311f59a2700bc33b2d692a0d2ab8fc5e416c2, migration 046                                                                |
-| HEAD validado             | c011a71bbc2fb5a43a8124f1ae3126c6fc23347f — baseline da R1 (CI 42302585169); a R2 é o commit seguinte, SHA e CI no PR #109       |
-| Alterações não commitadas | nenhuma após o commit da R2                                                                                                     |
-| PR                        | [Draft #109](https://github.com/therunnas/bslogistica/pull/109), empilhado sobre #108                                           |
-| Ambiente-alvo             | Somente aplicação e Supabase local descartável                                                                                  |
-| Última ação comprovada    | R2 validada no working tree: lint, tsc, 69 suítes Node, build, 48 suítes SQL e compatibilidade 034–047 (ver ressalva do runner) |
-| Próxima ação exata        | Consultar a CI do SHA publicado e aguardar revisão; Preview/HML exigem gate próprio                                             |
+| Campo                     | Valor                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Etapa                     | QA-20D — estabilidade do runner de compatibilidade (manutenção de teste, sem código de produto)                                                 |
+| Gate atual                | Gate 2 — validação local concluída; CI do SHA da QA-20D e revisão humana; PR Draft próprio, empilhado sobre #109                                |
+| Último gate concluído     | FIN-20D-R2: CI 42312206955 aprovada em c530da28ba5f05462139ac9f0cc767b919c2f249                                                                 |
+| Worktree                  | /private/tmp/bs-fin-20d                                                                                                                         |
+| Branch                    | qa/qa-20d-estabilidade-compat                                                                                                                   |
+| Base                      | PR #109, c530da28ba5f05462139ac9f0cc767b919c2f249 (FIN-20D-R2, migration 047)                                                                   |
+| HEAD validado             | c530da28ba5f05462139ac9f0cc767b919c2f249 — baseline da QA-20D (CI 42312206955); a QA-20D é o commit seguinte, SHA e CI no PR Draft da branch    |
+| Alterações não commitadas | nenhuma após o commit da QA-20D                                                                                                                 |
+| PR                        | Draft da branch qa/qa-20d-estabilidade-compat, empilhado sobre [#109](https://github.com/therunnas/bslogistica/pull/109); #109 não foi alterado |
+| Ambiente-alvo             | Somente aplicação e Supabase local descartável                                                                                                  |
+| Última ação comprovada    | Série de compatibilidade 034–047: runner antigo 3/3 e novo 5/5 aprovados na stack local isolada; suítes afetadas, lint e tsc                    |
+| Próxima ação exata        | Consultar a CI do SHA publicado e aguardar revisão; depois, retomar o gate de Preview/HML da FIN-20D com autorização própria                    |
 
 ## Evidências
 
@@ -30,7 +30,9 @@
 - Nenhum valor, motivo, referência, período, payload ou token é persistido. Containers segue com o próprio marcador em `sessionStorage`, sem alteração. Migration 047 intacta.
 - Suíte focal da R2 (9 testes, simulando um navegador com armazenamento e locks compartilhados entre abas), RED 9/9 antes da implementação e GREEN 9/9 depois: aba fechada e reaberta reconcilia sem segundo envio; nova aba simultânea e duplo clique são recusados; aba que fecha com envio em voo reaproveita a MESMA chave; usuários diferentes não compartilham marcador nem lock; sem Web Locks, lock que falha, armazenamento que lança e marcador corrompido falham fechados; registro legítimo novo é possível após reconciliar; legado desconhecido bloqueia também em aba nova; só `chave` e `legado` são gravados; storage apagado não recupera (limite).
 - Validação do working tree da R2: lint, `tsc --noEmit`, 69 suítes `test:*`, `npm run build`, 48 suítes SQL e compatibilidade 034/037–047 (97 asserções na 047) contra Supabase local descartável `bs-fin20d-local`.
-- Ressalva do runner de compatibilidade: em 3 execuções do runner do repositório houve falhas em cenários diferentes (banco-040, banco-045, banco-041), todas com "Could not find … in the schema cache" do PostgREST logo após o `db reset`, com a máquina sob carga. Com `NOTIFY pgrst, 'reload schema'` e espera após cada reset, aplicado numa cópia do runner fora do repositório, a matriz passou inteira. O runner do repositório não foi alterado; a corrida de cache é instabilidade do ambiente local, não da R2, mas a causa foi inferida por esse comportamento e não isolada além disso.
+- QA-20D (runner de compatibilidade): cada `db reset --local` passa por `resetar`, que chama `scripts/_aguardar_postgrest.py`. O verificador cria um canário `public._qa_pgrst_canario()` depois do reset, envia `NOTIFY pgrst, 'reload schema'` (repetido a cada 10 s) e só libera quando a RPC do canário responde 200 pelo cache do PostgREST; remove o canário sempre e desiste em 90 s com última resposta e logs do PostgREST. Sem espera fixa. Só aceita API 127.0.0.1/localhost e container `supabase_db_*`; `SUPABASE_WORKDIR` opcional aponta para uma stack local própria, e o runner imprime project_id, container e API antes de começar.
+- Causa: a mensagem vem do cache de schema do PostgREST (comprovado: com os triggers de recarga desativados, a RPC nova devolve PGRST202 por mais de 5 s). O gatilho exato das 3 falhas da R2 NÃO foi reproduzido: 6 resets isolados e 3 execuções completas do runner antigo passaram. Evidência a favor da hipótese: em 48 resets o canário precisou de 2 a 10 chamadas em 17 casos, com cauda de até 6,1 s de recarga, tempo suficiente para os primeiros testes do runner antigo encontrarem o cache defasado.
+- Uma primeira versão do verificador comparava o catálogo com o OpenAPI da raiz e foi descartada: a raiz lista objetos novos mesmo com o cache das requisições defasado, então daria falso "pronto".
 - Evidências anteriores da FIN-20D e da R1 permanecem no Git.
 
 ## Migrations por ambiente
