@@ -2,67 +2,76 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. RELEASE-PREVIEW-01, 07/11/2026. Integração LOCAL, sem publicação.**
-SDLC: Testes / integração para homologação manual. Objetivo: um único Preview com #106 + #108/#109/#110.
+**Fonte principal do estado atual. UX-SIMPLIFICACAO-02, 07/11/2026. UX-01 commitada e publicada no PR #111.**
+SDLC: Desenvolvimento / Testes. Objetivo: simplificar as telas administrativas sem mudar regra financeira,
+histórico, auditoria ou segurança, antes de um novo Preview no PR #111.
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Etapa                     | RELEASE-PREVIEW-01 — integração local de #106 e #108/#109/#110 para um Preview único                                                                         |
-| Gate atual                | Gate 2 concluído localmente; Gate 3 (Preview) aguarda autorização de push                                                                                    |
-| Último gate concluído     | CI aprovada nos insumos: #110 `877e06a111fed1dfc48ae1d1114d4063e47a6d2b` e #106 `5246e8d26a55fbecbdd1e0c711cf7ac673bcc439`                                   |
-| Worktree                  | `/private/tmp/bs-fin-20d`                                                                                                                                    |
-| Branch                    | `integracao/release-preview-01` (somente local, sem upstream)                                                                                                |
-| Base                      | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                                                                            |
-| HEAD validado             | `877e06a111fed1dfc48ae1d1114d4063e47a6d2b` (#110) e `5246e8d26a55fbecbdd1e0c711cf7ac673bcc439` (#106), cada um com CI própria; a integração ainda não tem CI |
-| Alterações não commitadas | nenhuma após o commit de validação da integração                                                                                                             |
-| PR                        | nenhum para a integração; insumos #106, #108, #109 e #110 em Draft, inalterados                                                                              |
-| Ambiente-alvo             | Local × Supabase local descartável; Preview e HML só com autorização própria                                                                                 |
-| Última ação comprovada    | Validação local completa da integração: lint, tsc, 80 suítes Node, build, 48 suítes SQL e compatibilidade 034–047                                            |
-| Próxima ação exata        | Autorizar push da branch (gera Preview) e, opcionalmente, PR Draft para CI; depois executar o roteiro manual                                                 |
+| Campo                     | Valor                                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Etapa                     | UX-SIMPLIFICACAO-02 — publicação da UX-SIMPLIFICACAO-01 no Preview do PR #111                                                |
+| Gate atual                | Gate 3 (Preview) em conferência; homologação manual da nova UX pendente                                                      |
+| Último gate concluído     | RELEASE-PREVIEW-02: push da integração, PR Draft #111, CI verde e Preview com destino HML provado                            |
+| Worktree                  | `/private/tmp/bs-fin-20d`                                                                                                    |
+| Branch                    | `integracao/release-preview-01` (publicada; PR Draft #111 contra `main`)                                                     |
+| Base                      | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                                            |
+| HEAD validado             | `4648e2b6a6adea83448a3891af72b469b6d3fe41` (#111, CI verde); a UX-SIMPLIFICACAO-01 está por cima, sem commit                 |
+| Alterações não commitadas | nenhuma: a UX-SIMPLIFICACAO-01 está no commit `feat(ux): simplify administrative workflows`, filho de `4648e2b`              |
+| PR                        | #111 Draft, atualizado com o commit da UX; #106, #108, #109 e #110 em Draft, inalterados                                     |
+| Ambiente-alvo             | Preview do #111 × HML `qbnfcmrxmssnwkhaitgd` (somente leitura nesta etapa)                                                   |
+| Última ação comprovada    | Validação local completa: lint, `tsc`, Prettier, 82/82 suítes Node e build; evidência visual em app local contra stack local |
+| Próxima ação exata        | Conferir CI e Preview pelo SHA do commit da UX; executar os itens 5, 6, 8 e 12 do roteiro manual                             |
 
 ## Evidências
 
-- Integração: `main` + cadeia #108→#109→#110 (046, 047, QA-20D) + #106 (correções da sessão 19).
-  #107 (runbook e script do expurgo do HML) fica **fora** da aplicação.
-- Código (`src/`) sem arquivos em comum entre #106 e a cadeia; `ci.yml` e `package.json` mesclados automaticamente.
-- Livro da sessão 19 herdado do #106: [livro dos controles](continuidade/controles-sessao-19.json) e
-  [matriz](homologacao-sessao-19.md) (283 PASS / 0 FAIL / 64 BLOQUEADO / 137 NÃO TESTADO; homologação NO-GO).
-- Validação local da integração (07/11/2026): lint e `tsc` OK; **80/80** suítes Node (inclui as 11 do #106);
-  `npm run build` OK; **48/48** suítes SQL em Supabase local isolado (`bs-fin20d-local`); compatibilidade
-  034/037–047 **0 falhas** (94 asserções no schema 045, o do HML: páginas 200, Fechamento, XLSX, adicionais legado).
-- Nenhum defeito P0/P1 encontrado; nenhuma correção de código foi necessária além dos merges.
-- Roteiro manual: [homologação RELEASE-PREVIEW-01](homologacao-release-preview-01.md).
+- Preview anterior (RELEASE-PREVIEW-02): `dpl_neQcXPsZ8UiyL3qNyMbRjfwoDf8y`, SHA `4648e2b`, destino HML provado.
+- UX-SIMPLIFICACAO-01 (07/11/2026), só apresentação, sem migration, RLS, grant, trigger ou RPC novos:
+  - Colaboradores: custo editado no próprio cadastro vira **nova vigência** pela RPC existente
+    `registrar_custo_colaborador` (data ≥ hoje, motivo, confirmação explícita); recusa data passada, mesma data e
+    custo futuro já programado; lista, custo médio e "Atual" mostram o custo **vigente** (antes mostravam
+    `employees.daily_cost`, que não acompanha as vigências). Histórico recolhido.
+  - Contratos: tolerância e parâmetros da 030 em "Regras especiais"; histórico recolhido.
+  - Operações: filtro Fixas com contrato × Avulsas por serviço; linha de cobrança explícita.
+  - Containers: cada serviço abre o detalhe; valor total com quantidade, custo, resultado bruto e situação.
+  - Faturamento: abas "Pendentes de faturamento" e "Faturas emitidas"; arredondamento acumulado recolhido.
+- Validação local: lint, `tsc`, Prettier e build OK; **82/82** suítes Node (inclui `test:colaborador-custo` e
+  `test:ux-simplificacao`, novas e na CI).
+- App local (build de produção com a stack `bs-fin20d-local`, zero referência ao HML no bundle): reajuste de
+  custo exercido de ponta a ponta com usuário de teste local; versão anterior encerrada em 07/11 e nova com motivo.
 
 ## Migrations por ambiente
 
-- Repositório integrado: até a **047** (`20261114120000`).
-- HML `qbnfcmrxmssnwkhaitgd`: 50 migrations, head **045** (último registro comprovado em 07/11/2026, leitura).
-  046 e 047 **não** aplicadas; o app integrado usa o caminho compatível com 045/046 (registro de adicional sem
-  idempotência) até a 047 existir no banco.
+- Repositório integrado: até a **047** (`20261114120000`). A UX-SIMPLIFICACAO-01 não acrescenta migration.
+- HML `qbnfcmrxmssnwkhaitgd`: head **045** (leitura de 07/11/2026); 046 e 047 **não** aplicadas.
 - Production: 034, fora do escopo. [Inventário histórico](AMBIENTES.md).
 
 ## Autorizações
 
-RELEASE-PREVIEW-01: inspeção, branch local de integração, correções nela, build, lint, TypeScript e testes
-seguros, preparação do Preview e roteiro manual.
+UX-SIMPLIFICACAO-01: alterações locais de interface, testes, builds e documentação mínima.
+UX-SIMPLIFICACAO-02: commit da UX-01, push só para `integracao/release-preview-01`, conferência de CI, deploy e
+ambiente, verificações não destrutivas no Preview.
 
 ## Proibições
 
-Sem push sem revisão, merge em `main`, deploy em Production, migrations remotas, expurgo de dados, reset de
-stacks de outras sessões, novo Supabase, alteração dos PRs originais ou das regras financeiras aprovadas.
+Sem merge, Production, PR novo, force push, migration remota (046/047 não aplicadas), gravação no HML, limpeza de
+dados sintéticos, backup, alteração dos PRs de origem ou de regra financeira.
 
 ## Bloqueios e riscos
 
-- Publicar o Preview exige push da branch (gera deploy Preview automático na Vercel): **autorização pendente**.
-- Idempotência de adicionais só vale com a 047 no HML; até lá, homologar adicionais sabendo que reenvio após
-  resposta perdida bloqueia e exige conferência (caminho legado).
-- Expurgo do HML, 046/047 no HML e cópia independente dos backups seguem com gates próprios
-  (inventário de backups mantido fora do repositório, no Mac do responsável técnico).
+- Decisões que exigem tarefa própria (não implementadas):
+  - Preço-base do contrato como recuo quando a resolução por função está ligada: hoje o banco não recua
+    (sem função = pendente; função sem tarifa = P0002). Mudar exige migration e revisão de paridade.
+  - Edição de serviço de container: não há RPC; o caminho seguro continua cancelar (só "disponível") e
+    registrar de novo.
+  - Localidade do calendário: existe só por operação (`operation_location_terms`), reutilizada por todos os
+    apontamentos dela; por regra, endereço ou sede do cliente não definem localidade. Localidade por contrato
+    exigiria migration. Feriados seguem na área de Contratos; validações territoriais intactas.
+- Idempotência de adicionais só vale com a 047 no HML.
+- Expurgo do HML, 046/047 no HML e cópia independente dos backups seguem com gates próprios.
 
 ## Retomada
 
-1. `git switch integracao/release-preview-01` no worktree acima e conferir `git log` e `git status`.
-2. Rever os resultados da validação neste HANDOFF.
-3. Publicar o Preview só com autorização explícita de push; depois conferir o deploy pelo SHA exato.
+1. No worktree acima, `git log -1` deve ser o commit da UX sobre `4648e2b`, com `git status` limpo.
+2. Rever as decisões em "Bloqueios e riscos".
+3. Conferir CI e o novo Preview pelo SHA exato; merge e Production seguem sem autorização.

@@ -11,6 +11,7 @@ import { dateBR } from "@/lib/format";
 import { PageHeader } from "../_components/app-shell";
 import { carregarContainersAction, carregarFormularioContainerAction } from "./_acoes";
 import type { ServicoContainerLista } from "@/lib/container-servico-dados";
+import { resumoDoServico } from "@/lib/container-servico-resumo";
 
 export const dinheiroContainer = (centavos: number) =>
   (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -150,34 +151,58 @@ export function ListaContainers() {
         <p>Nenhum serviço encontrado.</p>
       ) : (
         <div className="space-y-3">
-          {servicos.map((s) => (
-            <Card key={s.id}>
-              <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
-                <div>
-                  <Link
-                    className="font-semibold underline underline-offset-4"
-                    href={`/containers/${s.id}`}
-                  >
-                    {s.description}
-                  </Link>
-                  <p className="text-sm text-muted-foreground">
-                    {s.cliente_nome} · {dateBR(s.executed_on)} · {s.quantity} container(s)
-                  </p>
-                  <p className="text-sm">
-                    Receita {dinheiroContainer(s.revenue_cents)} · Custo{" "}
-                    {dinheiroContainer(s.cost_total_cents)}
-                  </p>
-                </div>
-                <Badge variant="outline">
-                  {s.situacao === "disponivel"
-                    ? "Disponível"
-                    : s.situacao === "faturado"
-                      ? "Faturado"
-                      : "Cancelado"}
-                </Badge>
-              </CardContent>
-            </Card>
-          ))}
+          {servicos.map((s) => {
+            const resumo = resumoDoServico(s);
+            return (
+              <Link
+                key={s.id}
+                href={`/containers/${s.id}`}
+                aria-label={`Ver detalhes do serviço ${s.description}, ${s.cliente_nome}, ${resumo.situacao}`}
+                className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                <Card className="transition-colors hover:bg-secondary/30">
+                  <CardContent className="grid gap-3 pt-6 sm:grid-cols-[1fr_auto] sm:items-start">
+                    <div className="min-w-0 space-y-1">
+                      <p className="font-semibold text-foreground">{s.description}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {s.cliente_nome}
+                        {s.operacao_nome ? ` · ${s.operacao_nome}` : ""} · executado em{" "}
+                        {dateBR(s.executed_on)}
+                      </p>
+                      <dl className="grid gap-x-6 gap-y-1 pt-1 text-sm sm:grid-cols-3">
+                        <div>
+                          <dt className="text-xs text-muted-foreground">Valor negociado</dt>
+                          <dd>{resumo.valorNegociado}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted-foreground">Custo dos participantes</dt>
+                          <dd>{resumo.custo}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted-foreground">Resultado bruto</dt>
+                          <dd
+                            className={
+                              resumo.negativo ? "font-medium text-destructive" : "font-medium"
+                            }
+                          >
+                            {resumo.resultado}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <div className="flex items-center gap-3 sm:flex-col sm:items-end">
+                      <Badge variant={s.situacao === "disponivel" ? "default" : "outline"}>
+                        {resumo.situacao}
+                      </Badge>
+                      <span className="text-sm text-primary underline-offset-4">
+                        Ver detalhes →
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

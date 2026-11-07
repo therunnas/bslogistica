@@ -86,6 +86,7 @@ import {
 } from "@/lib/funcoes";
 import { useFuncoes } from "@/lib/funcoes-dados";
 import { validarOperacaoAvulsa } from "@/lib/operacao-avulsa";
+import { modalidadeDaOperacao } from "@/lib/operacao-modalidade";
 import { useCriarComVigencia, useEstadoDoMotor, useFuncoesTurno } from "@/lib/vigencias-dados";
 import {
   hojeEmSaoPaulo,
@@ -423,6 +424,12 @@ export function PainelOperacoes() {
   const operacoesAvulsas =
     operations.data?.filter((operation) => operation.type === "spot").length ?? 0;
 
+  // Filtro de leitura: separa as fixas (com contrato) das avulsas (por serviço). Não muda dados.
+  const [filtroDeTipo, setFiltroDeTipo] = useState<"todas" | "fixed" | "spot">("todas");
+  const operacoesVisiveis = (operations.data ?? []).filter(
+    (operation) => filtroDeTipo === "todas" || operation.type === filtroDeTipo,
+  );
+
   const colaboradoresAlocados = new Set(
     (team.data ?? []).filter((item) => item.active).map((item) => item.employee_id),
   ).size;
@@ -633,10 +640,40 @@ export function PainelOperacoes() {
         <p className="mt-1 text-xs text-muted-foreground">
           Consulte regras comerciais, turnos e equipes vinculadas a cada operação.
         </p>
+
+        <div
+          className="mt-3 inline-flex rounded-xl border border-border bg-secondary/50 p-1"
+          role="group"
+          aria-label="Filtrar operações por tipo"
+        >
+          {(
+            [
+              ["todas", `Todas (${totalOperacoes})`],
+              ["fixed", `Fixas com contrato (${operacoesFixas})`],
+              ["spot", `Avulsas por serviço (${operacoesAvulsas})`],
+            ] as const
+          ).map(([valor, rotulo]) => (
+            <Button
+              key={valor}
+              type="button"
+              size="sm"
+              variant={filtroDeTipo === valor ? "default" : "ghost"}
+              className="rounded-lg"
+              aria-pressed={filtroDeTipo === valor}
+              onClick={() => setFiltroDeTipo(valor)}
+            >
+              {rotulo}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-4">
-        {(operations.data ?? []).map((operation) => {
+        {operacoesVisiveis.map((operation) => {
+          const modalidade = modalidadeDaOperacao(
+            operation,
+            operation.contract_id ? contractName(operation.contract_id) : null,
+          );
           const opShifts = (shifts.data ?? []).filter(
             (shift) => shift.operation_id === operation.id,
           );
@@ -681,16 +718,14 @@ export function PainelOperacoes() {
                         {operation.site ?? "Sem local definido"}
                       </span>
 
-                      <span className="flex items-center gap-1.5">
+                      <span
+                        className={`flex items-center gap-1.5 ${
+                          modalidade.pendente ? "font-medium text-destructive" : "text-foreground"
+                        }`}
+                      >
                         <Layers3 className="h-3.5 w-3.5" />
-                        {contractName(operation.contract_id)}
+                        {modalidade.cobranca}
                       </span>
-
-                      {operation.agreed_amount != null ? (
-                        <span className="font-medium text-foreground">
-                          {brl(operation.agreed_amount)}
-                        </span>
-                      ) : null}
 
                       {operation.operation_date ? (
                         <span className="flex items-center gap-1.5">
@@ -878,6 +913,12 @@ export function PainelOperacoes() {
             </Card>
           );
         })}
+
+        {(operations.data?.length ?? 0) > 0 && operacoesVisiveis.length === 0 ? (
+          <p className="rounded-2xl border border-border p-6 text-center text-sm text-muted-foreground">
+            Nenhuma operação deste tipo. Escolha “Todas” para ver as demais.
+          </p>
+        ) : null}
 
         {operations.data?.length === 0 ? (
           <Card className="rounded-2xl border-border bg-card">

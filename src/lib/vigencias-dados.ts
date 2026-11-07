@@ -113,6 +113,20 @@ export function lerCustosDosColaboradores(
   );
 }
 
+/**
+ * Versões ATIVAS de custo de vários colaboradores, para a lista do cadastro mostrar o custo em vigor
+ * (UX-SIMPLIFICACAO-01). Mesma leitura paginada da prévia; a chave fica sob ["vigencias"], que o registro
+ * de vigência já invalida.
+ */
+export function useCustosDosColaboradores(colaboradores: readonly string[], habilitado: boolean) {
+  const chave = [...colaboradores].sort().join(",");
+  return useQuery({
+    queryKey: ["vigencias", "custos-cadastro", chave],
+    enabled: habilitado && colaboradores.length > 0,
+    queryFn: () => lerCustosDosColaboradores(cliente(), colaboradores, true),
+  });
+}
+
 /** Versão de qualquer fonte de preço: os campos comuns tipados, os valores lidos por chave. */
 export type VersaoDeVigencia = VersaoBase & Record<string, unknown>;
 

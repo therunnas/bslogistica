@@ -986,27 +986,6 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Tolerância (min)</Label>
-
-              <Input
-                type="number"
-                value={contractForm.ot_tolerance_min}
-                disabled={taxaTravada}
-                onChange={(event) =>
-                  setContractForm({
-                    ...contractForm,
-                    ot_tolerance_min: Number(event.target.value),
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-              <p className="text-xs text-muted-foreground">
-                Minutos de excesso que ainda não contam como hora extra. Passou disso, a hora extra
-                é arredondada em blocos de 15/45 minutos.
-              </p>
-            </div>
-
-            <div className="space-y-2">
               <Label>Vigente de</Label>
 
               <Input
@@ -1045,78 +1024,127 @@ export function PainelClientes() {
             </p>
           )}
 
-          {camposDa030.length > 0 ? (
-            <div className="space-y-3 rounded-xl border border-border p-4">
-              <p className="text-xs text-muted-foreground">
-                Regras de hora extra, sábado e feriado, gravadas na vigência inicial do contrato.
-                Para mudar depois, registre uma nova vigência.
-              </p>
+          <details className="rounded-xl border border-border">
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-foreground">
+              Regras especiais
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                tolerância da hora extra, sábado e feriado
+              </span>
+            </summary>
+            <div className="grid gap-4 px-4 pb-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Tolerância (min)</Label>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                {camposDa030.map((campo) => (
-                  <div key={campo.chave} className="space-y-2">
-                    <Label htmlFor={`contrato-${campo.chave}`}>{campo.rotulo}</Label>
-
-                    {campo.tipo === "escolha" ? (
-                      <select
-                        id={`contrato-${campo.chave}`}
-                        value={parametros030[campo.chave] || campo.padrao || ""}
-                        onChange={(event) =>
-                          setParametros030({ ...parametros030, [campo.chave]: event.target.value })
-                        }
-                        className={`${INPUT_CLASS} w-full border px-3 text-sm`}
-                      >
-                        {(campo.opcoes ?? []).map((opcao) => (
-                          <option key={opcao.valor} value={opcao.valor}>
-                            {opcao.rotulo}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <Input
-                        id={`contrato-${campo.chave}`}
-                        inputMode="decimal"
-                        value={parametros030[campo.chave] ?? ""}
-                        onChange={(event) =>
-                          setParametros030({ ...parametros030, [campo.chave]: event.target.value })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    )}
-                  </div>
-                ))}
+                <Input
+                  type="number"
+                  value={contractForm.ot_tolerance_min}
+                  disabled={taxaTravada}
+                  onChange={(event) =>
+                    setContractForm({
+                      ...contractForm,
+                      ot_tolerance_min: Number(event.target.value),
+                    })
+                  }
+                  className={INPUT_CLASS}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Minutos de excesso que ainda não contam como hora extra. Passou disso, a hora
+                  extra é arredondada em blocos de 15/45 minutos.
+                </p>
               </div>
-
-              {errosDa030.length > 0 ? (
-                <ul className="list-disc pl-5 text-xs text-destructive">
-                  {errosDa030.map((mensagem) => (
-                    <li key={mensagem}>{mensagem}</li>
-                  ))}
-                </ul>
-              ) : null}
             </div>
+            {camposDa030.length > 0 ? (
+              <div className="mx-4 mb-4 space-y-3 rounded-xl border border-border p-4">
+                <p className="text-xs text-muted-foreground">
+                  Regras de hora extra, sábado e feriado, gravadas na vigência inicial do contrato.
+                  Para mudar depois, registre uma nova vigência.
+                </p>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  {camposDa030.map((campo) => (
+                    <div key={campo.chave} className="space-y-2">
+                      <Label htmlFor={`contrato-${campo.chave}`}>{campo.rotulo}</Label>
+
+                      {campo.tipo === "escolha" ? (
+                        <select
+                          id={`contrato-${campo.chave}`}
+                          value={parametros030[campo.chave] || campo.padrao || ""}
+                          onChange={(event) =>
+                            setParametros030({
+                              ...parametros030,
+                              [campo.chave]: event.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} w-full border px-3 text-sm`}
+                        >
+                          {(campo.opcoes ?? []).map((opcao) => (
+                            <option key={opcao.valor} value={opcao.valor}>
+                              {opcao.rotulo}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          id={`contrato-${campo.chave}`}
+                          inputMode="decimal"
+                          value={parametros030[campo.chave] ?? ""}
+                          onChange={(event) =>
+                            setParametros030({
+                              ...parametros030,
+                              [campo.chave]: event.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {errosDa030.length > 0 ? (
+                  <ul className="list-disc pl-5 text-xs text-destructive">
+                    {errosDa030.map((mensagem) => (
+                      <li key={mensagem}>{mensagem}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </details>
+
+          {errosDa030.length > 0 ? (
+            <p role="alert" className="text-xs text-destructive">
+              Revise as regras especiais: há campos com erro.
+            </p>
           ) : null}
 
           {taxaTravada ? (
             <p className="text-xs text-muted-foreground">
               {modoDeTaxa === "por-vigencia"
-                ? "Diária, jornada, fator e tolerância seguem a vigência: não são editados aqui. Registre uma nova vigência no histórico abaixo."
+                ? "Diária, jornada, fator e tolerância seguem a vigência: para mudar, abra “Histórico de condições e reajustes” abaixo e registre um reajuste com data."
                 : "Regras financeiras não confirmadas: as condições financeiras estão somente para leitura."}
             </p>
           ) : null}
 
           {contractForm.id ? (
-            <HistoricoDeVigencias
-              tipo="contrato"
-              entidadeId={contractForm.id}
-              estado={estadoDoMotor}
-              valoresIniciais={{
-                daily_rate: String(contractForm.daily_rate),
-                shift_hours: String(contractForm.shift_hours),
-                ot_factor: String(contractForm.ot_factor),
-                ot_tolerance_min: String(contractForm.ot_tolerance_min),
-              }}
-            />
+            <details className="rounded-xl border border-border">
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-foreground">
+                Histórico de condições e reajustes
+              </summary>
+              <div className="px-2 pb-2">
+                <HistoricoDeVigencias
+                  tipo="contrato"
+                  entidadeId={contractForm.id}
+                  estado={estadoDoMotor}
+                  valoresIniciais={{
+                    daily_rate: String(contractForm.daily_rate),
+                    shift_hours: String(contractForm.shift_hours),
+                    ot_factor: String(contractForm.ot_factor),
+                    ot_tolerance_min: String(contractForm.ot_tolerance_min),
+                  }}
+                />
+              </div>
+            </details>
           ) : modoDeTaxa === "direta" ? (
             <p className="text-xs text-muted-foreground">
               Depois de salvar, abra o contrato para preparar vigências futuras (reajustes com

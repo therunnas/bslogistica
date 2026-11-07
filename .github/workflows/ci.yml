@@ -263,6 +263,10 @@ jobs:
 
       - name: Teste operacao-avulsa
         run: npm run test:operacao-avulsa
+      - name: Teste colaborador-custo
+        run: npm run test:colaborador-custo
+      - name: Teste ux-simplificacao
+        run: npm run test:ux-simplificacao
 
       - name: Teste contrato-periodo
         run: npm run test:contrato-periodo

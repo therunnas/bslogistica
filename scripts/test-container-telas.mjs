@@ -25,6 +25,10 @@ const dominio = carregarModulo(path.resolve("src/lib/container-servico.ts"), nat
 const adicionaisDominio = carregarModulo(path.resolve("src/lib/adicionais.ts"), nativeRequire);
 const containerUi = carregarModulo(path.resolve("src/lib/container-servico-ui.ts"), nativeRequire);
 const formatos = carregarModulo(path.resolve("src/lib/format.ts"), nativeRequire);
+const resumoContainer = carregarModulo(
+  path.resolve("src/lib/container-servico-resumo.ts"),
+  nativeRequire,
+);
 const intencoes = carregarModulo(path.resolve("src/lib/container-servico-intencao.ts"), (id) =>
   id === "./container-servico" ? dominio : nativeRequire(id),
 );
@@ -221,6 +225,7 @@ function navegador(acoes = {}, conteudo = null, config = {}) {
       if (id === "@/lib/adicionais") return adicionaisDominio;
       if (id === "@/lib/container-servico-ui") return containerUi;
       if (id === "@/lib/format") return formatos;
+      if (id === "@/lib/container-servico-resumo") return resumoContainer;
       if (id === "@/lib/fechamento/periodo") return { competenciasDoMes: () => [] };
       if (id === "@/lib/vigencias-dados") {
         return {

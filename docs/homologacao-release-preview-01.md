@@ -58,10 +58,12 @@ Resultados anteriores por controle: [livro da sessão 19](continuidade/controles
 
 ## 5. Colaboradores
 
-| #   | Ação                                        | Resultado esperado                                        |
-| --- | ------------------------------------------- | --------------------------------------------------------- |
-| 5.1 | Criar colaborador com função e custo diário | Salvo; vigência de custo registrada                       |
-| 5.2 | Corrigir o custo com nova vigência          | Histórico preservado; datas exibidas no fuso local (#106) |
+| #   | Ação                                        | Resultado esperado                                                       |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------ |
+| 5.1 | Criar colaborador com função e custo diário | Salvo; vigência de custo registrada                                      |
+| 5.2 | Corrigir o custo com nova vigência          | Histórico preservado; datas exibidas no fuso local (#106)                |
+| 5.3 | Editar colaborador e mudar o custo          | Pede data (≥ hoje) e motivo, confirma; lista mostra o novo custo vigente |
+| 5.4 | Mudar o custo com data passada ou repetida  | Recusado com mensagem; nada gravado                                      |
 
 ## 6. Operações e turnos
 
@@ -70,6 +72,7 @@ Resultados anteriores por controle: [livro da sessão 19](continuidade/controles
 | 6.1 | Criar operação ligada ao contrato e um turno | Salvos                                      |
 | 6.2 | Criar operação **avulsa**                    | Fluxo aceito conforme regra aprovada (#106) |
 | 6.3 | Montar equipe (colaborador + função)         | Equipe listada                              |
+| 6.4 | Filtrar Fixas × Avulsas                      | Contagens e cobrança de cada tipo corretas  |
 
 ## 7. Apontamentos, diárias e horas extras
 
@@ -83,10 +86,11 @@ Resultados anteriores por controle: [livro da sessão 19](continuidade/controles
 
 ## 8. Containers
 
-| #   | Ação                                                                  | Resultado esperado                             |
-| --- | --------------------------------------------------------------------- | ---------------------------------------------- |
-| 8.1 | Registrar serviço de container                                        | Salvo; datas corretas (#106)                   |
-| 8.2 | Conferir o custo no Fechamento/Faturamento do período **de cobrança** | Custo entra na competência do adicional (#106) |
+| #   | Ação                                                                  | Resultado esperado                                   |
+| --- | --------------------------------------------------------------------- | ---------------------------------------------------- |
+| 8.1 | Registrar serviço de container                                        | Salvo; datas corretas (#106)                         |
+| 8.2 | Conferir o custo no Fechamento/Faturamento do período **de cobrança** | Custo entra na competência do adicional (#106)       |
+| 8.3 | Clicar no serviço na lista                                            | Abre o detalhe; valor total, custo e resultado batem |
 
 ## 9. Adicionais
 
@@ -122,6 +126,7 @@ Resultados anteriores por controle: [livro da sessão 19](continuidade/controles
 | 12.3 | Tentar gerar de novo a mesma fatura             | Recusado (sem duplicar)                                     |
 | 12.4 | Editar apontamento ou adicional já faturado     | Recusado                                                    |
 | 12.5 | (Só após a 046 no HML) Fatura só com adicionais | Imutável                                                    |
+| 12.6 | Aba "Faturas emitidas"                          | Todas as faturas, com totais; sem duplicar adicionais       |
 
 ## 13. Erros e robustez
 

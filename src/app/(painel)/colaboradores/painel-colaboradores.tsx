@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BadgeDollarSign,
   BriefcaseBusiness,
@@ -60,11 +60,21 @@ import {
 } from "@/lib/funcoes";
 import {
   useCriarComVigencia,
+  useCustosDosColaboradores,
   useEstadoDoMotor,
   useFuncoesTurno,
+  usePeriodoContratual,
+  useRegistrarVigencia,
   useRegrasDaBs,
+  useRegrasDefinitivas,
+  useVersoes,
 } from "@/lib/vigencias-dados";
-import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
+import {
+  custosVigentesPorColaborador,
+  planejarNovoCusto,
+  textoDaConfirmacao,
+} from "@/lib/colaborador-custo";
+import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa, type TermoDeCusto } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { useEmployees } from "@/lib/queries";
 import type { Employee } from "@/lib/types";
@@ -112,16 +122,80 @@ export function PainelColaboradores() {
   // Valor-hora acordado da hora extra paga (migration 029), opcional: vazio = sem valor acordado.
   const [horaExtraDoCusto, setHoraExtraDoCusto] = useState("");
 
+  // Reajuste do custo de colaborador EXISTENTE com vigências: editado no próprio cadastro e gravado como
+  // NOVA vigência (mecanismo existente), a partir de hoje ou de data futura, com motivo na trilha.
+  const registrarCusto = useRegistrarVigencia("colaborador");
+  const regrasDefinitivas = useRegrasDefinitivas();
+  const periodoContratual = usePeriodoContratual();
+  const [custoDigitado, setCustoDigitado] = useState("");
+  const [inicioDoReajuste, setInicioDoReajuste] = useState(hojeEmSaoPaulo());
+  const [motivoDoReajuste, setMotivoDoReajuste] = useState("");
+  const [confirmarCusto, setConfirmarCusto] = useState(false);
+  const reajusteNoCadastro = Boolean(form.id) && modoDeCusto === "por-vigencia";
+  const versoesDoCusto = useVersoes("colaborador", reajusteNoCadastro ? form.id : null);
+  const planoDoCusto = useMemo(
+    () =>
+      planejarNovoCusto({
+        versoes: (versoesDoCusto.data ?? []) as unknown as TermoDeCusto[],
+        custoAtual: form.daily_cost,
+        novoCusto: custoDigitado,
+        inicio: inicioDoReajuste,
+        motivo: motivoDoReajuste,
+        hoje: hojeEmSaoPaulo(),
+        regrasBs,
+        regrasDefinitivas,
+        periodoContratual,
+      }),
+    [
+      versoesDoCusto.data,
+      form.daily_cost,
+      custoDigitado,
+      inicioDoReajuste,
+      motivoDoReajuste,
+      regrasBs,
+      regrasDefinitivas,
+      periodoContratual,
+    ],
+  );
+  const reajustePendente = reajusteNoCadastro && planoDoCusto.muda;
+
   const colaboradoresAtivos = data.filter((employee) => employee.status === "active").length;
 
   const colaboradoresInativos = data.filter((employee) => employee.status !== "active").length;
 
+  // Com o motor por vigência o custo que vale é o da versão em vigor hoje (`employees.daily_cost` é só o
+  // valor do cadastro e não acompanha os reajustes). undefined = carregando; null = sem custo vigente.
+  const porVigencia = modoDeCusto === "por-vigencia";
+  const custosDaLista = useCustosDosColaboradores(
+    data.map((employee) => employee.id),
+    porVigencia,
+  );
+  const custosVigentes = useMemo(
+    () =>
+      porVigencia && custosDaLista.data
+        ? custosVigentesPorColaborador(
+            custosDaLista.data as unknown as (TermoDeCusto & { employee_id: string })[],
+            hojeEmSaoPaulo(),
+          )
+        : null,
+    [porVigencia, custosDaLista.data],
+  );
+  function custoExibido(employee: Employee): number | null | undefined {
+    if (!porVigencia) return Number(employee.daily_cost);
+    if (!custosVigentes) return undefined;
+    return custosVigentes.get(employee.id) ?? null;
+  }
+
+  const custosConhecidos = data
+    .map(custoExibido)
+    .filter((valor): valor is number => typeof valor === "number");
   const custoMedio =
-    data.length > 0
-      ? data.reduce((total, employee) => total + Number(employee.daily_cost), 0) / data.length
+    custosConhecidos.length > 0
+      ? custosConhecidos.reduce((total, valor) => total + valor, 0) / custosConhecidos.length
       : 0;
 
   function edit(employee: Employee) {
+    const custoEmVigor = custoExibido(employee) ?? Number(employee.daily_cost);
     setForm({
       id: employee.id,
       name: employee.name,
@@ -129,17 +203,19 @@ export function PainelColaboradores() {
       role: employee.role ?? "",
       job_function_id: employee.job_function_id ?? "",
       phone: employee.phone ?? "",
-      daily_cost: Number(employee.daily_cost),
+      daily_cost: custoEmVigor,
       status: employee.status === "inactive" ? "inactive" : "active",
     });
+    setCustoDigitado(custoEmVigor.toFixed(2).replace(".", ","));
+    setInicioDoReajuste(hojeEmSaoPaulo());
+    setMotivoDoReajuste("");
 
     setOpen(true);
   }
 
-  // O custo diário de colaborador existente só muda nesta tela com o motor DESLIGADO; ligado, é
-  // por nova vigência; sem estado confirmado, nada financeiro é oferecido nem enviado.
-  const custoTravado =
-    modoDeCusto !== "direta" && (Boolean(form.id) || modoDeCusto === "bloqueada");
+  // O custo diário de colaborador existente: com o motor DESLIGADO grava direto; ligado, é editado aqui
+  // mas vira NOVA vigência (nunca UPDATE da coluna); sem estado confirmado, nada financeiro é enviado.
+  const custoTravado = modoDeCusto === "bloqueada";
 
   // A função padrão se grava no próprio colaborador. No cadastro novo com o motor ligado o cadastro
   // passa pela RPC atômica do custo (que não conhece a função): a função se escolhe depois de salvar.
@@ -161,6 +237,11 @@ export function PainelColaboradores() {
 
     if (form.id) {
       payload["id"] = form.id;
+      if (reajustePendente) {
+        // Primeiro a confirmação explícita do novo valor e da data; o envio fica em confirmarReajuste.
+        if (planoDoCusto.form) setConfirmarCusto(true);
+        return;
+      }
       save.mutate(payload, { onSuccess: () => setOpen(false) });
       return;
     }
@@ -189,6 +270,27 @@ export function PainelColaboradores() {
     if (modoDeCusto === "direta") {
       save.mutate(payload, { onSuccess: () => setOpen(false) });
     }
+  }
+
+  // Cadastro e custo numa só ação: os dados cadastrais (sem o custo) e, depois, a nova vigência.
+  function confirmarReajuste() {
+    setConfirmarCusto(false);
+    const plano = planoDoCusto.form;
+    if (!form.id || !plano) return;
+    const payload: Record<string, unknown> = {
+      id: form.id,
+      name: form.name,
+      doc: form.doc || null,
+      role: form.role || null,
+      phone: form.phone || null,
+      status: form.status,
+      ...camposDeFuncaoDoColaborador(form.job_function_id || null, funcaoNoFormulario),
+    };
+    const id = form.id;
+    save.mutate(payload, {
+      onSuccess: () =>
+        registrarCusto.mutate({ entidadeId: id, form: plano }, { onSuccess: () => setOpen(false) }),
+    });
   }
 
   return (
@@ -374,7 +476,17 @@ export function PainelColaboradores() {
                       </TableCell>
 
                       <TableCell className="text-right text-sm font-medium text-foreground">
-                        {brl(employee.daily_cost)}
+                        {(() => {
+                          const custo = custoExibido(employee);
+                          if (custo === undefined) return "…";
+                          if (custo === null)
+                            return (
+                              <span className="text-xs font-medium text-destructive">
+                                Sem custo vigente
+                              </span>
+                            );
+                          return brl(custo);
+                        })()}
                       </TableCell>
 
                       <TableCell>
@@ -534,22 +646,73 @@ export function PainelColaboradores() {
             <div className="space-y-2">
               <Label htmlFor="employee-cost">Custo por diária (R$)</Label>
 
-              <Input
-                id="employee-cost"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.daily_cost}
-                disabled={custoTravado}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    daily_cost: Number(event.target.value),
-                  })
-                }
-                className={INPUT_CLASS}
-              />
+              {reajusteNoCadastro ? (
+                <Input
+                  id="employee-cost"
+                  inputMode="decimal"
+                  value={custoDigitado}
+                  onChange={(event) => setCustoDigitado(event.target.value)}
+                  aria-describedby="employee-cost-hint"
+                  className={INPUT_CLASS}
+                />
+              ) : (
+                <Input
+                  id="employee-cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.daily_cost}
+                  disabled={custoTravado}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      daily_cost: Number(event.target.value),
+                    })
+                  }
+                  className={INPUT_CLASS}
+                />
+              )}
+              {reajusteNoCadastro ? (
+                <p id="employee-cost-hint" className="text-xs text-muted-foreground">
+                  Atual: {brl(form.daily_cost)}. Um valor novo vale a partir da data abaixo; o
+                  anterior fica no histórico.
+                </p>
+              ) : null}
             </div>
+
+            {reajustePendente ? (
+              <div className="space-y-2">
+                <Label htmlFor="employee-cost-apply-from">Novo custo vale a partir de</Label>
+                <Input
+                  id="employee-cost-apply-from"
+                  type="date"
+                  min={hojeEmSaoPaulo()}
+                  value={inicioDoReajuste}
+                  onChange={(event) => setInicioDoReajuste(event.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </div>
+            ) : null}
+
+            {reajustePendente ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="employee-cost-reason">Motivo do reajuste</Label>
+                <Input
+                  id="employee-cost-reason"
+                  value={motivoDoReajuste}
+                  onChange={(event) => setMotivoDoReajuste(event.target.value)}
+                  placeholder="Ex.: reajuste anual combinado"
+                  className={INPUT_CLASS}
+                />
+                {planoDoCusto.erros.length > 0 ? (
+                  <ul className="list-disc pl-5 text-xs text-destructive" role="alert">
+                    {planoDoCusto.erros.map((erro) => (
+                      <li key={erro}>{erro}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
 
             {!form.id && modoDeCusto === "por-vigencia" ? (
               <div className="space-y-2">
@@ -618,19 +781,24 @@ export function PainelColaboradores() {
 
           {custoTravado ? (
             <p className="text-xs text-muted-foreground">
-              {modoDeCusto === "por-vigencia"
-                ? "O custo diário segue a vigência: não é editado aqui. Registre uma nova vigência no histórico abaixo."
-                : "Regras financeiras não confirmadas: o custo diário está somente para leitura."}
+              Regras financeiras não confirmadas: o custo diário está somente para leitura.
             </p>
           ) : null}
 
           {form.id ? (
-            <HistoricoDeVigencias
-              tipo="colaborador"
-              entidadeId={form.id}
-              estado={estadoDoMotor}
-              valoresIniciais={{ daily_cost: String(form.daily_cost) }}
-            />
+            <details className="group rounded-xl border border-border">
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-foreground">
+                Histórico de custos e ajustes avançados
+              </summary>
+              <div className="px-2 pb-2">
+                <HistoricoDeVigencias
+                  tipo="colaborador"
+                  entidadeId={form.id}
+                  estado={estadoDoMotor}
+                  valoresIniciais={{ daily_cost: String(form.daily_cost) }}
+                />
+              </div>
+            </details>
           ) : null}
 
           <DialogFooter className="mt-2 border-t border-border pt-5">
@@ -651,11 +819,17 @@ export function PainelColaboradores() {
                 !form.name ||
                 save.isPending ||
                 criarComVigencia.isPending ||
+                registrarCusto.isPending ||
+                (reajustePendente && planoDoCusto.form === null) ||
                 (modoDeCusto === "bloqueada" && !form.id) ||
                 (!form.id && modoDeCusto === "por-vigencia" && !inicioDoCusto)
               }
             >
-              {save.isPending || criarComVigencia.isPending ? "Salvando..." : "Salvar colaborador"}
+              {save.isPending || criarComVigencia.isPending || registrarCusto.isPending
+                ? "Salvando..."
+                : reajustePendente
+                  ? "Salvar e aplicar novo custo"
+                  : "Salvar colaborador"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -671,6 +845,15 @@ export function PainelColaboradores() {
           erro={funcoes.isError}
         />
       ) : null}
+
+      <ConfirmarAcaoIrreversivel
+        open={confirmarCusto}
+        onOpenChange={setConfirmarCusto}
+        titulo="Confirmar novo custo"
+        descricao={textoDaConfirmacao(planoDoCusto, form.name)}
+        rotuloConfirmar="Aplicar novo custo"
+        onConfirmar={confirmarReajuste}
+      />
 
       <ConfirmarAcaoIrreversivel
         open={colaboradorParaExcluir !== null}

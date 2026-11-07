@@ -21,6 +21,7 @@ import { ArredondamentoAcumulado } from "./arredondamento";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -375,157 +376,309 @@ export function PainelFaturamento() {
         }
       />
 
-      <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
-        <CardContent className="grid gap-4 p-5 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Cliente</Label>
+      <Tabs defaultValue="pendentes">
+        <TabsList className="mb-5 h-auto rounded-xl border border-border bg-secondary/50 p-1">
+          <TabsTrigger value="pendentes" className="rounded-lg px-4 py-2">
+            Pendentes de faturamento
+          </TabsTrigger>
+          <TabsTrigger value="emitidas" className="rounded-lg px-4 py-2">
+            Faturas emitidas{invoices.data ? ` (${invoices.data.length})` : ""}
+          </TabsTrigger>
+        </TabsList>
 
-            <Select value={selectedClient} onValueChange={setClientId}>
-              <SelectTrigger className={SELECT_CLASS}>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
+        <TabsContent value="pendentes" className="mt-0">
+          <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+            <CardContent className="grid gap-4 p-5 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Cliente</Label>
 
-              <SelectContent>
-                {(clients.data ?? []).map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                <Select value={selectedClient} onValueChange={setClientId}>
+                  <SelectTrigger className={SELECT_CLASS}>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
 
-          <div className="space-y-2">
-            <Label>De</Label>
+                  <SelectContent>
+                    {(clients.data ?? []).map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <Input
-              type="date"
-              value={start}
-              onChange={(event) => setStart(event.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>De</Label>
 
-          <div className="space-y-2">
-            <Label>Até</Label>
+                <Input
+                  type="date"
+                  value={start}
+                  onChange={(event) => setStart(event.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </div>
 
-            <Input
-              type="date"
-              value={end}
-              onChange={(event) => setEnd(event.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Até</Label>
 
-          {periodoContratual ? (
-            <div className="flex flex-wrap items-center gap-2 md:col-span-3">
-              {competencia.isError ? (
-                <p className="text-sm text-destructive">
-                  Não foi possível ler a frequência de fechamento do cliente.
-                </p>
-              ) : frequencia === null ? (
-                <p className="text-sm text-muted-foreground">Lendo a frequência de fechamento…</p>
-              ) : (
-                <>
-                  <Badge variant="secondary">
-                    Fechamento {ROTULO_DA_FREQUENCIA[frequencia].toLowerCase()}
-                  </Badge>
-                  {competenciasDoMesDoInicio.map((c) => (
-                    <Button
-                      key={c.inicio}
-                      type="button"
-                      variant={c.inicio === start && c.fim === end ? "default" : "outline"}
-                      size="sm"
-                      className="h-8 rounded-xl"
-                      onClick={() => {
-                        setStart(c.inicio);
-                        setEnd(c.fim);
-                      }}
-                    >
-                      {dateBR(c.inicio)} a {dateBR(c.fim)}
-                    </Button>
-                  ))}
-                  {!periodoEhCompetencia ? (
-                    <p className="w-full text-xs text-destructive">
-                      A fatura é uma competência inteira:{" "}
-                      {frequencia === "mensal"
-                        ? "do dia 1 ao último dia do mês."
-                        : "1 a 15 ou 16 ao último dia do mês."}
+                <Input
+                  type="date"
+                  value={end}
+                  onChange={(event) => setEnd(event.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </div>
+
+              {periodoContratual ? (
+                <div className="flex flex-wrap items-center gap-2 md:col-span-3">
+                  {competencia.isError ? (
+                    <p className="text-sm text-destructive">
+                      Não foi possível ler a frequência de fechamento do cliente.
                     </p>
-                  ) : null}
-                </>
-              )}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+                  ) : frequencia === null ? (
+                    <p className="text-sm text-muted-foreground">
+                      Lendo a frequência de fechamento…
+                    </p>
+                  ) : (
+                    <>
+                      <Badge variant="secondary">
+                        Fechamento {ROTULO_DA_FREQUENCIA[frequencia].toLowerCase()}
+                      </Badge>
+                      {competenciasDoMesDoInicio.map((c) => (
+                        <Button
+                          key={c.inicio}
+                          type="button"
+                          variant={c.inicio === start && c.fim === end ? "default" : "outline"}
+                          size="sm"
+                          className="h-8 rounded-xl"
+                          onClick={() => {
+                            setStart(c.inicio);
+                            setEnd(c.fim);
+                          }}
+                        >
+                          {dateBR(c.inicio)} a {dateBR(c.fim)}
+                        </Button>
+                      ))}
+                      {!periodoEhCompetencia ? (
+                        <p className="w-full text-xs text-destructive">
+                          A fatura é uma competência inteira:{" "}
+                          {frequencia === "mensal"
+                            ? "do dia 1 ao último dia do mês."
+                            : "1 a 15 ou 16 ao último dia do mês."}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
 
-      {exibicao.aviso && (
-        <AvisoLedger
-          aviso={exibicao.aviso}
-          onTentarNovamente={exibicao.podeTentarNovamente ? ledger.tentarNovamente : undefined}
-        />
-      )}
-
-      {exibicao.mostrarValores && (
-        <>
-          <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Resumo
-              label="Diárias"
-              value={num(totals.dailies, 0)}
-              description={brl(dailiesValue)}
-              icon={CalendarDays}
+          {exibicao.aviso && (
+            <AvisoLedger
+              aviso={exibicao.aviso}
+              onTentarNovamente={exibicao.podeTentarNovamente ? ledger.tentarNovamente : undefined}
             />
+          )}
 
-            <Resumo
-              label="Horas extras"
-              value={minutesToLabel(totals.otMinutes)}
-              description={brl(overtimeValue)}
-              icon={Clock3}
-            />
+          {exibicao.mostrarValores && (
+            <>
+              <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Resumo
+                  label="Total a faturar"
+                  value={brl(totalAFaturar)}
+                  description={
+                    regrasBs
+                      ? `Lançamentos ${brl(totals.billed)} + adicionais ${brl(totalAdicionais)}${
+                          regrasDefinitivas ? ` + arredondamento ${brl(totalAjustes)}` : ""
+                        }`
+                      : "Lançamentos elegíveis"
+                  }
+                  icon={ReceiptText}
+                />
 
-            <Resumo
-              label="Total a faturar"
-              value={brl(totalAFaturar)}
-              description={
-                regrasBs
-                  ? `Lançamentos ${brl(totals.billed)} + adicionais ${brl(totalAdicionais)}${
-                      regrasDefinitivas ? ` + arredondamento ${brl(totalAjustes)}` : ""
-                    }`
-                  : "Lançamentos elegíveis"
-              }
-              icon={ReceiptText}
-            />
+                <Resumo
+                  label="Margem"
+                  value={brl(totalAFaturar - custoTotal)}
+                  description={`${num(
+                    marginPct(totalAFaturar, custoTotal),
+                    1,
+                  )}% · custo ${brl(custoTotal)}${
+                    custoContainers > 0
+                      ? ` (apontamentos ${brl(totals.cost)} + Containers ${brl(custoContainers)})`
+                      : ""
+                  }`}
+                  icon={TrendingUp}
+                />
+                <Resumo
+                  label="Diárias"
+                  value={num(totals.dailies, 0)}
+                  description={brl(dailiesValue)}
+                  icon={CalendarDays}
+                />
 
-            <Resumo
-              label="Margem"
-              value={brl(totalAFaturar - custoTotal)}
-              description={`${num(
-                marginPct(totalAFaturar, custoTotal),
-                1,
-              )}% · custo ${brl(custoTotal)}${
-                custoContainers > 0
-                  ? ` (apontamentos ${brl(totals.cost)} + Containers ${brl(custoContainers)})`
-                  : ""
-              }`}
-              icon={TrendingUp}
-            />
-          </div>
+                <Resumo
+                  label="Horas extras"
+                  value={minutesToLabel(totals.otMinutes)}
+                  description={brl(overtimeValue)}
+                  icon={Clock3}
+                />
+              </div>
 
-          <Card className="mb-6 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+              <Card className="mb-6 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
+                <CardHeader className="border-b border-border px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                      <WalletCards className="h-4 w-4" />
+                    </div>
+
+                    <div>
+                      <CardTitle className="text-sm font-semibold tracking-tight">
+                        Prévia por operação
+                      </CardTitle>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Valores ainda disponíveis para faturamento no período selecionado.
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
+                          <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
+                            Operação
+                          </TableHead>
+
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Diárias
+                          </TableHead>
+
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Horas extras
+                          </TableHead>
+
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Total
+                          </TableHead>
+
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Custo
+                          </TableHead>
+
+                          <TableHead className="text-right text-xs font-semibold text-muted-foreground">
+                            Margem
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+
+                      <TableBody>
+                        {byOperation.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6}>
+                              <EstadoVazio
+                                title="Nenhum lançamento faturável"
+                                description="Não existem apontamentos elegíveis para faturamento neste cliente e período."
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          byOperation.map((operation) => {
+                            const margem = operation.billed - operation.cost;
+
+                            return (
+                              <TableRow
+                                key={operation.id}
+                                className="border-border transition-colors hover:bg-secondary/20"
+                              >
+                                <TableCell className="py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
+                                      <ReceiptText className="h-4 w-4" />
+                                    </div>
+
+                                    <p className="text-sm font-medium text-foreground">
+                                      {operation.name}
+                                    </p>
+                                  </div>
+                                </TableCell>
+
+                                <TableCell className="text-right text-sm text-muted-foreground">
+                                  {num(operation.dailies, 0)}
+                                </TableCell>
+
+                                <TableCell className="text-right text-sm text-muted-foreground">
+                                  {minutesToLabel(operation.otMinutes)}
+                                </TableCell>
+
+                                <TableCell className="text-right text-sm font-semibold text-foreground">
+                                  {brl(operation.billed)}
+                                </TableCell>
+
+                                <TableCell className="text-right text-sm text-muted-foreground">
+                                  {brl(operation.cost)}
+                                </TableCell>
+
+                                <TableCell className="text-right text-sm font-medium text-foreground">
+                                  {brl(margem)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {regrasDefinitivas ? (
+                <ArredondamentoAcumulado
+                  ajustes={ajustes.data ?? []}
+                  aguardando={ajustes.isPending && !ajustes.isFetching}
+                  carregando={ajustes.isLoading}
+                  erro={ajustes.isError}
+                  total={totalAjustes}
+                />
+              ) : null}
+
+              {regrasBs ? (
+                <AdicionaisDoPeriodo
+                  clienteId={selectedClient}
+                  inicio={start}
+                  fim={end}
+                  operacoes={(operations.data ?? []).filter(
+                    (operation) => operation.client_id === selectedClient,
+                  )}
+                  adicionais={adicionais.data ?? []}
+                  aguardando={adicionais.isPending && !adicionais.isFetching}
+                  carregando={adicionais.isLoading}
+                  erro={adicionais.isError}
+                  periodoContratual={periodoContratual}
+                />
+              ) : null}
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="emitidas" className="mt-0">
+          <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
             <CardHeader className="border-b border-border px-5 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-                  <WalletCards className="h-4 w-4" />
+                  <FileText className="h-4 w-4" />
                 </div>
 
                 <div>
                   <CardTitle className="text-sm font-semibold tracking-tight">
-                    Prévia por operação
+                    Faturas geradas
                   </CardTitle>
 
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Valores ainda disponíveis para faturamento no período selecionado.
+                    Histórico das faturas criadas pelo sistema.
                   </p>
                 </div>
               </div>
@@ -536,8 +689,12 @@ export function PainelFaturamento() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
-                      <TableHead className="h-12 min-w-48 text-xs font-semibold text-muted-foreground">
-                        Operação
+                      <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
+                        Cliente
+                      </TableHead>
+
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Período
                       </TableHead>
 
                       <TableHead className="text-right text-xs font-semibold text-muted-foreground">
@@ -556,229 +713,90 @@ export function PainelFaturamento() {
                         Custo
                       </TableHead>
 
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Margem
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        Status
                       </TableHead>
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
-                    {byOperation.length === 0 ? (
+                    {invoices.isError || invoices.data === undefined ? (
                       <TableRow>
-                        <TableCell colSpan={6}>
+                        <TableCell colSpan={7}>
                           <EstadoVazio
-                            title="Nenhum lançamento faturável"
-                            description="Não existem apontamentos elegíveis para faturamento neste cliente e período."
+                            title={
+                              invoices.isError
+                                ? "Não foi possível carregar as faturas"
+                                : "Carregando faturas…"
+                            }
+                            description={
+                              invoices.isError
+                                ? "A lista não é exibida como vazia porque a leitura falhou. Recarregue a página para tentar de novo."
+                                : "A lista aparece quando a leitura terminar."
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : invoices.data.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7}>
+                          <EstadoVazio
+                            title="Nenhuma fatura gerada"
+                            description="As faturas criadas pelo fechamento financeiro aparecerão aqui."
                           />
                         </TableCell>
                       </TableRow>
                     ) : (
-                      byOperation.map((operation) => {
-                        const margem = operation.billed - operation.cost;
-
-                        return (
-                          <TableRow
-                            key={operation.id}
-                            className="border-border transition-colors hover:bg-secondary/20"
-                          >
-                            <TableCell className="py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-                                  <ReceiptText className="h-4 w-4" />
-                                </div>
-
-                                <p className="text-sm font-medium text-foreground">
-                                  {operation.name}
-                                </p>
+                      invoices.data.map((invoice) => (
+                        <TableRow
+                          key={invoice.id}
+                          className="border-border transition-colors hover:bg-secondary/20"
+                        >
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/40">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
                               </div>
-                            </TableCell>
 
-                            <TableCell className="text-right text-sm text-muted-foreground">
-                              {num(operation.dailies, 0)}
-                            </TableCell>
+                              <span className="text-sm font-medium text-foreground">
+                                {clientName(invoice.client_id)}
+                              </span>
+                            </div>
+                          </TableCell>
 
-                            <TableCell className="text-right text-sm text-muted-foreground">
-                              {minutesToLabel(operation.otMinutes)}
-                            </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                            {dateBR(invoice.period_start)} – {dateBR(invoice.period_end)}
+                          </TableCell>
 
-                            <TableCell className="text-right text-sm font-semibold text-foreground">
-                              {brl(operation.billed)}
-                            </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {num(invoice.total_dailies, 0)}
+                          </TableCell>
 
-                            <TableCell className="text-right text-sm text-muted-foreground">
-                              {brl(operation.cost)}
-                            </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {num(invoice.total_overtime, 1)} h
+                          </TableCell>
 
-                            <TableCell className="text-right text-sm font-medium text-foreground">
-                              {brl(margem)}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
+                          <TableCell className="text-right text-sm font-semibold text-foreground">
+                            {brl(invoice.total_amount)}
+                          </TableCell>
+
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {brl(invoice.total_cost)}
+                          </TableCell>
+
+                          <TableCell>
+                            <StatusFatura status={invoice.status} />
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
-
-          {regrasDefinitivas ? (
-            <ArredondamentoAcumulado
-              ajustes={ajustes.data ?? []}
-              aguardando={ajustes.isPending && !ajustes.isFetching}
-              carregando={ajustes.isLoading}
-              erro={ajustes.isError}
-            />
-          ) : null}
-
-          {regrasBs ? (
-            <AdicionaisDoPeriodo
-              clienteId={selectedClient}
-              inicio={start}
-              fim={end}
-              operacoes={(operations.data ?? []).filter(
-                (operation) => operation.client_id === selectedClient,
-              )}
-              adicionais={adicionais.data ?? []}
-              aguardando={adicionais.isPending && !adicionais.isFetching}
-              carregando={adicionais.isLoading}
-              erro={adicionais.isError}
-              periodoContratual={periodoContratual}
-            />
-          ) : null}
-        </>
-      )}
-
-      <Card className="overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
-        <CardHeader className="border-b border-border px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.06] text-primary">
-              <FileText className="h-4 w-4" />
-            </div>
-
-            <div>
-              <CardTitle className="text-sm font-semibold tracking-tight">
-                Faturas geradas
-              </CardTitle>
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                Histórico das faturas criadas pelo sistema.
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
-                  <TableHead className="h-12 text-xs font-semibold text-muted-foreground">
-                    Cliente
-                  </TableHead>
-
-                  <TableHead className="text-xs font-semibold text-muted-foreground">
-                    Período
-                  </TableHead>
-
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Diárias
-                  </TableHead>
-
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Horas extras
-                  </TableHead>
-
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Total
-                  </TableHead>
-
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                    Custo
-                  </TableHead>
-
-                  <TableHead className="text-xs font-semibold text-muted-foreground">
-                    Status
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {invoices.isError || invoices.data === undefined ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>
-                      <EstadoVazio
-                        title={
-                          invoices.isError
-                            ? "Não foi possível carregar as faturas"
-                            : "Carregando faturas…"
-                        }
-                        description={
-                          invoices.isError
-                            ? "A lista não é exibida como vazia porque a leitura falhou. Recarregue a página para tentar de novo."
-                            : "A lista aparece quando a leitura terminar."
-                        }
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : invoices.data.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>
-                      <EstadoVazio
-                        title="Nenhuma fatura gerada"
-                        description="As faturas criadas pelo fechamento financeiro aparecerão aqui."
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  invoices.data.map((invoice) => (
-                    <TableRow
-                      key={invoice.id}
-                      className="border-border transition-colors hover:bg-secondary/20"
-                    >
-                      <TableCell className="py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/40">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                          </div>
-
-                          <span className="text-sm font-medium text-foreground">
-                            {clientName(invoice.client_id)}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {dateBR(invoice.period_start)} – {dateBR(invoice.period_end)}
-                      </TableCell>
-
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {num(invoice.total_dailies, 0)}
-                      </TableCell>
-
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {num(invoice.total_overtime, 1)} h
-                      </TableCell>
-
-                      <TableCell className="text-right text-sm font-semibold text-foreground">
-                        {brl(invoice.total_amount)}
-                      </TableCell>
-
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {brl(invoice.total_cost)}
-                      </TableCell>
-
-                      <TableCell>
-                        <StatusFatura status={invoice.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
