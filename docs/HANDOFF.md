@@ -10,17 +10,17 @@ SDLC: Testes / integração para homologação manual. Objetivo: um único Previ
 | Campo                     | Valor                                                                                                                                                        |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Etapa                     | RELEASE-PREVIEW-01 — integração local de #106 e #108/#109/#110 para um Preview único                                                                         |
-| Gate atual                | Gate 2 — validação local da integração em andamento; Preview ainda não publicado                                                                             |
+| Gate atual                | Gate 2 concluído localmente; Gate 3 (Preview) aguarda autorização de push                                                                                    |
 | Último gate concluído     | CI aprovada nos insumos: #110 `877e06a111fed1dfc48ae1d1114d4063e47a6d2b` e #106 `5246e8d26a55fbecbdd1e0c711cf7ac673bcc439`                                   |
 | Worktree                  | `/private/tmp/bs-fin-20d`                                                                                                                                    |
 | Branch                    | `integracao/release-preview-01` (somente local, sem upstream)                                                                                                |
 | Base                      | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                                                                            |
 | HEAD validado             | `877e06a111fed1dfc48ae1d1114d4063e47a6d2b` (#110) e `5246e8d26a55fbecbdd1e0c711cf7ac673bcc439` (#106), cada um com CI própria; a integração ainda não tem CI |
-| Alterações não commitadas | conferir `git status`; resultados da validação local entram no commit seguinte                                                                               |
+| Alterações não commitadas | nenhuma após o commit de validação da integração                                                                                                             |
 | PR                        | nenhum para a integração; insumos #106, #108, #109 e #110 em Draft, inalterados                                                                              |
 | Ambiente-alvo             | Local × Supabase local descartável; Preview e HML só com autorização própria                                                                                 |
-| Última ação comprovada    | Merges locais sem conflito de código; conflitos só em PROGRESS, ESTADO e HANDOFF, resolvidos                                                                 |
-| Próxima ação exata        | Concluir lint, TypeScript, suítes Node, build, SQL e compatibilidade; depois pedir autorização de push                                                       |
+| Última ação comprovada    | Validação local completa da integração: lint, tsc, 80 suítes Node, build, 48 suítes SQL e compatibilidade 034–047                                            |
+| Próxima ação exata        | Autorizar push da branch (gera Preview) e, opcionalmente, PR Draft para CI; depois executar o roteiro manual                                                 |
 
 ## Evidências
 
@@ -29,7 +29,11 @@ SDLC: Testes / integração para homologação manual. Objetivo: um único Previ
 - Código (`src/`) sem arquivos em comum entre #106 e a cadeia; `ci.yml` e `package.json` mesclados automaticamente.
 - Livro da sessão 19 herdado do #106: [livro dos controles](continuidade/controles-sessao-19.json) e
   [matriz](homologacao-sessao-19.md) (283 PASS / 0 FAIL / 64 BLOQUEADO / 137 NÃO TESTADO; homologação NO-GO).
-- Resultados da validação desta integração: **pendentes**.
+- Validação local da integração (07/11/2026): lint e `tsc` OK; **80/80** suítes Node (inclui as 11 do #106);
+  `npm run build` OK; **48/48** suítes SQL em Supabase local isolado (`bs-fin20d-local`); compatibilidade
+  034/037–047 **0 falhas** (94 asserções no schema 045, o do HML: páginas 200, Fechamento, XLSX, adicionais legado).
+- Nenhum defeito P0/P1 encontrado; nenhuma correção de código foi necessária além dos merges.
+- Roteiro manual: [homologação RELEASE-PREVIEW-01](homologacao-release-preview-01.md).
 
 ## Migrations por ambiente
 
