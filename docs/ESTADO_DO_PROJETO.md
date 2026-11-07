@@ -2,7 +2,7 @@
 
 ## FIN-20D — validação local em 06/11/2026
 
-**QA-20D (runner de compatibilidade):** cada reset local espera o PostgREST recarregar o schema por um canário que passa pelo cache das requisições, com prazo e diagnóstico; alvo local verificado. Série: runner antigo 3/3, novo 5/5. Detalhes e hipótese residual: [HANDOFF](HANDOFF.md).
+**QA-20D (runner de compatibilidade):** cada reset local espera o PostgREST recarregar o schema por um canário que passa pelo cache das requisições, com prazo e diagnóstico; alvo local verificado. Série: runner antigo 3/3, novo 5/5. R1: canário único por execução com privilégio mínimo e limpeza comprovada; URL local com parsing estrito, sem redirecionamento nem proxy; `SUPABASE_WORKDIR` obrigatório e alvo casado (API, Kong, rótulos, workdir) antes de qualquer reset ou SQL. Pendente: o mesmo isolamento em `testar-sql-local.sh`. Detalhes e hipótese residual: [HANDOFF](HANDOFF.md).
 
 **R2 em revisão:** o marcador opaco de intenção passa de `sessionStorage` para `localStorage`, com exclusão entre abas por Web Locks (um lock por usuário, sem espera, falha fechado sem a API). Sobrevive ao fechamento da aba; não cobre outro dispositivo/navegador nem armazenamento apagado. Sem valor financeiro no navegador; migration 047, regras comerciais e Containers intactos. Evidências e riscos: [HANDOFF](HANDOFF.md).
 

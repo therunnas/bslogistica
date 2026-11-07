@@ -1,42 +1,107 @@
 #!/usr/bin/env python3
-"""Espera o PostgREST LOCAL recarregar o cache de schema depois de um `supabase db reset --local`.
+"""Prontidão do PostgREST LOCAL após `supabase db reset --local` e conferência estrita do alvo local.
 
 Depois do reset o PostgREST recarrega o cache de schema de forma assíncrona. Enquanto a recarga não termina,
-qualquer chamada a um objeto novo falha com "Could not find ... in the schema cache" (PGRST202/PGRST205),
-mesmo que o banco já o tenha, e objetos removidos pelo reset continuam visíveis. A suíte de compatibilidade
-via isso de forma intermitente.
+uma chamada a objeto novo falha com "Could not find ... in the schema cache" (PGRST202/PGRST205) mesmo que o
+banco já o tenha, e objetos removidos pelo reset continuam visíveis.
 
-ATENÇÃO — o OpenAPI da raiz (`GET /rest/v1/`) NÃO serve como sinal de prontidão: ele lista objetos do banco
-mesmo quando o cache que atende às requisições está defasado (verificado: com os event triggers de recarga
-desativados, a raiz listava a função nova enquanto a chamada da RPC devolvia PGRST202).
+O OpenAPI da raiz (`GET /rest/v1/`) NÃO serve como sinal: ele lista objetos novos enquanto o cache das
+requisições ainda está defasado. O sinal é um CANÁRIO que passa pelo mesmo cache das requisições:
+  1. cria `public._qa_pgrst_canario_<aleatório>()` — NOME ÚNICO por execução. Com nome fixo, um cache defasado
+     que ainda guardasse o canário de uma execução anterior responderia 200 ao canário recriado (o PostgREST
+     resolve pela assinatura em cache e executa no banco), um falso "pronto" comprovado na stack local;
+  2. o canário só pode ser executado por `authenticated` (revogado de PUBLIC, anon e service_role);
+  3. envia `NOTIFY pgrst, 'reload schema'` (de novo a cada 10 s: uma notificação emitida antes de o PostgREST
+     voltar a escutar o canal se perde);
+  4. chama a RPC como `authenticated` até HTTP 200. O cache é trocado de forma atômica: enxergar um nome que
+     não existia antes desta execução prova que o cache carregado é posterior ao reset inteiro;
+  5. remove o canário sempre (também em SIGTERM/SIGINT, que o executor local usa no prazo) e confere que não
+     sobrou nenhum `_qa_pgrst_canario*`; sobras de uma execução morta por SIGKILL são removidas no início.
+Sem espera fixa: o prazo é só o limite de desistência, e a falha mostra a última resposta e os logs.
 
-Por isso este verificador usa um CANÁRIO que passa pelo mesmo cache das requisições:
-  1. cria `public._qa_pgrst_canario()` no banco (depois do reset) e a concede a `authenticated`;
-  2. envia `NOTIFY pgrst, 'reload schema'` (de novo a cada 10 s: uma notificação emitida antes de o PostgREST
-     voltar a escutar o canal se perde, e esperar sozinho não a traria de volta);
-  3. chama a RPC como `authenticated` até obter HTTP 200. O PostgREST troca o cache de forma atômica, então
-     enxergar um objeto criado DEPOIS do reset prova que o cache carregado é posterior ao reset inteiro;
-  4. remove o canário (sempre, inclusive em falha) e pede nova recarga, sem esperar por ela.
-Sem espera fixa: o prazo é só o limite de desistência, e a falha lista o último erro e os logs do PostgREST.
+Destino: só `http://127.0.0.1:<porta>` ou `http://localhost:<porta>` (porta 1–65535, sem credenciais, caminho,
+query ou fragmento), validado ANTES de qualquer requisição. O transporte ignora proxies do ambiente e recusa
+redirecionamento (o urllib padrão seguiria o redirecionamento reenviando `apikey` e `Authorization`).
 
-Só aceita alvo local: API em 127.0.0.1/localhost e container `supabase_db_*`. Nunca toca remoto.
-
-Uso: ANON_KEY=<chave local> JWT_SECRET=<segredo local> _aguardar_postgrest.py <api_url> <container_db> [prazo_s]
+Modos:
+  _aguardar_postgrest.py --validar-url <api_url>
+  _aguardar_postgrest.py --verificar-alvo <api_url> <project_id> <workdir>
+      confere que supabase_db_<id> e supabase_kong_<id> estão rodando com o rótulo do CLI deste project_id e
+      deste workdir, e que o Kong publica 8000/tcp exatamente na porta da API.
+  ANON_KEY=<chave local> JWT_SECRET=<segredo local> _aguardar_postgrest.py <api_url> <project_id> <workdir> [prazo_s]
+      espera a recarga; ANTES de qualquer SQL refaz o --verificar-alvo inteiro, então nunca escreve no banco de
+      uma stack cuja API, rótulos ou workdir não sejam os desta execução.
 Chave e segredo vêm do ambiente (não de argumento) para não aparecer na lista de processos. O JWT de papel
-`authenticated` é assinado aqui com o segredo do Supabase LOCAL; nada é enviado a um serviço remoto.
+`authenticated` é assinado aqui com o segredo do Supabase LOCAL.
 """
 import base64
 import hashlib
 import hmac
 import json
 import os
+import re
+import secrets
+import signal
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 
-CANARIO = "_qa_pgrst_canario"
+PREFIXO = "_qa_pgrst_canario"
+HOSTS_LOCAIS = ("127.0.0.1", "localhost")
+_URL = re.compile(r"http://(127\.0\.0\.1|localhost):([1-9][0-9]{0,4})/?")
+
+
+class Recusado(Exception):
+    """Destino ou alvo fora do permitido: nada é enviado."""
+
+
+def validar_url(api_url):
+    """Devolve (host, porta) de uma URL local estrita; qualquer outra forma é recusada."""
+    if not isinstance(api_url, str) or not _URL.fullmatch(api_url):
+        raise Recusado(f"API não é http://127.0.0.1:<porta> nem http://localhost:<porta>: {api_url!r}")
+    host, porta = _URL.fullmatch(api_url).groups()
+    porta = int(porta)
+    if not 1 <= porta <= 65535:
+        raise Recusado(f"porta fora de 1–65535: {porta}")
+    return host, porta
+
+
+class _SemRedirecionamento(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise Recusado(f"redirecionamento recusado (HTTP {code} para {newurl!r})")
+
+
+_TRANSPORTE = urllib.request.build_opener(urllib.request.ProxyHandler({}), _SemRedirecionamento())
+
+
+def docker_inspect(nome):
+    r = subprocess.run(["docker", "inspect", nome], capture_output=True, text=True, timeout=20)
+    if r.returncode != 0:
+        raise Recusado(f"container {nome} não existe")
+    return json.loads(r.stdout)[0]
+
+
+def verificar_alvo(api_url, project_id, workdir):
+    _, porta = validar_url(api_url)
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", project_id or ""):
+        raise Recusado(f"project_id inválido: {project_id!r}")
+    workdir = os.path.realpath(workdir)
+    for papel in ("db", "kong"):
+        nome = f"supabase_{papel}_{project_id}"
+        info = docker_inspect(nome)
+        rotulos = info.get("Config", {}).get("Labels") or {}
+        if not info.get("State", {}).get("Running"):
+            raise Recusado(f"{nome} não está rodando")
+        if rotulos.get("com.supabase.cli.project") != project_id:
+            raise Recusado(f"{nome} pertence a outro projeto: {rotulos.get('com.supabase.cli.project')!r}")
+        if os.path.realpath(rotulos.get("com.supabase.cli.workdir", "")) != workdir:
+            raise Recusado(f"{nome} foi criado por outro workdir: {rotulos.get('com.supabase.cli.workdir')!r}")
+        if papel == "kong":
+            portas = {b.get("HostPort") for b in (info.get("NetworkSettings", {}).get("Ports") or {}).get("8000/tcp") or []}
+            if str(porta) not in portas:
+                raise Recusado(f"a API {api_url} não é a porta publicada por {nome} ({sorted(portas)})")
 
 
 def psql(container, sql, prazo=20):
@@ -50,6 +115,31 @@ def psql(container, sql, prazo=20):
     return r.stdout
 
 
+def sql_criar_canario(nome):
+    return (
+        "begin;"
+        f"create function public.{nome}() returns int language sql as 'select 1';"
+        f"revoke all on function public.{nome}() from public, anon, service_role;"
+        f"grant execute on function public.{nome}() to authenticated;"
+        "commit;"
+    )
+
+
+# Remove TODO canário (o desta execução e sobras de execuções mortas) e devolve quantos restaram.
+SQL_REMOVER_CANARIOS = f"""
+do $$
+declare f regprocedure;
+begin
+  for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname like '{PREFIXO}%' loop
+    execute 'drop function ' || f;
+  end loop;
+end $$;
+select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname like '{PREFIXO}%';
+"""
+
+
 def jwt_authenticated(segredo):
     def b64(dados):
         return base64.urlsafe_b64encode(dados).rstrip(b"=")
@@ -60,19 +150,22 @@ def jwt_authenticated(segredo):
     return (cabecalho + b"." + corpo + b"." + assinatura).decode()
 
 
-def chamar_canario(api_url, apikey, token):
-    """Devolve (http_status, trecho_da_resposta). Falha de rede vira (0, erro)."""
+def chamar_canario(api_url, nome, apikey, token):
+    """Devolve (http_status, trecho). Falha de rede vira (0, erro). Redirecionamento levanta Recusado."""
+    validar_url(api_url)  # nenhum segredo sai para destino não validado
     req = urllib.request.Request(
-        f"{api_url.rstrip('/')}/rest/v1/rpc/{CANARIO}",
+        f"{api_url.rstrip('/')}/rest/v1/rpc/{nome}",
         data=b"{}",
         method="POST",
         headers={"apikey": apikey, "Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with _TRANSPORTE.open(req, timeout=10) as resp:
             return resp.status, resp.read(200).decode(errors="replace")
     except urllib.error.HTTPError as e:
         return e.code, e.read(200).decode(errors="replace")
+    except Recusado:
+        raise
     except Exception as e:  # noqa: BLE001 - conexão recusada, timeout durante recarga etc.
         return 0, str(e)
 
@@ -83,53 +176,60 @@ def logs_do_postgrest(container):
     return (r.stdout + r.stderr).strip()
 
 
-def main():
-    apikey = os.environ.get("ANON_KEY", "")
-    segredo = os.environ.get("JWT_SECRET", "")
-    if len(sys.argv) < 3 or not apikey or not segredo:
-        print(__doc__, file=sys.stderr)
-        return 2
-    api_url, container = sys.argv[1:3]
-    prazo = float(sys.argv[3]) if len(sys.argv) > 3 else 90.0
-    if not (api_url.startswith("http://127.0.0.1:") or api_url.startswith("http://localhost:")):
-        print(f"Recusado: API não é local ({api_url}).", file=sys.stderr)
-        return 2
-    if not container.startswith("supabase_db_"):
-        print(f"Recusado: container inesperado ({container}).", file=sys.stderr)
-        return 2
+def _interromper(signum, _frame):
+    raise SystemExit(128 + signum)  # executa os `finally`: o canário é removido também no prazo do executor
 
+
+def aguardar(api_url, project_id, workdir, prazo, apikey, segredo):
+    # Casar API, project_id, container e workdir ANTES de qualquer SQL: só o rótulo do container não basta,
+    # porque toda stack do CLI (inclusive a de outra sessão) tem o rótulo coerente com o próprio nome.
+    verificar_alvo(api_url, project_id, workdir)
+    container = f"supabase_db_{project_id}"
+
+    nome = f"{PREFIXO}_{secrets.token_hex(8)}"
     token = jwt_authenticated(segredo)
     inicio = time.monotonic()
     tentativas = 0
     ultimo = (None, "")
+    restantes = None
+    pronto = False
     try:
-        psql(
-            container,
-            f"drop function if exists public.{CANARIO}();"
-            f"create function public.{CANARIO}() returns int language sql as 'select 1';"
-            f"grant execute on function public.{CANARIO}() to authenticated;",
-        )
+        psql(container, SQL_REMOVER_CANARIOS)
+        psql(container, sql_criar_canario(nome))
         ultimo_notify = None
         while time.monotonic() - inicio < prazo:
             if ultimo_notify is None or time.monotonic() - ultimo_notify >= 10:
                 psql(container, "NOTIFY pgrst, 'reload schema';")
                 ultimo_notify = time.monotonic()
             tentativas += 1
-            ultimo = chamar_canario(api_url, apikey, token)
+            ultimo = chamar_canario(api_url, nome, apikey, token)
             if ultimo[0] == 200:
-                print(
-                    f"PostgREST recarregou o schema pós-reset: canário visível em "
-                    f"{time.monotonic() - inicio:.1f}s ({tentativas} chamada(s))."
-                )
-                return 0
+                pronto = True
+                break
             time.sleep(0.5)
+    except Recusado:
+        raise
     except Exception as e:  # noqa: BLE001
         ultimo = (None, f"erro do verificador: {e}")
     finally:
         try:
-            psql(container, f"drop function if exists public.{CANARIO}(); NOTIFY pgrst, 'reload schema';")
+            restantes = int(psql(container, SQL_REMOVER_CANARIOS + "NOTIFY pgrst, 'reload schema';").split()[-1])
         except Exception as e:  # noqa: BLE001
-            print(f"  aviso: não consegui remover o canário: {e}", file=sys.stderr)
+            print(f"  ERRO: não consegui remover o canário {nome}: {e}", file=sys.stderr)
+            restantes = -1
+        if restantes != 0:
+            print(f"  ERRO: restaram canários no banco ({restantes}).", file=sys.stderr)
+
+    # Pronto só com as duas provas: canário visível pelo cache E nenhum canário deixado no banco.
+    if pronto and restantes == 0:
+        print(
+            f"PostgREST recarregou o schema pós-reset: canário {nome} visível em "
+            f"{time.monotonic() - inicio:.1f}s ({tentativas} chamada(s)); canário removido."
+        )
+        return 0
+    if pronto:
+        print("PostgREST recarregou, mas a remoção do canário não foi comprovada.", file=sys.stderr)
+        return 1
 
     print(f"PostgREST NÃO recarregou o schema em {prazo:.0f}s ({tentativas} chamadas).", file=sys.stderr)
     print(f"  última resposta do canário: HTTP {ultimo[0]} {ultimo[1]}", file=sys.stderr)
@@ -140,5 +240,27 @@ def main():
     return 1
 
 
+def main(argv):
+    signal.signal(signal.SIGTERM, _interromper)
+    signal.signal(signal.SIGINT, _interromper)
+    try:
+        if argv[:1] == ["--validar-url"] and len(argv) == 2:
+            validar_url(argv[1])
+            return 0
+        if argv[:1] == ["--verificar-alvo"] and len(argv) == 4:
+            verificar_alvo(*argv[1:])
+            return 0
+        apikey = os.environ.get("ANON_KEY", "")
+        segredo = os.environ.get("JWT_SECRET", "")
+        if len(argv) not in (3, 4) or argv[0].startswith("--") or not apikey or not segredo:
+            print(__doc__, file=sys.stderr)
+            return 2
+        prazo = float(argv[3]) if len(argv) == 4 else 90.0
+        return aguardar(argv[0], argv[1], argv[2], prazo, apikey, segredo)
+    except Recusado as e:
+        print(f"Recusado: {e}", file=sys.stderr)
+        return 2
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

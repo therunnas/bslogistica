@@ -154,7 +154,10 @@ test("compatibilidade: todo reset espera o PostgREST recarregar o schema, sem es
   const shell = source("scripts/testar-compatibilidade-deploy.sh");
   const funcao = shell.match(/\nresetar\(\) \{\n([\s\S]*?)\n\}/)?.[1] ?? "";
   assert.match(funcao, /supa db reset --local --version "\$1"/);
-  assert.match(funcao, /python3 scripts\/_aguardar_postgrest\.py "\$API_URL" "\$CONTAINER"/);
+  assert.match(
+    funcao,
+    /python3 scripts\/_aguardar_postgrest\.py "\$API_URL" "\$project_id" "\$SUPABASE_WORKDIR"/,
+  );
   assert.doesNotMatch(funcao, /\bsleep\b/);
   // Nenhum reset fora de `resetar`, e os 12 cenários passam por ela.
   assert.equal(shell.match(/supa db reset/g)?.length, 1);
@@ -369,3 +372,249 @@ ${fragment}
     }
   });
 }
+
+const CARREGAR_VERIFICADOR = `
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('v', 'scripts/_aguardar_postgrest.py')
+v = importlib.util.module_from_spec(spec); spec.loader.exec_module(v)
+`;
+
+test("verificador: URL de destino com parsing estrito", () => {
+  const aceitas = [
+    "http://127.0.0.1:58621",
+    "http://127.0.0.1:58621/",
+    "http://localhost:1",
+    "http://localhost:65535",
+  ];
+  const recusadas = [
+    "https://127.0.0.1:58621",
+    "http://127.0.0.1",
+    "http://127.0.0.1:",
+    "http://127.0.0.1:0",
+    "http://127.0.0.1:65536",
+    "http://127.0.0.1:058621",
+    "http://user:pw@127.0.0.1:58621",
+    "http://127.0.0.1:58621@exemplo.com",
+    "http://127.0.0.1.exemplo.com:58621",
+    "http://localhost.:58621",
+    "http://LOCALHOST:58621",
+    "http://[::1]:58621",
+    "http://0.0.0.0:58621",
+    "http://127.0.0.1:58621/rest/v1",
+    "http://127.0.0.1:58621?x=1",
+    "http://127.0.0.1:58621#f",
+    " http://127.0.0.1:58621",
+    "http://127.0.0.1:58621\n",
+    "http://127.0.0.1:58621\\@exemplo.com",
+    "",
+  ];
+  const helper = join(root, "scripts/_aguardar_postgrest.py");
+  for (const url of aceitas) {
+    const r = spawnSync("python3", [helper, "--validar-url", url], {
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    assert.equal(r.status, 0, `${JSON.stringify(url)} deveria ser aceita: ${r.stderr}`);
+  }
+  for (const url of recusadas) {
+    const r = spawnSync("python3", [helper, "--validar-url", url], {
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    assert.equal(r.status, 2, `${JSON.stringify(url)} deveria ser recusada`);
+    assert.match(r.stderr, /Recusado/);
+  }
+});
+
+test("verificador: nenhum segredo segue redirecionamento nem passa por proxy do ambiente", () => {
+  const result = python(`${CARREGAR_VERIFICADOR}
+import http.server, os, threading
+recebidos = {'destino': [], 'proxy': []}
+def servidor(tratar):
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self): tratar(self)
+        do_GET = do_POST
+        def log_message(self, *a): pass
+    s = http.server.HTTPServer(('127.0.0.1', 0), H)
+    threading.Thread(target=s.serve_forever, daemon=True).start()
+    return s
+def registrar(chave):
+    def tratar(h):
+        recebidos[chave].append(dict(h.headers))
+        h.send_response(200); h.end_headers(); h.wfile.write(b'1')
+    return tratar
+destino = servidor(registrar('destino'))
+proxy = servidor(registrar('proxy'))
+def redirecionar(h):
+    h.rfile.read(int(h.headers.get('Content-Length') or 0))
+    h.send_response(303); h.send_header('Location', f'http://127.0.0.1:{destino.server_port}/rest/v1/rpc/x')
+    h.send_header('Content-Length', '0'); h.end_headers()
+origem = servidor(redirecionar)
+os.environ['http_proxy'] = os.environ['HTTP_PROXY'] = f'http://127.0.0.1:{proxy.server_port}'
+try:
+    v.chamar_canario(f'http://127.0.0.1:{origem.server_port}', 'x', 'APIKEY', 'TOKEN')
+except v.Recusado as e:
+    assert 'redirecionamento recusado' in str(e), e
+else:
+    raise AssertionError('redirecionamento seguido')
+assert recebidos == {'destino': [], 'proxy': []}, recebidos
+# destino não validado: falha antes de qualquer conexão
+for url in ['http://exemplo.com:80', 'http://127.0.0.1:1@exemplo.com']:
+    try: v.chamar_canario(url, 'x', 'APIKEY', 'TOKEN')
+    except v.Recusado: pass
+    else: raise AssertionError(url)
+`);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("verificador: canário único por reset, cache defasado não dá falso pronto, privilégio mínimo e limpeza", () => {
+  const result = python(`${CARREGAR_VERIFICADOR}
+import re, time
+class Pgrst:
+    """Fake do PostgREST: responde pela assinatura em CACHE e executa no BANCO."""
+    def __init__(self):
+        self.banco, self.cache = set(), {'_qa_pgrst_canario'}  # cache velho guarda o canário de nome fixo antigo
+        self.notificado = False; self.sql = []; self.recargas = 0; self.recarregar = True
+    def psql(self, container, sql, prazo=20):
+        self.sql.append(sql)
+        for nome in re.findall(r'create function public\\.(\\w+)\\(', sql): self.banco.add(nome)
+        if 'drop function' in sql: self.banco = {n for n in self.banco if not n.startswith('_qa_pgrst_canario')}
+        if 'NOTIFY pgrst' in sql: self.notificado = True
+        return '%d\\n' % len([n for n in self.banco if n.startswith('_qa_pgrst_canario')])
+    def chamar(self, api_url, nome, apikey, token):
+        if self.notificado and self.recarregar:  # a recarga só termina na chamada SEGUINTE ao NOTIFY
+            if getattr(self, '_pendente', False):
+                self.cache = set(self.banco); self.recargas += 1; self.notificado = False; self._pendente = False
+            else:
+                self._pendente = True
+        return (200, '1') if (nome in self.cache and nome in self.banco) else (404, 'PGRST202')
+f = Pgrst()
+v.psql = f.psql; v.chamar_canario = f.chamar; v.time.sleep = lambda s: None
+v.verificar_alvo = lambda url, projeto, workdir: v.validar_url(url)
+nomes = []
+for _ in range(2):  # dois resets consecutivos
+    antes = len(f.sql)
+    assert v.aguardar('http://127.0.0.1:58621', 'teste', '/w/teste', 5, 'k', 's') == 0
+    criacao = next(s for s in f.sql[antes:] if 'create function' in s)
+    nome = re.search(r'create function public\\.(\\w+)\\(', criacao).group(1)
+    nomes.append(nome)
+    assert re.fullmatch(r'_qa_pgrst_canario_[0-9a-f]{16}', nome), nome
+    assert 'revoke all on function public.%s() from public, anon, service_role;' % nome in criacao
+    assert 'grant execute on function public.%s() to authenticated;' % nome in criacao
+    assert criacao.startswith('begin;') and criacao.endswith('commit;')
+    assert not [n for n in f.banco if n.startswith('_qa_pgrst_canario')], 'canário ficou no banco'
+assert nomes[0] != nomes[1], nomes
+assert f.recargas == 2, 'pronto exige recarga posterior à criação do canário'
+
+# Cache que nunca recarrega: com nome fixo o canário recriado responderia 200 (falso pronto); com nome único, desiste.
+g = Pgrst(); g.recarregar = False; g.cache = set()
+v.psql = g.psql; v.chamar_canario = g.chamar
+t0 = time.monotonic()
+assert v.aguardar('http://127.0.0.1:58621', 'teste', '/w/teste', 0.2, 'k', 's') == 1
+assert not [n for n in g.banco if n.startswith('_qa_pgrst_canario')], 'timeout deixou canário'
+g.banco.add('_qa_pgrst_canario'); g.cache.add('_qa_pgrst_canario')
+assert g.chamar('', '_qa_pgrst_canario', '', '')[0] == 200  # o falso positivo que o nome único evita
+
+# Pronto, mas sem limpeza comprovada: não pode ser dado como pronto.
+h = Pgrst()
+psql_original = h.psql
+def psql_sem_drop(container, sql, prazo=20):
+    saida = psql_original(container, sql.replace('drop function', '-- drop'), prazo)
+    if 'drop' in sql: h.banco.add('_qa_pgrst_canario_sobra')
+    return saida
+v.psql = psql_sem_drop; v.chamar_canario = h.chamar
+assert v.aguardar('http://127.0.0.1:58621', 'teste', '/w/teste', 5, 'k', 's') == 1
+
+`);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("verificador: alvo exige project_id, workdir e porta correspondentes", () => {
+  const result = python(`${CARREGAR_VERIFICADOR}
+def stack(projeto='p1', workdir='/tmp/w1', porta='58621', rodando=True):
+    def inspect(nome):
+        info = {'State': {'Running': rodando}, 'Config': {'Labels': {'com.supabase.cli.project': projeto, 'com.supabase.cli.workdir': workdir}}}
+        if nome.startswith('supabase_kong_'):
+            info['NetworkSettings'] = {'Ports': {'8000/tcp': [{'HostIp': '0.0.0.0', 'HostPort': porta}]}}
+        return info
+    return inspect
+v.os.path.realpath = lambda p: p
+v.docker_inspect = stack(); v.verificar_alvo('http://127.0.0.1:58621', 'p1', '/tmp/w1')
+casos = [
+    (stack(projeto='outro'), 'http://127.0.0.1:58621', 'p1'),
+    (stack(workdir='/tmp/outro'), 'http://127.0.0.1:58621', 'p1'),
+    (stack(porta='54321'), 'http://127.0.0.1:58621', 'p1'),
+    (stack(rodando=False), 'http://127.0.0.1:58621', 'p1'),
+    (stack(), 'http://exemplo.com:58621', 'p1'),
+    (stack(), 'http://127.0.0.1:58621', 'p1;rm'),
+]
+for inspect, url, pid in casos:
+    v.docker_inspect = inspect
+    try: v.verificar_alvo(url, pid, '/tmp/w1')
+    except v.Recusado: continue
+    raise AssertionError((url, pid))
+`);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("compatibilidade: sem SUPABASE_WORKDIR próprio o runner para antes de subir ou resetar", () => {
+  const shell = source("scripts/testar-compatibilidade-deploy.sh");
+  const start = shell.indexOf("ler_project_id() {");
+  const end = shell.indexOf("\nsupa() {", start);
+  const guarda = shell.slice(start, end);
+  assert.ok(start > 0 && end > start);
+  assert.ok(
+    shell.indexOf("--verificar-alvo") < shell.indexOf("export API_URL"),
+    "chave exportada antes do alvo",
+  );
+  assert.ok(shell.indexOf("--verificar-alvo") < shell.indexOf("\nresetar 20261101120000"));
+  assert.doesNotMatch(shell, /case "\$API_URL" in/);
+  const dir = mkdtempSync(join(tmpdir(), "qa20d-workdir-"));
+  try {
+    const rodar = (env) =>
+      spawnSync("bash", ["-c", `set -euo pipefail\n${guarda}\necho GUARDA_OK`], {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 5000,
+        env: { PATH: process.env.PATH, ...env },
+      });
+    let r = rodar({});
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /Defina SUPABASE_WORKDIR/);
+    execFileSync("mkdir", ["-p", join(dir, "supabase")]);
+    const repo = source("supabase/config.toml").match(/^project_id = .*$/m)[0];
+    writeFileSync(join(dir, "supabase/config.toml"), `${repo}\n`);
+    r = rodar({ SUPABASE_WORKDIR: dir });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /compartilhado/);
+    writeFileSync(join(dir, "supabase/config.toml"), 'project_id = "qa-isolado"\n');
+    r = rodar({ SUPABASE_WORKDIR: dir });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /GUARDA_OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("verificador: espera só escreve no banco depois de casar API, project_id, container e workdir", () => {
+  const result = python(`${CARREGAR_VERIFICADOR}
+sql = []
+v.psql = lambda container, s, prazo=20: sql.append((container, s)) or '0'
+def inspect(nome):  # duas stacks do CLI: a desta execução (porta 58621) e a de outra sessão
+    projeto = nome.split('_', 2)[2]
+    portas = {'minha': '58621', 'outra': '54321'}[projeto]
+    info = {'State': {'Running': True}, 'Config': {'Labels': {'com.supabase.cli.project': projeto, 'com.supabase.cli.workdir': '/w/' + projeto}}}
+    if nome.startswith('supabase_kong_'):
+        info['NetworkSettings'] = {'Ports': {'8000/tcp': [{'HostPort': portas}]}}
+    return info
+v.docker_inspect = inspect; v.os.path.realpath = lambda p: p
+for projeto, workdir in [('outra', '/w/minha'), ('outra', '/w/outra'), ('minha', '/w/outra')]:
+    try:
+        v.aguardar('http://127.0.0.1:58621', projeto, workdir, 1, 'k', 's')
+    except v.Recusado:
+        continue
+    raise AssertionError((projeto, workdir))
+assert sql == [], sql
+`);
+  assert.equal(result.status, 0, result.stderr);
+});

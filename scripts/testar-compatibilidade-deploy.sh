@@ -23,11 +23,14 @@
 # schema cache" num schema que o banco já tinha. A espera cria um canário depois do reset, pede a recarga e só
 # libera quando a RPC do canário responde pelo cache; desiste por prazo, com diagnóstico — nunca por sleep fixo.
 #
-# Isolamento: por padrão usa `supabase/config.toml` do repositório. Para rodar numa stack local própria (outro
-# project_id e portas), sem tocar nos containers de outras sessões, aponte SUPABASE_WORKDIR para um diretório
-# de projeto Supabase local. O runner imprime o alvo e recusa API que não seja 127.0.0.1/localhost.
+# Isolamento: SUPABASE_WORKDIR é OBRIGATÓRIO e aponta para um diretório de projeto Supabase local próprio
+# (project_id e portas exclusivos). O project_id de `supabase/config.toml` do repositório é compartilhado por
+# todos os worktrees; resetar a stack dele derrubaria a de outra sessão, então o runner o recusa. Antes do
+# primeiro reset, `_aguardar_postgrest.py --verificar-alvo` confere que a API é http://127.0.0.1|localhost:<porta>
+# (parsing estrito) e que supabase_db_<id> e supabase_kong_<id> carregam o rótulo do CLI deste project_id e deste
+# workdir, com o Kong publicando exatamente a porta da API. Só então a chave local é usada.
 #
-# Uso: bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 047)
+# Uso: SUPABASE_WORKDIR=<dir> bash scripts/testar-compatibilidade-deploy.sh   (ao final o banco local fica até a 047)
 
 set -euo pipefail
 
@@ -40,14 +43,17 @@ local_command() { python3 scripts/_executar_local.py "$@"; }
 
 local_command 30 docker info >/dev/null 2>&1 || { codigo=$?; echo "Docker indisponível ou fora do prazo." >&2; exit "$codigo"; }
 
-workdir_args=()
-config=supabase/config.toml
-if [ -n "${SUPABASE_WORKDIR:-}" ]; then
-  [ -f "$SUPABASE_WORKDIR/supabase/config.toml" ] || { echo "SUPABASE_WORKDIR sem supabase/config.toml: $SUPABASE_WORKDIR" >&2; exit 1; }
-  workdir_args=(--workdir "$SUPABASE_WORKDIR")
-  config="$SUPABASE_WORKDIR/supabase/config.toml"
+ler_project_id() { grep -E '^project_id' "$1" | sed -E 's/^project_id[[:space:]]*=[[:space:]]*"(.*)"$/\1/'; }
+[ -n "${SUPABASE_WORKDIR:-}" ] || { echo "Defina SUPABASE_WORKDIR com uma stack Supabase local própria; o runner não reseta a stack do config.toml do repositório." >&2; exit 1; }
+config="$SUPABASE_WORKDIR/supabase/config.toml"
+[ -f "$config" ] || { echo "SUPABASE_WORKDIR sem supabase/config.toml: $SUPABASE_WORKDIR" >&2; exit 1; }
+project_id=$(ler_project_id "$config")
+[ -n "$project_id" ] || { echo "Não consegui ler project_id de $config." >&2; exit 1; }
+if [ "$project_id" = "$(ler_project_id supabase/config.toml)" ]; then
+  echo "O project_id de SUPABASE_WORKDIR ($project_id) é o do repositório, compartilhado por outras sessões. Use um project_id próprio." >&2
+  exit 1
 fi
-supa() { local_command 300 env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 ${workdir_args[@]+"${workdir_args[@]}"} "$@"; }
+supa() { local_command 300 env -u SUPABASE_ACCESS_TOKEN npx --yes supabase@2.117.0 --workdir "$SUPABASE_WORKDIR" "$@"; }
 
 echo "Subindo Supabase local..."
 supa start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null 2>&1 || { codigo=$?; if [ "$codigo" -eq 124 ]; then exit 124; fi; supa start >/dev/null; }
@@ -55,11 +61,10 @@ supa start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edg
 status_local=$(supa status -o env 2>/dev/null)
 eval "$(printf '%s\n' "$status_local" | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET)=')"
 unset status_local
-project_id=$(grep -E '^project_id' "$config" | sed -E 's/^project_id[[:space:]]*=[[:space:]]*"(.*)"$/\1/')
+# Nenhuma chave é exportada nem usada antes de o alvo inteiro ser conferido.
+local_command 60 python3 scripts/_aguardar_postgrest.py --verificar-alvo "${API_URL:-}" "$project_id" "$SUPABASE_WORKDIR" || { echo "Alvo local recusado; nada foi resetado." >&2; exit 1; }
 export API_URL ANON_KEY SERVICE_ROLE_KEY JWT_SECRET CONTAINER="supabase_db_${project_id}"
-case "$API_URL" in http://127.0.0.1:*|http://localhost:*) ;; *) echo "API_URL não é local: $API_URL" >&2; exit 1 ;; esac
-local_command 30 docker inspect --format '{{.State.Running}}' "$CONTAINER" | grep -qx true || { echo "Container $CONTAINER não está rodando." >&2; exit 1; }
-echo "Alvo local: project_id=$project_id container=$CONTAINER api=$API_URL (config: $config)"
+echo "Alvo local conferido: project_id=$project_id container=$CONTAINER api=$API_URL workdir=$SUPABASE_WORKDIR"
 
 tmp=$(mktemp -d)
 porta=3987
@@ -90,7 +95,7 @@ export BASE_URL="http://127.0.0.1:$porta"
 # Reset local até a versão $1 e espera o PostgREST refletir exatamente o schema resultante.
 resetar() {
   supa db reset --local --version "$1" >"$tmp/reset-$1.log" 2>&1 || { tail -30 "$tmp/reset-$1.log" >&2; echo "db reset --version $1 falhou." >&2; exit 1; }
-  local_command 150 python3 scripts/_aguardar_postgrest.py "$API_URL" "$CONTAINER" 90 || { echo "PostgREST não ficou pronto após o reset $1." >&2; exit 1; }
+  local_command 150 python3 scripts/_aguardar_postgrest.py "$API_URL" "$project_id" "$SUPABASE_WORKDIR" 90 || { echo "PostgREST não ficou pronto após o reset $1." >&2; exit 1; }
 }
 
 rodar() {
