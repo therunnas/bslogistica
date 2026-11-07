@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { dateBR } from "@/lib/format";
 import { PageHeader } from "../_components/app-shell";
 import { prepararLoteDeContainers, type LoteDeContainers } from "@/lib/container-servico";
 import {
@@ -717,7 +718,7 @@ export function FormularioContainer({
             </p>
             <p>
               {dados.clientes.find((c) => c.id === lote.clienteId)?.name} · Solicitação{" "}
-              {lote.solicitadoEm} · Execução {lote.executadoEm}
+              {dateBR(lote.solicitadoEm)} · Execução {dateBR(lote.executadoEm)}
             </p>
             <p>
               Receita: {dinheiroContainer(resumo.receitaCentavos)} · Custo:{" "}

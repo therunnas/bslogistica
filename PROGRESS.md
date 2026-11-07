@@ -1,8 +1,8 @@
 # BS Soluções Logísticas — Progresso
 
 Andamento do projeto: marcos concluídos, etapa atual e próximas etapas. Regras
-permanentes ficam em [CLAUDE.md](CLAUDE.md); o estado factual de Production, dos
-testes e das dependências, em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md);
+permanentes ficam em [CLAUDE.md](CLAUDE.md); o estado atual no [HANDOFF](docs/HANDOFF.md) e o histórico em
+[docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md);
 o modelo de segurança, em [docs/SEGURANCA.md](docs/SEGURANCA.md). O histórico
 detalhado de cada mudança está no Git — este arquivo não o repete.
 
@@ -25,53 +25,34 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**QA-20D-R1 — hardening do runner de compatibilidade:** PR Draft #110 sobre #109, aguardando revisão; não altera produto. Pendência separada: isolamento de `scripts/testar-sql-local.sh` (ainda usa o project_id do repositório). **FIN-20D-R2 — proteção de intenções entre abas:** marcador opaco persistente e exclusão entre abas em validação no PR Draft #109 (R1 em c011a71 com CI aprovada). Próxima ação: CI do novo SHA e revisão humana; persistência no servidor (migration 048) só com desenho aprovado e autorização própria; Preview/HML exigem gate próprio. A homologação integrada abaixo permanece como contexto anterior, sem reabertura nesta tarefa.
+**RELEASE-PREVIEW-01 — integração local para um Preview único de homologação manual.** Branch local
+`integracao/release-preview-01` = `main` + #108/#109/#110 (046, 047, QA-20D) + #106 (correções funcionais da sessão 19);
+#107 (runbook do expurgo) fica fora da aplicação. Sem push, merge, migrations remotas ou Production sem autorização.
 
-**Homologação integrada FIN-PR-11/12/13 em HML.** O PR
-[#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em
-`91513b91b11461ac48d8dfe6af118234bfb6fbc0` (CI de `main` verde). A matriz de 27 casos
-foi executada em HML nas sessões 12 a 14: 27 PASS (A05 e E06 fechados na sessão 14,
-com ressalvas registradas), 0 FAIL
-([resultados](docs/financeiro/homologacao-fin-pr-13.md)). Resolução comercial de HML
-restaurada para OFF. Production segue na 034 com o código da
-`main` publicado; a decisão sobre esse risco é o primeiro passo. O estado e a próxima
-ação exatos ficam no [HANDOFF](docs/HANDOFF.md).
+**S19G — continuidade documental e retomada da homologação, SDLC: Testes.**
+Estado, contagens, HEAD e ambiente corrente ficam exclusivamente no
+[HANDOFF](docs/HANDOFF.md); resultados por controle no
+[livro versionado](docs/continuidade/controles-sessao-19.json).
 
-**FIN-PR-12:** PR #99 mergeado por squash em `3e5b7b1`; CI de `main` e deploy
-automático de Production verdes. A exportação continua **não homologada** com o
-Excel real da Dynamis.
+### Fazer agora
 
-**FIN-PR-11:** HML recebeu 035–045 em 05/11/2026, após backup restaurado,
-compatibilidade e dry-run; verificações pós-migration aprovadas. Os nove fluxos de
-Containers continuam sem homologação real no navegador. Production continua na 034 e
-qualquer implantação lá exige autorização específica.
+Publicar correção de jornada e continuidade no PR Draft #106, conferir CI no novo
+HEAD e retomar controles sem evidência no HML. Diagnosticar o navegador se necessário.
 
-Decisão do usuário (05/11/2026): concluir primeiro as funcionalidades pendentes
-(FIN-PR-12 e FIN-PR-13) e fazer depois **uma homologação completa de ponta a
-ponta**, seguida do manual de utilização e da preparação de Production.
-Nenhuma funcionalidade é declarada homologada só por testes automatizados.
+### Não fazer ainda
 
-### Fila
+Sem merge, Production, migrations, publicação em staging estável ou mudança de regra
+comercial global. Decisões de HE < 1 e competência faturada continuam pendentes.
 
-1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
-   (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
-2. **Pendências:** revisão humana dos PRs #103 (documentação) e #105 (margem do Fechamento/Faturamento);
-   modelos de e-mail do Dashboard; segunda cópia do backup de Production (criado, restaurado e
-   ensaiado 034 → 045 em 05/11). Parecer atual: NO-GO condicional.
-3. [Manual de uso](docs/MANUAL_DE_USO.md) redigido; [plano de Production
-   034 → 045](docs/runbooks/producao-034-045.md) redigido, **sem execução** (gate próprio,
-   com backup novo).
+### Critério de conclusão
 
-### Pausadas
+Cobertura funcional com evidências individuais no ambiente autorizado; resolver
+bloqueios ou obter decisão explícita. CI verde não conclui homologação.
 
-- `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
-  lacunas documentais remanescentes, sem reabrir auditorias concluídas.
-- `CHECK-UP-E2E-01`: HML já tem o schema 045; entra na homologação completa, com
-  identidades de teste aprovadas.
-- Auditoria de segurança C03: permanece futura e separada do fluxo financeiro.
+### Próxima etapa
 
-Uma nova implementação só entra como ativa depois que a anterior tiver checkpoint
-de encerramento ou pausa com motivo.
+ChatGPT revisa o relatório retornado pelo usuário e prepara o próximo prompt,
+conforme [protocolo](docs/continuidade/PROTOCOLO_DE_TRABALHO.md).
 
 ## Marcos concluídos
 

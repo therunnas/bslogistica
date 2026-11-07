@@ -1,6 +1,7 @@
 # Ambientes e vínculos
 
-Inventário factual, sem credenciais, dos ambientes do painel. Cada afirmação traz
+Inventário datado, sem credenciais, dos ambientes do painel. O estado operacional
+ativo e os limites da última verificação ficam no [HANDOFF](HANDOFF.md). Cada afirmação traz
 o limite da evidência. Mudanças de configuração exigem autorização própria e não
 são executadas por este documento.
 
@@ -21,7 +22,7 @@ foi o `db push` no HML.
 Preview e HML são superfícies diferentes. Um Preview só é homologável quando o
 vínculo explícito com o HML autorizado estiver comprovado.
 
-## Matriz vigente
+## Matriz histórica — verificação de 05/11/2026
 
 | Ambiente   | Aplicação/Vercel                                                                                    | Supabase                                               | Migration head comprovado            | Situação                                                    |
 | ---------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------- |

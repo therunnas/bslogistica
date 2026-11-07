@@ -234,6 +234,39 @@ jobs:
       - name: Teste margem-containers
         run: npm run test:margem-containers
 
+      - name: Teste dashboard-moeda
+        run: npm run test:dashboard-moeda
+
+      - name: Teste clientes-validacao
+        run: npm run test:clientes-validacao
+
+      - name: Teste usuarios-data-instante
+        run: npm run test:usuarios-data-instante
+
+      - name: Teste shell-sem-rolagem
+        run: npm run test:shell-sem-rolagem
+
+      - name: Teste vigencias-largura
+        run: npm run test:vigencias-largura
+
+      - name: Teste containers-datas
+        run: npm run test:containers-datas
+
+      - name: Teste confirmacao-irreversivel
+        run: npm run test:confirmacao-irreversivel
+
+      - name: Teste configuracoes-ativacao-codigo
+        run: npm run test:configuracoes-ativacao-codigo
+
+      - name: Teste relatorios-csv
+        run: npm run test:relatorios-csv
+
+      - name: Teste operacao-avulsa
+        run: npm run test:operacao-avulsa
+
+      - name: Teste contrato-periodo
+        run: npm run test:contrato-periodo
+
       - name: Teste container-backend
         run: npm run test:container-backend
 
