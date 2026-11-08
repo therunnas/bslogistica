@@ -2,9 +2,9 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. CHECKPOINT-AUTO-02, 08/11/2026: publicação autorizada somente na branch do PR #111; controlador bloqueado, sem ativação.**
+**Fonte principal do estado atual. CHECKPOINT-AUTO-02, 08/11/2026: implementação publicada no PR #111, CI e Preview comprovados em c5c62e9; controlador bloqueado, sem ativação.**
 
-**Retomada:** branch e HEAD remoto conferidos em `0308127aa22a15d6d0551c8cf2bac8a711a050fa`; 19 arquivos da CHECKPOINT-AUTO-01 preservados e revisados. Os históricos abaixo mantêm suas evidências nos SHAs originais.
+**Retomada:** 19 arquivos publicados por fast-forward em `c5c62e99f91d154290247a1100cf98b090b6811d`. O commit que publica este checkpoint altera somente `docs/HANDOFF.md`; conferir o HEAD atual pelo PR e seus checks, sem atribuir automaticamente a ele a CI ou o Preview do código.
 SDLC: Desenvolvimento / Testes; homologação funcional pausada durante a publicação CHECKPOINT-AUTO-02. Objetivo: qualquer IA autorizada abre o repositório, lê este checkpoint, confere o
 GitHub e sabe onde continuar, sem depender de histórico de conversa.
 
@@ -12,30 +12,30 @@ GitHub e sabe onde continuar, sem depender de histórico de conversa.
 
 | Campo                     | Valor                                                                                                                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa | CHECKPOINT-AUTO-02 — publicar a implementação no PR #111, mantendo a automação bloqueada |
-| Gate atual | Publicação autorizada na branch ativa; CI/Preview do novo commit ainda pendentes |
-| Último gate concluído | Revisão dos 19 arquivos; 26/26 testes de automação e 8/8 documentais; evidências anteriores de 84 suítes e Webpack preservadas |
+| Etapa | CHECKPOINT-AUTO-02 — implementação publicada na branch do #111; automação ainda bloqueada |
+| Gate atual | CI e Preview do código c5c62e9 concluídos; ativação e instalação do controlador na branch padrão não autorizadas |
+| Último gate concluído | GitHub Actions 42481151663: validar e sql-local SUCCESS no SHA c5c62e9; Preview success no mesmo SHA; revisão focal de publicação sem bloqueio |
 | Worktree                  | `/private/tmp/bs-fin-20d`                                                                                                                                                           |
 | Branch                    | `integracao/release-preview-01`                                                                                                                                                     |
 | Base                      | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                                                                                                   |
-| HEAD validado | 0308127aa22a15d6d0551c8cf2bac8a711a050fa — base local/remota conferida; validação desta tarefa no working tree, antes do commit |
-| Alterações não commitadas | 19 arquivos da CHECKPOINT-AUTO-01, com trava adicional do controlador e documentação CHECKPOINT-AUTO-02; serão incluídos no commit autorizado |
+| HEAD validado | c5c62e99f91d154290247a1100cf98b090b6811d — implementação publicada e CI/Preview conferidos. Commit documental posterior altera só este HANDOFF; verificar seus checks separadamente |
+| Alterações não commitadas | Nenhuma após o commit documental que publica este checkpoint; confirmar status ao retomar. Nenhum artefato local necessário à automação foi deixado sem publicação |
 | PR                        | [#111](https://github.com/therunnas/bslogistica/pull/111) Draft contra `main`; #106, #108, #109 e #110 em Draft, inalterados                                                        |
 | Ambiente-alvo | GitHub/CI e Preview do PR #111; sem escrita em HML/Production ou migrations |
-| Última ação comprovada | Revisão local: sem alterações em src, supabase ou lockfile; sem padrões de credencial detectados; controlador com false, token de leitura e modo seco |
-| Próxima ação exata | Commit e push fast-forward exclusivamente na branch do #111; conferir CI e Preview no SHA publicado e registrar as evidências no HANDOFF |
+| Última ação comprovada | Push normal 0308127 → c5c62e9, CI validar/sql-local SUCCESS e deployment GitHub 7635950040 em Preview; signal skipped; main permaneceu 38b4349 |
+| Próxima ação exata | Revisar e autorizar separadamente o plano de contenção do deploy automático antes de qualquer instalação mínima na branch padrão; nenhuma ativação ou merge por inferência |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | CHECKPOINT-AUTO-02: revisão e publicação da CHECKPOINT-AUTO-01 sem ativação do bot |
-| Resultados e testes comprovados | 26/26 automação e 8/8 workflow PASS; teste da trava teve RED antes e GREEN após. Regressão anterior 84 suítes e build Webpack documentados; Turbopack segue limitação histórica por bind. CI nova ainda não executada |
-| Código e PR afetados | 19 arquivos de scripts, testes, CI e continuidade na branch integracao/release-preview-01, PR #111 Draft; sem alterações de negócio ou migrations |
-| Ambientes envolvidos | Checkout local e futura CI/Preview; leitura GitHub; HML/Production não acessados |
-| Pendências e decisões | Commit/push e verificação do novo SHA; ativação continua pendente. Plano futuro resolve default branch com contenção prévia comprovada de deploy, sem integrar release inteira |
-| Próxima ação exata | Publicar na branch autorizada e conferir CI/Preview; atualizar evidências antes de encerrar |
-| Autorizações e proibições | Commit/push fast-forward só branch do PR #111 autorizados. Sem merge, force push, bot de escrita, configuração de segredos, novos/fechados PRs, main, HML, Production ou migrations |
+| Tarefa executada | CHECKPOINT-AUTO-02 concluída: 19 arquivos publicados no #111, CI/Preview conferidos e bot mantido bloqueado |
+| Resultados e testes comprovados | Local: 26/26 automação, 8/8 documentais, lint, tsc e check:workflow PASS; revisão focal de publicação sem bloqueio. CI 42481151663: validar e sql-local SUCCESS em c5c62e9. Preview success no mesmo SHA. Turbopack local continua limitação histórica; build padrão passou na CI |
+| Código e PR afetados | Commit c5c62e99f91d154290247a1100cf98b090b6811d, 19 arquivos, branch integracao/release-preview-01, PR #111 aberto Draft; este checkpoint final em commit documental separado, sem alterações de negócio ou migrations |
+| Ambientes envolvidos | Checkout local, GitHub Actions efêmero e deployment Preview do #111; sem acesso ao banco HML/Production, sem alteração de main |
+| Pendências e decisões | Instalação na branch padrão e ativação permanecem proibidas; plano de contenção/reconexão não executado. Homologação funcional e decisões comerciais 048/049 continuam pendentes |
+| Próxima ação exata | Obter autorização específica para avaliar/aplicar contenção administrativa e preparar instalação mínima; o #111 não deve ser mergeado para instalar o controlador |
+| Autorizações e proibições | Executado commit/push fast-forward somente na branch do #111. Seguem proibidos merge/main, force push, bot de escrita, segredos remotos, novos/fechados PRs, HML/Production e migrations |
 
 ## Evidência automática de Preview
 
@@ -62,17 +62,46 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 
 ## Arquivos locais × remotos
 
-| Onde                                           | O que                                                                                                                                                                                                                                                                                    |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GitHub, branch `integracao/release-preview-01` | Código anterior, migrations 048/049, suítes Node e SQL, E2E, roteiro manual e checkpoint anterior à CHECKPOINT-AUTO-01                                                                                                                                                                    |
-| Remoto (HEAD) | `0308127aa22a15d6d0551c8cf2bac8a711a050fa`, conferido no GitHub em 08/11/2026. CHECKPOINT-AUTO-01 não está nesse commit; permanece somente no working tree |
-| Somente no Mac (não publicado)                 | Inventário oficial de backups; stack local isolada `bs-fin20d-local` e seus dados sintéticos; logs de execução                                                                                                                                                                           |
-| Nunca no GitHub                                | Senhas, chaves, conteúdo de dumps, dados pessoais, `.env`                                                                                                                                                                                                                                |
+- **Publicado no GitHub:** os 19 arquivos da implementação em `c5c62e99f91d154290247a1100cf98b090b6811d`, na branch `integracao/release-preview-01`. Este checkpoint final é publicado por commit documental subsequente na mesma branch; descobrir seu SHA no [PR #111](https://github.com/therunnas/bslogistica/pull/111).
+- **Somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado no GitHub.
+- **Nunca publicar:** credenciais, `.env`, dumps e dados pessoais. Nenhuma variável/segredo remoto foi configurado nesta tarefa.
 
-Arquivo local, inclusive em `/private/tmp`, não está publicado. Sem push autorizado, o checkpoint fica só no worktree
-e a diferença deve ser informada.
+Arquivos publicados (mesmo conjunto revisado):
+
+- `.github/workflows/checkpoint-preview-signal.yml`
+- `.github/workflows/checkpoint-preview.yml`
+- `.github/workflows/ci.yml`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `PROGRESS.md`
+- `docs/ESTADO_DO_PROJETO.md`
+- `docs/HANDOFF.md`
+- `docs/WORKFLOW.md`
+- `docs/continuidade/CHECKPOINT_AUTOMATICO.md`
+- `docs/continuidade/ESTADO_ATUAL.md`
+- `docs/continuidade/PROTOCOLO_DE_TRABALHO.md`
+- `package.json`
+- `scripts/atualizar-checkpoint-preview.mjs`
+- `scripts/checkpoint-github-api.mjs`
+- `scripts/checkpoint-preview.mjs`
+- `scripts/testar-checkpoint-preview.mjs`
+- `scripts/testar-workflow-documental.mjs`
+- `scripts/validar-workflow-documental.mjs`
 
 ## Evidências
+
+### CHECKPOINT-AUTO-02 — publicação comprovada em 08/11/2026
+
+- **Implementação:** `c5c62e99f91d154290247a1100cf98b090b6811d`; push normal exclusivamente na branch do #111, sobre `0308127`. Worktree limpo após o commit; nenhum force push.
+- **Local nesta tarefa:** 26/26 testes de automação, 8/8 documentais, lint, TypeScript, check:workflow e comparação do diff `0308127` → `c5c62e9` PASS. A trava de publicação teve RED/GREEN. Revisão independente focal sem bloqueio.
+- **CI:** [run 42481151663](https://github.com/therunnas/bslogistica/actions/runs/42481151663), jobs `validar` e `sql-local` **SUCCESS** no SHA exato `c5c62e9`. O job validar inclui lint, tsc, 84 suítes Node, validação de HANDOFF no conjunto publicado e build padrão. CodeRabbit pulou por Draft; não é revisão efetiva.
+- **Preview:** deployment GitHub `7635950040`, ambiente **Preview**, `production_environment: false`, **success** em `2026-11-08T12:38:11Z`, fonte `c5c62e9`; [URL imutável do Preview](https://bs-logistica-sistema-c54lp4w7j-bslogisticas.vercel.app). Nenhuma tela autenticada ou destino Supabase foi reverificado; não é homologação funcional.
+- **Desativação:** arquivo do controlador conferido no GitHub: `false &&`, `contents: read`, `--dry-run`. CI também só leitura; sinal sem permissões e execução **skipped**. Nenhum recibo do bot criado. Main permaneceu `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`.
+- **Escopo:** nenhuma alteração em `src`, `supabase` ou lockfile; varredura limitada aos 19 arquivos sem padrão de credencial. Sem secrets/vars configurados, instalação na main, merge ou operação em HML/Production.
+- **Plano futuro:** [instalação sem publicar Production](continuidade/CHECKPOINT_AUTOMATICO.md#plano-de-instalação-sem-publicar-production); contenção administrativa, bloqueio durável de deploy por branch, instalação mínima, reconexão comprovada e ensaio/ativação em gates separados. Nada disso foi executado nesta tarefa.
+- **Limite do checkpoint:** este registro comprova CI/Preview de `c5c62e9`. O commit posterior que grava somente este HANDOFF tem SHA/checks próprios, consultáveis no PR; não são declarados antecipadamente como aprovados aqui.
+
+### CHECKPOINT-AUTO-01 — histórico local anterior
 
 - **CHECKPOINT-AUTO-01, working tree local (08/11/2026):** 25 testes de automação e 8 de workflow documental PASS; matriz cobre falha, repetição, eventos em qualquer ordem, documentação, origem, URL, CAS e resposta perdida. Duas falhas da revisão reproduzidas antes da correção e revisão focal final sem achados.
 - **Regressão Node:** 84 suítes `test:*`; 83 PASS no sandbox e `test:calendario-runners` PASS 23/23 fora dele após bloqueio do servidor de teste em loopback. SQL não repetido: sem mudança de banco, harness ou migration.
@@ -159,7 +188,7 @@ de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups 
 
 1. Descobrir o checkout/worktree e a branch reais; conferir status, HEAD local e HEAD remoto pelo PR autorizado.
 2. Ler a identificação e “Última tarefa”; preservar alterações locais e não reutilizar autorização histórica.
-3. Conferir o HEAD publicado no #111, a CI/Preview do SHA exato e a seção “Última tarefa”; não assumir resultados de outro SHA.
+3. Conferir o HEAD atual do #111; o código validado está em c5c62e9 e o checkpoint posterior altera somente este arquivo. Conferir CI/Preview do HEAD exato pelo GitHub; não assumir resultados de outro SHA.
 4. Ativação permanece bloqueada independentemente de variáveis; seguir os gates futuros de [Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md), sem alterar main ou Production por inferência.
 5. Não repetir a triagem de PRs abaixo sem nova divergência; nenhuma recomendação equivale a autorização de fechamento.
 
