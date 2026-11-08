@@ -165,6 +165,13 @@ o contrato comum versionado, validado pelos mesmos comandos.
 ## Plano de instalação sem publicar Production
 
 **CHECKPOINT-AUTO-03, SDLC: Design/Arquitetura. Plano condicionado; nada ativado.**
+
+**Atualização AUTO-06:** o ensaio de bootstrap reprovou o critério de zero
+Production. O primeiro deployment permitido da branch Preview recebeu target
+Production no projeto novo. Não executar a instalação abaixo como plano aprovado;
+progressão interrompida, detalhes no [HANDOFF](../HANDOFF.md). O desenho anterior
+permanece histórico, sujeito a nova decisão/ensaio, sem alteração na BS real.
+
 Sincronização documental autorizada em CHECKPOINT-AUTO-03B; sem execução do plano.
 Estado e evidências da publicação ficam somente no [HANDOFF](../HANDOFF.md).
 O requisito adicional é preservar novos deployments automáticos de Preview.
@@ -410,7 +417,7 @@ real foi executado. Artefato temporário de referência:
 `/private/tmp/bs-sec-bypass-02/test-git-deployment-enabled.cjs`; redescobrir checkout
 e dependências ao reproduzir. Não tratar esse caminho temporário como requisito.
 
-### Ensaio hospedado: recurso e autorização ainda pendentes
+### Escopo preparado na AUTO-05 — histórico
 
 Inventário em leitura: um projeto no time Vercel consultado, o BS real; nenhum
 ambiente descartável identificado. Busca de candidatos entre repositórios próprios
@@ -435,8 +442,67 @@ Escopo concreto proposto para autorização futura:
 4. Registrar SHAs, configuração e IDs/status, sem segredos; preservar recursos para
    revisão. Exclusão posterior do repositório/projeto exige autorização própria.
 
-Essas criações, conexão e pushes/deployments de fixture **não estão autorizados**
-pela preparação AUTO-05. A conclusão desta etapa é preparar as provas e pedir esse
-gate; instalação mínima na main real, dry-run hospedado e escrita do controlador
-continuam autorizações independentes. Não concluir proteção de Production a partir
-do modelo local, da rotação de bypass ou de CI verde.
+Na AUTO-05, essas criações, conexão e pushes/deployments ainda não estavam
+autorizados. A AUTO-06 autorizou e executou o escopo nominal, com resultado FAIL
+registrado abaixo e no HANDOFF. Instalação mínima na main real, dry-run e escrita
+continuam sem autorização. Não concluir proteção de Production a partir do modelo
+local, da rotação de bypass ou de CI verde.
+
+
+## Ensaio hospedado CHECKPOINT-AUTO-06 — FAIL
+
+SDLC: Testes / diagnóstico. Recursos autorizados criados e preservados: repo
+privado therunnas/bs-checkpoint-sandbox e projeto Vercel bs-checkpoint-sandbox,
+no time existente Hobby. IDs, SHAs completos e observações estão somente no
+[HANDOFF](../HANDOFF.md). Nenhuma mudança em projeto/branch padrão BS.
+
+### O que a prova mostrou
+
+1. Primeiro commit da fixture já com main:false, confirmado no GitHub antes de
+   conectar. Criação/conexão via POST /v11/projects não chamou API de deployment.
+   Não é prova do fluxo de importação pelo painel; essa variante não foi executada.
+2. Conexão inicial: zero Production e zero Preview na leitura. Push adicional de
+   main: também zero na janela observada. Ausência não aprova o protocolo completo.
+3. Primeiro push de preview/checkpoint: um deployment Git READY/PROMOTED com
+   target production, fonte no SHA da branch Preview, apesar de Production Branch
+   main e main:false no vercel.json. Total na parada: **1 Production, 0 Preview**.
+4. FAIL registrado e progressão interrompida. Não houve novo push, regra alterada,
+   redeploy ou tentativa de usar o sandbox agora inicializado para converter a
+   mesma prova em PASS. Negativos adicionais e Fase 4 não executados.
+
+A [Vercel documenta](https://vercel.com/docs/domains/working-with-domains/deploying-and-redirecting)
+que o primeiro deployment de projeto novo é Production. O comportamento observado
+é consistente com esse bootstrap, e não com a suposição de que a primeira branch
+não-main permitida necessariamente produza Preview. git.deploymentEnabled decide
+se a branch pode gerar deployment; não é uma declaração de target. Main:false
+não impede bootstrap Production vindo de outra branch permitida.
+
+### Consequência e próxima decisão
+
+O desenho AUTO-05 não satisfez o critério de bootstrap sem Production e não foi
+promovido para instalação real. BS é um projeto já inicializado com Production e
+Previews existentes; a fixture é um projeto novo estático. Não extrapolar o FAIL
+para afirmar que todo push bloqueado na BS geraria Production, nem extrapolar a
+ausência de deploy de main no sandbox para declarar segura a instalação real.
+
+Proposta para **nova decisão**, não execução nesta etapa: definir com o responsável
+um ensaio separado para projeto já inicializado no sandbox preservado, com critérios
+explícitos de main bloqueada, target Preview na branch permitida, regras
+concorrentes seguras e contagens antes/depois. Manter AUTO-06 como FAIL histórico.
+Se o requisito continuar sendo zero Production desde o primeiro deployment de um
+projeto novo, revisar a viabilidade com base no comportamento documentado antes
+de solicitar qualquer novo experimento. Nenhum recurso adicional deve ser criado.
+
+Só após novo protocolo autorizado e aprovado será possível retomar manifesto
+mínimo sobre main, dependências, permissões, contenção e rollback. A lista anterior
+é uma proposta histórica, não instalação validada nesta sessão. Os gates continuam:
+contenção comprovada → instalação mínima desativada → dry-run hospedado → escrita
+explicitamente autorizada → primeiro recibo. Nenhum deles foi executado na BS.
+O rollback futuro não pode remover o bloqueio por conveniência ou alterar aliases
+reais por inferência; preservar a versão desativada e o histórico permanece regra.
+
+Revisão somente leitura dos PRs #112/#111 e proposta de incorporar os dois docs de
+negócio estão no HANDOFF. Não substituir o checkpoint atual pelo do #112 nem fazer
+merge documental na main sem avaliar seu deployment automático ainda não contido.
+CI/Preview do commit documental AUTO-06 serão conferidos pelo SHA próprio e não
+mudam o resultado do ensaio, nem ativam o controlador.

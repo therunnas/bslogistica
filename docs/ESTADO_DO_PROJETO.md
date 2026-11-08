@@ -5,6 +5,20 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## CHECKPOINT-AUTO-06 — 08/11/2026 — FAIL
+
+Criados exclusivamente o repositório privado e o projeto Vercel descartáveis
+bs-checkpoint-sandbox, em plano Hobby, com fixture estática sem dados/creds BS.
+Main:false confirmado no primeiro commit antes de conectar. A conexão inicial e
+o push adicional main não produziram deployment nas leituras; o primeiro push da
+branch Preview gerou Production READY/PROMOTED. Gate de parada acionado, sem
+adaptar ou continuar a prova; negativos hospedados e Fase 4 bloqueados. Recursos
+preservados. BS real servida/protegida igual ao estado inicial; nenhum teste de
+credenciais, mudança de app, banco ou configuração Vercel BS. #112/#111 lidos:
+dois documentos novos de negócio e três conflitos textuais de estado, sem merge
+ou incorporação. IDs, SHAs, contagens, limites e decisão necessária no
+[HANDOFF](HANDOFF.md); conclusão do desenho no [plano](continuidade/CHECKPOINT_AUTOMATICO.md#ensaio-hospedado-checkpoint-auto-06--fail).
+
 ## SEC-BYPASS-02 / CHECKPOINT-AUTO-05 — 08/11/2026
 
 Rotação autorizada exclusivamente do bypass do projeto Vercel BS: identidade de

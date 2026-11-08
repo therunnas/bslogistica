@@ -2,45 +2,46 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. SEC-BYPASS-02 concluída em 08/11/2026; CHECKPOINT-AUTO-05: preparação local concluída, sem ativação. B1 revogada e rejeitada; B2 validada e selecionada. Publicação documental autorizada no PR #111.**
+**Fonte principal do estado atual. CHECKPOINT-AUTO-06, 08/11/2026: ensaio hospedado FAIL; o primeiro deployment da branch Preview virou Production no sandbox. Progressão para instalação real interrompida. Controlador desativado; BS real preservada.**
 
-**Retomada:** checkpoint oficial consultado diretamente no GitHub antes da
-execução; HEAD local/remoto `8071a99f2050cb4de8e238b2531b1a0e078e1086`, PR #111
-aberto Draft na branch `integracao/release-preview-01`. Os três documentos locais
-SEC-BYPASS-01 foram preservados e incorporados a esta atualização; sem divergência
-ou fast-forward necessário. SDLC: Manutenção/Segurança concluída no limite dos
-testes de bypass e Design/Arquitetura da automação. Este conjunto publica somente
-quatro documentos; descobrir seu novo SHA, CI e Preview no PR. Não gerar commits
-recursivos apenas para registrar checks documentais. Automação permanece desativada.
+**Retomada:** checkpoint oficial do #111 consultado no GitHub; ponto de partida
+local/remoto `e01fffa54bbc567b92b9f0b21a8c84dfe3460563`, worktree limpo,
+`integracao/release-preview-01`; main real `38b4349`. SEC-BYPASS-02 permanece
+concluída; nenhum teste ou rotação de credenciais repetido. SDLC: Testes de
+infraestrutura / diagnóstico. Criados somente os dois recursos descartáveis
+nominalmente autorizados, agora preservados para revisão. A prova reprovou o
+desenho de bootstrap; não foi adaptada nem continuada após o Production inesperado.
+Este conjunto publica somente quatro documentos; descobrir seu SHA e conferir
+CI/Preview próprios no PR, sem commits recursivos só para registrar checks.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | SEC-BYPASS-02 concluída; CHECKPOINT-AUTO-05 preparação local concluída; ensaio hospedado pendente |
-| Gate atual | Revisão e publicação documental no #111; nenhum ensaio hospedado, instalação na main ou ativação autorizados |
-| Último gate concluído | Rotação real com B1 rejeitada, B2 aceita e anônimo barrado; 26/26 testes isolados da automação e 12/12 cenários locais da regra Git |
-| Worktree | `/private/tmp/bs-fin-20d` |
-| Branch | `integracao/release-preview-01` |
-| Base | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, fonte do Production servido conferido |
-| HEAD validado | 8071a99f2050cb4de8e238b2531b1a0e078e1086 — ponto de partida remoto/local; novo commit documental requer seus próprios checks e Preview |
-| Alterações não commitadas | Conjunto desta tarefa contém somente HANDOFF, PROGRESS, ESTADO_DO_PROJETO e CHECKPOINT_AUTOMATICO; após commit/push conferir status. Sem código, workflow ou vercel.json alterados |
-| PR | [#111](https://github.com/therunnas/bslogistica/pull/111) aberto Draft; nenhum PR criado/fechado ou merge |
-| Ambiente-alvo | Bypass do projeto Vercel autorizado, Preview existente para GET de login e HEAD público sem credenciais; preparação sintética local; sem Supabase/HML/Production de dados |
-| Última ação comprovada | Em 19:01:31Z, B1 removida/rejeitada e B2 selecionada/aceita; deployments, aliases e política de proteção preservados durante a troca |
-| Próxima ação exata | Após conferir a publicação, autorizar um repositório privado e um projeto Vercel descartáveis para ensaio hospedado do primeiro commit main:false e continuidade de Preview; sem usar projeto BS real |
+| Etapa | CHECKPOINT-AUTO-06: ensaio hospedado FAIL e diagnóstico registrado; continuidade #112/#111 analisada somente em leitura |
+| Gate atual | Progressão bloqueada pelo critério de zero Production do bootstrap; sem instalação real, novos testes hospedados ou ativação |
+| Último gate concluído | Recursos isolados criados; configuração inicial confirmada antes de conectar; falha real coletada e ensaio interrompido; comparação documental #112/#111 concluída |
+| Worktree | `/private/tmp/bs-fin-20d`; fixture isolada em `/private/tmp/bs-checkpoint-auto-06/sandbox` |
+| Branch | `integracao/release-preview-01` na BS; sandbox com main e preview/checkpoint |
+| Base | main real `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, inalterada na conferência |
+| HEAD validado | e01fffa54bbc567b92b9f0b21a8c84dfe3460563 — início local/remoto do #111; novo commit documental requer seus próprios checks |
+| Alterações não commitadas | Conjunto desta tarefa restrito a HANDOFF, PROGRESS, ESTADO_DO_PROJETO e CHECKPOINT_AUTOMATICO; conferir status após publicação |
+| PR | [#111](https://github.com/therunnas/bslogistica/pull/111) e [#112](https://github.com/therunnas/bslogistica/pull/112) abertos Draft; sem merge, criação ou fechamento de PR |
+| Ambiente-alvo | Somente novo repositório/projeto Vercel descartáveis; GitHub BS em leitura e publicação documental autorizada. Nenhuma escrita em configuração Vercel BS, Supabase ou banco |
+| Última ação comprovada | Sandbox com 1 Production READY/PROMOTED e 0 Preview, source git, branch preview/checkpoint; gate de parada acionado; estado servido da BS real conferido igual ao inicial |
+| Próxima ação exata | Revisar o protocolo com o responsável à luz do primeiro deployment sempre Production; autorizar novo ensaio separado no sandbox preservado já inicializado, mantendo AUTO-06 FAIL, antes de qualquer preparação/instalação na main BS |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | SEC-BYPASS-02: rotação controlada; CHECKPOINT-AUTO-05: conferência do mecanismo publicado, testes locais e escopo de ensaio isolado |
-| Resultados e testes comprovados | B1 identificada por igualdade com a exposição original, revogada e rejeitada em contexto limpo; B2 aceita antes/depois; anônimo barrado e login público 200. 26/26 testes de checkpoint, 12/12 cenários sintéticos git.deploymentEnabled, check:workflow, 8/8 testes documentais e diff --check PASS. Revisão focal sem valores secretos nos documentos/artefatos |
-| Código e PR afetados | Apenas PROGRESS.md, docs/ESTADO_DO_PROJETO.md, docs/HANDOFF.md e docs/continuidade/CHECKPOINT_AUTOMATICO.md; nenhum código/configuração versionada alterado; somente publicação no #111 autorizada |
-| Ambientes envolvidos | Vercel: mudança exclusivamente do bypass autorizado; testes no Preview imutável sem cookies e sem redirects; GET/HEAD sem escrita de negócio. Local: modelo sintético e validadores; GitHub: leitura e publicação documental autorizada |
-| Pendências e decisões | B1 revogada; B2 única e isEnvVar true. Zero consumidores externos identificados/atualizados; seleção da variável é a única migração configurada. Uso externo desconhecido e B1 embutida em builds antigos seguem como riscos, sem dependência funcional encontrada. Controlador travado; ensaio hospedado sem recurso disponível |
-| Próxima ação exata | Autorizar os recursos descartáveis e os pushes/deployments Git automáticos de fixture sintética no escopo do plano; depois provar bootstrap e Preview antes de qualquer main real |
-| Autorizações e proibições | Executadas somente criação/seleção B2 e revogação B1 no projeto autorizado; permitidos testes locais e commit/push documental no #111. Sem deploy manual, main, merge, migrations, Supabase, dados, aliases/domínios manuais, desativação de proteção, bot ou criação remota de recursos sem autorização própria |
+| Tarefa executada | CHECKPOINT-AUTO-06: criação isolada e ensaio real, interrompido no primeiro Production inesperado; diagnóstico e plano de futura incorporação documental #112 sem merge |
+| Resultados e testes comprovados | Primeiro commit main:false confirmado no GitHub antes da conexão; conexão inicial 0 deployments e main adicional 0 na janela. Push Preview criou Production READY/PROMOTED: FAIL. Negativos hospedados e Fase 4 BLOQUEADOS pelo gate. Três conflitos textuais documentais #112 identificados; check:workflow, 8/8 testes documentais, diff --check e revisão focal sem padrões de segredo PASS |
+| Código e PR afetados | Na BS apenas os quatro documentos de continuidade autorizados; sandbox contém index.html, README.md e vercel.json sintéticos, em repo privado novo. Nenhum código da release, workflow ou vercel.json da BS alterado |
+| Ambientes envolvidos | Sandbox Vercel Hobby e repo privado novos; Production inesperado contém somente fixture estática. BS real somente leitura; nenhum teste de B1/B2, Supabase, Auth ou dados de negócio |
+| Pendências e decisões | Resultado FAIL preservado; recursos não excluídos e nenhum push sandbox após a falha. Manifesto/instalação real não preparados nesta fase porque o gate falhou. #112 tem dois docs novos e três conflitos de estado; HANDOFF atual prevalece |
+| Próxima ação exata | Aprovar protocolo novo para projeto já inicializado e critérios de main bloqueada + Preview target Preview; execução requer decisão específica, sem reclassificar AUTO-06. Em gate documental separado, portar os dois docs do #112 com reconciliação manual de estado |
+| Autorizações e proibições | Executadas criação exclusiva do repo privado e projeto sandbox e pushes sintéticos; autorizado commit/push somente dos quatro docs no #111. Sem main BS, merge, Production BS, migrations, Supabase, aliases/domínios reais, custos pagos, force push, exclusões ou bot |
 
 ## Evidência automática de Preview
 
@@ -69,7 +70,9 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 
 - **Publicado no GitHub:** implementação em `c5c62e99f91d154290247a1100cf98b090b6811d`, plano AUTO-03 em `92ee55afa763d2234784486dedb476f87abe820b`, registro final AUTO-03B em `80ebfbb0f1be3615832f6f456a3240b7715919a7` e quatro documentos AUTO-04B em `85128d1378a5fb6f92665d70147b9107f84ef5be`.
 - **AUTO-04B publicada:** os quatro documentos estão em 85128d1, incluindo evidências sanitizadas AUTO-04. Este registro final é publicado em commit posterior exclusivo do HANDOFF; seu SHA/checks devem ser consultados no #111. Nenhuma alteração documental desta tarefa permanece exclusivamente local após a publicação final.
-- **Conjunto SEC-BYPASS-02/AUTO-05 autorizado para publicação:** quatro documentos, incluindo o diagnóstico local SEC-BYPASS-01 preservado e este resultado. Commit/push e seus checks ainda serão conferidos; não transferir evidência de CI/Preview entre SHAs.
+- **Publicado antes da AUTO-06:** resultado SEC-BYPASS-02/AUTO-05 em `e01fffa54bbc567b92b9f0b21a8c84dfe3460563`, ponto de partida remoto conferido.
+- **Conjunto AUTO-06:** somente quatro documentos de continuidade, com resultado FAIL e revisão #112; publicação autorizada no #111. O SHA deste registro e sua CI/Preview devem ser consultados no PR; não importar evidência de e01fffa.
+- **Sandbox remoto preservado:** [repositório privado](https://github.com/therunnas/bs-checkpoint-sandbox), projeto `bs-checkpoint-sandbox`; três commits sintéticos descritos abaixo. Não fazem parte da release BS.
 - **Outros artefatos somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado publicado.
 - **Nunca publicar:** credenciais, `.env`, dumps, respostas brutas, URLs/identificadores secretos ou fingerprints. B2 foi criada somente na Vercel e selecionada como variável de sistema, sem cópia para Git/chat/arquivos. A exposição original foi tratada pela revogação de B1, preservando o registro histórico sanitizado.
 
@@ -96,6 +99,143 @@ Arquivos publicados (mesmo conjunto revisado):
 - `scripts/validar-workflow-documental.mjs`
 
 ## Evidências
+
+### CHECKPOINT-AUTO-06 — 08/11/2026: ensaio hospedado FAIL
+
+#### Recursos, isolamento e primeiro commit
+
+- [Repo privado therunnas/bs-checkpoint-sandbox](https://github.com/therunnas/bs-checkpoint-sandbox),
+  ID `1450656069`, criado em `2026-11-08T20:55:38Z`, default branch main.
+- Projeto `bs-checkpoint-sandbox`, ID `prj_mywfRcPkdzLckvuZwHyNNHPFcltS`, criado
+  no time bslogisticas em `2026-11-08T20:59:20.119Z`; plano existente Hobby,
+  framework null/estático, outputDirectory `.`, zero variáveis explicitamente
+  configuradas. Sem Supabase, banco, dados reais, credenciais BS, dependências ou
+  domínios personalizados. Apenas aliases vercel.app nativos da plataforma.
+- Nomes confirmados livres antes de criar. A consulta de instalação GitHub App
+  pela sessão gh retornou 403; não houve ampliação de acesso. A conexão específica
+  via Vercel funcionou com os acessos existentes, sem alteração administrativa.
+- Fixture: somente index.html, README.md e vercel.json. Primeiro commit
+  `9351b797794f3f45376a874a0b4bc97e7571b440` na main, já com
+  `git.deploymentEnabled: {"main": false}`. Conteúdo confirmado no GitHub **antes**
+  de conectar à Vercel. Nenhuma cópia da release #111, .env ou credencial.
+- Conexão por `POST /v11/projects` com gitRepository específico. Não houve chamada
+  de criação de deployment, CLI deploy, promoção manual ou criação de PR. O caminho
+  REST de criação/conexão é registrado separadamente de eventual import pelo painel;
+  não declarar que um import pelo painel tenha sido exercitado.
+
+#### Resultado real e gate de parada
+
+| Etapa / observação UTC de 08/11/2026 | SHA | Production | Preview | Resultado |
+| --- | --- | --- | --- | --- |
+| Criação/conexão inicial; leitura 21:00:40Z | 9351b797794f3f45376a874a0b4bc97e7571b440 | 0 | 0 | PASS da observação; nenhum deployment inicial solicitado pela API |
+| Push adicional main; leitura 21:02:06Z | 48419e2b0b92e99e45b45f52ed35fbfd4a0cd529 | 0 | 0 | Zero Production observado nessa janela; não é aprovação do desenho completo |
+| Primeiro push preview/checkpoint; leitura 21:03:49Z | 54f799d4f474bcadd81bd721a986f8301eead691 | 1 | 0 | **FAIL: target production, READY/PROMOTED** |
+| Negativos hospedados de regras concorrentes | não executados | n.a. | n.a. | **BLOQUEADO** pelo gate de parada |
+| Fase 4: preparar/validar instalação real | não executada | n.a. | n.a. | **BLOQUEADO**; condição de entrada não satisfeita |
+
+**Deployment inesperado confirmado:** `dpl_3iP5NBVhdCp9gCifkNNFT5NDXwPJ`,
+source git, target production, READY/PROMOTED, gitSource ref preview/checkpoint,
+repoId 1450656069 e SHA exatamente `54f799d4f474bcadd81bd721a986f8301eead691`.
+Criado em `2026-11-08T21:02:22.745Z`, READY em `21:02:25.159Z`.
+[URL imutável do deployment](https://bs-checkpoint-sandbox-e2tbxwlt8-bslogisticas.vercel.app).
+Aliases automáticos: bs-checkpoint-sandbox.vercel.app,
+bs-checkpoint-sandbox-bslogisticas.vercel.app e
+bs-checkpoint-sandbox-git-preview-checkpoint-bslogisticas.vercel.app.
+A Production Branch continuava **main**, e o vercel.json do SHA Preview também
+foi confirmado com main:false. Não houve troca de branch tracking ou promoção
+manual. A API GitHub de deployments desse SHA retornou lista vazia; não inventar
+ID GitHub nem confundir com o ID Vercel acima.
+
+Contagem total na interrupção e na conferência final de **21:17:06Z**:
+**1 Production (PROMOTED), 0 Preview, 0 outros**; nenhum staged observado. Foram contados todos os estados/targets retornados,
+sem filtrar somente READY; paginação sem próxima página. Não houve novo push,
+redeploy, alteração de regra, cancelamento ou exclusão no sandbox após a falha.
+O deployment não foi reclassificado como Preview só pelo nome da branch.
+
+A [documentação oficial Vercel](https://vercel.com/docs/domains/working-with-domains/deploying-and-redirecting)
+afirma que o primeiro deployment de projeto novo é Production. Isso é consistente
+com o caso observado: bloquear a branch main não impede que o primeiro deployment
+permitido, vindo de outra branch, tenha target Production. Não se declara bug da
+Vercel nem se afirma que todos os projetos existentes tenham esse comportamento.
+O resultado **reprova o protocolo de bootstrap com zero Production + Preview**
+como preparado na AUTO-05. Não continuar o ensaio já inicializado e chamar o
+resultado de PASS retroativamente.
+
+#### Diferenças para BS e consequência para a instalação
+
+| Sandbox | BS real |
+| --- | --- |
+| Projeto novo, sem deployment anterior na conexão | Projeto estabelecido, Production já servido |
+| Fixture estática, framework null, sem dependências/env | Next.js, workflows, dependências e variáveis próprias; nada copiado para o sandbox |
+| main:false desde o primeiro commit | vercel.json real ainda sem bloqueio seletivo; não foi editado |
+| Primeiro push Preview virou Production | Previews anteriores do #111 já eram target Preview; evidência histórica não aprova este ensaio |
+
+A leitura da BS real antes/depois confirmou os mesmos IDs/aliases/SHAs e proteção:
+Production `dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4` de main `38b4349`, Preview
+`dpl_5LJ8yCQ6MrzQTxi38wLEiYrXfWFV` de e01fffa e política Standard Protection
+inalterados durante o ensaio. Nenhuma escrita em configuração Vercel BS, domínio,
+alias, main, Supabase ou dados. O push documental autorizado ao final pode produzir
+novo Preview BS e avançar seu alias automaticamente; é independente do FAIL do
+sandbox e não torna o ensaio aprovado.
+
+**Fase 4 não executada:** manifesto mínimo/validação sobre main real e nova
+sequência de instalação não foram preparados como aprovados. O plano anterior
+permanece histórico condicionado. Exige decisão do responsável sobre novo protocolo
+para projeto já inicializado, com critérios próprios e preservação explícita do
+FAIL AUTO-06. Um novo ensaio no sandbox atual só pode começar após essa decisão;
+nenhuma autorização é inferida da criação anterior. Não usar o achado para
+experimentar diretamente na main real. Controlador permanece com false &&,
+contents: read e --dry-run; nenhum recibo automático ou ativação foi realizado.
+SEC-BYPASS-02 segue concluída por evidência anterior, sem nova leitura de valores,
+testes de B1/B2 ou rotação nesta etapa.
+
+#### Continuidade dos PRs #112 e #111 — somente leitura
+
+#112 aberto Draft, branch docs/alinhamento-negocio-sistema, HEAD
+`2d1c0cde7bd47154a281171d77858b530d0b6de2`, base main. #111 aberto Draft,
+HEAD e01fffa antes desta publicação. Base comum confirmada na API:
+`38b43490a8e0913c62a4ee6047ef48a8288ca0dc`.
+Comparação textual de três vias apenas em arquivos temporários, sem merge,
+checkout ou edição da branch do #112:
+
+| Documento do #112 | Resultado contra #111 e ação futura |
+| --- | --- |
+| PROGRESS.md | Conflito textual; manter tarefa ativa e fila do checkpoint mais recente, incorporar só links/pendências de negócio autorizados |
+| docs/ESTADO_DO_PROJETO.md | Conflito textual; preservar histórico recente e natureza de arquivo histórico, sem restaurar sua antiga declaração de fonte única do estado |
+| docs/HANDOFF.md | Conflito textual; não substituir pelo checkpoint antigo do #112, nem importar worktree, SHAs e testes 5/5 como atuais |
+| docs/NEGOCIO.md e docs/NEGOCIO_X_SISTEMA.md | Dois arquivos novos no #112, ausentes em #111/base; sem colisão textual, ainda sujeitos a revisão semântica no HEAD que os receber |
+| docs/ARQUITETURA.md e docs/financeiro/container-servico-avulso.md | Combinação textual sem conflito; revisão semântica ainda necessária para distinguir negócio aprovado, regra implementada e desenho histórico |
+
+`NEGOCIO.md` separa funcionamento real e pontos a confirmar. A matriz
+`NEGOCIO_X_SISTEMA.md` declara escopo de código na main 38b4349; não descreve
+automaticamente a release #111, suas migrations até 049, estado de Preview ou
+homologação. Datas/flags/estados de ambiente nela precisam de fonte e limite de
+verificação no momento da incorporação. Generalização de Serviços Avulsos segue
+não iniciada e sem autorização funcional; novas descrições comerciais não alteram
+o código nem concedem permissão de migration.
+
+**Próximos passos documentais, em autorização separada:** manter #112 aberto Draft,
+portar primeiro os dois arquivos novos para o HEAD atualizado da linha #111,
+revisar a matriz contra o código/ambientes desse HEAD sem repetir auditorias válidas,
+incorporar somente os parágrafos pertinentes de arquitetura/container e os links,
+e atualizar o HANDOFF vigente da tarefa em vez de adotar o antigo. Não fazer
+cherry-pick/merge indiscriminado do commit completo com seus sete arquivos de
+estado. Só depois avaliar integração futura na main sob gates próprios; merge de
+PR documental também pode disparar Production enquanto o bloqueio real não existe.
+Nenhum documento de negócio foi incorporado nesta etapa e nenhum PR foi alterado.
+
+**Artefatos locais sanitizados:** `/private/tmp/bs-checkpoint-auto-06`, incluindo
+fixture, configurações, snapshots, observações e cópias temporárias da revisão.
+Não são checkpoint paralelo nem serão publicados como respostas brutas. Os IDs,
+SHAs e resultados necessários à retomada estão neste registro versionável.
+**Validação documental/publicação:** check:workflow PASS, test:workflow **8/8
+PASS**, diff --check PASS e revisão dos quatro documentos sem padrões de segredo.
+O commit que contém este registro publica somente os quatro documentos autorizados
+no #111; descobrir seu SHA e consultar [checks/CI](https://github.com/therunnas/bslogistica/pull/111/checks)
+e Preview correspondente. A redação antecede esses resultados, que não são
+declarados aprovados antecipadamente. Conferência final entregue ao usuário, sem
+novo commit recursivo só de checks. CI verde da BS não altera o FAIL do ensaio
+hospedado nem autoriza instalação ou Production.
 
 ### SEC-BYPASS-02 / CHECKPOINT-AUTO-05 — 08/11/2026
 
@@ -585,7 +725,9 @@ fora do Mac. Não há senha, chave nem conteúdo de dump neste repositório.
 
 ## Autorizações
 
-SEC-BYPASS-02 / CHECKPOINT-AUTO-05 (vigente): autorizadas criação de B2, validação no Preview protegido, seleção para builds futuras, atualização de consumidores identificados/autorizados e revogação de B1 após as provas, exclusivamente no projeto Vercel identificado. Autorizados preparo/testes locais e commit/push normal somente documental na branch do #111. Recursos remotos para ensaio precisam de autorização própria.
+CHECKPOINT-AUTO-06 (vigente): criação exclusiva do repo privado therunnas/bs-checkpoint-sandbox e projeto Vercel bs-checkpoint-sandbox no time existente, com pushes sintéticos e deployments Git automáticos; leitura #112/#111 e publicação normal somente documental no #111. Diante do FAIL, progressão do ensaio e Fase 4 interrompidas; preservar recursos. Nova execução exige decisão própria.
+
+Histórico SEC-BYPASS-02 / AUTO-05: rotação e preparação concluídas e publicadas, sem autorização reutilizada de credenciais nesta etapa.
 
 Histórico SEC-BYPASS-01: somente diagnóstico e planejamento local, sem rotação ou publicação naquela etapa.
 
@@ -607,14 +749,15 @@ deployment.
 
 ## Proibições
 
-SEC-BYPASS-02 / AUTO-05: sem valores secretos, deployments manuais, merge/main, migrations, Supabase HML/Production, novo Supabase, exclusão de dados, fechamento de PRs, ativação do bot, modificação de domínios/aliases ou desativação de proteção. Sem outras mudanças remotas, criação de recursos ou deployment fora das autorizações específicas. Publicação somente documental no #111; sem force push.
+CHECKPOINT-AUTO-06: sem main real BS, merge, Production BS, configuração Vercel BS, HML/Supabase, migrations, novos PRs BS, fechamento de PRs, exclusões, custos/serviços pagos, domínios/aliases reais, ampliação administrativa ou force push. Sem deploy manual, credenciais BS no sandbox ou escrita do bot. Não excluir/reutilizar recursos nem continuar o ensaio após FAIL sem decisão específica. Publicação somente documental no #111.
 Sem merge em `main`, deploy em Production, migration em HML ou Production (046–049 inclusive), limpeza ou escrita
 de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups redundantes e force push.
 
 ## Bloqueios e riscos
 
 - B1 revogada e rejeitada; B2 única e selecionada. Valor antigo embutido em builds e usos externos desconhecidos continuam riscos residuais; não restaurar a credencial comprometida.
-- Ensaio hospedado ainda não executado: sem ambiente descartável identificado e sem autorização de criação. Modelo local não prova contenção real de Production.
+- AUTO-06 FAIL: primeiro deployment permitido da branch Preview virou Production no sandbox; recursos preservados. Instalação real e negativos hospedados interrompidos. Modelo local AUTO-05 não prova bootstrap hospedado.
+- #112 tem três conflitos documentais com #111; não substituir o checkpoint atual nem inferir implementação/homologação a partir dos novos documentos de negócio.
 
 - Decisão comercial da 048 pendente (acima); sem ela, a 048 não vai a ambiente compartilhado.
 - Idempotência de adicionais só vale com a 047 no HML; até lá, reenvio após resposta perdida bloqueia e exige conferência.
@@ -626,7 +769,7 @@ de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups 
 
 1. Descobrir o checkout/worktree e a branch reais; conferir status, HEAD local e HEAD remoto pelo PR autorizado.
 2. Ler a identificação e “Última tarefa”; preservar alterações locais e não reutilizar autorização histórica.
-3. Ler o resultado SEC-BYPASS-02 e a preparação AUTO-05; não repetir a rotação nem reutilizar B1. Conferir o SHA documental publicado e seus próprios checks, sem commits recursivos. Ensaio hospedado e criação de recursos exigem autorização nominal; controlador permanece desativado.
+3. Ler primeiro AUTO-06 FAIL; preservar sandbox e não continuar testes/replanejar instalação como aprovada. Decisão sobre novo protocolo deve preceder qualquer push no sandbox. Rotação SEC-BYPASS-02 permanece concluída, sem repetir testes de chaves. Conferir SHA/checks deste checkpoint documental.
 4. Ativação permanece bloqueada independentemente de variáveis; seguir os gates futuros de [Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md), sem alterar main ou Production por inferência.
 5. Não repetir a triagem de PRs abaixo sem nova divergência; nenhuma recomendação equivale a autorização de fechamento.
 

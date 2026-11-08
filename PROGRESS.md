@@ -25,35 +25,35 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**SEC-BYPASS-02 concluída; CHECKPOINT-AUTO-05 — preparação local concluída.**
-B1 revogada/rejeitada, B2 validada e selecionada para builds futuras. Controlador
-continua desativado; estado e limites no [HANDOFF](docs/HANDOFF.md).
+**CHECKPOINT-AUTO-06 — ensaio hospedado FAIL; progressão interrompida.**
+Main descartável permaneceu sem deployment nas leituras, mas o primeiro push da
+branch Preview gerou Production no sandbox. Recursos preservados, controlador
+desativado e BS real inalterada; evidências no [HANDOFF](docs/HANDOFF.md).
 
 ### Fazer agora
 
 Publicar os quatro documentos autorizados e conferir CI/Preview do novo SHA.
-Obter autorização para um repositório privado e um projeto Vercel descartável
-para ensaio hospedado; não há ambiente existente identificado para esse fim.
+Obter decisão do responsável sobre protocolo novo para projeto já inicializado,
+sem reclassificar o FAIL AUTO-06 nem continuar no sandbox por inferência.
 
 ### Não fazer ainda
 
-Sem deploy manual, main/merge, migrations, Supabase, dados, domínio/alias manual,
-desativação de proteção, novos recursos remotos ou ativação do bot. B1 não é
-rollback; eventual consumidor desconhecido precisa de migração controlada a B2.
+Sem instalação real, novo ensaio hospedado/negativos após FAIL, main/merge BS,
+deploy manual, Supabase, migrations, aliases/domínios reais, exclusões ou bot.
+Não substituir o HANDOFF pelo checkpoint antigo do #112 nem iniciar Serviços Avulsos.
 
 ### Critério de conclusão
 
-Rotação comprovada em contexto sem cookies/redirects, deployments/aliases
-preservados durante a troca; 26 testes da automação e 12 cenários locais da regra
-Git passaram. Documentação sanitizada publicada e CI/Preview do novo SHA conferidos.
-Modelo local não substitui o ensaio hospedado do primeiro commit main:false.
+Resultado real FAIL e interrupção registrados com IDs/SHAs/contagens; recursos
+preservados, conflito documental #112 diagnosticado e checkpoint sanitizado
+publicado com CI/Preview próprios. Critério original de ensaio aprovado não atingido.
 
 ### Próxima etapa
 
-Autorizar escopo descartável do [plano](docs/continuidade/CHECKPOINT_AUTOMATICO.md#preparação-local-checkpoint-auto-05),
-ensaiar bloqueio/Preview e só então avaliar instalação mínima na branch padrão.
-Dry-run e ativação de escrita continuam gates posteriores. Homologação funcional
-e decisões 048/049 seguem na fila.
+Decisão específica para novo protocolo no sandbox já inicializado, mantendo a
+falha original no histórico. Incorporação futura dos dois docs de negócio do #112
+exige autorização documental separada e reconciliação dos três arquivos de estado.
+Instalação mínima, dry-run e escrita permanecem bloqueados/gates posteriores.
 
 ## Marcos concluídos
 
