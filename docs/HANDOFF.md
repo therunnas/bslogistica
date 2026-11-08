@@ -2,9 +2,9 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. CHECKPOINT-AUTO-03B, 08/11/2026: sincronização documental autorizada somente na branch do PR #111. Plano condicionado ao preflight Vercel; automação desativada.**
+**Fonte principal do estado atual. CHECKPOINT-AUTO-03B, 08/11/2026: quatro documentos da AUTO-03 publicados no PR #111; CI/Preview comprovados em 92ee55a. Plano condicionado ao preflight Vercel; automação desativada.**
 
-**Retomada:** base local/remota conferida em `0b41d80f29d84d23b10938da576c68a7f5c46b2a`. A AUTO-03B publica exclusivamente os quatro documentos da AUTO-03 e o registro desta sincronização. Conferir HEAD, CI e Preview pelo SHA exato no PR.
+**Retomada:** os quatro documentos foram publicados em `92ee55afa763d2234784486dedb476f87abe820b`, com CI e Preview conferidos nesse SHA. O commit que publica este registro final altera somente o HANDOFF; descobrir seu HEAD e conferir seus próprios checks no PR, sem transferir evidência entre SHAs.
 SDLC: Design/Arquitetura; homologação funcional e ativação aguardam gates próprios. Objetivo: qualquer IA autorizada abre o repositório, lê este checkpoint, confere o
 GitHub e sabe onde continuar, sem depender de histórico de conversa.
 
@@ -12,30 +12,30 @@ GitHub e sabe onde continuar, sem depender de histórico de conversa.
 
 | Campo                     | Valor                                                                                                                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa | CHECKPOINT-AUTO-03B — sincronização das quatro alterações documentais da AUTO-03, sem ativação |
-| Gate atual | Publicação documental autorizada; CI/Preview do novo commit serão conferidos após o push. Preflight Vercel continua pendente |
-| Último gate concluído | HEAD remoto/local 0b41d80 e diff restrito aos quatro documentos conferidos; validação documental local antes da publicação |
+| Etapa | CHECKPOINT-AUTO-03B concluída — plano da AUTO-03 publicado, sem ativação |
+| Gate atual | Sincronização documental publicada; CI/Preview de 92ee55a comprovados. Preflight Vercel continua pendente |
+| Último gate concluído | GitHub Actions 42493398898: validar e sql-local SUCCESS em 92ee55a; deployment Preview 7637659628 success no mesmo SHA |
 | Worktree                  | `/private/tmp/bs-fin-20d`                                                                                                                                                           |
 | Branch                    | `integracao/release-preview-01`                                                                                                                                                     |
 | Base                      | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                                                                                                   |
-| HEAD validado | 0b41d80f29d84d23b10938da576c68a7f5c46b2a — base remota/local conferida; validação atual apenas documental no working tree |
-| Alterações não commitadas | Somente os quatro documentos autorizados: PROGRESS.md, docs/ESTADO_DO_PROJETO.md, docs/HANDOFF.md e docs/continuidade/CHECKPOINT_AUTOMATICO.md; nenhuma alteração descartada |
+| HEAD validado | 92ee55afa763d2234784486dedb476f87abe820b — publicação dos quatro documentos, CI/Preview conferidos. Commit final só deste HANDOFF tem SHA/checks próprios, consultáveis no PR |
+| Alterações não commitadas | Nenhuma após o commit exclusivo do HANDOFF que publica este registro final; conferir status ao retomar. Todos os quatro documentos da AUTO-03 estão publicados |
 | PR                        | [#111](https://github.com/therunnas/bslogistica/pull/111) Draft contra `main`; #106, #108, #109 e #110 em Draft, inalterados                                                        |
 | Ambiente-alvo | GitHub/CI e Preview do PR #111 por publicação documental; sem alterar Vercel, main, HML ou Production |
-| Última ação comprovada | Retomada com preservação dos quatro documentos, revisão do diff e controlador mantido com false, token de leitura e modo seco |
-| Próxima ação exata | Publicar somente os quatro documentos na branch do #111, conferir CI/Preview no SHA publicado e registrar o resultado. Depois concluir o preflight Vercel somente leitura |
+| Última ação comprovada | Push normal 0b41d80 → 92ee55a na branch do #111; CI validar/sql-local SUCCESS, Preview success, signal skipped; main permaneceu 38b4349 |
+| Próxima ação exata | Disponibilizar acesso autenticado Vercel e concluir somente leitura de Production Branch, conexão Git, regras de deployment, hooks e proteção/domínios. Depois decidir os gates do plano; sem salvar configurações |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | CHECKPOINT-AUTO-03B: sincronização documental da AUTO-03 autorizada; plano preservado e checkpoint atualizado |
-| Resultados e testes comprovados | HEAD base e diff conferidos; check:workflow, 8/8 documentais, formatação do plano e diff --check PASS. CI/Preview novos pendentes; nenhuma evidência de ativação ou configuração real Vercel acrescentada |
-| Código e PR afetados | Somente quatro documentos na branch integracao/release-preview-01 do PR #111; nenhum código/workflow ou plano funcional alterado |
-| Ambientes envolvidos | Checkout local, GitHub Actions e Preview automático da branch; sem acesso a HML/Production ou configuração Vercel |
-| Pendências e decisões | Publicar/conferir o SHA documental; preflight Vercel e ativação continuam pendentes. Sem reabrir análise geral ou modificar o mecanismo |
-| Próxima ação exata | Concluir push e conferência de CI/Preview; depois disponibilizar conexão Vercel e executar apenas as leituras do preflight |
-| Autorizações e proibições | Commit/push normal exclusivamente dos quatro documentos na branch do #111 autorizados. Proibidos bot, main, merge, force push, Vercel, HML/Production, migrations e novos/fechados PRs |
+| Tarefa executada | CHECKPOINT-AUTO-03B: quatro documentos da AUTO-03 publicados por push normal no #111, com resultado e próxima ação registrados |
+| Resultados e testes comprovados | Local: check:workflow, 8/8 documentais, formatação do plano e diff --check PASS. CI 42493398898: validar/sql-local SUCCESS em 92ee55a. Preview 7637659628 success no mesmo SHA. Nenhum teste de ativação ou nova inspeção administrativa Vercel |
+| Código e PR afetados | 92ee55afa763d2234784486dedb476f87abe820b, somente PROGRESS.md, ESTADO_DO_PROJETO.md, HANDOFF.md e CHECKPOINT_AUTOMATICO.md; registro final em commit posterior exclusivo do HANDOFF; #111 aberto Draft |
+| Ambientes envolvidos | GitHub Actions efêmero e Preview automático da branch; sem alteração de main, HML/Production ou configurações Vercel |
+| Pendências e decisões | Preflight Vercel autenticado e todos os gates de instalação/ativação permanecem pendentes. Plano publicado é condicionado; publicação não autoriza execução |
+| Próxima ação exata | Disponibilizar conexão Vercel ou sessão acessível do painel e executar somente as cinco leituras previstas, sem expor credenciais ou chamar hooks |
+| Autorizações e proibições | Executados commit/push normal somente dos quatro documentos na branch do #111. Seguem proibidos bot, main, merge, force push, Vercel, HML/Production, migrations e novos/fechados PRs |
 
 ## Evidência automática de Preview
 
@@ -63,7 +63,7 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 ## Arquivos locais × remotos
 
 - **Publicado no GitHub:** os 19 arquivos da implementação em `c5c62e99f91d154290247a1100cf98b090b6811d`, na branch `integracao/release-preview-01`. Este checkpoint final é publicado por commit documental subsequente na mesma branch; descobrir seu SHA no [PR #111](https://github.com/therunnas/bslogistica/pull/111).
-- **AUTO-03B:** publicação autorizada exclusivamente dos quatro documentos da AUTO-03. O novo HEAD e suas evidências precisam ser conferidos após o push; o plano ainda não ativa nem configura nenhum ambiente.
+- **AUTO-03B publicada:** os quatro documentos da AUTO-03 estão em `92ee55afa763d2234784486dedb476f87abe820b`. Este resultado é publicado em commit posterior exclusivo do HANDOFF, cujo SHA/checks devem ser consultados no #111. O plano não ativa nem configura nenhum ambiente.
 - **Outros artefatos somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado no GitHub.
 - **Nunca publicar:** credenciais, `.env`, dumps e dados pessoais. Nenhuma variável/segredo remoto foi configurado nesta tarefa.
 
@@ -91,13 +91,16 @@ Arquivos publicados (mesmo conjunto revisado):
 
 ## Evidências
 
-### CHECKPOINT-AUTO-03B — sincronização documental autorizada
+### CHECKPOINT-AUTO-03B — sincronização documental publicada
 
-- Base local/remota `0b41d80f29d84d23b10938da576c68a7f5c46b2a` e branch `integracao/release-preview-01` conferidas no #111 aberto Draft; diff restrito aos quatro documentos, sem alterações descartadas.
-- Validação local: check:workflow, 8/8 testes documentais, formatação do plano e git diff --check PASS. Nenhum teste funcional ou de ativação repetido.
-- CI e Preview do novo commit ainda pendentes antes da publicação; resultados de outro SHA não são transferidos. Registro final será publicado após conferência.
-- Nenhum código, workflow, migration ou configuração Vercel alterado. Controlador permanece com false, token de leitura e modo seco.
-
+- **Commit dos quatro documentos:** `92ee55afa763d2234784486dedb476f87abe820b`, push normal sobre `0b41d80`, exclusivamente na branch `integracao/release-preview-01` do #111 aberto Draft. Nenhuma alteração existente descartada.
+- **Escopo publicado:** `PROGRESS.md`, `docs/ESTADO_DO_PROJETO.md`, `docs/HANDOFF.md`, `docs/continuidade/CHECKPOINT_AUTOMATICO.md`. Nenhum código, workflow, migration ou configuração Vercel alterado.
+- **Local:** check:workflow, 8/8 testes documentais, formatação do plano e git diff --check PASS; nenhum teste de ativação repetido ou declarado aprovado.
+- **CI do SHA 92ee55a:** [run 42493398898](https://github.com/therunnas/bslogistica/actions/runs/42493398898), jobs `validar` e `sql-local` SUCCESS, conferidos pelo SHA exato. A CI da aplicação não é homologação nem ativação.
+- **Preview:** deployment GitHub `7637659628`, ambiente Preview, `production_environment: false`, success em `2026-11-08T15:10:17Z`; [URL do Preview](https://bs-logistica-sistema-k2n3nl7hn-bslogisticas.vercel.app), fonte `92ee55a`. Nenhuma tela autenticada ou destino Supabase foi reverificado nesta sincronização.
+- **Controles:** signal skipped; controlador permanece com `false &&`, `contents: read`, `--dry-run`. Main conferida em `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`. Sem alteração em HML/Production ou configurações da Vercel.
+- **Checkpoint final:** este registro é publicado por commit documental subsequente apenas deste arquivo. CI/Preview desse commit têm SHA próprio e não são declarados antecipadamente como aprovados; conferir no PR.
+- **Próxima ação:** disponibilizar acesso Vercel e concluir o preflight somente leitura. Não executar o plano de ativação sem as autorizações específicas.
 
 ### CHECKPOINT-AUTO-03 — leitura e plano local em 08/11/2026
 
