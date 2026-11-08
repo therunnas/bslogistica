@@ -2,13 +2,14 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. CHECKPOINT-AUTO-04B, 08/11/2026: publicação documental autorizada do diagnóstico AUTO-04 no PR #111. Controlador permanece desativado; rotação controlada e ensaio isolado pendentes.**
+**Fonte principal do estado atual. CHECKPOINT-AUTO-04B, 08/11/2026: diagnóstico AUTO-04 publicado no PR #111 em 85128d1, com CI/Preview comprovados. Controlador desativado; rotação controlada e ensaio isolado pendentes.**
 
-**Retomada:** antes da publicação AUTO-04B, HEAD local/remoto do PR #111
-confirmado em `80ebfbb0f1be3615832f6f456a3240b7715919a7`, sem divergência;
-nenhum fast-forward necessário. Este conjunto contém somente os quatro documentos
-da AUTO-04, revisados para publicação na mesma branch. Descobrir o SHA publicado
-e seus próprios checks no PR; não transferir CI/Preview de 80ebfbb ao novo commit.
+**Retomada:** os quatro documentos AUTO-04 foram publicados em
+`85128d1378a5fb6f92665d70147b9107f84ef5be`, com CI e Preview conferidos nesse SHA.
+Este registro final é publicado por commit posterior exclusivo do HANDOFF na
+mesma branch; descobrir seu HEAD e conferir seus próprios checks no PR, sem
+transferir evidência entre SHAs. Não é preciso gerar novos commits apenas para
+registrar recursivamente os checks de cada atualização documental.
 Production e configurações Vercel não foram reinspecionados nesta sincronização;
 valem os limites da inspeção AUTO-04 abaixo. SDLC: documentação/publicação no PR,
 sem instalação ou ativação. Este arquivo permanece o checkpoint único.
@@ -17,29 +18,29 @@ sem instalação ou ativação. Este arquivo permanece o checkpoint único.
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | CHECKPOINT-AUTO-04B: sincronização documental autorizada exclusivamente no PR #111 |
-| Gate atual | Publicar diagnóstico sanitizado e conferir CI/Preview no novo SHA; rotação, ensaio e ativação não autorizados |
-| Último gate concluído | Leitura autenticada Vercel; CI 42494404663 validar/sql-local SUCCESS e Preview READY no HEAD 80ebfbb |
+| Etapa | CHECKPOINT-AUTO-04B concluída: quatro documentos publicados no #111; registro final exclusivo do HANDOFF |
+| Gate atual | Publicação documental e CI/Preview de 85128d1 comprovados; rotação, ensaio e ativação aguardam autorização própria |
+| Último gate concluído | CI 42508320309 validar/sql-local SUCCESS e Preview 7639731414 success em 85128d1, sem homologação funcional |
 | Worktree | `/private/tmp/bs-fin-20d` |
 | Branch | `integracao/release-preview-01` |
 | Base | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, também fonte do Production servido |
-| HEAD validado | 80ebfbb0f1be3615832f6f456a3240b7715919a7 — ponto de partida remoto/local confirmado da AUTO-04B; novo SHA e CI/Preview precisam de conferência própria |
-| Alterações não commitadas | Somente quatro documentos da AUTO-04 atualizados para AUTO-04B; conferir status após publicação; nenhum arquivo de código/configuração |
+| HEAD validado | 85128d1378a5fb6f92665d70147b9107f84ef5be — quatro documentos publicados e CI/Preview conferidos; commit posterior deste HANDOFF tem SHA/checks próprios consultáveis no PR |
+| Alterações não commitadas | Nenhuma após o commit final exclusivo deste HANDOFF; conferir status ao retomar. Os quatro documentos da AUTO-04 estão publicados |
 | PR | [#111](https://github.com/therunnas/bslogistica/pull/111) aberto Draft contra main; outros PRs inalterados |
 | Ambiente-alvo | GitHub/CI e Preview automático do PR #111 por publicação documental; sem nova inspeção ou alteração Vercel/Supabase |
-| Última ação comprovada | Branch/worktree/diff e HEAD remoto conferidos; exatamente quatro documentos locais, sem código/workflows/configurações alterados; controles do bot preservados |
-| Próxima ação exata | Após CI/Preview deste conjunto, obter autorização para rotação controlada do bypass exposto, com avaliação de consumidores e validação; depois autorizar ensaio descartável do bloqueio antes de instalação na main real |
+| Última ação comprovada | Push normal 80ebfbb → 85128d1 exclusivamente na branch do #111; CI e Preview success no mesmo SHA; signal SKIPPED; quatro arquivos remotos conferidos |
+| Próxima ação exata | Obter autorização para rotação controlada do bypass exposto, com avaliação de consumidores e validação; depois autorizar ensaio descartável do bloqueio antes de instalação na main real |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
 | Tarefa executada | CHECKPOINT-AUTO-04B: revisão e publicação exclusivamente documental do diagnóstico autenticado AUTO-04 na branch do #111 |
-| Resultados e testes comprovados | Confirmação remota 80ebfbb, sem divergência; exatamente quatro documentos e nenhum valor secreto identificado na revisão. Local desta sincronização: check:workflow PASS, test:workflow 8/8 PASS e diff --check PASS. CI/Preview do novo commit ainda pendentes no momento deste registro |
+| Resultados e testes comprovados | Local: check:workflow PASS, test:workflow 8/8 PASS, diff --check PASS; revisão dos quatro documentos sem valores secretos. CI 42508320309 validar/sql-local SUCCESS e Preview 7639731414 success no SHA 85128d1. Sem teste de ativação ou rotação |
 | Código e PR afetados | PROGRESS.md, docs/ESTADO_DO_PROJETO.md, docs/HANDOFF.md e docs/continuidade/CHECKPOINT_AUTOMATICO.md; somente PR #111, sem código, workflow, migration ou configuração alterados |
 | Ambientes envolvidos | GitHub e Preview automático do push documental; sem deploy manual, novas leituras Vercel/Supabase ou alteração em HML/Production |
 | Pendências e decisões | Credencial de bypass exposta na AUTO-04 exige rotação controlada autorizada, nunca seu valor neste arquivo. Ensaio main:false, instalação mínima, dry-run e escrita do bot continuam pendentes; controlador com false &&, contents: read e --dry-run |
-| Próxima ação exata | Conferir CI/Preview no SHA publicado; depois obter autorização específica para rotação controlada e, em gate separado, ensaio isolado preservando Previews |
+| Próxima ação exata | Obter autorização específica para rotação controlada da credencial de bypass e, em gate separado, ensaio isolado preservando Previews |
 | Autorizações e proibições | Autorizados commit e push normal somente destes quatro documentos na branch do #111. Proibidos valores secretos, rotação, deploy manual, main, merge/force push, bot, mudanças Vercel, HML/Production, migrations e criação/fechamento de PRs |
 
 ## Evidência automática de Preview
@@ -67,8 +68,8 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 
 ## Arquivos locais × remotos
 
-- **Publicado no GitHub:** implementação em `c5c62e99f91d154290247a1100cf98b090b6811d`, plano AUTO-03 em `92ee55afa763d2234784486dedb476f87abe820b`, registro final AUTO-03B em `80ebfbb0f1be3615832f6f456a3240b7715919a7`, HEAD remoto conferido do #111 nesta etapa.
-- **Conjunto AUTO-04B autorizado para publicação:** `docs/HANDOFF.md`, `PROGRESS.md`, `docs/ESTADO_DO_PROJETO.md` e referência em `docs/continuidade/CHECKPOINT_AUTOMATICO.md`, incluindo as evidências sanitizadas AUTO-04. A confirmação de push/CI/Preview pertence ao novo SHA; até sua conferência não declarar publicação aprovada.
+- **Publicado no GitHub:** implementação em `c5c62e99f91d154290247a1100cf98b090b6811d`, plano AUTO-03 em `92ee55afa763d2234784486dedb476f87abe820b`, registro final AUTO-03B em `80ebfbb0f1be3615832f6f456a3240b7715919a7` e quatro documentos AUTO-04B em `85128d1378a5fb6f92665d70147b9107f84ef5be`.
+- **AUTO-04B publicada:** os quatro documentos estão em 85128d1, incluindo evidências sanitizadas AUTO-04. Este registro final é publicado em commit posterior exclusivo do HANDOFF; seu SHA/checks devem ser consultados no #111. Nenhuma alteração documental desta tarefa permanece exclusivamente local após a publicação final.
 - **Outros artefatos somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado publicado.
 - **Nunca publicar:** credenciais, `.env`, dumps, respostas brutas da API, URLs/identificadores de hooks e bypass. Nenhum segredo/variável remoto foi configurado. Houve exposição acidental de identificador sensível na saída técnica, sem inclusão nos documentos; revisão administrativa pendente.
 
@@ -107,8 +108,25 @@ nenhum valor de bypass ou resposta bruta da API incluído. Ocorrência AUTO-04
 preservada abaixo, com necessidade de rotação controlada e autorização própria.
 Controlador conferido com as três travas; nenhum workflow alterado.
 Validações locais desta sincronização: `npm run check:workflow` PASS,
-`npm run test:workflow` 8/8 PASS e `git diff --check` PASS. Commit/push e CI/Preview
-deste conjunto ainda pendentes no momento deste registro, sem antecipar resultado.
+`npm run test:workflow` 8/8 PASS e `git diff --check` PASS.
+
+**Publicação comprovada:** push normal 80ebfbb →
+`85128d1378a5fb6f92665d70147b9107f84ef5be`, somente os quatro documentos, arquivos
+remotos conferidos. [CI 42508320309](https://github.com/therunnas/bslogistica/actions/runs/42508320309):
+`validar` e `sql-local` SUCCESS no SHA exato; sinal SKIPPED. CodeRabbit pulou a
+revisão por Draft, não é revisão efetiva. Deployment GitHub `7639731414`,
+ambiente Preview, `production_environment: false`, success em
+`2026-11-08T18:07:11Z`, fonte exatamente 85128d1;
+[URL do Preview](https://bs-logistica-sistema-6j5f86wt5-bslogisticas.vercel.app),
+Vercel `dpl_2188BMDC6gGSKcuJkssME5ZvpXg2`. Sem teste funcional, rotação ou
+ativação; sem deploy manual, configuração Vercel ou alteração de HML/Production.
+
+**Registro final:** commit posterior exclusivo deste HANDOFF, sem novos fatos de
+provedor ou código. Seus checks e Preview têm SHA próprio e devem ser consultados
+no PR; não são declarados aprovados antecipadamente neste arquivo. A conferência
+final é entregue ao usuário, sem ciclo recursivo de commits documentais.
+**Próxima ação:** autorização específica para rotação controlada; ensaio isolado e
+instalação/ativação do controlador continuam em gates separados.
 
 ### CHECKPOINT-AUTO-04 — inspeção autenticada em 08/11/2026, origem local; publicação documental autorizada na AUTO-04B
 
