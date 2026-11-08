@@ -58,7 +58,9 @@ instalação de pacotes ou execução de artefatos do candidato. O motor exige:
    formatos diferentes são recusados; a URL não comprova um ID interno de projeto.
 2. Commit completo e diff paginado. Commits exclusivamente `.md` de documentação
    e recibos automáticos não produzem nova escrita. Renomear código para docs não
-   o transforma em commit documental; SQL em runbook também não é ignorado.
+   o transforma em commit documental; arquivos .sql não são documentais. O
+   classificador usa caminhos, não interpreta comandos/SQL dentro de Markdown;
+   runbooks exigem revisão humana e não concedem autorização de execução.
 3. Um único PR aberto, do mesmo repositório, cujo HEAD ainda é o SHA implantado,
    em branch explicitamente permitida. Default branch, `main`, `master`,
    `production`, `prod`, `staging` e `hml` são recusadas, inclusive seus prefixos.
@@ -349,3 +351,92 @@ responsável pelo incidente. Qualquer cancelamento/promoção/rollback de Produc
 exige autorização específica; não alterar aliases automaticamente como parte do
 rollback do bot. Não reconectar/desconectar Git nem remover o bloqueio Git como
 “rollback rápido”, pois isso pode interromper Preview ou voltar a disparar Production.
+
+
+## Preparação local CHECKPOINT-AUTO-05
+
+SDLC: Design/Arquitetura / Testes. Execução e estado corrente somente no
+[HANDOFF](../HANDOFF.md). A preparação não instala nada na branch padrão nem
+remove as travas de publicação. A rotação de bypass não é requisito do escritor:
+o mecanismo usa evidências GitHub, sem acessar Preview ou carregar B2.
+
+### Mecanismo publicado conferido
+
+- Idempotência: recibo por deployment; repetição preserva o histórico existente.
+- Loop: commits apenas documentais/recibos não geram nova escrita. O classificador
+  examina caminhos e renomeações, não conteúdo semântico de Markdown.
+- Evidência: CI, deployment, PR e HEAD precisam coincidir no SHA; origem, URL,
+  jobs obrigatórios e estado mais recente são reconsultados, sem sucesso inferido.
+- Concorrência: workflow serializa pelo SHA e o commit atômico usa expectedHeadOid;
+  alterações concorrentes não são sobrescritas, resposta perdida exige reconciliação.
+- Branch: motor recusa branch padrão descoberta, main e nomes protegidos, inclusive
+  se incluídos na allowlist. Main também é a Production Branch confirmada nesta
+  inspeção. Isso impede escrita do bot, **não** desliga deployment Git na Vercel.
+  Se a Production Branch mudar, o preflight/allowlist precisa ser reavaliado.
+- Workflows intactos: controlador com false &&, contents: read e --dry-run; sinal
+  sem permissão, checkout ou segredos Vercel. Nenhuma configuração remota ativada.
+
+Validação isolada reutilizada: `npm run test:checkpoint-preview`, **26/26 PASS**,
+incluindo falha, repetição, ambas as ordens dos eventos, documentação, SHA errado,
+CAS, simultaneidade e resposta perdida. Não é prova de execução real workflow_run.
+
+### Matriz local da regra git.deploymentEnabled
+
+Modelo sintético da regra documentada, usando minimatch 3.1.5 já instalado,
+sem dependência nova, rede ou alteração de vercel.json real. Avaliação: booleano
+é global; objeto seleciona padrões que casam; sem padrão aplicável retorna true;
+se algum padrão aplicável for true, habilita. O modelo verifica a interpretação
+proposta; não executa código da Vercel e não comprova seu bootstrap/import.
+
+| Configuração sintética | Branch | Deployment habilitado esperado e observado |
+| --- | --- | --- |
+| main:false | main | não |
+| main:false | integracao/release-preview-01 | sim |
+| main:false | feat/example | sim |
+| main:false | staging | sim |
+| propriedade ausente | main | sim |
+| false global | integracao/release-preview-01 | não — quebra Preview |
+| true global | main | sim |
+| main:false e *:true | main | sim — regra concorrente insegura |
+| main:false e ma*:true | main | sim — sobreposição insegura |
+| internal-*:false | internal-test | não |
+| experiment-*:false e *-dev:true | experiment-my-branch-dev | sim |
+| main:false e feat/*:true | main | não |
+
+**12/12 cenários passaram localmente.** O vercel.json real foi lido e continua
+somente schema/framework, sem git.deploymentEnabled; o modelo também confirmou
+que sua ausência não contém main. Nenhum push/commit para main ou ensaio no projeto
+real foi executado. Artefato temporário de referência:
+`/private/tmp/bs-sec-bypass-02/test-git-deployment-enabled.cjs`; redescobrir checkout
+e dependências ao reproduzir. Não tratar esse caminho temporário como requisito.
+
+### Ensaio hospedado: recurso e autorização ainda pendentes
+
+Inventário em leitura: um projeto no time Vercel consultado, o BS real; nenhum
+ambiente descartável identificado. Busca de candidatos entre repositórios próprios
+por nomes/descrições também não encontrou recurso aprovado. Não reutilizar o BS,
+o site institucional ou outro projeto por conveniência.
+
+Escopo concreto proposto para autorização futura:
+
+1. Um repositório privado `therunnas/bs-checkpoint-sandbox` e um projeto
+   `bs-checkpoint-sandbox` no time Vercel existente, com conexão Git entre eles.
+   Confirmar disponibilidade de nomes antes de criar; sem domínio customizado,
+   Supabase, dados, credenciais ou env do BS real. Fonte estática sintética.
+2. Push somente nesse repositório descartável: main sintética e branch Preview.
+   Deployments **automáticos de Git/import** apenas no projeto descartável;
+   nenhum comando de deploy manual. Não criar PR nem instalar controlador nesse
+   primeiro ensaio sem escopo adicional. Registrar eventuais deployments iniciais
+   do import separadamente; não declarar que import obedece ao bloqueio sem prova.
+3. Provar comportamento do primeiro commit com main:false e dos seguintes,
+   contar deployments Production/staged antes/depois, confirmar novo Preview
+   automático e exercitar o negativo da regra true concorrente. Qualquer resultado
+   divergente reprova o desenho para main real, sem afetar a BS.
+4. Registrar SHAs, configuração e IDs/status, sem segredos; preservar recursos para
+   revisão. Exclusão posterior do repositório/projeto exige autorização própria.
+
+Essas criações, conexão e pushes/deployments de fixture **não estão autorizados**
+pela preparação AUTO-05. A conclusão desta etapa é preparar as provas e pedir esse
+gate; instalação mínima na main real, dry-run hospedado e escrita do controlador
+continuam autorizações independentes. Não concluir proteção de Production a partir
+do modelo local, da rotação de bypass ou de CI verde.

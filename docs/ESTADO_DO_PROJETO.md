@@ -5,6 +5,31 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## SEC-BYPASS-02 / CHECKPOINT-AUTO-05 — 08/11/2026
+
+Rotação autorizada exclusivamente do bypass do projeto Vercel BS: identidade de
+B1 confirmada por igualdade sem expor valor; B2 criada/validada/selecionada e B1
+revogada/rejeitada. Nenhum consumidor externo identificado para atualização;
+riscos de usos desconhecidos e env antiga em builds preservados no diagnóstico.
+Deployments, aliases e política de proteção inalterados durante a troca; nenhum
+deploy manual, alteração do app, Supabase ou banco. Revisão focal e 26 testes do
+checkpoint, mais 12 cenários sintéticos da regra Git, passaram; controlador segue
+travado. Ensaio hospedado depende de recursos descartáveis ainda não autorizados.
+Evidências sanitizadas, publicação documental e próxima ação no [HANDOFF](HANDOFF.md);
+matriz e escopo no [plano](continuidade/CHECKPOINT_AUTOMATICO.md#preparação-local-checkpoint-auto-05).
+
+## SEC-BYPASS-01 — 08/11/2026
+
+Diagnóstico somente leitura e plano local. Confirmado um bypass de automação,
+selecionado como variável de sistema; nenhum consumidor funcional específico da
+credencial exposta comprovado. Fontes versionadas, metadados GitHub/Vercel e
+baseline HEAD sem credenciais consultados; limites, inventário e procedimento de
+substituição/recuperação somente no [HANDOFF local](HANDOFF.md). Dependência de
+variável fixada no build distingue troca de cliente externo de atualização de
+deployment antigo. Nenhuma chave criada, usada em teste ou revogada, nenhum deploy,
+commit/push ou alteração de ambiente. Execução SEC-BYPASS-02 exige autorização
+nominal própria; controlador automático continua desativado.
+
 ## CHECKPOINT-AUTO-04B — 08/11/2026
 
 Publicação autorizada exclusivamente dos quatro documentos AUTO-04 na branch do

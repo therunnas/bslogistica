@@ -25,36 +25,35 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**CHECKPOINT-AUTO-04B — publicação documental do diagnóstico AUTO-04 no PR #111.**
-Evidências, SHA e estado de publicação somente no [HANDOFF](docs/HANDOFF.md).
-Controlador continua desativado; nenhuma configuração remota alterada.
+**SEC-BYPASS-02 concluída; CHECKPOINT-AUTO-05 — preparação local concluída.**
+B1 revogada/rejeitada, B2 validada e selecionada para builds futuras. Controlador
+continua desativado; estado e limites no [HANDOFF](docs/HANDOFF.md).
 
 ### Fazer agora
 
-Obter autorização nominal para ensaio isolado do bloqueio seletivo da branch
-Production confirmada como main, preservando Preview automático, conforme
-[plano existente](docs/continuidade/CHECKPOINT_AUTOMATICO.md#plano-de-instalação-sem-publicar-production).
-Antes de qualquer ativação, obter autorização para rotação controlada da credencial
-de bypass exposta, com avaliação de consumidores; nenhum valor em arquivo.
+Publicar os quatro documentos autorizados e conferir CI/Preview do novo SHA.
+Obter autorização para um repositório privado e um projeto Vercel descartável
+para ensaio hospedado; não há ambiente existente identificado para esse fim.
 
 ### Não fazer ainda
 
-Somente commit/push documental no #111 autorizados. Sem deploy manual,
-alteração Vercel/Supabase/Git, main, merge/force push, bot,
-tokens/segredos, HML/Production, migrations ou novos/fechados PRs. Sem revogar
-bypass sem autorização. Não desconectar Git para conter Production.
+Sem deploy manual, main/merge, migrations, Supabase, dados, domínio/alias manual,
+desativação de proteção, novos recursos remotos ou ativação do bot. B1 não é
+rollback; eventual consumidor desconhecido precisa de migração controlada a B2.
 
 ### Critério de conclusão
 
-Diagnóstico sanitizado publicado nos quatro documentos e CI/Preview conferidos
-no novo SHA. Inspeção AUTO-04 comprova conexão, main, zero hooks e aliases.
-Ensaio de zero Production e Preview preservado continua não executado; escrita
-e ativação exigem gates separados.
+Rotação comprovada em contexto sem cookies/redirects, deployments/aliases
+preservados durante a troca; 26 testes da automação e 12 cenários locais da regra
+Git passaram. Documentação sanitizada publicada e CI/Preview do novo SHA conferidos.
+Modelo local não substitui o ensaio hospedado do primeiro commit main:false.
 
 ### Próxima etapa
 
-Rotação controlada, após autorização específica; depois ensaio descartável
-autorizado separadamente e revisão da instalação mínima, sem release do #111. Homologação funcional e decisões 048/049 seguem na fila.
+Autorizar escopo descartável do [plano](docs/continuidade/CHECKPOINT_AUTOMATICO.md#preparação-local-checkpoint-auto-05),
+ensaiar bloqueio/Preview e só então avaliar instalação mínima na branch padrão.
+Dry-run e ativação de escrita continuam gates posteriores. Homologação funcional
+e decisões 048/049 seguem na fila.
 
 ## Marcos concluídos
 

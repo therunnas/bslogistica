@@ -2,46 +2,45 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. CHECKPOINT-AUTO-04B, 08/11/2026: diagnóstico AUTO-04 publicado no PR #111 em 85128d1, com CI/Preview comprovados. Controlador desativado; rotação controlada e ensaio isolado pendentes.**
+**Fonte principal do estado atual. SEC-BYPASS-02 concluída em 08/11/2026; CHECKPOINT-AUTO-05: preparação local concluída, sem ativação. B1 revogada e rejeitada; B2 validada e selecionada. Publicação documental autorizada no PR #111.**
 
-**Retomada:** os quatro documentos AUTO-04 foram publicados em
-`85128d1378a5fb6f92665d70147b9107f84ef5be`, com CI e Preview conferidos nesse SHA.
-Este registro final é publicado por commit posterior exclusivo do HANDOFF na
-mesma branch; descobrir seu HEAD e conferir seus próprios checks no PR, sem
-transferir evidência entre SHAs. Não é preciso gerar novos commits apenas para
-registrar recursivamente os checks de cada atualização documental.
-Production e configurações Vercel não foram reinspecionados nesta sincronização;
-valem os limites da inspeção AUTO-04 abaixo. SDLC: documentação/publicação no PR,
-sem instalação ou ativação. Este arquivo permanece o checkpoint único.
+**Retomada:** checkpoint oficial consultado diretamente no GitHub antes da
+execução; HEAD local/remoto `8071a99f2050cb4de8e238b2531b1a0e078e1086`, PR #111
+aberto Draft na branch `integracao/release-preview-01`. Os três documentos locais
+SEC-BYPASS-01 foram preservados e incorporados a esta atualização; sem divergência
+ou fast-forward necessário. SDLC: Manutenção/Segurança concluída no limite dos
+testes de bypass e Design/Arquitetura da automação. Este conjunto publica somente
+quatro documentos; descobrir seu novo SHA, CI e Preview no PR. Não gerar commits
+recursivos apenas para registrar checks documentais. Automação permanece desativada.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | CHECKPOINT-AUTO-04B concluída: quatro documentos publicados no #111; registro final exclusivo do HANDOFF |
-| Gate atual | Publicação documental e CI/Preview de 85128d1 comprovados; rotação, ensaio e ativação aguardam autorização própria |
-| Último gate concluído | CI 42508320309 validar/sql-local SUCCESS e Preview 7639731414 success em 85128d1, sem homologação funcional |
+| Etapa | SEC-BYPASS-02 concluída; CHECKPOINT-AUTO-05 preparação local concluída; ensaio hospedado pendente |
+| Gate atual | Revisão e publicação documental no #111; nenhum ensaio hospedado, instalação na main ou ativação autorizados |
+| Último gate concluído | Rotação real com B1 rejeitada, B2 aceita e anônimo barrado; 26/26 testes isolados da automação e 12/12 cenários locais da regra Git |
 | Worktree | `/private/tmp/bs-fin-20d` |
 | Branch | `integracao/release-preview-01` |
-| Base | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, também fonte do Production servido |
-| HEAD validado | 85128d1378a5fb6f92665d70147b9107f84ef5be — quatro documentos publicados e CI/Preview conferidos; commit posterior deste HANDOFF tem SHA/checks próprios consultáveis no PR |
-| Alterações não commitadas | Nenhuma após o commit final exclusivo deste HANDOFF; conferir status ao retomar. Os quatro documentos da AUTO-04 estão publicados |
-| PR | [#111](https://github.com/therunnas/bslogistica/pull/111) aberto Draft contra main; outros PRs inalterados |
-| Ambiente-alvo | GitHub/CI e Preview automático do PR #111 por publicação documental; sem nova inspeção ou alteração Vercel/Supabase |
-| Última ação comprovada | Push normal 80ebfbb → 85128d1 exclusivamente na branch do #111; CI e Preview success no mesmo SHA; signal SKIPPED; quatro arquivos remotos conferidos |
-| Próxima ação exata | Obter autorização para rotação controlada do bypass exposto, com avaliação de consumidores e validação; depois autorizar ensaio descartável do bloqueio antes de instalação na main real |
+| Base | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, fonte do Production servido conferido |
+| HEAD validado | 8071a99f2050cb4de8e238b2531b1a0e078e1086 — ponto de partida remoto/local; novo commit documental requer seus próprios checks e Preview |
+| Alterações não commitadas | Conjunto desta tarefa contém somente HANDOFF, PROGRESS, ESTADO_DO_PROJETO e CHECKPOINT_AUTOMATICO; após commit/push conferir status. Sem código, workflow ou vercel.json alterados |
+| PR | [#111](https://github.com/therunnas/bslogistica/pull/111) aberto Draft; nenhum PR criado/fechado ou merge |
+| Ambiente-alvo | Bypass do projeto Vercel autorizado, Preview existente para GET de login e HEAD público sem credenciais; preparação sintética local; sem Supabase/HML/Production de dados |
+| Última ação comprovada | Em 19:01:31Z, B1 removida/rejeitada e B2 selecionada/aceita; deployments, aliases e política de proteção preservados durante a troca |
+| Próxima ação exata | Após conferir a publicação, autorizar um repositório privado e um projeto Vercel descartáveis para ensaio hospedado do primeiro commit main:false e continuidade de Preview; sem usar projeto BS real |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | CHECKPOINT-AUTO-04B: revisão e publicação exclusivamente documental do diagnóstico autenticado AUTO-04 na branch do #111 |
-| Resultados e testes comprovados | Local: check:workflow PASS, test:workflow 8/8 PASS, diff --check PASS; revisão dos quatro documentos sem valores secretos. CI 42508320309 validar/sql-local SUCCESS e Preview 7639731414 success no SHA 85128d1. Sem teste de ativação ou rotação |
-| Código e PR afetados | PROGRESS.md, docs/ESTADO_DO_PROJETO.md, docs/HANDOFF.md e docs/continuidade/CHECKPOINT_AUTOMATICO.md; somente PR #111, sem código, workflow, migration ou configuração alterados |
-| Ambientes envolvidos | GitHub e Preview automático do push documental; sem deploy manual, novas leituras Vercel/Supabase ou alteração em HML/Production |
-| Pendências e decisões | Credencial de bypass exposta na AUTO-04 exige rotação controlada autorizada, nunca seu valor neste arquivo. Ensaio main:false, instalação mínima, dry-run e escrita do bot continuam pendentes; controlador com false &&, contents: read e --dry-run |
-| Próxima ação exata | Obter autorização específica para rotação controlada da credencial de bypass e, em gate separado, ensaio isolado preservando Previews |
-| Autorizações e proibições | Autorizados commit e push normal somente destes quatro documentos na branch do #111. Proibidos valores secretos, rotação, deploy manual, main, merge/force push, bot, mudanças Vercel, HML/Production, migrations e criação/fechamento de PRs |
+| Tarefa executada | SEC-BYPASS-02: rotação controlada; CHECKPOINT-AUTO-05: conferência do mecanismo publicado, testes locais e escopo de ensaio isolado |
+| Resultados e testes comprovados | B1 identificada por igualdade com a exposição original, revogada e rejeitada em contexto limpo; B2 aceita antes/depois; anônimo barrado e login público 200. 26/26 testes de checkpoint, 12/12 cenários sintéticos git.deploymentEnabled, check:workflow, 8/8 testes documentais e diff --check PASS. Revisão focal sem valores secretos nos documentos/artefatos |
+| Código e PR afetados | Apenas PROGRESS.md, docs/ESTADO_DO_PROJETO.md, docs/HANDOFF.md e docs/continuidade/CHECKPOINT_AUTOMATICO.md; nenhum código/configuração versionada alterado; somente publicação no #111 autorizada |
+| Ambientes envolvidos | Vercel: mudança exclusivamente do bypass autorizado; testes no Preview imutável sem cookies e sem redirects; GET/HEAD sem escrita de negócio. Local: modelo sintético e validadores; GitHub: leitura e publicação documental autorizada |
+| Pendências e decisões | B1 revogada; B2 única e isEnvVar true. Zero consumidores externos identificados/atualizados; seleção da variável é a única migração configurada. Uso externo desconhecido e B1 embutida em builds antigos seguem como riscos, sem dependência funcional encontrada. Controlador travado; ensaio hospedado sem recurso disponível |
+| Próxima ação exata | Autorizar os recursos descartáveis e os pushes/deployments Git automáticos de fixture sintética no escopo do plano; depois provar bootstrap e Preview antes de qualquer main real |
+| Autorizações e proibições | Executadas somente criação/seleção B2 e revogação B1 no projeto autorizado; permitidos testes locais e commit/push documental no #111. Sem deploy manual, main, merge, migrations, Supabase, dados, aliases/domínios manuais, desativação de proteção, bot ou criação remota de recursos sem autorização própria |
 
 ## Evidência automática de Preview
 
@@ -70,8 +69,9 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 
 - **Publicado no GitHub:** implementação em `c5c62e99f91d154290247a1100cf98b090b6811d`, plano AUTO-03 em `92ee55afa763d2234784486dedb476f87abe820b`, registro final AUTO-03B em `80ebfbb0f1be3615832f6f456a3240b7715919a7` e quatro documentos AUTO-04B em `85128d1378a5fb6f92665d70147b9107f84ef5be`.
 - **AUTO-04B publicada:** os quatro documentos estão em 85128d1, incluindo evidências sanitizadas AUTO-04. Este registro final é publicado em commit posterior exclusivo do HANDOFF; seu SHA/checks devem ser consultados no #111. Nenhuma alteração documental desta tarefa permanece exclusivamente local após a publicação final.
+- **Conjunto SEC-BYPASS-02/AUTO-05 autorizado para publicação:** quatro documentos, incluindo o diagnóstico local SEC-BYPASS-01 preservado e este resultado. Commit/push e seus checks ainda serão conferidos; não transferir evidência de CI/Preview entre SHAs.
 - **Outros artefatos somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado publicado.
-- **Nunca publicar:** credenciais, `.env`, dumps, respostas brutas da API, URLs/identificadores de hooks e bypass. Nenhum segredo/variável remoto foi configurado. Houve exposição acidental de identificador sensível na saída técnica, sem inclusão nos documentos; revisão administrativa pendente.
+- **Nunca publicar:** credenciais, `.env`, dumps, respostas brutas, URLs/identificadores secretos ou fingerprints. B2 foi criada somente na Vercel e selecionada como variável de sistema, sem cópia para Git/chat/arquivos. A exposição original foi tratada pela revogação de B1, preservando o registro histórico sanitizado.
 
 Arquivos publicados (mesmo conjunto revisado):
 
@@ -96,6 +96,283 @@ Arquivos publicados (mesmo conjunto revisado):
 - `scripts/validar-workflow-documental.mjs`
 
 ## Evidências
+
+### SEC-BYPASS-02 / CHECKPOINT-AUTO-05 — 08/11/2026
+
+#### Rotação autorizada e evidências
+
+Projeto confirmado `prj_K1OJ6G7AWnx6dQB1BDsy3HTELnCV`, `bs-logistica-sistema`,
+escopo `bslogisticas`. B1 foi identificada por **igualdade exata**, somente em
+memória, com a credencial da saída original da AUTO-04; a incerteza de identidade
+da SEC-BYPASS-01 foi resolvida sem imprimir, copiar, salvar ou gerar fingerprint
+do valor. B1 correspondia ao único registro criado em 23/10, scope automation-bypass.
+
+Reconferência focal, sem repetir auditoria geral: Actions e ambos os environments
+continuavam sem secrets/variables; nenhuma integração Vercel adicional aplicável.
+Nenhum consumidor externo acessível foi identificado para migração. Revisão focal
+SEC-BYPASS-01 reaproveitada: app/main sem leitor funcional da env de bypass; módulo
+server de Analytics apenas potencial, não importado. Não houve atualização de
+GitHub secrets, Sentry, variáveis do app, Supabase ou arquivos de credenciais.
+
+**Procedimento executado:** B2 adicionada preservando B1; B2 validada; riscos e
+zero consumidores atualizados registrados antes do corte; B2 selecionada para
+builds futuras, novamente validada; B1 revogada sem gerar outra chave. Após a
+troca, a configuração contém **somente B2**, scope automation-bypass, isEnvVar true.
+Valores ficaram somente na memória dos processos e no gerenciamento de segredos
+Vercel; bodies PATCH enviados por stdin, nunca argumentos ou arquivos.
+
+| Evidência UTC de 08/11/2026 | Resultado no Preview imutável de 8071a99 |
+| --- | --- |
+| 18:58:57, anônimo antes | 302 para hostname vercel.com, sem login do app |
+| 18:59:01, B1 antes | 200, marcador da página de login do app |
+| 18:59:07, B2 antes do corte | 200, mesmo marcador; propagação inicial exigiu nova leitura após aproximadamente 4 segundos |
+| 19:01:18, B2 selecionada | Única selecionada para a env futura, B1 ainda presente; B2 200 |
+| 19:01:21, revogação | B1 ausente, apenas B2 configurada e selecionada |
+| 19:01:25, B1 após revogar | 302 para vercel.com, sem marcador do app; primeira leitura ainda aceitou B1 durante propagação de aproximadamente 4 segundos, sem PASS antecipado |
+| 19:01:25, B2 após revogar | 200, marcador da página de login |
+| 19:01:25, anônimo após | 302 para vercel.com; proteção continuou ativa |
+| 19:01:31, continuidade | HEAD do login público 200; deployments/aliases e política de proteção conferidos inalterados |
+
+Validação usou GET da página pública de login do Preview exato
+`https://bs-logistica-sistema-5p4soi6bg-bslogisticas.vercel.app/login`, com header
+em memória, **sem cookie jar/SSO e sem seguir redirects**, rejeitando outra origem
+antes de abrir conexão e sem proxy intermediário configurado pelo processo.
+Corpos, Location integral, Set-Cookie, headers e respostas brutas não foram
+registrados. Não houve login de usuário nem requisição de negócio com sessão.
+Teste em contexto limpo comprova rejeição de B1 nesse caminho; não comprova apagar
+cópias externas nem invalidar toda sessão/cookie preexistente.
+
+**Preservação durante a rotação:** Production
+`dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4` (main 38b4349), seus quatro aliases, Preview
+`dpl_9kmT1ZM9Qmh8fvotKRf3YSc1Ldpm` (8071a99) e seu alias de branch permaneceram
+iguais. IDs/aliases conferidos por GET antes/depois. Production Branch main,
+Standard Protection all_except_custom_domains e autoatribuição mantidas. Nenhum
+deploy manual, promoção, alteração manual de domínio/alias ou de dados. O push
+posterior desta documentação pode criar **novo Preview automático** e avançar seu
+alias de branch; isso não é alteração de alias feita pela rotação. Production não
+foi homologada e seu app/banco não foi publicado ou modificado.
+
+**Riscos residuais e recuperação:** B1 permanece como valor obsoleto embutido nos
+builds antigos; a plataforma não o reescreve sem deployment. Nenhum leitor funcional
+foi encontrado na superfície revisada, portanto não surgiu justificativa nem
+necessidade comprovada de redeploy. Usos fora do inventário continuam desconhecidos.
+Se um consumidor aparecer, migrá-lo para B2 somente no escopo autorizado e testar;
+não restaurar B1, desproteger URL ou executar deploy por inferência. Recurso/chave
+adicional ou deployment necessário exige decisão própria. A seleção isEnvVar não
+é garantia de migração de um consumidor externo nem de homologação funcional.
+
+#### Preparação da automação e limite dos testes
+
+Reutilizados os workflows e runtime publicados; nenhum alterado. Controlador
+continua com `false &&`, `contents: read` e `--dry-run`; sinal sem permissões,
+sem checkout e sem segredo Vercel. O bot consulta GitHub e **não depende de B2**.
+Revisão focal confirmou guarda de branch padrão/main, allowlist, origem/URL,
+CI/Preview/HEAD no mesmo SHA, recibo por deployment, diff documental, reconsulta
+antes da escrita e expectedHeadOid. Workflow serializa eventos pelo SHA; GraphQL
+CAS recusa avanço concorrente. Esse bloqueio de escrita do bot não bloqueia os
+deployments Git da main: vercel.json real continua sem git.deploymentEnabled.
+
+- `npm run test:checkpoint-preview`: **26/26 PASS**, incluindo repetição, loops,
+  ordens CI/Preview, falhas, SHA divergente, concorrência/CAS e resposta perdida.
+- Modelo local documentado com minimatch **3.1.5 já instalado**: **12/12 PASS**,
+  sem dependência nova nem edição de vercel.json. Main false, Previews omitidos
+  true, global false bloqueando Preview e regra true sobreposta liberando main
+  foram exercitados. Matriz e passos no [plano](continuidade/CHECKPOINT_AUTOMATICO.md#preparação-local-checkpoint-auto-05).
+  Trata-se de simulação da regra documentada, **não** execução do avaliador Vercel
+  nem prova do primeiro commit/instalação hospedada.
+- Inventário somente leitura: o time Vercel retornou **um projeto**, o BS real,
+  sem paginação restante. Entre 49 repositórios próprios consultados, nenhum
+  candidato descartável pelos nomes/descrições usados na busca. Nenhum recurso
+  existente foi identificado/aprovado para ensaio; nome não prova finalidade.
+- Escopo proposto: **um repositório privado** e **um projeto Vercel descartável**,
+  fonte estática sintética, main + branch Preview, sem banco, secrets do app,
+  domínio customizado, vínculo com o BS ou escrita no projeto real. Criar recursos,
+  conectá-los e fazer pushes/deployments Git automáticos de fixture exige nova
+  autorização; não criar PR, instalar controlador ou executar deploy manual por
+  inferência. Ensaiar contagens antes/depois, primeiro commit bloqueado e Preview
+  automático; todo eventual deployment isolado permanece fora da Production BS.
+
+Artefatos de execução somente locais em `/private/tmp/bs-sec-bypass-02`: scripts
+sem valores secretos, snapshots/jornal sanitizados e modelo sintético. Não são
+fontes permanentes de estado nem serão commitados. Diagnóstico SEC-BYPASS-01
+preservado abaixo como histórico, com suas incertezas no momento original.
+
+**Validação documental/publicação deste conjunto:** check:workflow PASS,
+8/8 testes documentais PASS e diff --check PASS. Comparação interna dos valores
+B1/B2 com os documentos e artefatos locais sem ocorrência, sem exibir os valores.
+Publicação autorizada exclusivamente dos quatro documentos na branch do #111.
+O commit que contém este registro é o checkpoint desta tarefa: descobrir seu SHA
+no PR e consultar [checks/CI](https://github.com/therunnas/bslogistica/pull/111/checks)
+e deployment correspondente; não transferir CI/Preview de 8071a99. A redação
+antecede esses checks, que não são declarados aprovados antecipadamente. Resultado
+final é entregue ao usuário após a conferência, sem novo commit só de checks.
+
+### SEC-BYPASS-01 — 08/11/2026, diagnóstico e plano somente locais
+
+#### Inventário e limites de identificação
+
+Projeto Vercel `bs-logistica-sistema`, ID `prj_K1OJ6G7AWnx6dQB1BDsy3HTELnCV`,
+escopo `bslogisticas`. GET via CLI existente, sem imprimir respostas brutas,
+credenciais, chaves do objeto protectionBypass ou nomes/valores de cookies.
+Os valores sensíveis da resposta ficaram apenas na memória do processo de leitura;
+nenhum foi usado em requisição, copiado para argumento de comando, arquivo ou log.
+
+- **B1** é apenas um rótulo deste documento, nunca valor ou identificador secreto.
+  Há **um** registro, scope `automation-bypass`, criado em
+  `2026-10-23T18:41:52.791Z`, `isEnvVar: true`, sem nota. `autoExposeSystemEnvs: true`.
+- B1 é o único candidato atual à credencial exposta na AUTO-04. A data é anterior
+  à exposição, mas não houve comparação byte a byte com a saída antiga, teste
+  com a chave ou confirmação de alterações por terceiros. **Não declarar identidade
+  criptográfica nem uso funcional comprovados.** Tratar B1 como comprometido por
+  precaução e confirmar expressamente o alvo da substituição com o responsável.
+- Confirmada a **seleção** de B1 para `VERCEL_AUTOMATION_BYPASS_SECRET`; não se
+  confundem seleção/injeção automática, leitura efetiva pela aplicação e envio
+  de uma requisição com a credencial. Os dois últimos não foram comprovados.
+- Metadados das 11 variáveis explicitamente configuradas, consultados com
+  `decrypt=false`, não contêm nome de bypass; não foram descriptografadas.
+  A variável de sistema é injetada pela plataforma e sua ausência nessa lista
+  não significa ausência de B1 nos builds. Nenhum outro segredo do app é alvo.
+- Nenhum Deploy Hook, nenhuma integração adicional retornada pelo inventário
+  Vercel aplicável ao projeto. Isso não enumera clientes externos que detenham
+  a chave, sessões de navegador ou todos os serviços nativos da plataforma.
+
+#### Consumidores: confirmado, potencial e não comprovado
+
+| Superfície examinada | Resultado e relação específica com B1 |
+| --- | --- |
+| Variável de sistema Vercel | B1 selecionado com isEnvVar true. Configuração confirmada; uso funcional do valor por deployments existentes não foi exercitado |
+| E2E/Playwright | Nenhum Playwright/Puppeteer/Cypress/Selenium ou header de bypass nas superfícies versionadas verificadas. Os runners de fluxos/compatibilidade usam Supabase local e HTTP loopback; não foram executados nesta etapa |
+| GitHub Actions | Workflows CI/signal/controlador sem referência ao bypass. API: zero secrets e zero variables de repositório e de ambos os environments Preview/Production; proprietário é User, sem inventário de secrets de organização aplicável |
+| Controlador de checkpoint | Usa API GitHub; não acessa URL de Preview e não precisa de bypass Vercel. Mantidas false &&, contents: read e --dry-run |
+| Scripts e ambiente local | Nenhuma variável de bypass/Playwright herdada no processo atual. Apenas .env.example na raiz ativa; metadados de 14 worktrees deste repositório sem arquivo .env de credenciais encontrado nas raízes examinadas. Nenhum conteúdo de .env ou store de credenciais lido; outros terminais, perfis, subpastas e máquinas não enumerados |
+| Integrações versionadas | App usa @vercel/analytics/next (client). @vercel/analytics/server 2.0.1 instalado contém suporte ao bypass, mas não é importado pelo app nos SHAs examinados; consumidor apenas potencial. Sentry configurado no app, sem referência a bypass encontrada; não confundir seu token com B1 |
+| Integrações externas | API Vercel não retornou configurações adicionais aplicáveis; GitHub tem zero webhooks de repositório. Isso não comprova ausência de GitHub Apps, monitores externos, caches, links ou automações manuais. Confirmação do responsável solicitada, ainda não recebida |
+
+Revisão focal: 387 arquivos versionados em scripts, .github, src, package.json,
+.env.example e vercel.json, buscando os nomes/headers exatos e frameworks E2E;
+sem ocorrências nessas superfícies. Mesmo recorte consultado no SHA da main
+servida, sem referência encontrada. A dependência instalada Analytics foi
+inspecionada separadamente para distinguir módulo server potencial de client usado.
+O grafo disponível é de outro checkout/branch, geração 14/10/2026, com scripts
+excluídos e cobertura insuficiente; as conclusões se apoiam na fonte atual, sem
+reindexar nem presumir cobertura completa do grafo.
+
+**Conclusão específica:** nenhum consumidor funcional da credencial exposta foi
+confirmado. O único vínculo configurado confirmado é B1 como variável de sistema.
+Não há prova de que ninguém a use. Não foram lidos valores de secrets externos,
+logs antigos portadores da exposição, cookies de navegador ou memória de outros
+processos; não há trilha de uso por credencial nas respostas consultadas.
+
+#### Baseline e impacto
+
+- HEAD local/remoto `8071a99f2050cb4de8e238b2531b1a0e078e1086`, #111 aberto Draft;
+  CI [42508993311](https://github.com/therunnas/bslogistica/actions/runs/42508993311)
+  validar/sql-local SUCCESS, signal SKIPPED, conferidos no SHA exato.
+- Vercel continua servindo Production `dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4` de
+  main `38b4349`, e Preview `dpl_9kmT1ZM9Qmh8fvotKRf3YSc1Ldpm` de 8071a99.
+  Production Branch main, Standard Protection all_except_custom_domains.
+- **HEAD sem credenciais**, sem redirects/cookie jar: `admin.bslogisticas.com.br/login`
+  respondeu **200**; o Preview imutável
+  `bs-logistica-sistema-5p4soi6bg-bslogisticas.vercel.app/login` respondeu **302**
+  com destino hostname `vercel.com`. Não foram registrados query, Location integral,
+  Set-Cookie ou corpo. Não é homologação funcional nem teste de token.
+- [Documentação oficial](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation):
+  múltiplas chaves podem coexistir e valem nos deployments do projeto até revogação.
+  Bypass é controle de acesso da plataforma, **não** substitui login Supabase, MFA
+  ou RLS do app. Alterar/revogar a chave é configuração compartilhada do projeto,
+  incluindo URLs protegidas de deployments Production; não é operação restrita ao PR.
+- **Deployment não é requisito para um cliente externo enviar B2 ao Preview já
+  existente.** Porém a variável de sistema é fixada no build: selecionar outra
+  chave não reescreve o valor dos deployments antigos. Se algum consumidor depender
+  desse valor embutido, a documentação exige redeployment para atualizá-lo.
+  Isso não prova que o app inteiro saia do ar após revogar B1; o risco é o caminho
+  que ainda enviar o segredo antigo. Não prometer ausência absoluta de impacto.
+- Nenhum consumidor da env foi encontrado no código do app/main examinados.
+  Não há justificativa comprovada para redeploy de Production nesta etapa.
+  Se surgir dependência em Production, parar: deploy e atualização da aplicação
+  exigem autorização própria. Não alterar domínio, proteção, Supabase ou Auth
+  para compensar eventual falha de bypass.
+
+#### Opções e procedimento recomendado, ainda não executado
+
+Revogar B1 imediatamente reduz a janela de exposição, mas pode interromper
+consumidor desconhecido. Criar B2 e adiar indefinidamente a revogação mantém a
+exposição. **Recomendação:** sobreposição curta, com responsáveis, janela de
+execução e critérios de passagem definidos, seguida de revogação comprovada.
+Não deixar o token comprometido como mecanismo de recuperação permanente.
+
+1. **Preflight autorizado:** reconfirmar projeto, B1 e responsáveis por usos fora
+   do checkout. Aprovar explicitamente B1 como alvo, mesmo sem recuperar o valor
+   antigo da conversa. Revalidar metadados imediatamente antes de escrever; se a
+   quantidade/seleção/data mudar, parar e reconciliar. Confirmar quais consumidores
+   serão alterados nominalmente; conjunto atual de consumidores funcionais é vazio,
+   portanto não criar secrets GitHub nem alterar Sentry/Supabase sem necessidade.
+2. **Adicionar B2 sem revogar B1**, via administrador Vercel autorizado, em canal
+   seguro. Confirmar a coexistência e os metadados/seleção antes de prosseguir.
+   Não usar regeneração destrutiva de um único passo. Não expor B2 no chat,
+   argumentos, URLs, traces, histórico do shell ou arquivos versionados.
+3. **Migrar somente consumidores nomeados e autorizados**, usando armazenamento
+   seguro e header x-vercel-protection-bypass apenas para a origem Preview exata.
+   Nunca NEXT_PUBLIC, query de URL, comando com valor literal ou logs/traces de
+   headers. Nenhum consumidor novo foi aprovado nesta etapa.
+4. **Validar B2 no Preview existente**, com contexto limpo sem SSO/cookies e sem
+   seguir redirect para outra origem. Primeiro manter prova de bloqueio anônimo;
+   com B2 alcançar a página pública de login do app, sem autenticar em Supabase ou
+   escrever no HML. Comprovar funcionamento real de cada consumidor autorizado,
+   registrar apenas status/host/resultado e descartar corpos/headers sensíveis.
+5. **Seleção da env:** escolher B2 para builds futuras, conferindo seleção única.
+   Isso não atualiza builds existentes. Se algum consumidor ainda depender de B1
+   embutido, não revogar até haver solução autorizada; eventual novo Preview tem
+   gate próprio, e Production não pode ser redeployado por inferência.
+6. **Revogar somente B1**, após confirmação de identidade/alvo, B2 e consumidores
+   validados e nenhuma dependência pendente de build antigo. Restringir a janela
+   de coexistência; não desativar proteção nem criar exceção pública para contornar
+   falhas. Se faltar evidência, não declarar a rotação concluída e devolver o gate
+   ao responsável com a exposição ainda explicitamente pendente.
+7. **Prova pós-revogação:** metadados sem B1; mesmo Preview imutável, novos contextos
+   sem cookies/SSO: anônimo barrado, B1 barrado pela Vercel e B2 alcançando login.
+   Não basta testar no domínio Production público, onde 200 não prova validade
+   de nenhum token. Se propagação divergir, aguardar somente o prazo administrativo
+   acordado e reinspecionar; nunca registrar PASS por antecipação. Testar o token
+   antigo em contexto limpo não comprova invalidação de toda sessão/cookie anterior.
+8. **Continuidade:** repetir HEAD sem segredo do domínio público e verificar os
+   consumidores nominalmente aprovados; nenhuma alteração em app, domínio, banco,
+   migrations, main ou controlador. Registrar somente evidências sanitizadas no
+   HANDOFF; eventual commit/push continuará dependendo de autorização própria.
+
+#### Recuperação e autorização necessária
+
+**Antes de revogar:** se B2 ou consumidor falhar, interromper o corte, manter a
+proteção ligada e corrigir a distribuição da chave nova na janela aprovada;
+comunicar a exposição pendente. Não mascarar falha com exceção pública.
+**Depois de revogar:** manter B2 válido, corrigir o consumidor para usar B2 e
+retestar. Não restaurar/recriar B1 comprometido. Chave adicional de contingência,
+reimplantação de Preview ou qualquer intervenção Production exigem nova autorização
+se não constarem expressamente do gate. Login administrativo Vercel normal pode
+servir para diagnóstico humano, não substitui prova de automação B2 em contexto limpo.
+Não há rollback de código/banco nesta troca; preservar histórico, domains/aliases,
+conexão Git e configuração de acesso existente.
+
+**Gate SEC-BYPASS-02 proposto, não concedido:** administrador com papel Vercel
+adequado (member de time ou Project Administrator) e autorização nominal para,
+somente em `prj_K1OJ6G7AWnx6dQB1BDsy3HTELnCV`, adicionar B2, mantê-lo fora do Git/chat,
+atualizar apenas consumidores previamente nomeados, selecionar B2 para builds
+futuras, executar GET/HEAD com bypass somente no Preview imutável autorizado
+e HEAD sem credenciais no login público para comparação de continuidade,
+revogar B1 após as provas e verificar a rejeição da antiga/aceitação da nova.
+A autorização precisa reconhecer o escopo compartilhado da proteção do projeto,
+inclusive URLs protegidas de Production; não autoriza deployment, promoção,
+alteração do app/domínios Production, HML, Auth, main, banco, automação ou publicação
+Git. Se exigir novo deployment para consumidor embutido, o plano para esse
+consumidor precisa de gate separado **antes** da revogação.
+
+**Validação documental SEC-BYPASS-01:** `npm run check:workflow` PASS,
+`npm run test:workflow` 8/8 PASS, `git diff --check` PASS e revisão focal sem
+valores secretos nos três documentos locais. Não foram executados
+criação/revogação, teste com segredo, consumidor externo, deploy, build, SQL,
+homologação ou novo job CI. Sem segredos, fingerprints ou respostas brutas em
+arquivos. Pergunta sobre alterações/usos externos ainda sem resposta; isso não
+constitui autorização nem confirmação de ausência.
 
 ### CHECKPOINT-AUTO-04B — sincronização documental em 08/11/2026
 
@@ -308,7 +585,11 @@ fora do Mac. Não há senha, chave nem conteúdo de dump neste repositório.
 
 ## Autorizações
 
-CHECKPOINT-AUTO-04B (vigente): commit e push normal exclusivamente dos quatro documentos na branch ativa do PR #111, atualização do HANDOFF e conferência de CI/Preview do SHA publicado. Sem autorização de mudança de provedor ou rotação.
+SEC-BYPASS-02 / CHECKPOINT-AUTO-05 (vigente): autorizadas criação de B2, validação no Preview protegido, seleção para builds futuras, atualização de consumidores identificados/autorizados e revogação de B1 após as provas, exclusivamente no projeto Vercel identificado. Autorizados preparo/testes locais e commit/push normal somente documental na branch do #111. Recursos remotos para ensaio precisam de autorização própria.
+
+Histórico SEC-BYPASS-01: somente diagnóstico e planejamento local, sem rotação ou publicação naquela etapa.
+
+Histórico CHECKPOINT-AUTO-04B: publicação documental no #111 e conferência de CI/Preview, concluídas anteriormente; autorização não reutilizada nesta etapa.
 
 Histórico CHECKPOINT-AUTO-04: somente leitura e diagnóstico autenticado, com documentação local; nenhuma publicação naquela etapa.
 
@@ -326,11 +607,14 @@ deployment.
 
 ## Proibições
 
-CHECKPOINT-AUTO-04B: sem exibir/registrar valores secretos, rotacionar credenciais, executar deploy manual, alterar Vercel/Supabase/conexão Git, main, merge/force push, bot, tokens/segredos, hooks, novos/fechados PRs, HML/Production ou migrations. Publicação autorizada somente dos quatro documentos no #111.
+SEC-BYPASS-02 / AUTO-05: sem valores secretos, deployments manuais, merge/main, migrations, Supabase HML/Production, novo Supabase, exclusão de dados, fechamento de PRs, ativação do bot, modificação de domínios/aliases ou desativação de proteção. Sem outras mudanças remotas, criação de recursos ou deployment fora das autorizações específicas. Publicação somente documental no #111; sem force push.
 Sem merge em `main`, deploy em Production, migration em HML ou Production (046–049 inclusive), limpeza ou escrita
 de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups redundantes e force push.
 
 ## Bloqueios e riscos
+
+- B1 revogada e rejeitada; B2 única e selecionada. Valor antigo embutido em builds e usos externos desconhecidos continuam riscos residuais; não restaurar a credencial comprometida.
+- Ensaio hospedado ainda não executado: sem ambiente descartável identificado e sem autorização de criação. Modelo local não prova contenção real de Production.
 
 - Decisão comercial da 048 pendente (acima); sem ela, a 048 não vai a ambiente compartilhado.
 - Idempotência de adicionais só vale com a 047 no HML; até lá, reenvio após resposta perdida bloqueia e exige conferência.
@@ -342,7 +626,7 @@ de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups 
 
 1. Descobrir o checkout/worktree e a branch reais; conferir status, HEAD local e HEAD remoto pelo PR autorizado.
 2. Ler a identificação e “Última tarefa”; preservar alterações locais e não reutilizar autorização histórica.
-3. Conferir o HEAD publicado AUTO-04B e seus próprios checks; preflight Vercel autenticado concluído na AUTO-04 no limite descrito acima. Rotação controlada e ensaio isolado exigem autorizações próprias; sem ativação.
+3. Ler o resultado SEC-BYPASS-02 e a preparação AUTO-05; não repetir a rotação nem reutilizar B1. Conferir o SHA documental publicado e seus próprios checks, sem commits recursivos. Ensaio hospedado e criação de recursos exigem autorização nominal; controlador permanece desativado.
 4. Ativação permanece bloqueada independentemente de variáveis; seguir os gates futuros de [Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md), sem alterar main ou Production por inferência.
 5. Não repetir a triagem de PRs abaixo sem nova divergência; nenhuma recomendação equivale a autorização de fechamento.
 
