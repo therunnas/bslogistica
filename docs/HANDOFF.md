@@ -10,20 +10,20 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
 
 ## Identificação
 
-| Campo                     | Valor                                                                                                                                                                                         |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | Fechamento pré-Production (sessão 16)                                                                                                                                                         |
-| Gate atual                | Ensaio 034 → 045 e backup restaurado concluídos; parecer NO-GO condicional (4 itens não técnicos)                                                                                             |
-| Último gate concluído     | PR #104 mergeado em `071ea6d`; ensaio integral 034 → 045 sobre o banco restaurado, sem erro                                                                                                   |
-| Worktree                  | `/private/tmp/bs-fin-hml`                                                                                                                                                                     |
-| Branch                    | `docs/sessao-14-manual-e-producao` (PR #103); margem do Fechamento/Faturamento em `fix/margem-containers-faturamento-fechamento` (PR #105)                                                    |
-| Base                      | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (`origin/main`, squash do PR #101)                                                                                                                 |
-| HEAD validado             | `e7f77b02a63e433247e7c04a07ed335e7c602b57` (main); esta etapa só altera documentação                                                                                                          |
-| Alterações não commitadas | Nenhuma depois do commit documental desta sessão; `.e2e-tmp/` (harness, não versionado) segue ignorado                                                                                        |
-| PR                        | [#103](https://github.com/therunnas/bslogistica/pull/103) docs e [#105](https://github.com/therunnas/bslogistica/pull/105) margem, abertos, sem merge automático; #101, #102 e #104 mergeados |
-| Ambiente-alvo             | Production (034) só lida e copiada (dump); HML e stacks locais isoladas; nada aplicado                                                                                                        |
-| Última ação comprovada    | Banco restaurado migrado 034 → 045 (11 migrations, ~2,5 s), catálogo = HML, reversão ensaiada até 034                                                                                         |
-| Próxima ação exata        | Segunda cópia do backup; conferir e-mails no Dashboard; revisar #103/#105; só então pedir autorização da janela                                                                               |
+| Campo                     | Valor                                                                                                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Etapa                     | Alinhamento documental negócio × sistema (sessão 17); fechamento pré-Production (sessão 16) segue em NO-GO condicional                                            |
+| Gate atual                | PR documental #112 em Draft, aguardando revisão do responsável; sem implementação                                                                                 |
+| Último gate concluído     | Sessão 16: PR #104 em `071ea6d`, ensaio 034 → 045 sem erro. Verificado em 08/11/2026: #103 e #105 já estão na `main`                                              |
+| Worktree                  | `/home/claude/therunnas/bslogistica`                                                                                                                              |
+| Branch                    | `docs/alinhamento-negocio-sistema` (PR #112)                                                                                                                      |
+| Base                      | `38b43490a8e0913c62a4ee6047ef48a8288ca0dc` (`origin/main`, squash do PR #105)                                                                                     |
+| HEAD validado             | `cedee7125cb5acf2ccafb6b79d594652473c83ee` (branch do PR #112); só documentação                                                                                   |
+| Alterações não commitadas | Nenhuma                                                                                                                                                           |
+| PR                        | [#112](https://github.com/therunnas/bslogistica/pull/112) documental, Draft, sem merge automático                                                                 |
+| Ambiente-alvo             | Nenhum. HML na 045 e Production na 034, ambos inalterados                                                                                                         |
+| Última ação comprovada    | `check:workflow`, `test:workflow` (5/5) e `prettier --check` nos 6 Markdown alterados; diff só de documentação                                                    |
+| Próxima ação exata        | Revisão do Draft #112 pelo responsável; sem merge sem autorização. Depois, análise de impacto da generalização de Serviços Avulsos (etapa separada, não iniciada) |
 
 ## Evidências
 
@@ -105,13 +105,16 @@ Codex CLI e Claude Code: [Transferência entre agentes](WORKFLOW.md#transferênc
   desde o FIN-PR-01), mas o merge em `main` publica antes da CI. Opções: manter
   (a compatibilidade 034 → 045 está testada), conter por rollback na Vercel com
   acesso administrativo, ou preparar 035–045 em Production com backup novo.
-- Pendências reais: revisão humana dos PRs #103 e #104; **segunda cópia** do backup em outro
+- Pendências reais: **segunda cópia** do backup em outro
   local protegido; conferir no Dashboard do Supabase os **modelos de e-mail** de convite e
   recuperação, a **expiração** do link e a autenticação do domínio de envio (ver runbook, 1.2);
   decisão e autorização para implantar 035–045 em Production, com dump novo se houver escrita.
 - Dados sintéticos em HML, com faturas emitidas (imutáveis), exigem tarefa própria de
   limpeza. Regra de arredondamento da HE aprovada e documentada na sessão 13.
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
+- O módulo de Containers ainda exige o pedido um dia antes e só trata contêineres; o negócio definiu
+  contêiner como um tipo de serviço avulso, com pedido no mesmo dia. A generalização **não foi
+  iniciada** ([NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md)).
 
 ## Retomada
 
