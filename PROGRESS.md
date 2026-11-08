@@ -25,34 +25,33 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**RELEASE-PREVIEW-01 — integração local para um Preview único de homologação manual.** Branch local
-`integracao/release-preview-01` = `main` + #108/#109/#110 (046, 047, QA-20D) + #106 (correções funcionais da sessão 19);
-#107 (runbook do expurgo) fica fora da aplicação. Sem push, merge, migrations remotas ou Production sem autorização.
+**Homologação do Preview do PR #111 e decisão comercial da 048.** Branch `integracao/release-preview-01`
+(`main` + #108/#109/#110 + #106 + UX-SIMPLIFICACAO-01 + FUNC-READY-01), PR Draft. Estado, HEAD, CI, Preview,
+ambientes e próxima ação exata: **somente** no [HANDOFF](docs/HANDOFF.md). Não copiar estado mutável para cá.
 
-**S19G — continuidade documental e retomada da homologação, SDLC: Testes.**
-Estado, contagens, HEAD e ambiente corrente ficam exclusivamente no
-[HANDOFF](docs/HANDOFF.md); resultados por controle no
-[livro versionado](docs/continuidade/controles-sessao-19.json).
+Concluídas e já publicadas no #111 (histórico em [ESTADO_DO_PROJETO](docs/ESTADO_DO_PROJETO.md)): RELEASE-PREVIEW-01/02
+(integração e Preview), UX-SIMPLIFICACAO-01/02 (telas), FUNC-READY-01/02 (precedência de preço 048, correção auditada de
+container 049, prévia do apontamento) e CHECKUP-SYNC-01 (checkpoint).
 
 ### Fazer agora
 
-Publicar correção de jornada e continuidade no PR Draft #106, conferir CI no novo
-HEAD e retomar controles sem evidência no HML. Diagnosticar o navegador se necessário.
+1. Homologação manual do Preview pelo [roteiro](docs/homologacao-release-preview-01.md).
+2. Decisão comercial da 048 (preço-base como fallback) e confirmação da correção por substituição (049).
 
 ### Não fazer ainda
 
-Sem merge, Production, migrations, publicação em staging estável ou mudança de regra
-comercial global. Decisões de HE < 1 e competência faturada continuam pendentes.
+Sem merge, Production, migrations 046–049 em HML ou Production, escrita ou limpeza no HML, nem mudança de regra comercial
+global. Decisões de HE < 1 e competência faturada continuam pendentes.
 
 ### Critério de conclusão
 
-Cobertura funcional com evidências individuais no ambiente autorizado; resolver
-bloqueios ou obter decisão explícita. CI verde não conclui homologação.
+Homologação manual com evidência por item no ambiente autorizado, 048 decidida e, só então, gates próprios para aplicar
+as migrations no HML. CI verde não é homologação; código no Preview não é migration aplicada.
 
 ### Próxima etapa
 
-ChatGPT revisa o relatório retornado pelo usuário e prepara o próximo prompt,
-conforme [protocolo](docs/continuidade/PROTOCOLO_DE_TRABALHO.md).
+Resultado da homologação e da decisão comercial; depois, autorização nominal por ambiente para 046–049 e para o
+expurgo do HML, conforme [WORKFLOW](docs/WORKFLOW.md).
 
 ## Marcos concluídos
 

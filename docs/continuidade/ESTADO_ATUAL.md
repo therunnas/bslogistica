@@ -10,6 +10,13 @@ cobertura, decisões, defeitos, bloqueios e próxima ação exata.
 - [Estado do projeto](../ESTADO_DO_PROJETO.md): histórico das decisões e implantações.
 - [Ambientes](../AMBIENTES.md): inventário datado; conferir o limite da verificação.
 - [Workflow](../WORKFLOW.md) e [protocolo](PROTOCOLO_DE_TRABALHO.md): regras permanentes.
+- [Roteiro de homologação manual](../homologacao-release-preview-01.md): itens por fluxo, com os que dependem de migrations ainda não aplicadas.
+
+**Regra de continuidade.** Toda tarefa, ao concluir ou pausar, atualiza o HANDOFF com o que foi executado, o que
+funcionou, o que não funcionou, as evidências e ambientes, as pendências, a próxima ação e o que não está autorizado.
+O HANDOFF distingue sempre implementado, validado localmente, CI aprovada, publicado em Preview, aplicado no HML,
+homologado e publicado em Production: estados distintos, nunca equivalentes. Sem push autorizado, o checkpoint fica
+só no worktree e a diferença é informada.
 
 No conflito entre um relato histórico e o checkpoint, retomar pelo HANDOFF e
 reconciliar com Git/GitHub e o ambiente autorizado. Não copiar estado mutável para

@@ -121,7 +121,8 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
   execução autônoma por PR, sem atravessar gates sem autorização nominal.
 - Ao concluir ou pausar uma etapa, atualizar o checkpoint em `docs/HANDOFF.md`,
   o estado factual em `docs/ESTADO_DO_PROJETO.md` e a fila em `PROGRESS.md`, sem
-  duplicar históricos.
+  duplicar históricos. O HANDOFF distingue implementado, validado localmente, CI
+  aprovada, publicado em Preview, aplicado no HML, homologado e em Production.
 
 ## Validação obrigatória
 

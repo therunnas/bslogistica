@@ -104,7 +104,11 @@ O agente que encerra ou pausa a sessão atualiza no HANDOFF:
 3. alterações não commitadas, por caminho, ou “Nenhuma”;
 4. último gate concluído e gate em andamento;
 5. testes executados, cada um vinculado ao SHA ou ao working tree em que rodou;
-6. próxima ação autorizada, proibições e bloqueios.
+6. próxima ação autorizada, proibições e bloqueios;
+7. o que foi executado, o que funcionou e o que não funcionou, com a evidência e o ambiente de cada resultado;
+8. o estado de cada entrega nos níveis **implementado, validado localmente, CI aprovada, publicado em Preview,
+   aplicado no HML, homologado e publicado em Production**, que nunca são equivalentes (código no Preview não é
+   migration aplicada; CI verde não é homologação).
 
 Commit e push do checkpoint seguem a autorização vigente. Sem ela, o HANDOFF fica
 atualizado no working tree e aparece em “Alterações não commitadas”. Um checkpoint

@@ -112,7 +112,9 @@ Erro de Prettier introduzido por uma edição se corrige **à mão**, não com
   execução autônoma por PR, sem atravessar gates sem autorização nominal.
 - Ao terminar ou pausar, atualizar `HANDOFF.md`, `ESTADO_DO_PROJETO.md` e
   `PROGRESS.md` conforme as responsabilidades documentais, sem copiar estado
-  mutável para instruções permanentes.
+  mutável para instruções permanentes. O HANDOFF distingue implementado, validado
+  localmente, CI aprovada, publicado em Preview, aplicado no HML, homologado e em
+  Production: estados nunca equivalentes.
 
 ## Auth
 

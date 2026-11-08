@@ -5,6 +5,29 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## Integração, UX e funcional — 07/11/2026 (histórico; o estado ativo está no [HANDOFF](HANDOFF.md))
+
+**RELEASE-PREVIEW-01/02.** Branch `integracao/release-preview-01` = `main` + #108/#109/#110 (046, 047, QA-20D) + #106
+(correções da sessão 19); o #107 (runbook do expurgo) ficou fora. Publicada em PR Draft [#111](https://github.com/therunnas/bslogistica/pull/111),
+CI verde e Preview com destino HML `qbnfcmrxmssnwkhaitgd` (schema 045) provado. Os PRs #106 e #108–#110 seguem em Draft
+como insumos; o #111 é o veículo de homologação. Não houve merge nem migration remota.
+
+**UX-SIMPLIFICACAO-01/02.** Só apresentação: custo do colaborador editado no cadastro vira nova vigência pela RPC existente;
+"Regras especiais" em Contratos; filtro de Operações; Containers com resumo por serviço; Faturamento em abas. Commit
+`9978684`, CI verde e Preview publicado; homologação manual pendente.
+
+**FUNC-READY-01/02.** Fluxos validados de ponta a ponta numa stack local isolada, com sessão real de admin e conferência
+do que ficou gravado (E2E `scripts/testar-fluxos-local.sh`, 34 verificações). Defeitos comprovados e corrigidos:
+
+- Contratos: com a resolução de tarifas ligada não havia recuo (função sem tarifa = P0002) e, desligada, a diária
+  individual e a tarifa eram ignoradas. A **048** implementa a precedência diária individual > tarifa da função >
+  preço-base (**decisão comercial pendente de aprovação definitiva**: cobrar o preço-base em vez de bloquear o dia).
+  A prévia do apontamento passou a seguir a mesma precedência do banco.
+- Containers: a **049** acrescenta a correção por **substituição auditada** do registro original (cancela o original,
+  registra o substituto, trilha `corrected` com vínculo e histórico), no lugar de cancelar e recriar à mão.
+- Local: lint, TypeScript, build, 83 suítes Node, 50 suítes SQL e E2E 34/34. 048 e 049 aplicadas **somente** na stack
+  local; HML segue na 045 e Production na 034. Código no Preview não significa migration aplicada.
+
 ## FIN-20D — validação local em 06/11/2026
 
 **QA-20D (runner de compatibilidade):** cada reset local espera o PostgREST recarregar o schema por um canário que passa pelo cache das requisições, com prazo e diagnóstico; alvo local verificado. Série: runner antigo 3/3, novo 5/5. R1: canário único por execução com privilégio mínimo e limpeza comprovada; URL local com parsing estrito, sem redirecionamento nem proxy; `SUPABASE_WORKDIR` obrigatório e alvo casado (API, Kong, rótulos, workdir) antes de qualquer reset ou SQL. Pendente: o mesmo isolamento em `testar-sql-local.sh`. Detalhes e hipótese residual: [HANDOFF](HANDOFF.md).
