@@ -5,6 +5,19 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## CHECKPOINT-AUTO-07 — 08/11/2026 — PASS limitado
+
+Reutilizado sandbox inicializado: dois Previews antes e um depois de dois pushes
+bloqueados da main; source Git, SHAs/branches e READY confirmados. Baseline de um
+Production histórico preservado; zero novos Production/staged Production e zero
+Preview indevido da main. AUTO-06 permanece FAIL histórico. Negativos apenas
+locais (22), motor existente (26) e YAML passaram. Plano mínimo/gates preparados,
+mas Gate 1 continua BLOQUEADO por falta da prova do primeiro commit ausente→false;
+nenhuma instalação ou configuração BS alterada. #112 no mesmo HEAD, conflitos
+anteriores preservados sem nova auditoria ou incorporação. Estado/SHAs/IDs no
+[HANDOFF](HANDOFF.md); plano técnico em
+[Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md#plano-técnico-checkpoint-auto-07).
+
 ## CHECKPOINT-AUTO-06 — 08/11/2026 — FAIL
 
 Criados exclusivamente o repositório privado e o projeto Vercel descartáveis

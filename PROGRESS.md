@@ -25,35 +25,37 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**CHECKPOINT-AUTO-06 — ensaio hospedado FAIL; progressão interrompida.**
-Main descartável permaneceu sem deployment nas leituras, mas o primeiro push da
-branch Preview gerou Production no sandbox. Recursos preservados, controlador
-desativado e BS real inalterada; evidências no [HANDOFF](docs/HANDOFF.md).
+**CHECKPOINT-AUTO-07 — PASS para sandbox inicializado; Gate 1 real BLOQUEADO.**
+Três Previews READY, dois pushes da main sem deployment e zero novos Production.
+AUTO-06 continua FAIL histórico; controlador desativado. Evidências e limites no
+[HANDOFF](docs/HANDOFF.md), plano mínimo e gates no
+[plano](docs/continuidade/CHECKPOINT_AUTOMATICO.md#plano-técnico-checkpoint-auto-07).
 
 ### Fazer agora
 
-Publicar os quatro documentos autorizados e conferir CI/Preview do novo SHA.
-Obter decisão do responsável sobre protocolo novo para projeto já inicializado,
-sem reclassificar o FAIL AUTO-06 nem continuar no sandbox por inferência.
+Publicar os quatro documentos e conferir CI/Preview próprios. Aprovar protocolo
+TRANS-MAIN apenas no sandbox para provar o primeiro commit que introduz main:false;
+baseline deliberadamente sem trava exige autorização específica, não inferida.
 
 ### Não fazer ainda
 
-Sem instalação real, novo ensaio hospedado/negativos após FAIL, main/merge BS,
-deploy manual, Supabase, migrations, aliases/domínios reais, exclusões ou bot.
-Não substituir o HANDOFF pelo checkpoint antigo do #112 nem iniciar Serviços Avulsos.
+Sem instalação/ativação real, main/merge BS, Vercel BS, deploy manual, Supabase,
+migrations, novas chaves/recursos, exclusão do sandbox ou implementação funcional.
+Não declarar a transição de Gate 1 comprovada com os testes da main já bloqueada.
 
 ### Critério de conclusão
 
-Resultado real FAIL e interrupção registrados com IDs/SHAs/contagens; recursos
-preservados, conflito documental #112 diagnosticado e checkpoint sanitizado
-publicado com CI/Preview próprios. Critério original de ensaio aprovado não atingido.
+A/B/C hospedados e D local registrados como PASS no seu escopo, AUTO-06 preservado,
+plano mínimo preparado com Gate 1 bloqueado e documentação publicada com checks
+próprios. O modelo local não é prova remota nem homologação funcional.
 
 ### Próxima etapa
 
-Decisão específica para novo protocolo no sandbox já inicializado, mantendo a
-falha original no histórico. Incorporação futura dos dois docs de negócio do #112
-exige autorização documental separada e reconciliação dos três arquivos de estado.
-Instalação mínima, dry-run e escrita permanecem bloqueados/gates posteriores.
+Prova TRANS-MAIN após decisão específica → Gate 1 contenção → Gate 2 instalação
+mínima desativada → Gate 3 dry-run → Gate 4 escrita autorizada → Gate 5 primeiro
+recibo. Fila funcional futura: docs de negócio #112 → reconciliação dos PRs →
+divergências funcionais → financeiro → Serviços Avulsos → homologação, sem merges
+ou implementação autorizados por esta fila.
 
 ## Marcos concluídos
 

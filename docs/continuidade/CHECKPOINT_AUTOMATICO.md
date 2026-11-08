@@ -172,6 +172,10 @@ Production no projeto novo. Não executar a instalação abaixo como plano aprov
 progressão interrompida, detalhes no [HANDOFF](../HANDOFF.md). O desenho anterior
 permanece histórico, sujeito a nova decisão/ensaio, sem alteração na BS real.
 
+**Atualização AUTO-07:** novos eventos no sandbox já inicializado passaram,
+sem reclassificar AUTO-06. O Gate 1 real ainda está bloqueado pela prova ausente
+do primeiro commit que introduz a trava; ver [plano técnico](#plano-técnico-checkpoint-auto-07).
+
 Sincronização documental autorizada em CHECKPOINT-AUTO-03B; sem execução do plano.
 Estado e evidências da publicação ficam somente no [HANDOFF](../HANDOFF.md).
 O requisito adicional é preservar novos deployments automáticos de Preview.
@@ -506,3 +510,175 @@ negócio estão no HANDOFF. Não substituir o checkpoint atual pelo do #112 nem 
 merge documental na main sem avaliar seu deployment automático ainda não contido.
 CI/Preview do commit documental AUTO-06 serão conferidos pelo SHA próprio e não
 mudam o resultado do ensaio, nem ativam o controlador.
+
+
+## Plano técnico CHECKPOINT-AUTO-07
+
+SDLC: Design/Arquitetura após A/B/C hospedados PASS e D local PASS. Evidências,
+SHAs/IDs e riscos correntes ficam somente no [HANDOFF](../HANDOFF.md). AUTO-06
+continua FAIL para bootstrap novo. Este plano **não autoriza execução na BS**;
+Gate 1 não está liberado, embora a main já bloqueada e Previews tenham passado.
+
+### Escopo comprovado e diferença de eventos
+
+Sandbox existente: main:false preservado em todos os cinco commits; dois pushes
+Preview antes, dois main bloqueados e um Preview depois, sem novo Production.
+Negativos de configuração/consulta/concorrência foram somente simulados. O modelo
+local não prova comportamento da Vercel, e READY não prova login funcional.
+
+Sandbox é estático, sem env e sem domínio customizado; BS é Next.js, com env e
+domínios próprios, já inicializada. Ambos têm Git conectado, Production Branch
+main e Standard Protection. Não copiar env, secrets, GitCredential ou bypass.
+Sandbox tem createDeployments disabled e disableRepositoryDispatchEvents true;
+BS tem createDeployments enabled e histórico real de deployments GitHub. A emissão
+de [deployment_status](https://vercel.com/docs/git/vercel-for-github) é distinta da
+criação de builds na Vercel. Não alterar configurações para esconder essa diferença;
+o ensaio AUTO-07 não exerceu signal/workflow_run ou bot hospedados.
+
+### Lacuna obrigatória: primeiro commit real / TRANS-MAIN
+
+A BS hoje não contém git.deploymentEnabled no vercel.json. Dois pushes de uma
+main **já com false** não provam qual versão de configuração é usada ao introduzir
+false pela primeira vez. Portanto **nem todas as condições do Gate 1 foram
+comprovadas**. Não fazer esse experimento na main BS nem usar a CI como substituto.
+
+Ensaio adicional proposto apenas para o sandbox existente, **não executado**:
+
+1. Aprovar protocolo TRANS-MAIN, janela e risco de baseline equivalente à BS,
+   com main inicialmente sem a regra. Não remover o bloqueio atual sob a autorização
+   AUTO-07: esse push pode gerar um Production sintético esperado e exige autorização
+   específica, distinta dos negativos locais que não podem criá-lo intencionalmente.
+2. Se o responsável aprovar essa baseline, registrar separadamente o único
+   Production sintético esperado, seus IDs/SHAs e o conjunto de deployments antes
+   do commit sob prova. Sem dados, env BS, novo recurso, deploy manual ou promoção.
+3. Publicar o primeiro commit que **introduz** main:false, com conteúdo restante
+   preservado, e comparar todos os IDs/targets, inclusive staged/cancelado. Exigir
+   zero novo deployment nesse commit, depois um controle Preview READY e nova
+   leitura da main/configuração. Qualquer novo Production nessa transição é FAIL.
+4. Manter baseline e prova separadas, preservar AUTO-06 FAIL e AUTO-07 PASS no
+   escopo original. Protocolo/execução novos exigem decisão nominal. Se essa
+   baseline Production não for aceitável, definir uma prova alternativa suficiente
+   antes de qualquer escrita na BS; não declarar a lacuna resolvida por simulação.
+
+### Manifesto mínimo e dependências
+
+Base real conferida: `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`.
+Fonte publicada dos arquivos do controlador:
+`1af74ed60f4e6f4a8969a4e4b4dc88ccd53918d2`. Revalidar SHAs antes de preparar a
+branch de instalação; nunca copiar a release inteira, fazer cherry-pick integral
+dos commits de integração ou substituir package.json/ci.yml completos.
+
+| Arquivo | Alteração mínima sobre a main conferida |
+| --- | --- |
+| .github/workflows/checkpoint-preview.yml | Adicionar definição confiável, mantendo false &&, contents: read, --dry-run |
+| .github/workflows/checkpoint-preview-signal.yml | Adicionar sinal sem permissão, checkout ou código do candidato |
+| scripts/atualizar-checkpoint-preview.mjs | Adicionar CLI e ligação ao motor/API; escrita local recusada |
+| scripts/checkpoint-preview.mjs | Adicionar motor de evidência, idempotência, branch/URL/HEAD e recibo |
+| scripts/checkpoint-github-api.mjs | Adicionar adaptador GitHub com paginação, API fixa e CAS GraphQL |
+| scripts/validar-workflow-documental.mjs | Atualizar validador existente para sete campos por tarefa e diff de checkpoint |
+| scripts/testar-checkpoint-preview.mjs | Adicionar suíte do motor/adaptador e travas versionadas |
+| scripts/testar-workflow-documental.mjs | Atualizar suíte existente de 5 para 8 casos/contrato compartilhado |
+| package.json | Acrescentar somente test:checkpoint-preview: node --test scripts/testar-checkpoint-preview.mjs; check:workflow e test:workflow já existem |
+| .github/workflows/ci.yml | Manter steps atuais; acrescentar gate de HANDOFF no diff do PR e teste checkpoint-preview; manter token read e fetch-depth 0 |
+
+Imports conferidos nos scripts acima são locais ou Node nativos (fs, path, url,
+child_process, assert, test etc.); fetch é do runtime. CI main e candidato já usam
+Node 24; controlador usa setup-node 24 e não instala pacotes nem executa artefatos
+indicados pelo PR. Não há dependência npm nova nem secret Vercel/Supabase.
+
+Contrato documental mínimo também precisa acompanhar a instalação: patch pontual
+em AGENTS/CLAUDE e WORKFLOW, guia técnico do mecanismo e HANDOFF novo da tarefa,
+com fila PROGRESS e histórico ESTADO_DO_PROJETO coerentes. Não copiar o HANDOFF do
+#111 inteiro para main: release, migrations e homologação devem refletir a main
+real e limites datados, preservando o link para o candidato #111. O validador novo
+exige Última tarefa e estrutura que o checkpoint antigo da main ainda não fornece.
+Índices/protocolo de continuidade só entram se referenciados; não são dependência
+de runtime. A main conferida não tem a árvore docs/continuidade do #111.
+
+**Não incluir:** src, migrations/SQL, fixtures financeiras, refactors de app,
+lockfile, dependências, correções de negócio ou documentos #112 por arrasto. A
+composição mínima ainda precisa de diff e CI próprios na branch isolada de main;
+os 26 testes do #111 não validam antecipadamente essa nova composição.
+
+### Cinco gates, critérios de aprovação e rollback
+
+| Gate | Mudança futura / critérios obrigatórios | Rollback e limite |
+| --- | --- | --- |
+| 1 — Contenção | Após TRANS-MAIN aprovado e revisão nominal: PR mínimo a partir da main atual com git.deploymentEnabled exatamente main:false, mantendo schema/framework Next.js. Só integrar mediante autorização própria. Conferir mesmo Production/aliases e zero novo Production, além de Preview automático | Manter a trava nos commits seguintes. Se surgir Production inesperado, STOP e decisão administrativa de contenção previamente autorizada; não remover false nem alterar aliases como rollback automático |
+| 2 — Instalado desativado | PR mínimo com manifesto acima e checkpoint adequado à main; validar combinação local/CI e política Git. Workflow_run instalado na branch padrão, mas false &&, token read, --dry-run e flag desligada. Sem release #111 | Recolocar versão travada se divergir; preservar main:false, histórico e app. Nenhuma ampliação global do token |
+| 3 — Dry-run hospedado | Autorização própria para remover só false &&, mantendo read e --dry-run; definir allowlist/vars não secretas; adequar teste que fixa a versão desativada. Exigir evento real, CI/Preview/SHA corretos e decisão dry-run, sem commit do bot | Desligar variável, restaurar trava, manter read/dry-run e cancelar execução se autorizado; nenhum recibo a apagar |
+| 4 — Escrita autorizada | Após Gate 3 e revisão nominal, mudar apenas job confiável para contents: write e --write, adequando testes. Revalidar CAS, dois caminhos permitidos e branch; autorização explícita de ativação | Desligar flag, cancelar jobs se autorizado, restaurar false &&/read/dry-run. Preservar recibos e a trava de deployment; nunca criar PAT para contornar bloqueio |
+| 5 — Primeiro recibo | Um evento não documental autorizado em branch permitida, PR aberto e CI/Preview success no mesmo SHA produz um único commit atômico HANDOFF+recibo. Repetição não duplica; evento do commit documental não escreve de novo | Se divergente, suspender escritor e reconciliar via tarefa documental autorizada, sem apagar histórico, reescrever recibo existente ou inferir sucesso após resposta perdida |
+
+Gate 1 é o próximo gate técnico, **ainda BLOQUEADO pela prova TRANS-MAIN e por
+sua autorização própria**. Gate 2 não inicia porque o sandbox passou; exige o
+fechamento do Gate 1, diff da combinação mínima e autorização de integração.
+Não executar nenhum desses gates na BS na tarefa AUTO-07.
+
+A política mínima proposta para o vercel.json preserva o arquivo atual:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "git": { "deploymentEnabled": { "main": false } }
+}
+```
+
+Preparar na CI futura uma verificação estrita de que o objeto de política tem
+**somente** main:false; booleano global, ausência, main:true ou outras regras
+exigem revisão. Essa escolha conservadora evita o true concorrente que libera
+main. É uma checagem a preparar no Gate 1/2, não instalada agora; sem pacote novo.
+Validar também branches Preview e não desconectar Git. A trava precisa acompanhar
+instalação, dry-run, ativação e rollback; sincronizar branches candidatas em tarefa
+autorizada, preservando mudanças e sem rebase/force push publicado.
+
+### Permissões, reprocessamento, logs e primeiro evento
+
+[workflow_run depende da definição na branch padrão](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
+O executor confiável deve continuar usando github.workflow_sha com
+persist-credentials false; não buscar/executar PR, cache ou artefato não confiável.
+API reconsulta origem, CI, deployment, PR e HEAD; o evento sozinho não é prova.
+
+Política GitHub lida nesta etapa: default_workflow_permissions read e
+can_approve_pull_request_reviews false. Não alterar esse padrão global. Gate 2/3
+mantêm contents/actions/deployments/pull-requests read no job. Só Gate 4 pede
+contents write nesse job; GITHUB_TOKEN não tem escopo por caminho, então a
+proteção efetiva também depende do código confiável, allowlist, guards e revisão.
+Qualquer restrição administrativa adicional deve ser diagnosticada, sem ampliar
+permissões automaticamente.
+
+Variáveis futuras, sem segredos: CHECKPOINT_AUTO_ENABLED, CHECKPOINT_PREVIEW_BRANCHES
+(allowlist exata), CHECKPOINT_PREVIEW_PROJECT=bs-logistica-sistema e
+CHECKPOINT_PREVIEW_TEAM=bslogisticas. Não incluir default branch/main, forks ou
+ambientes protegidos na allowlist. Reconfirmar open PR/HEAD antes de publicar.
+Nenhuma dessas variáveis foi configurada nesta tarefa.
+
+A definição atual espera CI (validar/sql-local) e Preview signal, reconsulta ambos
+no SHA e trata qualquer ordem. Deployment-status ausente, jobs não aprovados,
+URL/branch/origem divergentes, paginação incompleta ou CAS concorrente recusam
+escrita. Recibo por ID preserva histórico; resposta perdida exige reconciliar
+HEAD/recibo antes de repetir, nunca criar um segundo commit às cegas. Concorrência
+do workflow é pelo SHA, cancel-in-progress false, com expectedHeadOid final.
+
+Dry-run precisa de diff não documental aprovado para testar o caminho completo;
+push apenas de Markdown será corretamente skipped. Planejar um pequeno artefato
+sintético sem import no app e HANDOFF na branch permitida, em autorização própria;
+não alterar regra funcional só para disparar a prova. Reentrega de evento e falha
+controlada devem ocorrer no escopo aprovado, sem desligar Preview para mascarar loop.
+
+Logs devem registrar somente status/IDs/SHAs e limitações, sem corpos de API,
+headers, cookies, URLs com query ou credenciais. A API é fixa GitHub, redirects
+recusados; o motor não acessa URL Preview nem B2. O commit de recibo tem SHA próprio,
+distinto do código implantado: não copiar CI entre eles nem pressupor execução
+nova; consultar checks ou registrar ausência. Primeiro recibo, loop e permissões
+reais ainda não foram testados remotamente. Nenhuma homologação é inferida.
+
+### Continuidade funcional após infraestrutura
+
+Manter a análise #112/#111 já registrada, sem substituir HANDOFF atual. Ordem
+futura: incorporar os dois docs de negócio com checkpoint novo → reconciliar
+estados dos PRs → revisar divergências funcionais no HEAD correto → priorizar
+financeiro e decisões/migrations por ambiente → evoluir Serviços Avulsos → homologar
+o sistema. Cada implementação, migration, merge e homologação tem gate próprio;
+a fila e o PASS técnico AUTO-07 não concedem essas autorizações.
