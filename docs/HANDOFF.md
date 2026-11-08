@@ -2,40 +2,40 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. CHECKPOINT-AUTO-02, 08/11/2026: implementação publicada no PR #111, CI e Preview comprovados em c5c62e9; controlador bloqueado, sem ativação.**
+**Fonte principal do estado atual. CHECKPOINT-AUTO-03B, 08/11/2026: sincronização documental autorizada somente na branch do PR #111. Plano condicionado ao preflight Vercel; automação desativada.**
 
-**Retomada:** 19 arquivos publicados por fast-forward em `c5c62e99f91d154290247a1100cf98b090b6811d`. O commit que publica este checkpoint altera somente `docs/HANDOFF.md`; conferir o HEAD atual pelo PR e seus checks, sem atribuir automaticamente a ele a CI ou o Preview do código.
-SDLC: Desenvolvimento / Testes; homologação funcional pausada durante a publicação CHECKPOINT-AUTO-02. Objetivo: qualquer IA autorizada abre o repositório, lê este checkpoint, confere o
+**Retomada:** base local/remota conferida em `0b41d80f29d84d23b10938da576c68a7f5c46b2a`. A AUTO-03B publica exclusivamente os quatro documentos da AUTO-03 e o registro desta sincronização. Conferir HEAD, CI e Preview pelo SHA exato no PR.
+SDLC: Design/Arquitetura; homologação funcional e ativação aguardam gates próprios. Objetivo: qualquer IA autorizada abre o repositório, lê este checkpoint, confere o
 GitHub e sabe onde continuar, sem depender de histórico de conversa.
 
 ## Identificação
 
 | Campo                     | Valor                                                                                                                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa | CHECKPOINT-AUTO-02 — implementação publicada na branch do #111; automação ainda bloqueada |
-| Gate atual | CI e Preview do código c5c62e9 concluídos; ativação e instalação do controlador na branch padrão não autorizadas |
-| Último gate concluído | GitHub Actions 42481151663: validar e sql-local SUCCESS no SHA c5c62e9; Preview success no mesmo SHA; revisão focal de publicação sem bloqueio |
+| Etapa | CHECKPOINT-AUTO-03B — sincronização das quatro alterações documentais da AUTO-03, sem ativação |
+| Gate atual | Publicação documental autorizada; CI/Preview do novo commit serão conferidos após o push. Preflight Vercel continua pendente |
+| Último gate concluído | HEAD remoto/local 0b41d80 e diff restrito aos quatro documentos conferidos; validação documental local antes da publicação |
 | Worktree                  | `/private/tmp/bs-fin-20d`                                                                                                                                                           |
 | Branch                    | `integracao/release-preview-01`                                                                                                                                                     |
 | Base                      | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                                                                                                   |
-| HEAD validado | c5c62e99f91d154290247a1100cf98b090b6811d — implementação publicada e CI/Preview conferidos. Commit documental posterior altera só este HANDOFF; verificar seus checks separadamente |
-| Alterações não commitadas | Nenhuma após o commit documental que publica este checkpoint; confirmar status ao retomar. Nenhum artefato local necessário à automação foi deixado sem publicação |
+| HEAD validado | 0b41d80f29d84d23b10938da576c68a7f5c46b2a — base remota/local conferida; validação atual apenas documental no working tree |
+| Alterações não commitadas | Somente os quatro documentos autorizados: PROGRESS.md, docs/ESTADO_DO_PROJETO.md, docs/HANDOFF.md e docs/continuidade/CHECKPOINT_AUTOMATICO.md; nenhuma alteração descartada |
 | PR                        | [#111](https://github.com/therunnas/bslogistica/pull/111) Draft contra `main`; #106, #108, #109 e #110 em Draft, inalterados                                                        |
-| Ambiente-alvo | GitHub/CI e Preview do PR #111; sem escrita em HML/Production ou migrations |
-| Última ação comprovada | Push normal 0308127 → c5c62e9, CI validar/sql-local SUCCESS e deployment GitHub 7635950040 em Preview; signal skipped; main permaneceu 38b4349 |
-| Próxima ação exata | Revisar e autorizar separadamente o plano de contenção do deploy automático antes de qualquer instalação mínima na branch padrão; nenhuma ativação ou merge por inferência |
+| Ambiente-alvo | GitHub/CI e Preview do PR #111 por publicação documental; sem alterar Vercel, main, HML ou Production |
+| Última ação comprovada | Retomada com preservação dos quatro documentos, revisão do diff e controlador mantido com false, token de leitura e modo seco |
+| Próxima ação exata | Publicar somente os quatro documentos na branch do #111, conferir CI/Preview no SHA publicado e registrar o resultado. Depois concluir o preflight Vercel somente leitura |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | CHECKPOINT-AUTO-02 concluída: 19 arquivos publicados no #111, CI/Preview conferidos e bot mantido bloqueado |
-| Resultados e testes comprovados | Local: 26/26 automação, 8/8 documentais, lint, tsc e check:workflow PASS; revisão focal de publicação sem bloqueio. CI 42481151663: validar e sql-local SUCCESS em c5c62e9. Preview success no mesmo SHA. Turbopack local continua limitação histórica; build padrão passou na CI |
-| Código e PR afetados | Commit c5c62e99f91d154290247a1100cf98b090b6811d, 19 arquivos, branch integracao/release-preview-01, PR #111 aberto Draft; este checkpoint final em commit documental separado, sem alterações de negócio ou migrations |
-| Ambientes envolvidos | Checkout local, GitHub Actions efêmero e deployment Preview do #111; sem acesso ao banco HML/Production, sem alteração de main |
-| Pendências e decisões | Instalação na branch padrão e ativação permanecem proibidas; plano de contenção/reconexão não executado. Homologação funcional e decisões comerciais 048/049 continuam pendentes |
-| Próxima ação exata | Obter autorização específica para avaliar/aplicar contenção administrativa e preparar instalação mínima; o #111 não deve ser mergeado para instalar o controlador |
-| Autorizações e proibições | Executado commit/push fast-forward somente na branch do #111. Seguem proibidos merge/main, force push, bot de escrita, segredos remotos, novos/fechados PRs, HML/Production e migrations |
+| Tarefa executada | CHECKPOINT-AUTO-03B: sincronização documental da AUTO-03 autorizada; plano preservado e checkpoint atualizado |
+| Resultados e testes comprovados | HEAD base e diff conferidos; check:workflow, 8/8 documentais, formatação do plano e diff --check PASS. CI/Preview novos pendentes; nenhuma evidência de ativação ou configuração real Vercel acrescentada |
+| Código e PR afetados | Somente quatro documentos na branch integracao/release-preview-01 do PR #111; nenhum código/workflow ou plano funcional alterado |
+| Ambientes envolvidos | Checkout local, GitHub Actions e Preview automático da branch; sem acesso a HML/Production ou configuração Vercel |
+| Pendências e decisões | Publicar/conferir o SHA documental; preflight Vercel e ativação continuam pendentes. Sem reabrir análise geral ou modificar o mecanismo |
+| Próxima ação exata | Concluir push e conferência de CI/Preview; depois disponibilizar conexão Vercel e executar apenas as leituras do preflight |
+| Autorizações e proibições | Commit/push normal exclusivamente dos quatro documentos na branch do #111 autorizados. Proibidos bot, main, merge, force push, Vercel, HML/Production, migrations e novos/fechados PRs |
 
 ## Evidência automática de Preview
 
@@ -63,7 +63,8 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 ## Arquivos locais × remotos
 
 - **Publicado no GitHub:** os 19 arquivos da implementação em `c5c62e99f91d154290247a1100cf98b090b6811d`, na branch `integracao/release-preview-01`. Este checkpoint final é publicado por commit documental subsequente na mesma branch; descobrir seu SHA no [PR #111](https://github.com/therunnas/bslogistica/pull/111).
-- **Somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado no GitHub.
+- **AUTO-03B:** publicação autorizada exclusivamente dos quatro documentos da AUTO-03. O novo HEAD e suas evidências precisam ser conferidos após o push; o plano ainda não ativa nem configura nenhum ambiente.
+- **Outros artefatos somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado no GitHub.
 - **Nunca publicar:** credenciais, `.env`, dumps e dados pessoais. Nenhuma variável/segredo remoto foi configurado nesta tarefa.
 
 Arquivos publicados (mesmo conjunto revisado):
@@ -89,6 +90,24 @@ Arquivos publicados (mesmo conjunto revisado):
 - `scripts/validar-workflow-documental.mjs`
 
 ## Evidências
+
+### CHECKPOINT-AUTO-03B — sincronização documental autorizada
+
+- Base local/remota `0b41d80f29d84d23b10938da576c68a7f5c46b2a` e branch `integracao/release-preview-01` conferidas no #111 aberto Draft; diff restrito aos quatro documentos, sem alterações descartadas.
+- Validação local: check:workflow, 8/8 testes documentais, formatação do plano e git diff --check PASS. Nenhum teste funcional ou de ativação repetido.
+- CI e Preview do novo commit ainda pendentes antes da publicação; resultados de outro SHA não são transferidos. Registro final será publicado após conferência.
+- Nenhum código, workflow, migration ou configuração Vercel alterado. Controlador permanece com false, token de leitura e modo seco.
+
+
+### CHECKPOINT-AUTO-03 — leitura e plano local em 08/11/2026
+
+- PR #111 aberto Draft, HEAD remoto/local `0b41d80f29d84d23b10938da576c68a7f5c46b2a`; default branch main, HEAD `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`. CI já existente desse HEAD: `validar`/`sql-local` success, sinal skipped; nenhuma suíte funcional repetida.
+- Arquivos publicados conferidos: main só contém CI; controlador/sinal estão no #111 e continuam com as travas. `vercel.json` nas duas referências tem apenas schema/framework, sem bloqueio por branch. O validador de main não tem a seção Última tarefa, portanto a combinação mínima precisa de compatibilidade/testes próprios.
+- Não foi possível ler configurações atuais do painel Vercel: CLI não encontrada, token ausente no processo, navegador com `The browser access host is unavailable` e plugin Vercel não instalado/conectado. Conexão sugerida; nenhuma credencial lida/exposta, nenhum hook chamado.
+- [Plano local revisado](continuidade/CHECKPOINT_AUTOMATICO.md#plano-de-instalação-sem-publicar-production): opções, leituras exatas, conjunto mínimo, autorizações, testes e rollback. Preferência condicionada por bloqueio seletivo Git, sem desconexão, mudança de Production Branch ou proteção de acesso. Bloqueio Git não substitui controle de hooks/CLI/API.
+- **Não comprovados:** Production Branch nominal, estado real da conexão Git, regras/overrides, existência de hooks, autoatribuição/proteção de domínios. Nenhum teste de bootstrap/ativação ou configuração em ambiente real foi executado.
+- **Validação documental local AUTO-03:** check:workflow, 8/8 testes documentais e git diff --check PASS. Sem repetir auditoria geral ou testes funcionais da aplicação.
+
 
 ### CHECKPOINT-AUTO-02 — publicação comprovada em 08/11/2026
 
@@ -162,7 +181,11 @@ fora do Mac. Não há senha, chave nem conteúdo de dump neste repositório.
 
 ## Autorizações
 
-CHECKPOINT-AUTO-02 (vigente): revisão, commit e push fast-forward exclusivamente na branch ativa do PR #111, e leitura de CI/Preview. O checkpoint final pode acompanhar commit documental posterior na mesma branch.
+CHECKPOINT-AUTO-03B (vigente): commit e push normal somente dos quatro documentos da AUTO-03 na branch ativa do PR #111 e conferência de CI/Preview. O registro final de evidências pode acompanhar commit posterior exclusivo do HANDOFF na mesma branch.
+
+Histórico CHECKPOINT-AUTO-03: inspeção somente leitura e plano/checkpoint locais; sem publicação naquela sessão.
+
+Histórico CHECKPOINT-AUTO-02: revisão, commit/push fast-forward exclusivamente na branch do #111 e leitura de CI/Preview; autorização não reutilizada nesta etapa.
 
 Histórico CHECKPOINT-AUTO-01: implementação/testes locais e fast-forward, sem publicação naquela etapa.
 
@@ -172,7 +195,7 @@ deployment.
 
 ## Proibições
 
-CHECKPOINT-AUTO-02: sem merge/main, force push, ativação de bot, configuração de segredos, novos/fechados PRs ou instalação do controlador na branch padrão.
+CHECKPOINT-AUTO-03B: sem alterar Vercel/conexão Git, main, merge, force push, bot, segredos, novos/fechados PRs, HML/Production ou migrations. Escrita autorizada somente nos quatro documentos da branch do #111.
 Sem merge em `main`, deploy em Production, migration em HML ou Production (046–049 inclusive), limpeza ou escrita
 de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups redundantes e force push.
 
@@ -188,7 +211,7 @@ de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups 
 
 1. Descobrir o checkout/worktree e a branch reais; conferir status, HEAD local e HEAD remoto pelo PR autorizado.
 2. Ler a identificação e “Última tarefa”; preservar alterações locais e não reutilizar autorização histórica.
-3. Conferir o HEAD atual do #111; o código validado está em c5c62e9 e o checkpoint posterior altera somente este arquivo. Conferir CI/Preview do HEAD exato pelo GitHub; não assumir resultados de outro SHA.
+3. Conferir o HEAD documental publicado e a seção Última tarefa; o plano da AUTO-03 continua condicionado ao preflight, sem execução administrativa ou ativação.
 4. Ativação permanece bloqueada independentemente de variáveis; seguir os gates futuros de [Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md), sem alterar main ou Production por inferência.
 5. Não repetir a triagem de PRs abaixo sem nova divergência; nenhuma recomendação equivale a autorização de fechamento.
 

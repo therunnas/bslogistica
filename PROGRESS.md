@@ -25,30 +25,31 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**CHECKPOINT-AUTO-02 — publicação da continuidade automática no PR #111, sem ativação.**
-Commit/push autorizados exclusivamente na branch ativa; controlador bloqueado. Estado, evidências,
-arquivos locais, limites e próxima ação exata: [HANDOFF](docs/HANDOFF.md).
-Mecanismo: [Checkpoint automático](docs/continuidade/CHECKPOINT_AUTOMATICO.md).
+**CHECKPOINT-AUTO-03 — definir ativação segura sem deployment Production e sem
+interromper Previews.** Sincronização documental autorizada em CHECKPOINT-AUTO-03B; estado e evidências no
+[HANDOFF](docs/HANDOFF.md). O controlador publicado continua desativado.
 
 ### Fazer agora
 
-Publicar o conjunto revisado e conferir CI/Preview do SHA publicado; detalhes, resultados e próxima ação somente no HANDOFF.
+Disponibilizar conexão Vercel e concluir o preflight autenticado somente leitura.
+Comparação, instalação mínima, testes e rollback no
+[plano](docs/continuidade/CHECKPOINT_AUTOMATICO.md#plano-de-instalação-sem-publicar-production).
 
 ### Não fazer ainda
 
-Sem ativação de automação, novos/fechados PRs, merge/main, HML, Production, segredos ou migrations.
+Sem alteração Vercel/conexão Git, main, merge, bot, segredos, HML/Production,
+migrations ou novos/fechados PRs. Não desconectar Git para conter Production.
 
 ### Critério de conclusão
 
-Implementação publicada somente na branch do #111, CI e Preview conferidos no
-SHA exato; controlador bloqueado e plano futuro de instalação sem publicar Production documentado.
+Preflight real registrado; procedimento escolhido com provas de zero Production
+e Preview automático preservado; ações administrativas separadamente autorizadas.
+O plano atual permanece condicionado ao acesso, sem testes reais de ativação.
 
 ### Próxima etapa
 
-Ativação e instalação na branch padrão somente por autorização posterior. Homologação manual do #111,
-decisão comercial da 048 e confirmação da 049 ficam pausadas; depois seguem gates
-próprios por ambiente para migrations e eventual expurgo. A triagem dos PRs permanece
-válida, sem autorização de fechamento.
+Leitura autenticada e aprovação específica do ensaio de contenção. Homologação
+funcional do #111 e decisões 048/049 permanecem na fila, sem reabertura da triagem.
 
 ## Marcos concluídos
 

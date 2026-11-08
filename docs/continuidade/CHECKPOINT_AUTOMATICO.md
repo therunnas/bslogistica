@@ -162,48 +162,185 @@ o contrato comum versionado, validado pelos mesmos comandos.
 
 ## Plano de instalação sem publicar Production
 
-**Plano somente; nenhum passo administrativo executado em CHECKPOINT-AUTO-02.**
-Não fazer merge do #111 para instalar o controlador. `main` ainda é a branch
-padrão exigida por `workflow_run`; isso não obriga integrar a release inteira.
-O caminho proposto é uma mudança mínima futura de infraestrutura/documentação,
-precedida de contenção comprovada do deploy automático e com autorização própria.
+**CHECKPOINT-AUTO-03, SDLC: Design/Arquitetura. Plano condicionado; nada ativado.**
+Sincronização documental autorizada em CHECKPOINT-AUTO-03B; sem execução do plano.
+Estado e evidências da publicação ficam somente no [HANDOFF](../HANDOFF.md).
+O requisito adicional é preservar novos deployments automáticos de Preview.
+A proposta de desconectar/reconectar Git descrita na AUTO-02 não atende a esse
+requisito e deixa de ser a recomendação. O GitHub mantém o plano anterior no
+histórico; esta revisão não autoriza alteração remota nem instalação na main.
 
-1. **Antes de alterar `main`:** obter autorização administrativa específica;
-   registrar o deployment/aliases atuais de Production e os mecanismos que podem
-   publicar (integração Git, hooks e workflows). Não pausar o aplicativo servido.
-   A opção documentada de contenção é desconectar temporariamente o repositório
-   do projeto Vercel existente em [Settings → Git](https://vercel.com/docs/project-configuration/git-settings).
-   Não apagar projeto, domínio, deployment ou dados. Conferir antes/depois que o
-   domínio e seus aliases continuam no mesmo deployment, sem publicação nova.
-   Se isso não puder ser comprovado, parar: nenhuma alteração em `main`.
-2. **Com a contenção comprovada:** por um gate futuro de integração autorizada,
-   levar a `main` apenas controlador/sinal, módulos Node necessários, validador
-   compatível e checkpoint — sem código funcional, migrations ou commits de
-   integração da release. Manter `false &&`, token somente leitura e `--dry-run`.
-   A preparação desse conjunto precisa identificar dependências mínimas e obter
-   aprovação nominal; este documento não autoriza branch nova, PR ou merge.
-3. **Bloqueio durável antes de reconectar:** preparar, nessa mudança mínima
-   futura, `git.deploymentEnabled` com `main: false` na configuração Vercel,
-   preservando as demais configurações. Essa opção [impede deploy automático por
-   branch](https://vercel.com/docs/project-configuration/git-configuration).
-   Conferir a Production Branch real e bloquear todas as branches de Production;
-   nenhuma regra concorrente verdadeira pode reabilitá-las. Não usar `[skip ci]`
-   ou apenas impedir atribuição de domínio como prova de ausência de deployment.
-4. **Reconexão é outro gate:** validar previamente, fora de Production, o
-   comportamento de reconectar o projeto existente com esse bloqueio; não acionar
-   importação, redeploy ou promoção. Revalidar CI, histórico de deployments e
-   aliases. Se o provedor não oferecer prova suficiente de que a reconexão não
-   dispara Production, manter a integração desconectada e a ativação bloqueada.
-   Não reconectar por tentativa nem prometer que a contenção foi validada agora.
-5. **Só depois:** autorizar as variáveis não secretas e um ensaio de leitura com
-   Preview da branch permitida. Ainda sem remover as três travas. A prova do
-   controlador instalado não é permissão de escrita. Habilitar o job inicialmente
-   em modo seco também exige uma alteração revisada específica.
-6. **Último gate, separado:** após aprovação do ensaio, autorizar remoção da trava,
-   `--write` e permissão mínima de conteúdo; conferir um evento real, repetição,
-   conflito e evento documental, sem publicar Production ou migrar banco.
+### Evidência atual e inspeção pendente
 
-Em qualquer divergência, suspender a ativação e preservar histórico/aliases; não
-usar force push, mudar a default branch ou promover o Preview para contornar o
-gate. A contenção descrita é uma proposta apoiada na documentação do provedor,
-não uma configuração inspecionada ou aplicada no projeto nesta sessão.
+Referência histórica da leitura AUTO-03 no GitHub em 08/11/2026 (não é HEAD permanente):
+
+- #111 aberto Draft, branch `integracao/release-preview-01`, HEAD
+  `0b41d80f29d84d23b10938da576c68a7f5c46b2a`; main/default branch em
+  `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`.
+- No HEAD do #111, `validar`/`sql-local` success e sinal skipped. Controlador com
+  `false &&`, `contents: read`, `--dry-run`. Main contém somente `ci.yml`.
+- `vercel.json` nas duas referências contém apenas schema e `framework: nextjs`;
+  não há bloqueio versionado por branch nem `ignoreCommand` nesse arquivo.
+- O validador na main exporta `validarHandoff`, mas ainda não exige “Última tarefa”.
+  Não pressupor que copiar apenas os YAML seja instalação completa ou equivalente.
+
+**Configuração Vercel real não inspecionada nesta etapa:** CLI não encontrada,
+nenhum token no processo, acesso ao navegador indisponível e plugin Vercel não
+instalado/conectado. Foi sugerida a conexão. O histórico de Preview no GitHub não
+comprova as configurações atuais do painel.
+
+| Leitura administrativa necessária           | O que registrar, sem segredos                                                                                          |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Environments → Production → Branch Tracking | Production Branch nominal e autoatribuição de domínios                                                                 |
+| Settings → Git                              | Repositório/time/projeto conectados e eventos de deployment                                                            |
+| Build/Deployment                            | Ignored Build Step, overrides e regras que afetem deploys                                                              |
+| Deploy Hooks                                | Quantidade, branch e responsável/uso; nunca copiar URL ou identificador que funcione como segredo; nunca chamar o hook |
+| Domains / Deployment Protection             | Aliases e deployment servido, vínculo por branch, método/escopo de proteção e exceções; nunca coletar bypass secrets   |
+| Caminhos alternativos de publicação         | Existência de CLI/API, hooks ou outra integração capaz de criar/promover Production                                    |
+
+Não declarar Production Branch, hooks ausentes, Git conectado ou proteção de
+domínio como confirmados sem essa leitura. Vercel Authentication protege acesso;
+não é uma trava que impeça criar ou promover deployments.
+
+### Opções comparadas
+
+| Opção                                                             | Preserva Preview automático                          | Impede novo deployment Production                                        | Parecer                                                                  |
+| ----------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Bloqueio seletivo `git.deploymentEnabled` na branch de Production | Sim, com Git conectado e outras branches habilitadas | Para o caminho Git, condicionado à configuração efetiva e prova anterior | Preferida, após preflight autenticado                                    |
+| Desligar autoatribuição de domínio                                | Sim                                                  | Não; ainda permite deployment Production staged                          | Insuficiente para este objetivo                                          |
+| Ignored Build Step                                                | Pode preservar                                       | Pode criar tentativa cancelada; pode sofrer override                     | Não usar como garantia de zero deployment                                |
+| Desconectar Git ou `deploymentEnabled: false` global              | Não                                                  | Bloqueia o caminho Git globalmente                                       | Incompatível com continuidade de Preview                                 |
+| Mudar Production Branch para branch congelada                     | Possível                                             | Depende dos efeitos da mudança e de outros canais                        | Mais configuração/risco; não recomendada sem ensaio e preflight próprios |
+
+Base documental: [configuração Git](https://vercel.com/docs/project-configuration/git-configuration),
+[Production/Preview branches](https://vercel.com/docs/git),
+[staged deployments](https://vercel.com/docs/deployments/promoting-a-deployment) e
+[Ignored Build Step](https://vercel.com/docs/monorepos#ignoring-the-build-step).
+Nenhuma opção baseada só em Git impede, por si, chamadas CLI/API ou hooks.
+
+### Desenho recomendado, após confirmação do painel
+
+Manter conexão Git, Production Branch, domínios e ambientes existentes. Bloquear
+apenas as branches capazes de produzir Production. Se a Production Branch real
+for confirmada como `main`, a configuração proposta, partindo do arquivo atual,
+seria a seguinte; **não foi aplicada**:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  }
+}
+```
+
+A Vercel documenta branches não especificadas como habilitadas. Assim, os pushes
+nas branches Preview continuam com deploy automático. Não adicionar `"*": true`:
+se várias regras casarem e uma for true, a Vercel permite o deployment. O bloqueio
+precisa estar no commit avaliado da branch protegida, não só no #111. Manter esse
+bloqueio em todos os commits posteriores de instalação, ensaio, ativação e rollback.
+
+Esse é o desenho de menor alteração para o caminho Git, não uma garantia já
+comprovada no projeto. **Antes do primeiro commit em main**, é obrigatório provar
+em ambiente descartável autorizado que o commit que introduz o bloqueio já deixa
+de criar Production, e que um commit de Preview continua criando Preview. Também
+é preciso concluir a leitura de hooks/canais alternativos e delimitar sua contenção.
+Se isso exigir mudanças administrativas que não preservem Preview, parar e rever
+o desenho; não efetuar um commit em main como experimento.
+
+Desabilitar autoatribuição de domínios poderia ser defesa adicional, mediante
+aprovação separada, mas não satisfaz a condição de zero deployment Production.
+Não mudar a proteção de acesso dos domínios: isso pode interromper usuários e não
+resolve o gatilho de deploy.
+
+### Instalação mínima avaliada
+
+Preparar em etapa futura um conjunto a partir da main revalidada, com manifesto
+de arquivos e diff. Não fazer merge/cherry-pick dos commits de integração do #111.
+Não copiar `package.json` ou `ci.yml` inteiros da release.
+
+- Runtime: os dois workflows de checkpoint, `scripts/atualizar-checkpoint-preview.mjs`,
+  `scripts/checkpoint-preview.mjs`, `scripts/checkpoint-github-api.mjs` e o validador
+  `scripts/validar-workflow-documental.mjs` compatível com o contrato da tarefa.
+- Verificação: `scripts/testar-checkpoint-preview.mjs` e
+  `scripts/testar-workflow-documental.mjs`, com fixtures compatíveis. Aplicar somente
+  os acréscimos de comando/steps necessários em `package.json` e `ci.yml`.
+- Continuidade: HANDOFF de instalação próprio, válido, preservando evidências e
+  apontando a tarefa de homologação do #111; documentação deste mecanismo.
+- Contenção: patch seletivo no `vercel.json` da branch Production real, após prova.
+
+Não incluir `src`, migrations, testes/fixtures financeiros, dependências, lockfile
+ou mudanças de negócio. A combinação mínima sobre main ainda precisa de validação
+local e CI próprias; a CI do #111 não comprova essa combinação nova.
+
+### Roteiro com autorizações separadas
+
+1. **Agora, somente leitura:** disponibilizar acesso Vercel e concluir a tabela de
+   preflight. Registrar também o ID/aliases do Production servido e um Preview de
+   referência. Nenhuma URL de hook/token entra no registro.
+2. **Autorização administrativa de ensaio:** escolher um projeto descartável já
+   aprovado ou autorizar explicitamente sua criação, com fonte sintética e sem
+   banco/domínio/credenciais reais. Ensaiar bloqueio da branch Production desde o
+   primeiro commit e continuidade de Preview; testar regras sobrepostas. Registrar
+   contagem/IDs de deployments antes/depois. Nenhum ensaio em Production real.
+3. **Autorização de contenção/instalação:** aprovar manifesto, branch Production
+   nominal e qualquer contenção necessária de hooks/CLI/API. Só então autorizar o
+   fluxo de integração mínima em main com o bloqueio Git validado. Ainda manter
+   `false &&`, token de leitura, `--dry-run` e chave de ativação desligada. Não
+   incluir a release do #111. Conferir zero novos deployments Production e aliases
+   inalterados; confirmar que um push autorizado de Preview continua automático.
+4. **Autorização de ensaio hospedado:** permitir remover apenas `false &&`, manter
+   `contents: read` e `--dry-run`, configurar as quatro variáveis não secretas com
+   allowlist exata e atualizar o teste que fixa a versão bloqueada. Com
+   `CHECKPOINT_AUTO_ENABLED=true`, o controlador e o sinal podem executar, mas sem
+   publicar. Exigir CI, Preview e decisão dry-run no mesmo SHA; testar ambas as
+   ordens de conclusão. Nenhum novo secret é necessário.
+5. **Autorização específica do escritor:** após revisar as evidências, permitir
+   `--write` e `contents: write` somente no controlador confiável, atualizar seus
+   testes e manter o bloqueio Production. Revalidar instalação antes de ativar.
+   `GITHUB_TOKEN` não restringe escrita por caminho; as guardas de branch/caminho,
+   a definição confiável e os controles administrativos são parte da proteção.
+6. **Encerramento:** registrar tarefa, ambiente, SHAs, runs, deployments e decisões
+   no HANDOFF; zero novos deployments Production, Preview automático preservado,
+   recibo único e sem homologação inferida. Publicação de documentação tem a própria
+   autorização; a AUTO-03B autoriza somente sincronizar os quatro documentos, sem
+   executar o plano nem instalar/ativar o controlador.
+
+### Matriz de testes reais e critérios
+
+- Bootstrap no ensaio descartável: o primeiro commit com bloqueio e todos os
+  seguintes geram **zero** deployments Production, inclusive staged; domínio
+  servido no projeto real permanece com o mesmo deployment/aliases.
+- Preview positivo: commit autorizado de fixture de teste e HANDOFF em branch
+  permitida com PR aberto, sem mudança funcional, gera Preview automaticamente.
+  A CI do SHA passa e o controlador produz decisão dry-run; depois da autorização
+  de escrita, um único commit documental com HANDOFF/recibo.
+- Repetição e loop: reentrega do mesmo evento não duplica; o deployment do commit
+  documental é ignorado pelo controlador. Não desligar Preview para mascarar loop.
+- Negativos: CI incompleta/falha, origem/URL divergente, branch não permitida,
+  evento antigo ou Production não produzem recibo nem alteração de branch.
+- Concorrência: avanço legítimo do HEAD não é sobrescrito. Se a corrida não for
+  efetivamente observada no ensaio remoto, registrar limite; os testes locais de
+  CAS não viram PASS remoto por inferência.
+- Isolamento: o controlador não recebe token Vercel, chave Supabase nem bypass;
+  não autentica no aplicativo nem chama hooks. Deployment Protection é preservada.
+- Em cada passo, falta de evidência significa gate pendente, nunca homologação.
+
+### Rollback da ativação
+
+Autorização de rollback precisa estar nominalmente incluída no gate de ativação.
+Desligar `CHECKPOINT_AUTO_ENABLED`, desabilitar o workflow e cancelar execuções em
+curso; variáveis alteradas não cancelam jobs já iniciados. Conferir o último HEAD
+e recibos, pois um commit pode ter concluído antes do cancelamento. Repor modo
+seco/token de leitura/trava versionada por alteração revisada, mantendo o bloqueio
+Git de Production e a conexão de Preview. Preservar recibos e histórico; correção
+por novo commit, sem reset/force push ou exclusão de evidências.
+
+Se ocorrer deployment Production inesperado, abortar a ativação e acionar o
+responsável pelo incidente. Qualquer cancelamento/promoção/rollback de Production
+exige autorização específica; não alterar aliases automaticamente como parte do
+rollback do bot. Não reconectar/desconectar Git nem remover o bloqueio Git como
+“rollback rápido”, pois isso pode interromper Preview ou voltar a disparar Production.

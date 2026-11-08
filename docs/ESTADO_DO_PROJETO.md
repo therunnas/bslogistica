@@ -5,6 +5,25 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## CHECKPOINT-AUTO-03B — 08/11/2026
+
+Sincronização autorizada exclusivamente dos quatro documentos locais da AUTO-03
+na branch do PR #111, preservando seu conteúdo. Sem mudança em código, workflows,
+Vercel ou ambientes. Commit publicado, CI/Preview efetivamente conferidos e próxima
+ação ficam somente no [HANDOFF](HANDOFF.md). A inspeção autenticada Vercel e a
+ativação continuam pendentes de gates próprios; publicação não é ativação.
+
+## CHECKPOINT-AUTO-03 — 08/11/2026
+
+Análise focada e plano local, sem alteração remota. GitHub confirmou o HEAD do
+#111 em `0b41d80` e main em `38b4349`; configuração versionada sem bloqueio de
+branch. A inspeção autenticada Vercel ficou pendente por indisponibilidade de
+acesso. O requisito de Preview contínuo descarta a desconexão proposta na AUTO-02;
+preferência condicionada por contenção seletiva Git, com ensaio antes de tocar
+main e avaliação de hooks/canais alternativos. Estado e limite de evidência no
+[HANDOFF](HANDOFF.md); plano em [Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md).
+Nenhum teste de ativação ou configuração em Production/Preview foi executado.
+
 ## CHECKPOINT-AUTO-02 — 08/11/2026
 
 Revisão dos 19 arquivos para publicação autorizada exclusivamente na branch do
