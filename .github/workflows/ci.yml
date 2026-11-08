@@ -267,6 +267,8 @@ jobs:
         run: npm run test:colaborador-custo
       - name: Teste ux-simplificacao
         run: npm run test:ux-simplificacao
+      - name: Teste func-ready
+        run: npm run test:func-ready
 
       - name: Teste contrato-periodo
         run: npm run test:contrato-periodo

@@ -644,9 +644,9 @@ const migrations = readdirSync("supabase/migrations")
   .filter((f) => f.endsWith(".sql"))
   .sort();
 verificar(
-  "G1. a 030 existe, a 047 (idempotência dos adicionais, FIN-20D) é a última migration e a 019 continua ausente",
+  "G1. a 030 existe, a 049 (correção de serviço de container, FUNC-READY-01) é a última migration e a 019 continua ausente",
   [migrations.includes(NOME), migrations.at(-1), migrations.some((m) => m.includes("_019_"))],
-  [true, "20261114120000_047_idempotencia_adicionais.sql", false],
+  [true, "20261116120000_049_correcao_servico_container.sql", false],
 );
 verificar(
   "G2. arredondamento só na COBRANÇA: o custo usa o excedente exato; o feriado só no custo",

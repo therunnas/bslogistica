@@ -18,7 +18,7 @@ Resultados anteriores por controle: [livro da sessão 19](continuidade/controles
 - Convidar usuário, trocar papel e recuperação de senha dependem de variáveis que o Preview genérico não tem:
   devem mostrar indisponibilidade, sem quebrar a tela.
 - O HML está na **045**. A 046 (imutabilidade de fatura com adicionais) e a 047 (idempotência de adicionais)
-  **não** estão aplicadas: os itens 9.4 e 12.5 só são homologáveis depois delas.
+  **não** estão aplicadas: os itens 9.4 e 12.5 só são homologáveis depois delas. Os itens 4.6 e 8.4 dependem da 048 e da 049.
 
 ## 1. Login, sessão e MFA
 
@@ -48,13 +48,14 @@ Resultados anteriores por controle: [livro da sessão 19](continuidade/controles
 
 ## 4. Clientes e contratos
 
-| #   | Ação                                               | Resultado esperado                              |
-| --- | -------------------------------------------------- | ----------------------------------------------- |
-| 4.1 | Criar cliente `HML-TESTE …` com dados válidos      | Salvo e listado                                 |
-| 4.2 | Criar cliente com campo obrigatório vazio/inválido | Mensagem clara; nada salvo (#106)               |
-| 4.3 | Criar contrato com jornada de **0 horas**          | Recusado, sem valor assumido em silêncio (#106) |
-| 4.4 | Criar contrato válido (diária, HE, período)        | Salvo; período contratual coerente              |
-| 4.5 | Ação irreversível (ex.: encerrar vigência)         | Pede confirmação explícita antes (#106)         |
+| #   | Ação                                                                                               | Resultado esperado                                                         |
+| --- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| 4.1 | Criar cliente `HML-TESTE …` com dados válidos                                                      | Salvo e listado                                                            |
+| 4.2 | Criar cliente com campo obrigatório vazio/inválido                                                 | Mensagem clara; nada salvo (#106)                                          |
+| 4.3 | Criar contrato com jornada de **0 horas**                                                          | Recusado, sem valor assumido em silêncio (#106)                            |
+| 4.4 | Criar contrato válido (diária, HE, período)                                                        | Salvo; período contratual coerente                                         |
+| 4.5 | Ação irreversível (ex.: encerrar vigência)                                                         | Pede confirmação explícita antes (#106)                                    |
+| 4.6 | (Só após a 048 no HML) Com tarifas ligadas, apontar colaborador sem individual e função sem tarifa | Cobra o preço-base do contrato; individual e tarifa continuam prevalecendo |
 
 ## 5. Colaboradores
 
@@ -86,11 +87,12 @@ Resultados anteriores por controle: [livro da sessão 19](continuidade/controles
 
 ## 8. Containers
 
-| #   | Ação                                                                  | Resultado esperado                                   |
-| --- | --------------------------------------------------------------------- | ---------------------------------------------------- |
-| 8.1 | Registrar serviço de container                                        | Salvo; datas corretas (#106)                         |
-| 8.2 | Conferir o custo no Fechamento/Faturamento do período **de cobrança** | Custo entra na competência do adicional (#106)       |
-| 8.3 | Clicar no serviço na lista                                            | Abre o detalhe; valor total, custo e resultado batem |
+| #   | Ação                                                                  | Resultado esperado                                                                              |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 8.1 | Registrar serviço de container                                        | Salvo; datas corretas (#106)                                                                    |
+| 8.2 | Conferir o custo no Fechamento/Faturamento do período **de cobrança** | Custo entra na competência do adicional (#106)                                                  |
+| 8.3 | Clicar no serviço na lista                                            | Abre o detalhe; valor total, custo e resultado batem                                            |
+| 8.4 | (Só após a 049 no HML) "Corrigir serviço": mudar quantidade ou valor  | Original cancelado, substituto com os dados novos, histórico liga os dois; faturado não corrige |
 
 ## 9. Adicionais
 

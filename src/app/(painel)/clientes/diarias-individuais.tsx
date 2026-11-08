@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { usePrecoBaseRecuo } from "@/lib/vigencias-dados";
 
 import {
   montarQuadroDeDiarias,
@@ -74,6 +75,8 @@ export function DiariasIndividuais({
   );
 
   const [aberto, setAberto] = useState(false);
+  // 048: preço-base do contrato como 3º nível com a resolução ligada.
+  const precoBaseRecuo = usePrecoBaseRecuo();
   const [colaboradorId, setColaboradorId] = useState("");
   const [inicio, setInicio] = useState(hoje);
   const [valor, setValor] = useState("");
@@ -105,6 +108,7 @@ export function DiariasIndividuais({
             Valor cobrado do cliente por este colaborador, neste contrato. Quando existe, vale no
             lugar da tarifa da função e do período. Sem diária individual, vale a tarifa da função.
             Não é o custo do colaborador.
+            {precoBaseRecuo ? " Sem tarifa para a função, vale o preço-base do contrato." : null}
           </p>
         </div>
         <Button
@@ -164,7 +168,8 @@ export function DiariasIndividuais({
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Sem diária individual hoje: vale a tarifa da função.
+                        Sem diária individual hoje: vale a tarifa da função
+                        {precoBaseRecuo ? " (ou o preço-base, se a função não tiver tarifa)" : ""}.
                       </p>
                     )}
                     {l.proxima ? (

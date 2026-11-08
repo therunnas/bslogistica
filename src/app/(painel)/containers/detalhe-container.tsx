@@ -21,7 +21,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { dateBR, instanteDataHoraBR } from "@/lib/format";
 import { PageHeader } from "../_components/app-shell";
-import { cancelarContainerAction, carregarContainerAction } from "./_acoes";
+import {
+  cancelarContainerAction,
+  capacidadeCorrecaoContainerAction,
+  carregarContainerAction,
+} from "./_acoes";
 import { dinheiroContainer } from "./lista-containers";
 
 type Detalhe = Extract<Awaited<ReturnType<typeof carregarContainerAction>>, { ok: true }>["data"];
@@ -34,7 +38,21 @@ export function DetalheDoContainer({ id }: { id: string }) {
   const [motivo, setMotivo] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [indeterminado, setIndeterminado] = useState(false);
+  const [podeCorrigir, setPodeCorrigir] = useState(false);
   const trava = useRef(false);
+  useEffect(() => {
+    let ativo = true;
+    // Falha ao conferir a capacidade = não oferecer a correção; nunca bloqueia o detalhe.
+    Promise.resolve()
+      .then(() => capacidadeCorrecaoContainerAction())
+      .then((r) => {
+        if (ativo) setPodeCorrigir(r.ok && r.data === true);
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+    };
+  }, []);
   const carregar = useCallback(async () => {
     setCarregando(true);
     setErro("");
@@ -120,7 +138,7 @@ export function DetalheDoContainer({ id }: { id: string }) {
       </div>
     );
   }
-  const { servico, participantes, auditoria, competencia } = detalhe;
+  const { servico, participantes, auditoria, competencia, substituidoPor } = detalhe;
   const campos = [
     ["Cliente", servico.cliente_nome],
     ["Operação", servico.operacao_nome ?? "Sem operação"],
@@ -146,6 +164,19 @@ export function DetalheDoContainer({ id }: { id: string }) {
         <p role="alert" className="rounded-md border p-4">
           {erro}
         </p>
+      )}
+      {substituidoPor && (
+        <p className="rounded-md border p-4">
+          Este serviço foi corrigido e substituído.{" "}
+          <Link className="underline" href={`/containers/${substituidoPor}`}>
+            Abrir o serviço corrigido
+          </Link>
+        </p>
+      )}
+      {servico.situacao === "disponivel" && podeCorrigir && !indeterminado && (
+        <Button asChild variant="outline">
+          <Link href={`/containers/${servico.id}/corrigir`}>Corrigir serviço</Link>
+        </Button>
       )}
       {indeterminado && (
         <Button variant="outline" onClick={() => void carregar()}>
@@ -194,8 +225,12 @@ export function DetalheDoContainer({ id }: { id: string }) {
           {auditoria.map((evento) => (
             <div key={evento.id}>
               <p className="font-medium">
-                {evento.action === "registered" ? "Registro" : "Cancelamento"} ·{" "}
-                {instanteDataHoraBR(evento.created_at)}
+                {evento.action === "registered"
+                  ? "Registro"
+                  : evento.action === "corrected"
+                    ? "Correção"
+                    : "Cancelamento"}{" "}
+                · {instanteDataHoraBR(evento.created_at)}
               </p>
               <p className="text-sm text-muted-foreground">{evento.reason}</p>
             </div>

@@ -108,6 +108,7 @@ function clientPanel(client, { contract, motor = "desligado" } = {}) {
         useRegrasDefinitivas: () => false,
         useDiariaIndividual: () => false,
         useResolucaoDeTarifas: () => false,
+        usePrecoBaseRecuo: () => false,
         useTarifasPorFuncao: () => "indisponivel",
       },
     };

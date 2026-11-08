@@ -4,6 +4,7 @@ import { decidirDisponibilidade } from "./fechamento/disponibilidade";
 import { ehFrequenciaDeFechamento, type FrequenciaDeFechamento } from "./fechamento/periodo";
 import { interpretarFuncoesTurno } from "./funcoes";
 import {
+  interpretarPrecoBaseRecuo,
   interpretarResolucaoDeTarifas,
   interpretarSnapshotsDeFuncao,
   interpretarTarifasPorFuncao,
@@ -246,6 +247,13 @@ export function useResolucaoDeTarifas(): boolean | null {
   const consulta = useConsultaDoMotor();
   if (consulta.isError || !consulta.data || consulta.data.error) return null;
   return interpretarResolucaoDeTarifas(consulta.data.data, null);
+}
+
+/** Preço-base do contrato como 3º nível da precedência (048)? Desconhecido = falso (regra antiga). */
+export function usePrecoBaseRecuo(): boolean {
+  const consulta = useConsultaDoMotor();
+  if (consulta.isError || !consulta.data || consulta.data.error) return false;
+  return interpretarPrecoBaseRecuo(consulta.data.data, null);
 }
 
 /** O banco tem a diária individual por colaborador e contrato (042)? */

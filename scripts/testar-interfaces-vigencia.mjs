@@ -1136,13 +1136,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. a 047 (idempotência dos adicionais, FIN-20D) é a última migration, a 046, a 045, a 044, a 043, a 042, a 041, a 040, a 039, a 038, a 037, a 035, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
+  "I1. a 049 (correção de serviço de container, FUNC-READY-01) é a última migration, a 048, a 047, a 046, a 045, a 044, a 043, a 042, a 041, a 040, a 039, a 038, a 037, a 035, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [52, "20261114120000_047_idempotencia_adicionais.sql", false],
+  [54, "20261116120000_049_correcao_servico_container.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",

@@ -35,6 +35,7 @@ import {
   useRegistrarVigencia,
   useRegrasDaBs,
   useRegrasDefinitivas,
+  usePrecoBaseRecuo,
   useResolucaoDeTarifas,
   useVersoes,
 } from "@/lib/vigencias-dados";
@@ -134,6 +135,8 @@ export function HistoricoDeVigencias({
   // Com a resolução por função ligada (041) a diária genérica não define o preço: o campo some e o
   // valor atual segue no envio, porque a RPC legada o exige.
   const resolucaoDeTarifas = useResolucaoDeTarifas();
+  // 048: com o recuo, o preço-base continua valendo e a nova condição volta a pedi-lo.
+  const precoBaseRecuo = usePrecoBaseRecuo();
   const campos = camposDaVigencia(tipo, regrasBs, regrasDefinitivas, periodoContratual);
   const hoje = hojeEmSaoPaulo();
   const liberado = podeRegistrarVigencia(estado);
@@ -326,7 +329,14 @@ export function HistoricoDeVigencias({
             </div>
 
             {campos
-              .filter((campo) => !(campo.ocultarComTarifas === true && resolucaoDeTarifas === true))
+              .filter(
+                (campo) =>
+                  !(
+                    campo.ocultarComTarifas === true &&
+                    resolucaoDeTarifas === true &&
+                    !precoBaseRecuo
+                  ),
+              )
               .map((campo) => (
                 <div key={campo.chave} className="space-y-2">
                   <Label htmlFor={`vigencia-${campo.chave}`}>{campo.rotulo}</Label>

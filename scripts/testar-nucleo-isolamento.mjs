@@ -88,6 +88,10 @@ verificar(
     "20261110120000_043_dias_especiais_v2.sql",
     // A 044 mantém o mesmo núcleo financeiro e acrescenta o contexto territorial.
     "20261111120000_044_calendario_territorial.sql",
+    // A 048 redefine o motor por vigência (que chama o núcleo) para o preço-base como 3º nível, e a 049
+    // redefine só o estado do motor (a chave anunciada `nucleo_v2`).
+    "20261115120000_048_preco_base_como_recuo.sql",
+    "20261116120000_049_correcao_servico_container.sql",
   ],
 );
 verificar(

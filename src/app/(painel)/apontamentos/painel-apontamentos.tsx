@@ -89,10 +89,14 @@ import {
   useDiasEspeciaisV2,
   useRegrasDaBs,
   useRegrasDefinitivas,
+  usePrecoBaseRecuo,
   useResolucaoDeTarifas,
   useSnapshotsDeFuncao,
   useTermosDoApontamento,
 } from "@/lib/vigencias-dados";
+import { aplicarPrecedenciaDoPreco } from "@/lib/preco-do-dia";
+import { useTarifasDoContrato } from "@/lib/tarifas-dados";
+import { useDiariasDoContrato } from "@/lib/diaria-individual-dados";
 import { ehDomingo, parametrosDeHoras, resolverCondicaoDoDia, tipoDoDia } from "@/lib/vigencias-ui";
 import { AvisoDoMotor } from "../_components/vigencias";
 import { brl, minutesToLabel, todayISO } from "@/lib/format";
@@ -562,6 +566,12 @@ export function PainelApontamentos() {
               : "carregando"
           : "pronto";
   const operacaoDaTela = operationList.find((item) => item.id === operationId) ?? null;
+  // Com a resolução ligada, a prévia de linha nova segue a precedência do banco (individual > tarifa >
+  // preço-base): sem isto ela mostrava o preço-base e o banco gravava outro valor.
+  const precoBaseRecuo = usePrecoBaseRecuo();
+  const contratoDaTela = operacaoDaTela?.contract_id ?? "";
+  const tarifasDaTela = useTarifasDoContrato(contratoDaTela, resolucaoLigada);
+  const diariasDaTela = useDiariasDoContrato(contratoDaTela, resolucaoLigada && diariaIndividual);
   const termos = useTermosDoApontamento({
     habilitado: estadoDoMotor.tag === "ligado" && Boolean(operationId),
     contratoId: operacaoDaTela?.contract_id ?? null,
@@ -607,13 +617,30 @@ export function PainelApontamentos() {
           motivo: "Não foi possível consultar as vigências financeiras.",
         };
       } else if (!termos.carregando) {
-        condicaoDoDia = resolverCondicaoDoDia({
-          data: date,
-          contratoId: operacaoDaTela?.contract_id ?? null,
-          termosContrato: termos.termosContrato,
-          termosOperacao: termos.termosOperacao,
-          termosCusto: termos.termosCusto.filter((termo) => termo.employee_id === row.employeeId),
-        });
+        condicaoDoDia = aplicarPrecedenciaDoPreco(
+          resolverCondicaoDoDia({
+            data: date,
+            contratoId: operacaoDaTela?.contract_id ?? null,
+            termosContrato: termos.termosContrato,
+            termosOperacao: termos.termosOperacao,
+            termosCusto: termos.termosCusto.filter((termo) => termo.employee_id === row.employeeId),
+          }),
+          {
+            resolucaoLigada,
+            recuoNoPrecoBase: precoBaseRecuo,
+            contratoId: operacaoDaTela?.contract_id ?? null,
+            colaboradorId: row.employeeId,
+            data: date,
+            funcaoId: funcaoDaLinha(row.employeeId) || null,
+            periodo: shift ? periodoDoTurno(shift) : null,
+            individuais: !diariaIndividual
+              ? []
+              : diariasDaTela.isSuccess
+                ? diariasDaTela.data
+                : null,
+            tarifas: tarifasDaTela.isSuccess ? tarifasDaTela.data : null,
+          },
+        );
       }
     }
 

@@ -93,6 +93,7 @@
     "test:fin-pr-13": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fin-pr-13.mjs",
     "test:colaborador-custo": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs --test scripts/testar-colaborador-custo.mjs",
     "test:ux-simplificacao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs --test scripts/testar-ux-simplificacao.mjs",
+    "test:func-ready": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs --test scripts/testar-func-ready.mjs",
     "test:workflow": "node --test scripts/testar-workflow-documental.mjs"
   },
   "dependencies": {

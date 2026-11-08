@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { usePrecoBaseRecuo } from "@/lib/vigencias-dados";
 
 import { DiariasIndividuais } from "./diarias-individuais";
 
@@ -97,6 +98,8 @@ export function TarifasDoContrato({
   const [valor, setValor] = useState("");
   const [motivo, setMotivo] = useState("");
   const [motivoResolucao, setMotivoResolucao] = useState("");
+  // 048: preço-base do contrato como 3º nível com a resolução ligada.
+  const precoBaseRecuo = usePrecoBaseRecuo();
 
   const erros = edicao
     ? validarTarifa({
@@ -181,7 +184,9 @@ export function TarifasDoContrato({
             {resolucaoLigada === null
               ? "Não foi possível ler o estado. Nada é alterado sem a confirmação."
               : resolucaoLigada
-                ? "Os apontamentos de contrato são cobrados pela tarifa da função e do período do turno do dia. Sem função, sem classificação do turno ou sem tarifa, o apontamento é recusado (nunca cobrado como zero)."
+                ? precoBaseRecuo
+                  ? "Os apontamentos de contrato seguem a ordem: diária individual do colaborador, tarifa da função e do período do turno do dia e, por último, o preço-base do contrato. Sem função ou sem classificação do turno, o apontamento fica pendente (nunca cobrado como zero)."
+                  : "Os apontamentos de contrato são cobrados pela tarifa da função e do período do turno do dia. Sem função, sem classificação do turno ou sem tarifa, o apontamento é recusado (nunca cobrado como zero)."
                 : "Enquanto desligado, o preço continua sendo a diária genérica do contrato. Cadastrar tarifas aqui não muda nenhum valor até a resolução ser ligada."}
           </p>
           {resolucaoLigada !== null ? (

@@ -60,6 +60,7 @@ import {
   usePeriodoContratual,
   useRegrasDefinitivas,
   useDiariaIndividual,
+  usePrecoBaseRecuo,
   useResolucaoDeTarifas,
   useTarifasPorFuncao,
 } from "@/lib/vigencias-dados";
@@ -138,6 +139,9 @@ export function PainelClientes() {
     null,
   );
   const diariaGenericaSemEfeito = tarifasPorFuncao === "disponivel" && resolucaoDeTarifas === true;
+  // 048: com o recuo, o preço-base continua valendo (3º nível) e por isso volta a aparecer.
+  const precoBaseRecuo = usePrecoBaseRecuo();
+  const ocultarPrecoBase = diariaGenericaSemEfeito && !precoBaseRecuo;
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   const removeContract = useDeleteRow("contracts");
   const [clienteParaExcluir, setClienteParaExcluir] = useState<Client | null>(null);
@@ -595,7 +599,7 @@ export function PainelClientes() {
                         </TableCell>
 
                         <TableCell className="text-right text-sm font-medium text-foreground">
-                          {diariaGenericaSemEfeito ? (
+                          {ocultarPrecoBase ? (
                             <span className="text-xs font-normal text-muted-foreground">
                               Por função (ver Tarifas)
                             </span>
@@ -899,7 +903,7 @@ export function PainelClientes() {
               />
             </div>
 
-            {diariaGenericaSemEfeito ? (
+            {ocultarPrecoBase ? (
               <div className="space-y-2">
                 <Label>Preço da diária</Label>
                 <p className="rounded-xl border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
@@ -911,9 +915,11 @@ export function PainelClientes() {
             ) : (
               <div className="space-y-2">
                 <Label>
-                  {tarifasPorFuncao === "disponivel"
-                    ? "Diária genérica (R$)"
-                    : "Valor da diária (R$)"}
+                  {tarifasPorFuncao !== "disponivel"
+                    ? "Valor da diária (R$)"
+                    : precoBaseRecuo
+                      ? "Preço-base da diária (R$)"
+                      : "Diária genérica (R$)"}
                 </Label>
 
                 <Input
@@ -929,7 +935,12 @@ export function PainelClientes() {
                   }
                   className={INPUT_CLASS}
                 />
-                {tarifasPorFuncao === "disponivel" ? (
+                {tarifasPorFuncao === "disponivel" && precoBaseRecuo ? (
+                  <p className="text-xs text-muted-foreground">
+                    Cobrado quando o colaborador não tem diária individual neste contrato e a função
+                    dele não tem tarifa. Com as tarifas desligadas, vale para todos.
+                  </p>
+                ) : tarifasPorFuncao === "disponivel" ? (
                   <p className="text-xs text-muted-foreground">
                     Vale enquanto as tarifas por função e período não estiverem ligadas; depois, o
                     preço vem da tarifa de cada função.
