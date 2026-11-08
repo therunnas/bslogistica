@@ -5,6 +5,27 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## CHECKPOINT-AUTO-02 — 08/11/2026
+
+Revisão dos 19 arquivos para publicação autorizada exclusivamente na branch do
+PR #111. Controlador endurecido antes da publicação: job bloqueado por `false &&`,
+`contents: read` e `--dry-run`, sem depender de variáveis remotas. Plano futuro de
+instalação descreve contenção comprovada do deploy antes de qualquer integração
+mínima na branch padrão; nenhuma contenção ou ativação foi executada. Commit,
+checks, Preview e limites efetivamente comprovados ficam no [HANDOFF](HANDOFF.md).
+Sem alterações de negócio, migrations, HML, Production, merge ou fechamento de PR.
+
+## CHECKPOINT-AUTO-01 — 08/11/2026
+
+Retomada da branch ativa após leitura do GitHub; checkout limpo atualizado somente
+por fast-forward de `2a7270f` para `0308127` (uma atualização de HANDOFF). Implementação
+local de contrato por tarefa, gate documental na CI e controlador pós-Preview com
+recibos por deployment, limite de branch, SHA exato e CAS. Nenhum commit/push,
+fechamento de PR, merge, migration ou acesso a HML/Production. Estado das validações
+e próxima ação ficam somente no [HANDOFF](HANDOFF.md); desenho e requisitos em
+[Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md). Não representa
+ativação nem execução hospedada da automação.
+
 ## Integração, UX e funcional — 07/11/2026 (histórico; o estado ativo está no [HANDOFF](HANDOFF.md))
 
 **RELEASE-PREVIEW-01/02.** Branch `integracao/release-preview-01` = `main` + #108/#109/#110 (046, 047, QA-20D) + #106

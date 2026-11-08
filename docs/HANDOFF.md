@@ -2,30 +2,49 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. FUNC-READY-02 / CHECKUP-SYNC-01, 07/11/2026. FUNC-READY-01 concluída localmente e publicada no PR #111 (Draft).**
+**Fonte principal do estado atual. CHECKPOINT-AUTO-02, 08/11/2026: publicação autorizada somente na branch do PR #111; controlador bloqueado, sem ativação.**
 
-**Atualização de retomada em 08/11/2026:** consultar a seção "Retomada Codex — verificação dos sete PRs" ao final. O último SHA de código/CI/Preview comprovado antes deste commit documental é `2a7270f694fc8a10131774ae326f4fbcd6c5a47f`.
-SDLC: Testes / homologação. Objetivo: qualquer IA autorizada abre o repositório, lê este checkpoint, confere o
+**Retomada:** branch e HEAD remoto conferidos em `0308127aa22a15d6d0551c8cf2bac8a711a050fa`; 19 arquivos da CHECKPOINT-AUTO-01 preservados e revisados. Os históricos abaixo mantêm suas evidências nos SHAs originais.
+SDLC: Desenvolvimento / Testes; homologação funcional pausada durante a publicação CHECKPOINT-AUTO-02. Objetivo: qualquer IA autorizada abre o repositório, lê este checkpoint, confere o
 GitHub e sabe onde continuar, sem depender de histórico de conversa.
 
 ## Identificação
 
 | Campo                     | Valor                                                                                                                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Etapa                     | FUNC-READY-01 concluída localmente (precedência de preço, correção de container, prévia); publicada no #111 por FUNC-READY-02; checkpoint por CHECKUP-SYNC-01                       |
-| Gate atual                | Gate 3 (CI e Preview) concluído para o código; homologação manual e decisão comercial da 048 pendentes                                                                              |
-| Último gate concluído     | FUNC-READY-01: validação local completa e E2E 34/34; antes, UX-SIMPLIFICACAO-02 (`9978684`, CI verde, Preview com destino HML provado)                                              |
+| Etapa | CHECKPOINT-AUTO-02 — publicar a implementação no PR #111, mantendo a automação bloqueada |
+| Gate atual | Publicação autorizada na branch ativa; CI/Preview do novo commit ainda pendentes |
+| Último gate concluído | Revisão dos 19 arquivos; 26/26 testes de automação e 8/8 documentais; evidências anteriores de 84 suítes e Webpack preservadas |
 | Worktree                  | `/private/tmp/bs-fin-20d`                                                                                                                                                           |
 | Branch                    | `integracao/release-preview-01`                                                                                                                                                     |
 | Base                      | `main` `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`                                                                                                                                   |
-| HEAD validado             | `c4b445622b5f89c2f98907333ce8aee362f76407` (commit `c4b4456`, código da FUNC-READY-01). Commits seguintes só alteram documentação; ver "Arquivos locais × remotos"                  |
-| Alterações não commitadas | Nenhuma ao fechar esta etapa; qualquer alteração fora deste checkpoint pertence a outro agente: preservar                                                                           |
+| HEAD validado | 0308127aa22a15d6d0551c8cf2bac8a711a050fa — base local/remota conferida; validação desta tarefa no working tree, antes do commit |
+| Alterações não commitadas | 19 arquivos da CHECKPOINT-AUTO-01, com trava adicional do controlador e documentação CHECKPOINT-AUTO-02; serão incluídos no commit autorizado |
 | PR                        | [#111](https://github.com/therunnas/bslogistica/pull/111) Draft contra `main`; #106, #108, #109 e #110 em Draft, inalterados                                                        |
-| Ambiente-alvo             | Preview do #111 × HML `qbnfcmrxmssnwkhaitgd` (schema 045). Nenhuma escrita ou migration remota nesta etapa                                                                          |
-| Última ação comprovada    | Push de `c4b4456` e `f03e8c7` para o #111; CI (`validar`, `sql-local`) PASS e Preview READY com destino HML conferidos no SHA `f03e8c7`                                             |
-| Próxima ação exata        | Homologação manual do Preview (roteiro `docs/homologacao-release-preview-01.md`, itens 4, 5, 6, 8, 12) e decisão comercial da 048; 046–049 só entram no HML com autorização própria |
+| Ambiente-alvo | GitHub/CI e Preview do PR #111; sem escrita em HML/Production ou migrations |
+| Última ação comprovada | Revisão local: sem alterações em src, supabase ou lockfile; sem padrões de credencial detectados; controlador com false, token de leitura e modo seco |
+| Próxima ação exata | Commit e push fast-forward exclusivamente na branch do #111; conferir CI e Preview no SHA publicado e registrar as evidências no HANDOFF |
 
-## Estados por item
+## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | CHECKPOINT-AUTO-02: revisão e publicação da CHECKPOINT-AUTO-01 sem ativação do bot |
+| Resultados e testes comprovados | 26/26 automação e 8/8 workflow PASS; teste da trava teve RED antes e GREEN após. Regressão anterior 84 suítes e build Webpack documentados; Turbopack segue limitação histórica por bind. CI nova ainda não executada |
+| Código e PR afetados | 19 arquivos de scripts, testes, CI e continuidade na branch integracao/release-preview-01, PR #111 Draft; sem alterações de negócio ou migrations |
+| Ambientes envolvidos | Checkout local e futura CI/Preview; leitura GitHub; HML/Production não acessados |
+| Pendências e decisões | Commit/push e verificação do novo SHA; ativação continua pendente. Plano futuro resolve default branch com contenção prévia comprovada de deploy, sem integrar release inteira |
+| Próxima ação exata | Publicar na branch autorizada e conferir CI/Preview; atualizar evidências antes de encerrar |
+| Autorizações e proibições | Commit/push fast-forward só branch do PR #111 autorizados. Sem merge, force push, bot de escrita, configuração de segredos, novos/fechados PRs, main, HML, Production ou migrations |
+
+## Evidência automática de Preview
+
+<!-- checkpoint-preview:start -->
+Automação não ativada: controlador com `false &&`, `contents: read` e `--dry-run`. Nenhum recibo remoto gerado pelo bot.
+Históricos manuais de Preview abaixo continuam vinculados aos SHAs originais.
+<!-- checkpoint-preview:end -->
+
+## Estados funcionais anteriores — preservados (não são validação da automação)
 
 Estados **não são equivalentes**: cada coluna precisa de evidência própria. "n.a." = não se aplica ao item.
 
@@ -45,8 +64,8 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 
 | Onde                                           | O que                                                                                                                                                                                                                                                                                    |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GitHub, branch `integracao/release-preview-01` | Código, migrations 048/049, suítes Node e SQL, E2E `scripts/testar-fluxos-local.sh`, roteiro manual e este checkpoint                                                                                                                                                                    |
-| Remoto (HEAD)                                  | `f03e8c7a7a21f993368de60d92b6224d542df320` ao gravar este checkpoint (código `c4b4456` + documentação `f03e8c7`). O commit que publica este texto altera só `docs/HANDOFF.md` e não invalida as evidências; conferir com `git ls-remote origin refs/heads/integracao/release-preview-01` |
+| GitHub, branch `integracao/release-preview-01` | Código anterior, migrations 048/049, suítes Node e SQL, E2E, roteiro manual e checkpoint anterior à CHECKPOINT-AUTO-01                                                                                                                                                                    |
+| Remoto (HEAD) | `0308127aa22a15d6d0551c8cf2bac8a711a050fa`, conferido no GitHub em 08/11/2026. CHECKPOINT-AUTO-01 não está nesse commit; permanece somente no working tree |
 | Somente no Mac (não publicado)                 | Inventário oficial de backups; stack local isolada `bs-fin20d-local` e seus dados sintéticos; logs de execução                                                                                                                                                                           |
 | Nunca no GitHub                                | Senhas, chaves, conteúdo de dumps, dados pessoais, `.env`                                                                                                                                                                                                                                |
 
@@ -54,6 +73,13 @@ Arquivo local, inclusive em `/private/tmp`, não está publicado. Sem push autor
 e a diferença deve ser informada.
 
 ## Evidências
+
+- **CHECKPOINT-AUTO-01, working tree local (08/11/2026):** 25 testes de automação e 8 de workflow documental PASS; matriz cobre falha, repetição, eventos em qualquer ordem, documentação, origem, URL, CAS e resposta perdida. Duas falhas da revisão reproduzidas antes da correção e revisão focal final sem achados.
+- **Regressão Node:** 84 suítes `test:*`; 83 PASS no sandbox e `test:calendario-runners` PASS 23/23 fora dele após bloqueio do servidor de teste em loopback. SQL não repetido: sem mudança de banco, harness ou migration.
+- **Ferramentas locais:** lint, `tsc --noEmit`, `check:workflow` e comparação documental real `2a7270f` → `0308127` PASS. Build Webpack PASS com domínio `.invalid` e chave pública inerte. `npm run build` (Turbopack) falhou por bind `Operation not permitted`, inclusive fora do sandbox; não declarado PASS.
+- **Não executado nesta tarefa:** nova CI/Preview, escrita real do bot, outra sessão real de Claude/Codex, homologação, Supabase, HML ou Production. Logs somente locais em `/private/tmp/checkpoint-auto-01-*`.
+
+### Histórico funcional anterior (evidência nos SHAs originais)
 
 - **Local, em `c4b4456` (07/11/2026):** lint, `tsc` e build OK; **83 suítes Node PASS**; **50 suítes SQL PASS**
   numa stack local recriada do zero com as 49 migrations; **34 verificações E2E locais PASS**
@@ -107,12 +133,17 @@ fora do Mac. Não há senha, chave nem conteúdo de dump neste repositório.
 
 ## Autorizações
 
-CHECKUP-SYNC-01 / FUNC-READY-02: commit da FUNC-READY-01, atualização dos documentos de continuidade, push
+CHECKPOINT-AUTO-02 (vigente): revisão, commit e push fast-forward exclusivamente na branch ativa do PR #111, e leitura de CI/Preview. O checkpoint final pode acompanhar commit documental posterior na mesma branch.
+
+Histórico CHECKPOINT-AUTO-01: implementação/testes locais e fast-forward, sem publicação naquela etapa.
+
+Histórico CHECKUP-SYNC-01 / FUNC-READY-02 (não reutilizar como autorização atual): commit da FUNC-READY-01, atualização dos documentos de continuidade, push
 exclusivamente para `integracao/release-preview-01`, verificação de CI e Preview e verificações não destrutivas do
 deployment.
 
 ## Proibições
 
+CHECKPOINT-AUTO-02: sem merge/main, force push, ativação de bot, configuração de segredos, novos/fechados PRs ou instalação do controlador na branch padrão.
 Sem merge em `main`, deploy em Production, migration em HML ou Production (046–049 inclusive), limpeza ou escrita
 de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups redundantes e force push.
 
@@ -126,16 +157,16 @@ de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups 
 
 ## Retomada
 
-1. `git worktree list` e `git status --short --branch` em `/private/tmp/bs-fin-20d`.
-2. Conferir o HEAD remoto: `git ls-remote origin refs/heads/integracao/release-preview-01` e `gh pr view 111`.
-3. `git diff --stat c4b4456 HEAD`: se tocar algo além de documentação, as evidências acima não valem.
-4. Conferir CI e Preview pelo SHA (`gh pr checks 111`), nunca pela última execução visível.
-5. Seguir "Próxima ação exata"; merge e Production seguem sem autorização.
+1. Descobrir o checkout/worktree e a branch reais; conferir status, HEAD local e HEAD remoto pelo PR autorizado.
+2. Ler a identificação e “Última tarefa”; preservar alterações locais e não reutilizar autorização histórica.
+3. Conferir o HEAD publicado no #111, a CI/Preview do SHA exato e a seção “Última tarefa”; não assumir resultados de outro SHA.
+4. Ativação permanece bloqueada independentemente de variáveis; seguir os gates futuros de [Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md), sem alterar main ou Production por inferência.
+5. Não repetir a triagem de PRs abaixo sem nova divergência; nenhuma recomendação equivale a autorização de fechamento.
 
 
 ## Retomada Codex — verificação dos sete PRs (08/11/2026)
 
-**Natureza:** resultado de uma sessão de análise, sem alterações de código nem de ambiente. Este registro foi consolidado a partir do relatório do Codex e reconciliação do GitHub. Nenhum fechamento de PR foi autorizado ou executado.
+**Registro histórico anterior à CHECKPOINT-AUTO-01. Natureza:** resultado de uma sessão de análise, sem alterações de código nem de ambiente. Este registro foi consolidado a partir do relatório do Codex e reconciliação do GitHub. Nenhum fechamento de PR foi autorizado ou executado.
 
 ### Evidências mais recentes até este checkpoint documental
 

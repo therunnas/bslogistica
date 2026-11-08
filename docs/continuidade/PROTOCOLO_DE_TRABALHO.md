@@ -16,6 +16,12 @@ Antes de encerrar cada sessão, atualizar o HANDOFF com os sete grupos: estado
 funcional/etapa; Git/PR/alterações locais; ambientes/migrations; cobertura/evidências;
 decisões; defeitos/riscos/bloqueios; próxima ação exata. Preservar históricos datados.
 
+Além da troca de sessão, concluir ou interromper **cada tarefa** exige preencher
+os sete campos da seção “Última tarefa”. Com publicação autorizada, o HANDOFF
+acompanha os commits e o push da tarefa na branch ativa; sem autorização permanece
+local. O [checkpoint automático](CHECKPOINT_AUTOMATICO.md) acrescenta somente
+evidências técnicas de CI/Preview e não executa homologação funcional.
+
 O relatório diferencia arquivos locais, commits locais e arquivos publicados,
 indicando branch, SHA remoto e CI no SHA exato. Não presumir que outra IA acessa
 um caminho local ou que um arquivo já está no GitHub. Evidência necessária à

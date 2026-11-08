@@ -25,33 +25,30 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**Homologação do Preview do PR #111 e decisão comercial da 048.** Branch `integracao/release-preview-01`
-(`main` + #108/#109/#110 + #106 + UX-SIMPLIFICACAO-01 + FUNC-READY-01), PR Draft. Estado, HEAD, CI, Preview,
-ambientes e próxima ação exata: **somente** no [HANDOFF](docs/HANDOFF.md). Não copiar estado mutável para cá.
-
-Concluídas e já publicadas no #111 (histórico em [ESTADO_DO_PROJETO](docs/ESTADO_DO_PROJETO.md)): RELEASE-PREVIEW-01/02
-(integração e Preview), UX-SIMPLIFICACAO-01/02 (telas), FUNC-READY-01/02 (precedência de preço 048, correção auditada de
-container 049, prévia do apontamento) e CHECKUP-SYNC-01 (checkpoint).
+**CHECKPOINT-AUTO-02 — publicação da continuidade automática no PR #111, sem ativação.**
+Commit/push autorizados exclusivamente na branch ativa; controlador bloqueado. Estado, evidências,
+arquivos locais, limites e próxima ação exata: [HANDOFF](docs/HANDOFF.md).
+Mecanismo: [Checkpoint automático](docs/continuidade/CHECKPOINT_AUTOMATICO.md).
 
 ### Fazer agora
 
-1. Homologação manual do Preview pelo [roteiro](docs/homologacao-release-preview-01.md).
-2. Decisão comercial da 048 (preço-base como fallback) e confirmação da correção por substituição (049).
+Publicar o conjunto revisado e conferir CI/Preview do SHA publicado; detalhes, resultados e próxima ação somente no HANDOFF.
 
 ### Não fazer ainda
 
-Sem merge, Production, migrations 046–049 em HML ou Production, escrita ou limpeza no HML, nem mudança de regra comercial
-global. Decisões de HE < 1 e competência faturada continuam pendentes.
+Sem ativação de automação, novos/fechados PRs, merge/main, HML, Production, segredos ou migrations.
 
 ### Critério de conclusão
 
-Homologação manual com evidência por item no ambiente autorizado, 048 decidida e, só então, gates próprios para aplicar
-as migrations no HML. CI verde não é homologação; código no Preview não é migration aplicada.
+Implementação publicada somente na branch do #111, CI e Preview conferidos no
+SHA exato; controlador bloqueado e plano futuro de instalação sem publicar Production documentado.
 
 ### Próxima etapa
 
-Resultado da homologação e da decisão comercial; depois, autorização nominal por ambiente para 046–049 e para o
-expurgo do HML, conforme [WORKFLOW](docs/WORKFLOW.md).
+Ativação e instalação na branch padrão somente por autorização posterior. Homologação manual do #111,
+decisão comercial da 048 e confirmação da 049 ficam pausadas; depois seguem gates
+próprios por ambiente para migrations e eventual expurgo. A triagem dos PRs permanece
+válida, sem autorização de fechamento.
 
 ## Marcos concluídos
 

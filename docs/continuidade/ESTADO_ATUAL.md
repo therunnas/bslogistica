@@ -10,6 +10,8 @@ cobertura, decisões, defeitos, bloqueios e próxima ação exata.
 - [Estado do projeto](../ESTADO_DO_PROJETO.md): histórico das decisões e implantações.
 - [Ambientes](../AMBIENTES.md): inventário datado; conferir o limite da verificação.
 - [Workflow](../WORKFLOW.md) e [protocolo](PROTOCOLO_DE_TRABALHO.md): regras permanentes.
+- [Checkpoint automático](CHECKPOINT_AUTOMATICO.md): contrato por tarefa, evidências
+  técnicas de Preview e requisitos de ativação; estado ativo continua no HANDOFF.
 - [Roteiro de homologação manual](../homologacao-release-preview-01.md): itens por fluxo, com os que dependem de migrations ainda não aplicadas.
 
 **Regra de continuidade.** Toda tarefa, ao concluir ou pausar, atualiza o HANDOFF com o que foi executado, o que

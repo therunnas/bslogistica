@@ -138,6 +138,16 @@ Várias suítes asseveram a **forma literal** do código. Erro de Prettier se co
 
 ## Continuidade entre agentes
 
+Ao concluir ou interromper **cada tarefa**, preencher os sete campos de “Última
+tarefa” no `docs/HANDOFF.md`: tarefa, resultados/testes comprovados, código/PR,
+ambientes, pendências/decisões, próxima ação exata e autorizações/proibições.
+Quando a publicação estiver autorizada, incluir esse checkpoint no mesmo conjunto
+de commits/push da tarefa, na branch ativa. Sem autorização, mantê-lo local e
+informar a diferença. A CI exige a alteração do HANDOFF no conjunto publicado.
+Descobrir worktree, branch e HEAD remoto em cada retomada; nunca fixar caminhos ou
+SHAs antigos. Evidência automática de Preview não é homologação nem autorização.
+Mecanismo e limites: [Checkpoint automático](docs/continuidade/CHECKPOINT_AUTOMATICO.md).
+
 Retome por [Estado atual](docs/continuidade/ESTADO_ATUAL.md) e pelo checkpoint
 único [HANDOFF](docs/HANDOFF.md). Siga o
 [Protocolo de trabalho](docs/continuidade/PROTOCOLO_DE_TRABALHO.md) para o ciclo

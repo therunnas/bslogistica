@@ -94,7 +94,8 @@
     "test:colaborador-custo": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs --test scripts/testar-colaborador-custo.mjs",
     "test:ux-simplificacao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs --test scripts/testar-ux-simplificacao.mjs",
     "test:func-ready": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs --test scripts/testar-func-ready.mjs",
-    "test:workflow": "node --test scripts/testar-workflow-documental.mjs"
+    "test:workflow": "node --test scripts/testar-workflow-documental.mjs",
+    "test:checkpoint-preview": "node --test scripts/testar-checkpoint-preview.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

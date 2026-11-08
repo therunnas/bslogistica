@@ -1,0 +1,22 @@
+name: Preview signal
+
+on:
+  deployment_status:
+
+# O evento pode estar no ref do candidato: não conceder escrita, buscar código
+# nem interpretar campos do evento como comandos. O escritor vive em workflow_run.
+permissions: {}
+
+jobs:
+  signal:
+    if: >-
+      github.repository == 'therunnas/bslogistica' &&
+      vars.CHECKPOINT_AUTO_ENABLED == 'true' &&
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Preview' &&
+      github.event.deployment.production_environment == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Sinalizar para reconciliação pelo controlador confiável
+        run: echo 'Preview signal; evidence must be queried independently.'
