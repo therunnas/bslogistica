@@ -6,6 +6,16 @@ revisão, sem homologação ou autorização de ativação. Este documento não 
 038 ou qualquer outra esteja aplicada em HML ou Production. Estado real dos
 ambientes: [Estado do projeto](../ESTADO_DO_PROJETO.md).
 
+> **Atualização de 08/11/2026 (alinhamento com o negócio).** Contêiner é **um tipo** de serviço
+> avulso, não o conjunto: o catálogo de serviços avulsos inclui também caminhões, paletes,
+> embalagem, movimentação, retrabalhos e outros ([NEGOCIO.md](../NEGOCIO.md), seção 6). O pedido
+> pode ocorrer **no mesmo dia** da execução. A cobrança pode ser por diária, unidade ou valor
+> fechado, como possibilidades de modelagem ainda não confirmadas na prática. As regras abaixo
+> permanecem como **histórico do desenho de 30/10/2026**; onde a atualização as supera, o texto
+> original foi mantido e marcado. O módulo implementado ainda reflete o desenho original. Divergências:
+> [NEGOCIO_X_SISTEMA.md](../NEGOCIO_X_SISTEMA.md). A generalização é uma etapa separada, ainda não
+> iniciada.
+
 ## Objetivo e limites confirmados
 
 - Container é **serviço avulso**, com cobrança negociada e pagamento por
@@ -19,6 +29,8 @@ ambientes: [Estado do projeto](../ESTADO_DO_PROJETO.md).
   seja um valor em R$ por pessoa, seja um total a dividir entre eles.
 - O pedido do serviço deve ocorrer **até um dia antes** da execução, conforme
   a regra comercial relatada. Não inventar preço, equipe ou quantidade.
+  **[Superado em 08/11/2026: o pedido pode ocorrer no mesmo dia; não há exigência universal de
+  antecedência. O código ainda impõe a antecedência.]**
 - O registro contém data, cliente, operação opcional, descrição do serviço
   (tamanho/produto), quantidade de containers e valor cobrado.
 - No fechamento e na fatura, o serviço aparece inclusive quando o cliente
@@ -69,12 +81,16 @@ Estas diretrizes foram registradas na conversa do projeto em 30/10/2026,
 a partir das respostas do cliente; não são decisões técnicas novas:
 
 1. **Solicitação:** serviço solicitado até um dia antes; não impor prazos
-   horários adicionais sem evidência.
+   horários adicionais sem evidência. **[Superado em 08/11/2026: mesmo dia permitido.]**
 2. **Cobrança:** valor negociado para cada serviço, considerando produto,
    quantidade, tempo, equipe e eventual ajuda do cliente. **Sem tabela de
    preços fixa**, fórmula automática de orçamento ou tarifa por container.
+   (Em 08/11/2026 o negócio informou a diária como referência comercial para contêineres, com valor
+   negociado conforme o serviço; diária, unidade e valor fechado seguem como possibilidades de
+   modelagem a confirmar. Nada disso cria tabela de preços.)
 3. **Registro:** data, cliente, operação opcional, descrição com produto/tamanho,
-   quantidade de containers e valor total efetivamente acordado.
+   quantidade de containers e valor total efetivamente acordado. (Na generalização, a quantidade
+   passa a ter unidade e o serviço passa a ter tipo; ver [NEGOCIO_X_SISTEMA.md](../NEGOCIO_X_SISTEMA.md).)
 4. **Pagamento:** informar os colaboradores participantes e o valor devido
    **por colaborador**, aceitando a entrada de R$ por pessoa ou o rateio
    explícito de um total informado. Não pressupor divisão igualitária sem

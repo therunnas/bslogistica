@@ -3,7 +3,33 @@
 Fotografia factual do sistema de **BS Soluções Logísticas**. É a **fonte única**
 dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
 estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
-Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
+Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md). O funcionamento real da
+empresa fica em [NEGOCIO.md](NEGOCIO.md); a distinção entre negócio, comportamento esperado e
+implementado, em [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md).
+
+## Sessão 17 (08/11/2026) — alinhamento documental negócio × sistema
+
+Etapa só de documentação (sem código, migration, banco, Preview, HML nem Production). Base
+`origin/main` = `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, que já inclui os PRs #103
+(`0cb3b94`) e #105 (`38b4349`); `PROGRESS.md` e `HANDOFF.md` ainda os listavam como abertos.
+Ambientes inalterados: HML na 045, Production na 034, resolução comercial OFF.
+
+Definições registradas (detalhe em [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md)):
+
+- Operação fixa é recorrente e por diárias; **serviço avulso** é atividade pontual, e contêiner é só
+  um tipo dele. O pedido pode ocorrer no mesmo dia.
+- Regra do sábado: cobrança (diária integral até 4 horas; acima, mais HE com 50%) e pagamento
+  (diária normal até 4 horas; acima, mais HE do excedente, com valor-hora acordado) são distintos.
+  O núcleo financeiro já os implementa; só `ARQUITETURA.md` estava desatualizada.
+- Nota fiscal e recebimentos fazem parte do funcionamento real, mas estão **fora do escopo atual**.
+- Pendentes de confirmação do negócio: remuneração nos avulsos, rotina de reajuste das diárias
+  individuais, funções com preço próprio, modalidades de cobrança do avulso, exceções contratuais
+  ao sábado.
+
+O módulo implementado (Containers, migration 045) ainda reflete o desenho original: exige pedido
+um dia antes e só trata contêineres. Sua generalização para Serviços Avulsos **não foi iniciada**
+e exige análise de impacto e autorização própria. Nenhuma suposição sobre o número da próxima
+migration foi feita.
 
 ## Sessão 16 (05/11/2026)
 
@@ -510,7 +536,8 @@ que naquele checkpoint estava **Draft e não mergeado**, na branch
 é o commit que contém esta seção, a conferir no Git/PR com seus próprios checks.
 
 **Decisão operacional:** uma mesma operação pode conter diárias, HE e serviços
-avulsos de containers. Container continua sendo serviço avulso, com receita
+avulsos de containers. Container continua sendo serviço avulso (desde 08/11/2026: um **tipo** de
+serviço avulso, não o conjunto; ver [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md)), com receita
 negociada e custos explícitos, sem virar diária/HE. Não se cria outra operação
 nem contrato específico para registrar o serviço. O menu Containers permanece
 como visão geral dos serviços; Faturamento, Fechamento e Relatórios continuam
@@ -1295,9 +1322,12 @@ Regras confirmadas para esta etapa:
   protegido enquanto essa decisão estiver pendente.
 - Adicionais avulsos podem ter competência de cobrança diferente da execução.
   Container é serviço avulso com cobrança negociada e pagamento por container,
-  exclusivo do FIN-PR-11; não será desenvolvido nesta etapa.
+  exclusivo do FIN-PR-11; não será desenvolvido nesta etapa. (Registro histórico; FIN-PR-11 já
+  foi integrado. Desde 08/11/2026 o contêiner é um tipo de serviço avulso e o pedido pode ocorrer
+  no mesmo dia.)
 - Diária individual muda por admin mediante nova vigência. Históricos, snapshots
-  e faturas não são reprecificados. Domingo/feriado e bônus seguem FIN-PR-09.
+  e faturas não são reprecificados. Domingo/feriado e bônus seguem FIN-PR-09. (Comportamento do
+  sistema; a rotina real de reajuste na BS ainda não foi confirmada.)
 - Custo previsto não é folha de pagamento.
 - Fontes oficiais para 2026–2028 serão conferidas; datas municipais dependem de
   conferência do cliente antes de ativação real. Sem comprovação, ficam pendentes;

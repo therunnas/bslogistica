@@ -331,13 +331,24 @@ recusa faturar à parte o que sobrou de um colaborador já faturado nesse perío
 A receita de Dashboard e Relatórios vem de `resumo_financeiro_periodo`, a mesma
 função de ajuste que a fatura usa, com o ajuste separado das demais parcelas.
 
-Regras que a BS não confirmou continuam como antes: pagamento no sábado, cobrança
-no feriado, domingo e compensação entre dias.
+Regras que a BS ainda não confirmou: compensação entre dias. As demais deixaram de ser
+pendência: o pagamento no sábado foi definido (diária normal até 4 horas; acima disso,
+diária normal mais as horas extras do excedente, com valor-hora acordado, que pode diferir
+do cobrado) e a cobrança de domingo e feriado está implementada (migrations `043` e `044`).
+A cobrança no sábado segue a diária integral até 4 horas e, acima disso, a diária integral
+mais as horas extras do excedente, com acréscimo de 50%. Fonte do negócio:
+[NEGOCIO.md](NEGOCIO.md), seção 10. (Texto anterior, preservado como histórico: "Regras que a BS
+não confirmou continuam como antes: pagamento no sábado, cobrança no feriado, domingo e
+compensação entre dias.")
 
 **Adicionais de serviço** (`billing_additionals`, migration `029`) são valores
 extras do período, com motivo e referência, separados da diária: não criam
 diária nem custo. `gerar_fatura` soma os que cabem inteiros no período da fatura
-e cria um item para cada.
+e cria um item para cada. **Não confundir com "serviço avulso"**, termo do negócio para a
+atividade pontual contratada pelo cliente ([NEGOCIO.md](NEGOCIO.md), seção 6). Um serviço
+avulso gera uma receita que hoje é registrada por meio de um adicional, mas os dois nomes
+continuam separados. Diferenças entre o negócio e o sistema:
+[NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md).
 
 ## Diária por colaborador
 

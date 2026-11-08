@@ -3,7 +3,9 @@
 Andamento do projeto: marcos concluídos, etapa atual e próximas etapas. Regras
 permanentes ficam em [CLAUDE.md](CLAUDE.md); o estado factual de Production, dos
 testes e das dependências, em [docs/ESTADO_DO_PROJETO.md](docs/ESTADO_DO_PROJETO.md);
-o modelo de segurança, em [docs/SEGURANCA.md](docs/SEGURANCA.md). O histórico
+o modelo de segurança, em [docs/SEGURANCA.md](docs/SEGURANCA.md); o funcionamento real da
+empresa, em [docs/NEGOCIO.md](docs/NEGOCIO.md), e como o sistema o representa, em
+[docs/NEGOCIO_X_SISTEMA.md](docs/NEGOCIO_X_SISTEMA.md). O histórico
 detalhado de cada mudança está no Git — este arquivo não o repete.
 
 O checkpoint executável da sessão seguinte fica em
@@ -53,12 +55,29 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
 1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
    (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
-2. **Pendências:** revisão humana dos PRs #103 (documentação) e #105 (margem do Fechamento/Faturamento);
-   modelos de e-mail do Dashboard; segunda cópia do backup de Production (criado, restaurado e
-   ensaiado 034 → 045 em 05/11). Parecer atual: NO-GO condicional.
+2. **Pendências:** modelos de e-mail do Dashboard; segunda cópia do backup de Production (criado,
+   restaurado e ensaiado 034 → 045 em 05/11). Parecer atual: NO-GO condicional. Os PRs #103
+   (documentação) e #105 (margem do Fechamento/Faturamento) já estão na `main` (`0cb3b94` e
+   `38b4349`, verificado em 08/11/2026); esta fila os listava como pendentes de revisão humana.
 3. [Manual de uso](docs/MANUAL_DE_USO.md) redigido; [plano de Production
    034 → 045](docs/runbooks/producao-034-045.md) redigido, **sem execução** (gate próprio,
    com backup novo).
+4. **Alinhamento documental negócio × sistema (08/11/2026):** PR só de documentação, em Draft para
+   revisão. Registra o funcionamento real em [NEGOCIO.md](docs/NEGOCIO.md) e as divergências com o
+   sistema em [NEGOCIO_X_SISTEMA.md](docs/NEGOCIO_X_SISTEMA.md). Não é implementação e não altera
+   código, banco nem ambientes.
+5. **Próxima, ainda não iniciada:** generalização do módulo de Containers para **Serviços
+   Avulsos** (tipo, unidade, modalidade de cobrança, pedido no mesmo dia). Exige análise de impacto,
+   compatibilidade com os dados existentes e autorização própria; o número da próxima migration
+   deve ser verificado na `main` quando a etapa começar.
+
+### Fora do escopo atual
+
+Fazem parte do funcionamento real da BS ([NEGOCIO.md](docs/NEGOCIO.md), seções 12 e 14), mas
+**não** são implementados nesta entrega, por decisão do responsável em 08/11/2026; ficam para
+avaliação futura: emissão de nota fiscal; acompanhamento de recebimentos e de prazos de pagamento;
+folha e baixa de pagamento realizado (o sistema calcula custo previsto); etapa de aprovação do
+cliente no sistema; cadastro de novos tipos de serviço avulso por tela de administração.
 
 ### Pausadas
 
