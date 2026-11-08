@@ -25,31 +25,36 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**CHECKPOINT-AUTO-03 — definir ativação segura sem deployment Production e sem
-interromper Previews.** Sincronização documental autorizada em CHECKPOINT-AUTO-03B; estado e evidências no
-[HANDOFF](docs/HANDOFF.md). O controlador publicado continua desativado.
+**CHECKPOINT-AUTO-04B — publicação documental do diagnóstico AUTO-04 no PR #111.**
+Evidências, SHA e estado de publicação somente no [HANDOFF](docs/HANDOFF.md).
+Controlador continua desativado; nenhuma configuração remota alterada.
 
 ### Fazer agora
 
-Disponibilizar conexão Vercel e concluir o preflight autenticado somente leitura.
-Comparação, instalação mínima, testes e rollback no
-[plano](docs/continuidade/CHECKPOINT_AUTOMATICO.md#plano-de-instalação-sem-publicar-production).
+Obter autorização nominal para ensaio isolado do bloqueio seletivo da branch
+Production confirmada como main, preservando Preview automático, conforme
+[plano existente](docs/continuidade/CHECKPOINT_AUTOMATICO.md#plano-de-instalação-sem-publicar-production).
+Antes de qualquer ativação, obter autorização para rotação controlada da credencial
+de bypass exposta, com avaliação de consumidores; nenhum valor em arquivo.
 
 ### Não fazer ainda
 
-Sem alteração Vercel/conexão Git, main, merge, bot, segredos, HML/Production,
-migrations ou novos/fechados PRs. Não desconectar Git para conter Production.
+Somente commit/push documental no #111 autorizados. Sem deploy manual,
+alteração Vercel/Supabase/Git, main, merge/force push, bot,
+tokens/segredos, HML/Production, migrations ou novos/fechados PRs. Sem revogar
+bypass sem autorização. Não desconectar Git para conter Production.
 
 ### Critério de conclusão
 
-Preflight real registrado; procedimento escolhido com provas de zero Production
-e Preview automático preservado; ações administrativas separadamente autorizadas.
-O plano atual permanece condicionado ao acesso, sem testes reais de ativação.
+Diagnóstico sanitizado publicado nos quatro documentos e CI/Preview conferidos
+no novo SHA. Inspeção AUTO-04 comprova conexão, main, zero hooks e aliases.
+Ensaio de zero Production e Preview preservado continua não executado; escrita
+e ativação exigem gates separados.
 
 ### Próxima etapa
 
-Leitura autenticada e aprovação específica do ensaio de contenção. Homologação
-funcional do #111 e decisões 048/049 permanecem na fila, sem reabertura da triagem.
+Rotação controlada, após autorização específica; depois ensaio descartável
+autorizado separadamente e revisão da instalação mínima, sem release do #111. Homologação funcional e decisões 048/049 seguem na fila.
 
 ## Marcos concluídos
 

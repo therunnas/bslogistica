@@ -5,6 +5,26 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## CHECKPOINT-AUTO-04B — 08/11/2026
+
+Publicação autorizada exclusivamente dos quatro documentos AUTO-04 na branch do
+PR #111; HEAD remoto/local inicialmente coincidentes, sem fast-forward necessário.
+Revisão sem valores secretos nos documentos; ocorrência de exposição registrada
+sem credencial, com rotação controlada ainda não autorizada. Resultados efetivos
+de publicação, testes, CI e Preview ficam no [HANDOFF](HANDOFF.md). Sem mudança
+no controlador, Vercel, main, HML/Production ou banco; nenhum deploy manual.
+
+## CHECKPOINT-AUTO-04 — 08/11/2026
+
+Diagnóstico autenticado por sessões existentes de GitHub, Vercel CLI no cache npm
+e Supabase CLI. GETs confirmaram conexão Git, branch Production main, ausência de
+Deploy Hooks, deployment servido/aliases e Preview do HEAD publicado. Nenhum
+provedor alterado, nenhum commit/push; evidências sanitizadas e próxima ação
+somente no [HANDOFF local](HANDOFF.md). Mantido o plano já publicado, com ensaio
+isolado e autorizações anteriores à instalação/ativação. Exposição acidental de
+identificador sensível na saída técnica comunicada, sem valor em arquivo;
+revisão administrativa separada pendente. Nenhuma nova auditoria funcional ou SQL.
+
 ## CHECKPOINT-AUTO-03B — 08/11/2026
 
 Sincronização autorizada exclusivamente dos quatro documentos locais da AUTO-03

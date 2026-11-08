@@ -170,7 +170,7 @@ A proposta de desconectar/reconectar Git descrita na AUTO-02 não atende a esse
 requisito e deixa de ser a recomendação. O GitHub mantém o plano anterior no
 histórico; esta revisão não autoriza alteração remota nem instalação na main.
 
-### Evidência atual e inspeção pendente
+### Evidência histórica e inspeção autenticada
 
 Referência histórica da leitura AUTO-03 no GitHub em 08/11/2026 (não é HEAD permanente):
 
@@ -184,10 +184,15 @@ Referência histórica da leitura AUTO-03 no GitHub em 08/11/2026 (não é HEAD 
 - O validador na main exporta `validarHandoff`, mas ainda não exige “Última tarefa”.
   Não pressupor que copiar apenas os YAML seja instalação completa ou equivalente.
 
-**Configuração Vercel real não inspecionada nesta etapa:** CLI não encontrada,
-nenhum token no processo, acesso ao navegador indisponível e plugin Vercel não
-instalado/conectado. Foi sugerida a conexão. O histórico de Preview no GitHub não
-comprova as configurações atuais do painel.
+**Limite histórico AUTO-03:** a sessão então não encontrou a CLI no PATH,
+e o navegador/plugin não estava disponível. **AUTO-04:** localizada CLI já
+existente no cache npm e sessão autenticada funcional; leitura real do projeto
+concluída, incluindo main como Production Branch, Git conectado, zero hooks e
+aliases. Evidências, limites e próxima ação somente no [HANDOFF](../HANDOFF.md),
+com publicação documental autorizada na AUTO-04B, sem ativação nem rotação.
+A tabela abaixo permanece o roteiro de
+revalidação, não uma declaração de acesso ainda bloqueado. Nada ativado; ensaio
+real do bloqueio continua pendente de autorização.
 
 | Leitura administrativa necessária           | O que registrar, sem segredos                                                                                          |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
