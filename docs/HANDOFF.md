@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**UX-AVULSA-01 — três rótulos da operação avulsa desvinculados de "carga e descarga", em PR Draft. Matriz curta de 9 cenários PASS no banco/RPC e na interface (localhost → HML).** SHAs e contagens abaixo são evidências de 09/11/2026; reconferir antes de agir.
+**UX-AVULSA-02 — item "Containers" removido do menu lateral, em PR Draft; o serviço de container passa a ser registrado como operação avulsa. #120 (UX-AVULSA-01) mesclado. Matriz curta de 9 cenários PASS no banco/RPC e na interface (localhost → HML).** SHAs e contagens abaixo são evidências de 09/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | UX-AVULSA-01 — Gate 1/2, desenvolvimento e validação local/CI |
-| Gate atual | Gate 2: PR Draft com validação local; CI do HEAD publicado a conferir no GitHub. Sem homologação, merge ou Production |
-| Último gate concluído | Homologação da matriz curta (9/9 PASS na interface, 38/38 no banco/RPC); HML 045 → 050 verificado; #119 integrado na main |
-| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-avulsa` (git worktree; o checkout `...\bslogistica` segue em `claude/jolly-allen-fqechw`). Descobrir de novo na retomada |
-| Branch | `ux/operacoes-avulsa-rotulos`, criada de `origin/claude/jolly-allen-fqechw` `d0e71432db5d6e2531d36c9ab3be25967c6a9230` |
-| Base | main `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef`; a branch herda 3 commits só de documentação (`2e0f91a`, `1999494`, `d0e7143`) |
-| HEAD validado | d0e71432db5d6e2531d36c9ab3be25967c6a9230 + o diff deste commit (três textos + HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Etapa | UX-AVULSA-02 — Gate 1/2, desenvolvimento e validação local/CI |
+| Gate atual | Gate 2: PR Draft com validação local e no navegador (localhost → HML, sem salvar); CI do HEAD publicado a conferir no GitHub. Sem homologação, merge ou Production |
+| Último gate concluído | #120 (UX-AVULSA-01) mesclado por squash em `f3f846e23370125344e73144bf33c6c9b18c96fd` (09/11/2026 21:04 UTC); matriz curta 9/9 PASS na interface e 38/38 no banco/RPC |
+| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-menu` (git worktree). Outros: `...\bslogistica` em `claude/jolly-allen-fqechw` (HANDOFF local não commitado, conteúdo já incorporado ao #120) e `...\bslogistica-ux-avulsa` em `ux/operacoes-avulsa-rotulos` (mesclada). Descobrir de novo na retomada |
+| Branch | `ux/menu-containers-como-avulsa`, criada de `origin/main` |
+| Base | main `f3f846e23370125344e73144bf33c6c9b18c96fd` |
+| HEAD validado | f3f846e23370125344e73144bf33c6c9b18c96fd + o diff deste commit (menu, duas expectativas de teste e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119 mergeado; #63, #106–#112 e #118 fechados com motivo |
-| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) não escrito nesta tarefa. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
-| Última ação comprovada | Três textos trocados; lint, TypeScript, check:workflow, check:vercel-deployments, 69/72 suítes e build PASS no Windows; 3 suítes com falha idêntica sem a mudança (ambiente) |
+| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #120 e #119 mesclados |
+| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) só lido pelo navegador, nada salvo. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
+| Última ação comprovada | Item de menu removido; lint, TypeScript, check:workflow, check:vercel-deployments, build e 69/72 suítes PASS no Windows (3 falhas de ambiente idênticas às anteriores); navegador: menu sem Containers, `/containers` abre por URL, Operações → Nova operação → Avulsa funciona (cancelado) |
 | Próxima ação exata | Conferir CI `validar` e `sql-local` no HEAD do PR; usuário revisa o Draft. Depois: decisões dos serviços avulsos e plano de Production 034 → 050 com `pg_dump` e autorização nominal |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `6fd2632`: migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119), mergeado). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| Main | `f3f846e` (#120 sobre `6fd2632`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -36,12 +36,24 @@
 
 | Campo | Valor |
 | --- | --- |
+| Tarefa executada | UX-AVULSA-02 (09/11/2026): retirar o item "Containers" da navegação lateral do admin. Decisão do responsável: serviço de container passa a ser registrado como operação avulsa em Operações (nome do serviço, equipe e diária). Nada apagado: rotas, ações, componentes, migrations 045–050 e dados de containers permanecem |
+| Resultados e testes comprovados | `src/app/(painel)/_components/app-shell.tsx`: removido `{ href: "/containers", label: "Containers", icon: Package }` e o import `Package`, sem outro uso (o lint reprovaria). Expectativas que conferiam o item: `scripts/testar-papel.mjs` E5 9 → 8 links, `TELAS_NAV` exclui `containers` como já excluía `usuarios` (a rota segue em `TELAS`, com guard e rota conferidos) e nova E5c "containers NÃO é item da navegação principal"; `scripts/testar-tela-operacional.mjs` B15 9 → 8. Windows, Node 26.13: `npm run lint` PASS, `npx tsc --noEmit` PASS, `check:workflow` PASS, `check:vercel-deployments` PASS, `test:papel` 111/0, `test:tela-operacional` 170/0, 69/72 `test:*` PASS, `npm run build` PASS, `git diff --check` PASS. Falham por ambiente Windows, iguais às da UX-AVULSA-01: `test:calendario-runners` 10/13, `test:workflow` 7/1, `test:vercel-deployments` 0/22. Navegador (app do worktree em `localhost:3001`, CSP → `qbnfcm…`, admin): menu com Dashboard, Apontamentos, Operações, Clientes e contratos, Colaboradores, Faturamento, Fechamento, Relatórios; `/containers` abre por URL direta com 11 serviços; Nova operação → tipo "Avulsa" mostra valor acordado por diária e data; cancelado, cartão Avulsas segue em 1 |
+| Código e PR afetados | `src/app/(painel)/_components/app-shell.tsx`, `scripts/testar-papel.mjs`, `scripts/testar-tela-operacional.mjs`, `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci`, `next dev` na porta 3001 lendo o `.env` existente sem alterá-lo, encerrado ao fim) e CI. HML só lido. Nenhum banco, Production, `.env`, chave de serviço, flag, migration, cálculo, faturamento, auth, `vercel.json` ou workflow tocado. O `next dev` reescreve `AGENTS.md` com bloco "nextjs-agent-rules": restaurado, fora do commit |
+| Pendências e decisões | Links restantes para `/containers`, mantidos de propósito: `faturamento/adicionais.tsx` (import de `../containers/_acoes`, `router.push` linha ~144 e `href` linha ~336) e `operacoes/painel-operacoes.tsx` linha ~701 (botão "Adicionar serviço de container" → `/containers/novo?operacao=…`). Testes que referenciam rotas `/containers` seguem válidos (`test-container-telas`, `test-container-dados`, `testar-func-ready`, `testar-compatibilidade-deploy`). Decisões abertas: lista de tipos de serviço, unidade e modalidade de cobrança dos avulsos (diária, unidade, valor fechado como adicional), remuneração por pessoa ou rateio, destino final do módulo Containers. Pendentes anteriores abaixo seguem válidos |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, remoção do item de menu e das expectativas que o conferiam, commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo/faturamento, auth/MFA, `vercel.json`, workflows, apagar/alterar rotas, ações, componentes ou dados de containers, remover os links listados, escrita no HML, Production, `.env`, chave de serviço, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — UX-AVULSA-01 (09/11/2026, #120 mesclado)
+
+| Campo | Valor |
+| --- | --- |
 | Tarefa executada | UX-AVULSA-01 (09/11/2026): trocar três textos da tela Operações que prendiam a avulsa a "carga e descarga". O tipo do serviço avulso passa a ser dito pelo nome da operação (decisão do responsável). Menu e módulo "Containers" inalterados |
 | Resultados e testes comprovados | Trocas: (1) `painel-operacoes.tsx`, opção do tipo "Avulsa (carga/descarga)" → "Avulsa"; (2) `painel-operacoes.tsx`, cartão "Avulsas" description "Carga e descarga" → "Serviços pontuais"; (3) `operacoes/page.tsx`, metadata description → "Operações fixas e avulsas, com turnos, intervalos e equipe alocada." (uma linha, exigência do Prettier corrigida à mão). Nenhuma suíte conferia os textos antigos. Windows, Node 26.13: `npm run lint` PASS, `npx tsc --noEmit` PASS, `check:workflow` PASS, `check:vercel-deployments` PASS, 69/72 `test:*` PASS, `npm run build` PASS (66 s, 24 páginas), `git diff --check` PASS. Falham `test:calendario-runners` (Python ausente), `test:workflow` (separador `\`) e `test:vercel-deployments` (caminho `C:\C:\…PC%20CASA`) com contagens idênticas no checkout original em `d0e7143` sem a mudança: ambiente Windows, a confirmar na CI Linux |
 | Código e PR afetados | `src/app/(painel)/operacoes/painel-operacoes.tsx`, `src/app/(painel)/operacoes/page.tsx`, `docs/HANDOFF.md`. PR Draft desta branch contra main, incluindo os 3 commits de documentação herdados |
 | Ambientes envolvidos | Local (worktree, `npm ci`) e CI. Nenhum banco, HML, Production, `.env`, chave de serviço, flag, migration, cálculo, faturamento, auth, `vercel.json` ou workflow tocado |
 | Pendências e decisões | Evolução dos serviços avulsos: lista de tipos reais, unidade/modalidade de cobrança (diária, unidade, valor fechado), se toda avulsa é por diária, remuneração por pessoa ou rateio, futuro do menu "Containers". Outras ocorrências não alteradas (fora do escopo): `painel-operacoes.tsx` "Operações fixas usam turnos diários; avulsas registram data e valor acordado." e "Valor acordado por diária (avulsa)"; `operacoes/page.tsx` openGraph "Operações fixas e avulsas com turnos e equipe alocada."; dashboard "Distribuição entre operações fixas e avulsas."; `/containers` "Serviços avulsos, valores negociados e custos por participante." Nenhuma outra menção de interface a carga/descarga em `src/` ou `scripts/`. Pendentes anteriores abaixo seguem válidos |
-| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Próxima ação exata | Concluída: CI validar/sql-local SUCCESS em `5cec5cf` e `9eb628f`; #120 mesclado pelo usuário em `f3f846e` |
 | Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, os três textos, commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo/faturamento, `billing.ts`, auth/MFA, `vercel.json`, workflows, HML, Production, `.env`, chave de serviço, módulo/menu "Containers", tipo/unidade/quantidade de serviço, merge, Ready, force push, outro PR |
 
 ### Tarefa anterior — homologação da interface (09/11/2026)
@@ -70,11 +82,11 @@
 
 ## Autorizações
 
-Escrita sintética `HOMOLOG-SINT` no HML pelas telas, incluindo uma fatura, autorizada e concluída em 09/11/2026, com resolução comercial OFF; não está mais vigente. UX-AVULSA-01: três textos da tela Operações, commit/push na branch `ux/operacoes-avulsa-rotulos` e PR Draft #120. Nenhuma correção pendente de aprovação. Não se estendem a outras escritas, Production ou ativação comercial.
+Escrita sintética `HOMOLOG-SINT` no HML pelas telas, incluindo uma fatura, autorizada e concluída em 09/11/2026, com resolução comercial OFF; não está mais vigente. UX-AVULSA-01: três textos da tela Operações, PR #120, mesclado pelo usuário em `f3f846e`. UX-AVULSA-02 (vigente): retirar o item "Containers" do menu, ajustar as expectativas de teste correspondentes, commit/push na branch `ux/menu-containers-como-avulsa` e um PR Draft. Nenhuma correção pendente de aprovação. Não se estendem a outras escritas, Production ou ativação comercial.
 
 ## Proibições
 
-Sem deploy ou migration em Production, nova escrita no HML, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, merge ou Ready do #120 sem autorização nominal.
+Sem deploy ou migration em Production, nova escrita no HML, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, apagar rotas/ações/dados de containers, merge ou Ready do PR da UX-AVULSA-02 sem autorização nominal.
 
 ## Retomada
 
