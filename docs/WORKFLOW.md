@@ -5,8 +5,8 @@ trabalham neste repositório. O fluxo protege a continuidade entre sessões sem
 reabrir decisões aprovadas nem transformar documentação em autorização.
 
 O inventário factual dos ambientes fica em [AMBIENTES.md](AMBIENTES.md), o
-checkpoint operacional atual em [HANDOFF.md](HANDOFF.md), o estado mutável do
-sistema em [ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md) e a fila de trabalho em
+estado atual e checkpoint principal em [HANDOFF.md](HANDOFF.md), o histórico em
+[ESTADO_DO_PROJETO.md](ESTADO_DO_PROJETO.md) e a fila de trabalho em
 [PROGRESS.md](../PROGRESS.md). O formato obrigatório dos prompts de sessão está em
 [PADRAO_DE_PROMPTS.md](PADRAO_DE_PROMPTS.md); ele delimita a autorização da
 sessão, mas não dispensa nenhum gate deste documento.
@@ -95,7 +95,27 @@ histórico de conversa e relatórios no chat não são fonte de estado; o Git e 
 GitHub prevalecem sobre qualquer um deles. Não é preciso commitar a cada comando,
 apenas registrar o checkpoint antes de transferir.
 
-### Checkpoint antes de transferir
+### Checkpoint por tarefa e antes de transferir
+
+Ao concluir ou interromper **cada tarefa**, inclusive documental, o executor
+atualiza a seção “Última tarefa” do HANDOFF com tarefa executada, resultados e
+testes comprovados, código/PR afetados, ambientes envolvidos, pendências e decisões,
+próxima ação exata e autorizações/proibições. Resultado não executado é “não
+executado”; resultado antigo identifica SHA e data e não se transfere à tarefa.
+O validador exige esses sete campos. A CI compara o conjunto publicado desde o
+HEAD anterior do evento (ou a base do PR na abertura) e recusa alterações sem
+HANDOFF no mesmo conjunto. A checagem estrutural não confirma a veracidade do
+relato; a evidência continua sendo responsabilidade do executor.
+
+Quando commit e push estiverem autorizados, o checkpoint acompanha a tarefa na
+branch ativa. Sem autorização de publicação, atualizar somente o working tree e
+declarar que o GitHub ainda não recebeu a tarefa. Nenhuma ferramenta tem exceção:
+as mesmas regras se aplicam a Claude Code, Codex e outras IAs.
+
+O [mecanismo pós-Preview](continuidade/CHECKPOINT_AUTOMATICO.md) altera somente um
+bloco técnico delimitado do HANDOFF e acrescenta um recibo por deployment, com
+escrita atômica condicionada ao HEAD. Não substitui o checkpoint funcional do agente
+nem infere homologação, destino do banco, migrations ou decisões comerciais.
 
 O agente que encerra ou pausa a sessão atualiza no HANDOFF:
 
@@ -104,7 +124,11 @@ O agente que encerra ou pausa a sessão atualiza no HANDOFF:
 3. alterações não commitadas, por caminho, ou “Nenhuma”;
 4. último gate concluído e gate em andamento;
 5. testes executados, cada um vinculado ao SHA ou ao working tree em que rodou;
-6. próxima ação autorizada, proibições e bloqueios.
+6. próxima ação autorizada, proibições e bloqueios;
+7. o que foi executado, o que funcionou e o que não funcionou, com a evidência e o ambiente de cada resultado;
+8. o estado de cada entrega nos níveis **implementado, validado localmente, CI aprovada, publicado em Preview,
+   aplicado no HML, homologado e publicado em Production**, que nunca são equivalentes (código no Preview não é
+   migration aplicada; CI verde não é homologação).
 
 Commit e push do checkpoint seguem a autorização vigente. Sem ela, o HANDOFF fica
 atualizado no working tree e aparece em “Alterações não commitadas”. Um checkpoint
@@ -116,7 +140,9 @@ invalidam suas evidências. Qualquer outra diferença invalida.
 
 ### Reconciliação na retomada
 
-1. `git worktree list` e `git status --short --branch` no worktree indicado.
+1. Descobrir o checkout com `git rev-parse --show-toplevel`, `git worktree list` e
+   `git branch --show-current`; conferir `git status --short --branch`. Caminhos
+   escritos no checkpoint são evidência da sessão anterior, não configuração fixa.
 2. HEAD local com `git rev-parse HEAD`; HEAD remoto com
    `git ls-remote origin refs/heads/<branch>` ou `gh pr view <n> --json headRefOid`.
    O clone pode buscar só `main`: não confiar em `origin/<branch>` sem conferir.
@@ -128,6 +154,10 @@ invalidam suas evidências. Qualquer outra diferença invalida.
    pela última execução visível.
 6. Divergência entre HANDOFF e Git/GitHub é registrada no próprio HANDOFF antes
    de qualquer ação da tarefa.
+7. Quando houver atualização remota autorizada, buscar a branch descoberta e
+   sincronizar exclusivamente por fast-forward se o working tree estiver limpo.
+   Havendo alteração local, commit local exclusivo ou divergência, preservar e
+   reportar; não usar stash, reset, rebase ou descarte automático.
 
 ## Gate 1 — desenvolvimento
 

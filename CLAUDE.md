@@ -368,5 +368,18 @@ authenticated` e injetar as claims com `set_config`.
 | [docs/SEGURANCA.md](docs/SEGURANCA.md)                 | modelo de segurança e riscos residuais            |
 | [docs/divida-tecnica/](docs/divida-tecnica/)           | histórico das dívidas já resolvidas, com índice   |
 
-Estado mutável tem **uma única fonte**: `ESTADO_DO_PROJETO.md`. Não o repita em
-outros arquivos; aponte para ele.
+O checkpoint operacional único é `docs/HANDOFF.md`; o histórico factual fica em
+`docs/ESTADO_DO_PROJETO.md` e a fila em `PROGRESS.md`. Não criar outra fonte de
+continuidade nem copiar o checkpoint de uma release sobre a main.
+
+## Continuidade entre agentes
+
+Ao concluir ou interromper **cada tarefa**, preencher os sete campos de “Última
+tarefa” no `docs/HANDOFF.md`: tarefa, resultados/testes comprovados, código/PR,
+ambientes, pendências/decisões, próxima ação exata e autorizações/proibições.
+Quando a publicação estiver autorizada, incluir esse checkpoint no mesmo conjunto
+de commits/push da tarefa, na branch ativa. Sem autorização, mantê-lo local e
+informar a diferença. A CI exige a alteração do HANDOFF no conjunto publicado.
+Descobrir worktree, branch e HEAD remoto em cada retomada; nunca fixar caminhos ou
+SHAs antigos. Evidência automática de Preview não é homologação nem autorização.
+Mecanismo e limites: [Checkpoint automático](docs/continuidade/CHECKPOINT_AUTOMATICO.md).

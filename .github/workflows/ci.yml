@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Node 24 é o runtime LTS usado na Vercel. Os testes rodam com
       # --experimental-strip-types, que exige Node 22.6 ou superior — o mesmo
@@ -49,6 +51,13 @@ jobs:
 
       - name: Validar workflow documental
         run: npm run check:workflow
+
+      - name: Exigir checkpoint no conjunto publicado da tarefa
+        if: github.event_name == 'pull_request'
+        run: npm run check:workflow -- --base "$CHECKPOINT_BASE_SHA" --head "$CHECKPOINT_HEAD_SHA"
+        env:
+          CHECKPOINT_BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha }}
+          CHECKPOINT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Teste dias-especiais
         run: npm run test:dias-especiais
@@ -248,6 +257,9 @@ jobs:
 
       - name: Teste workflow documental
         run: npm run test:workflow
+
+      - name: Teste checkpoint automático de Preview
+        run: npm run test:checkpoint-preview
 
       # O build pré-renderiza páginas que leem as variáveis públicas do Supabase
       # e falha sem elas, de propósito. Os valores abaixo são inertes: domínio

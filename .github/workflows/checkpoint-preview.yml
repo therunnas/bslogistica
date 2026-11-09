@@ -1,0 +1,50 @@
+name: Checkpoint Preview
+
+on:
+  workflow_run:
+    workflows: [CI, Preview signal]
+    types: [completed]
+
+# CHECKPOINT-AUTO-02: trava versionada. Ativação exige outra alteração revisada.
+permissions: {}
+
+concurrency:
+  group: checkpoint-preview-${{ github.event.workflow_run.head_sha || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  checkpoint:
+    if: >-
+      false &&
+      github.repository == 'therunnas/bslogistica' &&
+      vars.CHECKPOINT_AUTO_ENABLED == 'true' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+      pull-requests: read
+    steps:
+      - name: Checkout do controlador confiável
+        uses: actions/checkout@v4
+        with:
+          # Nunca checkout de branch, commit ou artefato indicado pelo PR.
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Conferir evidência sem publicar
+        run: node scripts/atualizar-checkpoint-preview.mjs --dry-run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CHECKPOINT_AUTO_ENABLED: ${{ vars.CHECKPOINT_AUTO_ENABLED }}
+          CHECKPOINT_PREVIEW_BRANCHES: ${{ vars.CHECKPOINT_PREVIEW_BRANCHES }}
+          CHECKPOINT_PREVIEW_PROJECT: ${{ vars.CHECKPOINT_PREVIEW_PROJECT }}
+          CHECKPOINT_PREVIEW_TEAM: ${{ vars.CHECKPOINT_PREVIEW_TEAM }}
