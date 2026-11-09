@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { LocalidadeDaOperacao } from "../_components/calendario-territorial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -697,11 +695,6 @@ export function PainelOperacoes() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button asChild variant="outline" size="sm" className="rounded-xl">
-                      <Link href={`/containers/novo?operacao=${operation.id}`}>
-                        Adicionar serviço de container
-                      </Link>
-                    </Button>
                     <Button
                       type="button"
                       variant="outline"
