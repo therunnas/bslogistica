@@ -25,32 +25,30 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**CHECKPOINT-AUTO-09 — Gate 1 somente preparado em branch da main.**
-Regra main:false, validador Node e negativos em CI, sem release ou controlador.
-[Draft #113](https://github.com/therunnas/bslogistica/pull/113) publicado; merge não autorizado. Estado/checks e plano de
-integração no [HANDOFF](docs/HANDOFF.md), único checkpoint desta linha.
+**AUTO-10B — Gate 1 PASS; checkpoint no Draft #114, integração pendente.**
+Somente #113 integrado, main `2561b919da5ab31e0ed1882864ee069b9961b6f7`; 30 minutos observados, Production
+preservada e Preview Git via PR READY. Sem release #111/#112 ou controlador.
+Evidências e limites no [HANDOFF](docs/HANDOFF.md).
 
 ### Fazer agora
 
-Revisar o HEAD final do Draft #113 e obter autorização nominal de integração do
-Gate 1, com janela e responsável pela resposta a falhas definidos. Production preservada, contenção
-ainda não aplicada na main. Não iniciar gates 2–5.
+Revisar/autorizar integração deste checkpoint documental. Depois autorizar tarefa
+isolada do Gate 2 mínimo desativado; nenhuma instalação foi iniciada.
 
 ### Não fazer ainda
 
-Merge, Production, HML/Supabase, migrations, bot, deploy manual, credenciais,
-integração #111/#112 ou reconciliação funcional.
+Sem merge deste Draft, #111/#112, banco/migrations, recuperação administrativa,
+deploy manual, credenciais ou instalação/ativação do controlador por inferência.
 
 ### Critério de conclusão
 
-Draft mínimo da main com testes/checks e Preview próprios, baseline Production
-preservada, riscos/autorizações e próximo gate registrados; sem merge.
+Squash exato, CI da nova main, 30 minutos sem Production novo, Preview automático
+READY e checkpoint publicado separado. Integração documental tem aprovação própria.
 
 ### Próxima etapa
 
-Gate 1: integração nominalmente autorizada e comprovação da contenção real;
-depois gates independentes 2 (controlador desativado), 3 (dry-run), 4 (escrita),
-5 (primeiro recibo). Não executar nesta tarefa.
+Checkpoint aprovado → Gate 2 mínimo com false &&/read/--dry-run/flag desligada →
+Gate 3 dry-run → Gate 4 escrita → Gate 5 primeiro recibo, cada qual autorizado.
 
 ### Fila funcional herdada da main — pausada nesta tarefa
 

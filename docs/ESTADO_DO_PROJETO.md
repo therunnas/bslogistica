@@ -5,6 +5,19 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## AUTO-10B — Gate 1 PASS (08/11/2026 BRT)
+
+Squash #113 em `2561b919da5ab31e0ed1882864ee069b9961b6f7`, pai 38b4349 e árvore idêntica ao candidato53dce23.
+main:false/Next.js e CI de política presentes; CI validar/sql-local aprovada.
+Observação 2026-11-09T02:22:16Z → 2026-11-09T02:52:26Z (1810.0 s,
+49 amostras): mesmos 43 Production, zero novos, mesmo servido/aliases/
+domínios/proteção/Git; nenhum deployment do merge. Total 212→213, novo Preview
+Git READY do controle0732b66 via Draft #114. Push isolado sem PR não comprovado.
+Originais locais AUTO-10 preservados, nenhum banco/credencial ou app alterado.
+Checkpoint neste Draft separado, integração ainda não autorizada; #111/#112
+preservados, Gate 2 somente proposto, controlador ausente da main e desativado
+no #111. Evidências/limites e próxima autorização no [HANDOFF](HANDOFF.md).
+
 ## CHECKPOINT-AUTO-09 — Gate 1 preparado (08/11/2026 BRT)
 
 Branch chore/gate1-production-deployment-guard criada exclusivamente da main
