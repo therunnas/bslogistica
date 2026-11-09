@@ -25,32 +25,33 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**AUTO-11 — Gate 1 consolidado; Gate 2 mínimo candidato desativado.**
-#114 integrado por squash em b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b;
-CI da nova main aprovada, main:false e Production preservados. Composição Gate 2
-isolada para PR Draft da branch chore/gate2-checkpoint-disabled, sem release
-#111/#112. Evidências, testes e estado publicado no [HANDOFF](docs/HANDOFF.md).
+**AUTO-12 — Gate 2 PASS, instalado desativado.** #115 integrado por squash na
+main `92478763af9674ecd327333020ea2a6f240ee404`; CI aprovada, main:false/Production preservados.
+Workflow_run observado com checkpoint SKIPPED/zero steps; sem dry-run ativo,
+escrita ou recibo automático. Registro factual separado desta etapa, estado de
+integração no GitHub e evidências no [HANDOFF](docs/HANDOFF.md).
 
 ### Fazer agora
 
-Revisar o Draft do Gate 2 e autorizar nominalmente sua integração desativada após
-revalidar SHA/base/diff/CI/Preview/Production. Nenhum merge do Gate 2 autorizado.
+Revisar/autorizar nominalmente a integração do checkpoint documental se pendente;
+depois aprovar separadamente o [protocolo Gate 3](docs/continuidade/CHECKPOINT_AUTOMATICO.md)
+read-only. Nenhuma mudança de ativação está autorizada nesta etapa.
 
 ### Não fazer ainda
 
-Sem gates 3–5, remoção de false &&, escrita automática, merge #111/#112,
-banco/migrations, alteração administrativa Vercel, credenciais ou deploy manual.
+Sem remover false &&, flag ON, dry-run hospedado ativo, contents: write, --write,
+recibo, gates 4–5, merge #111/#112, app, banco/migrations ou intervenção Production.
 
 ### Critério de conclusão
 
-#114 consolidado e main revalidada; candidato mínimo testado/publicado em Draft,
-CI/Preview do próprio SHA conferidos e zero Production inesperado. Consultar
-checks no GitHub; não transferir PASS de outra branch nem criar commit recursivo.
+#115 exato integrado, CI da nova main aprovada, árvore/17 arquivos/travas/Gate 1
+preservados, Production estável e nenhuma escrita automática. Resultado comprovado
+na AUTO-12; publicação documental tem SHA/checks próprios, sem commit recursivo.
 
 ### Próxima etapa
 
-Autorização específica → integrar/revalidar Gate 2 desativado → autorização Gate 3
-para dry-run hospedado em leitura → Gate 4 escrita → Gate 5 recibo, separados.
+Consolidar checkpoint se pendente → autorização Gate 3 para ensaio hospedado em
+leitura e retorno OFF → Gates 4 e 5 somente com autorizações independentes.
 
 ### Fila funcional herdada da main — pausada nesta tarefa
 

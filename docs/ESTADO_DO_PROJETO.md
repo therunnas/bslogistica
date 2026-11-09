@@ -5,6 +5,30 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## AUTO-12 — Gate 2 instalado desativado, PASS (09/11/2026 UTC)
+
+#115 Ready e squash do HEAD exato fda7fcc9df7b64d0393852c9cc5256624a7b9b52 sobre
+b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b; main `92478763af9674ecd327333020ea2a6f240ee404`,
+árvore idêntica ao candidato, 17 arquivos, sem funcionalidade/SQL/dependências ou
+alteração vercel.json. [CI validar/sql-local SUCCESS](https://github.com/therunnas/bslogistica/actions/runs/42560037734).
+56 testes locais pertinentes e validações YAML/contrato/Gate 1 PASS nesta sessão.
+
+Sete leituras paginadas, última Vercel em 2026-11-09T04:12:39Z (309 s após squash);
+processo de consultas encerrado em 2026-11-09T04:12:44Z, duração agregada 315,0 s:
+216→216 deployments, mesmos 43 Production (todos os estados), zero deployment do
+merge. Servido dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4 no SHA 38b43490a8e0913c62a4ee6047ef48a8288ca0dc,
+aliases/domínios/proteção/Git preservados. Refs só avançaram pelo squash autorizado,
+sem bot/recibo novo. Controlador e sinalizador presentes na default main; run
+[42560278574](https://github.com/therunnas/bslogistica/actions/runs/42560278574) workflow_run/checkpoint SKIPPED, zero steps.
+false &&, contents: read, --dry-run, flag ausente/OFF, sinal sem escrita e checkout
+confiável mantidos. Estado active na API é registro do workflow, não ativação do bot.
+
+Sem dry-run hospedado ativo, token read exercido, escrita, homologação funcional
+ou operação Supabase. Registro documental separado, sem merge automático; verificar
+integração no GitHub. Gate 3 somente plano detalhado, exige autorização própria;
+Gates 4–5 proibidos. #111/#112 e worktrees anteriores preservados. Evidências e
+próxima ação no [HANDOFF](HANDOFF.md); históricos anteriores mantêm seus escopos.
+
 ## AUTO-11 — checkpoint consolidado e Gate 2 candidato (09/11/2026 UTC)
 
 #114 exclusivamente documental: HEAD final 0917e0c16e8480bcb74e7a638027e91dfd961c26,
