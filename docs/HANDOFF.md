@@ -2,6 +2,17 @@
 
 <!-- workflow-handoff:v1 -->
 
+**AUTO-10B — controle sintético de Preview em andamento, não é homologação.**
+Main integrada pelo squash #113: `2561b919da5ab31e0ed1882864ee069b9961b6f7`. Regra main:false preservada.
+Produção servida continua dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4/38b4349;
+nenhum deployment do merge nas leituras. CI da nova main aprovada. Janela de
+30 minutos iniciada em 2026-11-09T02:22:16Z; Gate 1 ainda não pode ser PASS.
+Esta branch docs/checkpoint-auto-10b-gate1-result foi criada diretamente da main integrada; apenas este
+marcador documental provoca o Preview Git. Sem src, banco, configuração Vercel,
+credenciais ou controlador. Aguardar READY/SHA/source/target e conclusão da janela.
+Os registros AUTO-09 seguintes são históricos e serão reconciliados no fechamento.
+
+
 **CHECKPOINT-AUTO-09 — Gate 1 somente preparado. SDLC: Desenvolvimento/Testes,
 com publicação de PR Draft autorizada; merge não autorizado. A main e Production
 permanecem sem alteração. A contenção real só poderá ser comprovada após integração
