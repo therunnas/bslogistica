@@ -2,47 +2,100 @@
 
 <!-- workflow-handoff:v1 -->
 
-**CHECKPOINT-AUTO-10B — Gate 1 PASS na janela observada. SDLC: integração e
-testes de infraestrutura. Somente #113 foi integrado; main:false está na main,
-Production servida foi preservada e Preview automático via PR comprovado.
-Controlador ausente da main, desativado no #111; gates 2–5 não executados.**
+**CHECKPOINT-AUTO-11 — Gate 1 consolidado; Gate 2 mínimo candidato desativado.
+SDLC: Desenvolvimento / Testes. #114 integrado por squash na main; composição do
+Gate 2 isolada para revisão em PR Draft, sem merge ou ativação autorizados.**
 
-Este checkpoint consolida o resultado do Gate 1 pela linha documental do
-[#114](https://github.com/therunnas/bslogistica/pull/114); consultar no GitHub seu
-estado e o SHA da integração. AUTO-11 autoriza a consolidação após revalidação
-e a preparação de um PR Draft mínimo do Gate 2, mantido desativado. Nenhum merge
-do Gate 2 ou ativação está autorizado.
+O estado desta branch não substitui o da main até integração específica. A main
+contém a contenção do Gate 1 e seu checkpoint, sem controlador. Este candidato
+porta somente infraestrutura/contrato de continuidade; #111/#112 preservados.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | AUTO-10B — Gate 1 integrado e PASS; consolidação documental #114 |
-| Gate atual | Preparação do Gate 2 autorizada pela AUTO-11 após revalidar a main; merge/ativação do Gate 2 não autorizados |
-| Último gate concluído | Squash #113 + CI da nova main + observação completa de 30 minutos + Preview Git READY |
-| Worktree | /private/tmp/bs-checkpoint-auto-10b/worktree; worktree original /private/tmp/bs-fin-20d preservado com três documentos locais; redescobrir ao retomar |
-| Branch | docs/checkpoint-auto-10b-gate1-result, criada da main integrada; controle e checkpoint, sem funcionalidade |
-| Base | 2561b919da5ab31e0ed1882864ee069b9961b6f7 — main integrada; base anterior autorizada 38b43490a8e0913c62a4ee6047ef48a8288ca0dc |
-| HEAD validado | 2561b919da5ab31e0ed1882864ee069b9961b6f7 — main/CI; smoke 0732b66e85b3768101da854307ba6a5a32a6d25c. HEAD documental deste PR tem checks próprios a consultar, sem transferir PASS |
-| Alterações não commitadas | Fechamento somente de HANDOFF, PROGRESS e ESTADO_DO_PROJETO nesta branch; os três originais locais anteriores permanecem intocados no outro worktree |
-| PR | #113 MERGED; #114 consolidação documental (estado no GitHub); #111 e #112 preservados nos HEADs abaixo |
-| Ambiente-alvo | GitHub/main protegida contra deploy Git; Preview de controle; Production somente observada; nenhum HML/Supabase |
-| Última ação comprovada | 1810.0 s, 49 amostras com histórico completo; 43 Production antes/depois, zero novos; merge sem deployment; CI aprovada e smoke READY |
-| Próxima ação exata | Após confirmar #114 integrado e main/CI/Production preservados, preparar/testar/publicar Gate 2 mínimo em PR Draft, com todas as travas; sem merge ou ativação |
+| Etapa | AUTO-11 — consolidação #114 e preparação/publicação do Gate 2 mínimo |
+| Gate atual | Gate 2 candidato em branch isolada; merge e Gate 3 não autorizados |
+| Último gate concluído | Gate 1 PASS no AUTO-10B; checkpoint #114 integrado e main/CI/Production revalidados na AUTO-11 |
+| Worktree | /private/tmp/bs-checkpoint-auto-11/gate2; originais anteriores preservados no outro worktree; redescobrir caminhos ao retomar |
+| Branch | chore/gate2-checkpoint-disabled — criada da main consolidada, sem cherry-pick integral da release |
+| Base | b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b — squash documental #114; conferir main remota ao retomar |
+| HEAD validado | b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b — main/CI. Testes do Gate 2 executados neste working tree; HEAD publicado e checks próprios devem ser consultados no PR desta branch |
+| Alterações não commitadas | Composição mínima e checkpoint incluídos no conjunto autorizado desta tarefa; após publicação conferir status. Três docs preexistentes AUTO-10 permanecem locais e intocados no worktree original |
+| PR | #114 MERGED; Gate 2: PR Draft desta branch contra main, consultar HEAD/checks no GitHub; #111/#112 abertos Draft e preservados |
+| Ambiente-alvo | GitHub/CI e Preview automático do candidato. Production somente leitura; nenhum HML/Supabase |
+| Última ação comprovada | #114 squash/documentação e CI da nova main PASS; 191,3 s de observação sem deployment do squash, mesmos 43 Production/servido/aliases/proteção/Git; testes locais da composição abaixo |
+| Próxima ação exata | Revisar o PR Draft do Gate 2 e autorizar nominalmente sua integração desativada após revalidar HEAD/base/diff/CI/Preview/Production. Não executar Gate 3 |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Revalidar, tornar #113 Ready, squash condicionado ao HEAD exato, monitorar 30 minutos, controlar Preview e publicar checkpoint separado |
-| Resultados e testes comprovados | Árvore do squash idêntica ao candidato, pai correto; CI validar/sql-local SUCCESS na nova main; 27 testes locais (22 política/5 documentais) PASS; janela 1810.0 s/49 amostras sem Production novo; Preview Git READY com SHA/branch/PR/recibo corretos. Validação documental, 5 testes documentais, política Vercel e diff --check PASS; revisão dos três documentos sem padrões de segredo |
-| Código e PR afetados | Main contém somente os oito arquivos autorizados do #113. Controle/checkpoint altera apenas documentação em #114; sem release #111/#112, app, SQL, migration ou controlador |
-| Ambientes envolvidos | Main GitHub e Preview automático; Vercel Production só leitura. Sem deploy manual, promoção/cancelamento/aliases ou credenciais; sem operação Supabase |
-| Pendências e decisões | Gate 1 PASS delimitado à janela e fluxo Preview via PR. Push isolado não comprovou Preview. AUTO-11 autoriza consolidação #114 e preparação/publicação do Gate 2 desativado após revalidação; merge e ativação do Gate 2 continuam proibidos |
-| Próxima ação exata | Revalidar main após #114; preparar Gate 2 mínimo isolado, preservando main:false e false &&/read/--dry-run/flag desligada; publicar somente Draft |
-| Autorizações e proibições | Exercidos apenas Ready/squash #113 exato, smoke Git e publicação documental separada. AUTO-11 permite squash documental #114 após checks e preparo/publicação do Gate 2; sem merge Gate 2/#111/#112, recuperação administrativa, banco, migração, credenciais, deploy manual ou ativação |
+| Tarefa executada | Ajustar referências transitórias dos três documentos do #114, validar/publicar/squash documental; portar seletivamente controlador mínimo desativado da referência #111 para branch nova da main consolidada |
+| Resultados e testes comprovados | #114: três arquivos/blobs e árvore do squash conferidos, CI validar/sql-local SUCCESS na nova main, zero deployment do squash. Gate 2: 70/70 suítes Node PASS, incluindo 26 casos de automação, 8 documentais e 22 de política Vercel; lint/TypeScript PASS; validação estrutural YAML/CI/Gate 1 PASS. Build Turbopack PASS (31,73 s, variáveis públicas inertes da CI), diff --check/revisão de segurança PASS; CI/Preview do candidato têm evidência própria, sem herdar CI do #111 |
+| Código e PR afetados | #114 exclusivamente HANDOFF/PROGRESS/ESTADO. Gate 2: dois workflows, três módulos Node, suíte, validador/contrato documental e integração mínima na CI, sem aplicação/SQL/migration/dependências ou documentos do #112 |
+| Ambientes envolvidos | Publicação Git autorizada e Preview automático. Vercel real apenas consultas GET, sem alteração administrativa, deploy manual ou uso de bypass. Nenhuma operação Supabase/HML/Production |
+| Pendências e decisões | Controlador ausente da main e candidato com false &&/contents: read/--dry-run/flag OFF. Publicação Draft não é instalação; CI/Preview do novo SHA devem ser verificados no GitHub e relatados sem commit recursivo só de checks. Gate 3 somente planejado |
+| Próxima ação exata | Revisar/autorizar separadamente o merge do Gate 2 desativado; depois revalidar main e contenção antes de solicitar ensaio Gate 3 em leitura com autorização própria |
+| Autorizações e proibições | AUTO-11 exercida para squash documental #114 e preparo/testes/commit/push/PR Draft mínimo Gate 2. Sem merge Gate 2/#111/#112, ativação, remoção de false &&, escrita automática, configuração Vercel, deploy manual, banco/migrations, credenciais, aliases ou domínios |
+
+## Evidência automática de Preview
+
+<!-- checkpoint-preview:start -->
+Controlador candidato desativado: false &&, contents: read, --dry-run e flag OFF.
+Nenhum recibo automático ou dry-run hospedado executado por esta composição.
+<!-- checkpoint-preview:end -->
 
 ## Evidências
+
+### AUTO-11 — consolidação documental comprovada
+
+- #114 ajustou somente referências transitórias em HANDOFF, PROGRESS e ESTADO;
+  HEAD final `0917e0c16e8480bcb74e7a638027e91dfd961c26`, três blobs remotos
+  conferidos, CI/Preview próprios aprovados, Ready e nenhuma revisão/thread
+  bloqueante. CodeRabbit não produziu aprovação de código (política do serviço).
+- Squash em 2026-11-09T03:23:27Z: `b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b`,
+  pai `2561b919da5ab31e0ed1882864ee069b9961b6f7`, árvore idêntica ao candidato.
+  [CI da nova main](https://github.com/therunnas/bslogistica/actions/runs/42556140779):
+  validar e sql-local SUCCESS, sem supressão de checks ou --admin.
+- Leituras completas/paginadas antes e após o squash, até 03:26:42Z (191,3 s):
+  215 deployments totais, mesmos 43 Production, zero deployment associado ao
+  squash em qualquer target/estado, Git e main:false preservados. Servido
+  `dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4`, SHA
+  `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, mesmos aliases/domínios/proteção.
+  É verificação desta consolidação, não nova homologação ou repetição do AUTO-10B.
+
+### AUTO-11 — composição mínima do Gate 2
+
+Branch criada de b26b6d8, fonte seletiva #111
+`7e08270011f74ea5dfe4470097f58659eea81140`. Sem merge/cherry-pick de release,
+sem app, SQL/migrations, lockfile, documentos de negócio #112 ou nova dependência.
+O [guia técnico](continuidade/CHECKPOINT_AUTOMATICO.md) descreve os componentes,
+limites e o plano do Gate 3. HANDOFF permanece entrada única de continuidade;
+AGENTS/CLAUDE compartilham contrato literal de sete campos por tarefa.
+
+Workflows permanecem com **false &&, contents: read, --dry-run e flag OFF**.
+Sinalizador sem checkout/escrita; controlador usa github.workflow_sha confiável,
+sem executar código/artefatos de PR. Nenhum secret ou variável foi configurado.
+A composição é candidata; workflow_run depende da instalação na branch padrão,
+ainda não autorizada. Sem dry-run hospedado, recibo ou escrita automática real.
+
+Testes desta composição (não transferidos do #111): 70 suítes Node PASS; 26 casos
+cobrem repetição/idempotência, CAS/conflito/resposta perdida, SHA/CI/origem/branches,
+falha de consulta/evidência insuficiente, documentação/loops e locks. Mais 8 casos
+documentais e 22 de política Vercel. Lint e TypeScript PASS. YAML validado e CI
+comparada estruturalmente à base: só histórico completo no checkout de validar,
+gate HANDOFF e suíte nova; Gate 1/permissões/jobs restantes intactos. Build padrão Turbopack PASS em 31,73 s
+com placeholders públicos inertes, sem .env/credenciais reais. Diff --check e
+revisão de segurança PASS. Revisão independente da composição sem achado crítico
+ou importante para o Draft; observação de contrato CLAUDE corrigida e teste do
+checkout confiável/cache/artefatos reforçado, 26 casos reexecutados PASS. Nenhum
+resultado de teste hospedado/CI/Preview do candidato é presumido antes de sua
+consulta no SHA publicado. Consultar checks próprios sem commit recursivo só
+para registrar status.
+
+Históricos seguintes mantêm seus SHAs/resultados e não representam autorização
+vigente. AUTO-06 FAIL, AUTO-07 PASS e AUTO-08 TRANS-MAIN PASS seguem independentes.
 
 ### AUTO-10 interrompido e preservação local
 
@@ -106,7 +159,7 @@ bypass, autenticação funcional ou homologação a partir de READY/HTTP 200.
 O fechamento documental posterior pode gerar outro Preview autorizado; ele tem
 SHA/checks próprios e não pertence à contagem da janela acima.
 
-### Gate 2 — proposta mínima, sem instalação
+### Histórico AUTO-10B — proposta do Gate 2 então não preparada
 
 Reutilizado o [plano existente do #111](https://github.com/therunnas/bslogistica/blob/7e08270011f74ea5dfe4470097f58659eea81140/docs/continuidade/CHECKPOINT_AUTOMATICO.md),
 sem repetir auditorias. Fonte atual `7e08270011f74ea5dfe4470097f58659eea81140`; base futura deve ser redescoberta
@@ -134,7 +187,7 @@ exige aprovação nominal separada. Instalação na main não realizada; gates 3
 continuam sujeitos a autorizações independentes. Rollback sempre preserva
 main:false; qualquer intervenção administrativa continua sem autorização.
 
-### Estado publicado e limites
+### Histórico AUTO-10B — estado publicado e limites
 
 #113 mergeado; #111 `7e08270011f74ea5dfe4470097f58659eea81140` e #112 `2d1c0cde7bd47154a281171d77858b530d0b6de2` permanecem
 abertos Draft, sem integração ou reconciliação funcional. Controlador ausente na
@@ -310,7 +363,7 @@ inferência a partir da release #111.
 
 ## Migrations por ambiente
 
-AUTO-09: nenhuma consulta/operação de banco ou alteração SQL. Os estados abaixo
+AUTO-11: nenhuma consulta/operação de banco ou alteração SQL. Os estados abaixo
 são o último registro herdado da main, não reconferidos nesta tarefa.
 
 - Esta etapa não criou nem aplicou migration.
@@ -337,9 +390,10 @@ Merge e mudanças de main/Production não autorizados. Os itens abaixo são hist
 
 ## Proibições
 
-AUTO-10B: não remover main:false; sem rollback cego, deploy manual, promoção,
-cancelamento, alias, credenciais, banco, migrations, #111/#112 ou gates 2–5.
-A consolidação #114 foi autorizada na AUTO-11; merge do Gate 2 e ativações exigem novas autorizações.
+AUTO-11: não remover main:false; sem rollback cego, deploy manual, promoção,
+cancelamento, alias, credenciais, banco, migrations ou merge #111/#112/Gate 2.
+#114 integrado; Gate 2 candidato autorizado somente em Draft. Gates 3–5 exigem
+autorizações independentes. Não confundir publicação do candidato com instalação.
 Os limites AUTO-09 abaixo pertencem àquela sessão, não desfazem o squash concluído.
 
 AUTO-09: sem merge, main direta, release #111/#112, Vercel real, HML/Supabase,
@@ -369,8 +423,10 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 - Registros funcionais/banco seguintes são históricos da main; sem reconciliação
   funcional nesta tarefa nem autorização herdada desses parágrafos.
 
-- **Production roda código 045 sobre banco 034.** Não é novidade desta sessão (vem
-  desde o FIN-PR-01), mas o merge em `main` publica antes da CI. Opções: manter
+- **Histórico funcional: Production roda código 045 sobre banco 034.** Não é nova
+  inspeção de banco. O acoplamento Git/Production referido nos registros antigos
+  foi contido pelo Gate 1; esta etapa não altera código ou banco servido. Opções
+  históricas de tratamento, sempre com autorização própria: manter
   (a compatibilidade 034 → 045 está testada), conter por rollback na Vercel com
   acesso administrativo, ou preparar 035–045 em Production com backup novo.
 - Pendências reais: revisão humana dos PRs #103 e #104; **segunda cópia** do backup em outro
@@ -383,11 +439,15 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 
 ## Retomada
 
-1. Descobrir worktrees, alterações e HEADs remotos; preservar os três documentos
-   originais no worktree anterior. Ler este checkpoint e o estado/checks do #114 no GitHub.
-2. Revalidar o squash documental #114 e a main remota, main:false, CI e Production;
-   o SHA 2561b919da5ab31e0ed1882864ee069b9961b6f7 acima é a integração histórica do Gate 1.
-3. AUTO-11 permite preparar/testar/publicar Gate 2 em Draft a partir da main
-   atualizada, com manifesto mínimo e locks preservados. Não integrar/ativar.
-4. Se houver incidente, STOP e evidências; proprietário decide e autoriza qualquer
-   intervenção administrativa. Nunca cancelar/promover/trocar alias ou remover a trava.
+1. Redescobrir worktrees/status/HEADs, preservar originais locais AUTO-10 e ler
+   este HANDOFF na branch/PR da tarefa autorizada. Main e release #111 têm estados
+   distintos; não copiar seus checkpoints um sobre o outro.
+2. Conferir #114 MERGED e main remota; b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b
+   é a consolidação histórica desta sessão. Validar main:false, CI e Production.
+3. Localizar PR Draft chore/gate2-checkpoint-disabled e conferir seu HEAD/diff/
+   checks/Preview próprios. Merge exige nova autorização nominal; manter todas
+   as travas e os componentes do Gate 1.
+4. Só após integrar/revalidar Gate 2 desativado, solicitar aprovação do plano
+   Gate 3 em leitura. Não remover false && nem configurar flag por inferência.
+5. Em incidente, FAIL/STOP e evidências sanitizadas; proprietário decide qualquer
+   intervenção administrativa. Não cancelar/promover/trocar alias/remover a trava.

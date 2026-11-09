@@ -81,7 +81,8 @@
     "test:container-telas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-telas.mjs",
     "test:fin-pr-13": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fin-pr-13.mjs",
     "test:workflow": "node --test scripts/testar-workflow-documental.mjs",
-    "test:vercel-deployments": "node --test scripts/test-vercel-deployment-policy.mjs"
+    "test:vercel-deployments": "node --test scripts/test-vercel-deployment-policy.mjs",
+    "test:checkpoint-preview": "node --test scripts/testar-checkpoint-preview.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

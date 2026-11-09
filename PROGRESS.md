@@ -25,30 +25,32 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**AUTO-10B — Gate 1 PASS; consolidação documental #114 e preparação do Gate 2 na AUTO-11.**
-Somente #113 integrado, main `2561b919da5ab31e0ed1882864ee069b9961b6f7`; 30 minutos observados, Production
-preservada e Preview Git via PR READY. Sem release #111/#112 ou controlador.
-Evidências e limites no [HANDOFF](docs/HANDOFF.md).
+**AUTO-11 — Gate 1 consolidado; Gate 2 mínimo candidato desativado.**
+#114 integrado por squash em b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b;
+CI da nova main aprovada, main:false e Production preservados. Composição Gate 2
+isolada para PR Draft da branch chore/gate2-checkpoint-disabled, sem release
+#111/#112. Evidências, testes e estado publicado no [HANDOFF](docs/HANDOFF.md).
 
 ### Fazer agora
 
-Após revalidar #114 integrado, main/CI/Production preservados, preparar/testar/
-publicar PR Draft mínimo do Gate 2 pela AUTO-11. Sem merge ou ativação do Gate 2.
+Revisar o Draft do Gate 2 e autorizar nominalmente sua integração desativada após
+revalidar SHA/base/diff/CI/Preview/Production. Nenhum merge do Gate 2 autorizado.
 
 ### Não fazer ainda
 
-Sem merge do Gate 2, #111/#112, banco/migrations, recuperação administrativa,
-deploy manual, credenciais ou instalação/ativação do controlador por inferência.
+Sem gates 3–5, remoção de false &&, escrita automática, merge #111/#112,
+banco/migrations, alteração administrativa Vercel, credenciais ou deploy manual.
 
 ### Critério de conclusão
 
-Squash exato, CI da nova main, 30 minutos sem Production novo, Preview automático
-READY e checkpoint documental; sua consolidação foi autorizada na AUTO-11, condicionada a diff/checks. Gate 2 continua sem autorização de merge.
+#114 consolidado e main revalidada; candidato mínimo testado/publicado em Draft,
+CI/Preview do próprio SHA conferidos e zero Production inesperado. Consultar
+checks no GitHub; não transferir PASS de outra branch nem criar commit recursivo.
 
 ### Próxima etapa
 
-Main revalidada após #114 → Gate 2 mínimo em Draft com false &&/read/--dry-run/flag desligada →
-Gate 3 dry-run → Gate 4 escrita → Gate 5 primeiro recibo, cada qual autorizado.
+Autorização específica → integrar/revalidar Gate 2 desativado → autorização Gate 3
+para dry-run hospedado em leitura → Gate 4 escrita → Gate 5 recibo, separados.
 
 ### Fila funcional herdada da main — pausada nesta tarefa
 

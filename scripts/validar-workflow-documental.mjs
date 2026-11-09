@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -19,12 +20,23 @@ const CAMPOS_HANDOFF = [
 
 const SECOES_HANDOFF = [
   "Identificação",
+  "Última tarefa",
   "Evidências",
   "Migrations por ambiente",
   "Autorizações",
   "Proibições",
   "Bloqueios e riscos",
   "Retomada",
+];
+
+const CAMPOS_TAREFA = [
+  "Tarefa executada",
+  "Resultados e testes comprovados",
+  "Código e PR afetados",
+  "Ambientes envolvidos",
+  "Pendências e decisões",
+  "Próxima ação exata",
+  "Autorizações e proibições",
 ];
 
 const ARQUIVOS_CANONICOS = [
@@ -78,7 +90,9 @@ export function validarHandoff(markdown) {
     }
   }
 
-  const campos = camposDaTabela(markdown);
+  const secao = (titulo) =>
+    markdown.split(/^## /m).find((parte) => parte.startsWith(`${titulo}\n`)) ?? "";
+  const campos = camposDaTabela(secao("Identificação"));
   for (const campo of CAMPOS_HANDOFF) {
     const valor = campos.get(campo) ?? "";
     if (valor === "" || /^(?:-|tbd|a definir|indefinido|\?+)$/i.test(valor)) {
@@ -90,7 +104,20 @@ export function validarHandoff(markdown) {
   if (headValidado !== "" && !/\b[0-9a-f]{40}\b/.test(headValidado)) {
     erros.push("docs/HANDOFF.md: HEAD validado precisa do SHA completo de 40 caracteres");
   }
+  const tarefa = camposDaTabela(secao("Última tarefa"));
+  for (const campo of CAMPOS_TAREFA) {
+    const valor = tarefa.get(campo) ?? "";
+    if (valor === "" || /^(?:-|tbd|a definir|indefinido|\?+)$/i.test(valor)) {
+      erros.push(`docs/HANDOFF.md: última tarefa sem valor: ${campo}`);
+    }
+  }
   return erros;
+}
+
+export function validarCheckpointAlterado(arquivos) {
+  return arquivos.length > 0 && !arquivos.includes("docs/HANDOFF.md")
+    ? ["A tarefa altera arquivos sem atualizar docs/HANDOFF.md no mesmo conjunto publicado."]
+    : [];
 }
 
 function alvoLocal(link) {
@@ -159,6 +186,31 @@ const executadoDiretamente =
 
 if (executadoDiretamente) {
   const erros = validarRepositorio(process.cwd());
+  const args = process.argv.slice(2);
+  if (args.length > 0) {
+    if (
+      args.length !== 4 ||
+      args[0] !== "--base" ||
+      args[2] !== "--head" ||
+      !/^[0-9a-f]{40}$/.test(args[1]) ||
+      !/^[0-9a-f]{40}$/.test(args[3])
+    ) {
+      erros.push("Comparação de tarefa exige --base e --head com SHAs completos.");
+    } else {
+      try {
+        const arquivos = execFileSync(
+          "git",
+          ["diff", "--no-ext-diff", "--name-only", "-z", args[1], args[3], "--"],
+          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+        )
+          .split("\0")
+          .filter(Boolean);
+        erros.push(...validarCheckpointAlterado(arquivos));
+      } catch {
+        erros.push("Histórico da tarefa indisponível; comparação do checkpoint não comprovada.");
+      }
+    }
+  }
   if (erros.length > 0) {
     for (const erro of erros) console.error(`ERRO: ${erro}`);
     process.exitCode = 1;

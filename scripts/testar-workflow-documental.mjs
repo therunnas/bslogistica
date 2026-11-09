@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
 import {
   validarHandoff,
+  validarCheckpointAlterado,
   validarReferenciasLocais,
   validarRepositorio,
 } from "./validar-workflow-documental.mjs";
@@ -32,6 +33,18 @@ const handoffValido = `# Handoff ativo
 | Ambiente-alvo | Nenhum ambiente remoto |
 | Última ação comprovada | Validação local concluída |
 | Próxima ação exata | Abrir PR Draft |
+
+## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | WORKFLOW-01 |
+| Resultados e testes comprovados | Teste documental local aprovado |
+| Código e PR afetados | Documentação; PR ainda não aberto |
+| Ambientes envolvidos | Local |
+| Pendências e decisões | Publicação pendente |
+| Próxima ação exata | Aguardar autorização |
+| Autorizações e proibições | Só local; sem publicação |
 
 ## Evidências
 
@@ -85,6 +98,34 @@ test("handoff exige worktree, estado não commitado, último gate e SHA completo
     );
   }
   assert.ok(erros.some((erro) => erro.includes("HEAD validado") && erro.includes("SHA")));
+});
+
+test("cada tarefa exige resultado, código/PR, ambiente, decisões e limites próprios", () => {
+  const invalido = handoffValido
+    .replace("| Resultados e testes comprovados | Teste documental local aprovado |", "")
+    .replace("| Autorizações e proibições | Só local; sem publicação |", "");
+  const erros = validarHandoff(invalido);
+  assert.ok(erros.some((erro) => erro.includes("Resultados e testes comprovados")));
+  assert.ok(erros.some((erro) => erro.includes("Autorizações e proibições")));
+});
+
+test("publicação de tarefa exige HANDOFF no mesmo conjunto de alterações", () => {
+  assert.deepEqual(validarCheckpointAlterado([]), []);
+  assert.deepEqual(validarCheckpointAlterado(["docs/HANDOFF.md", "src/example.ts"]), []);
+  assert.ok(validarCheckpointAlterado(["src/example.ts"]).length > 0);
+  assert.ok(validarCheckpointAlterado(["docs/WORKFLOW.md"]).length > 0);
+});
+
+test("Claude e Codex recebem o mesmo contrato versionado por tarefa", () => {
+  const contracts = ["AGENTS.md", "CLAUDE.md"].map((file) => {
+    const text = readFileSync(join(root, file), "utf8");
+    const section = text.split("## Continuidade entre agentes\n")[1];
+    assert.ok(section?.includes("Ao concluir ou interromper **cada tarefa**"));
+    assert.ok(section.includes("sete campos"));
+    assert.ok(section.includes("Sem autorização"));
+    return section.split("Retome por")[0].trim();
+  });
+  assert.equal(contracts[0], contracts[1]);
 });
 
 test("referências locais quebradas falham sem tratar URL externa ou âncora como arquivo", () => {

@@ -5,6 +5,25 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## AUTO-11 — checkpoint consolidado e Gate 2 candidato (09/11/2026 UTC)
+
+#114 exclusivamente documental: HEAD final 0917e0c16e8480bcb74e7a638027e91dfd961c26,
+squash b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b. CI validar/sql-local SUCCESS.
+Observação pós-squash 191,3 s, até 03:26:42Z: 215 deployments completos, mesmos
+43 Production, zero deployment do squash, mesmo servido dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4
+no SHA 38b4349; aliases/domínios/proteção/Git preservados. main:false permanece.
+
+Gate 2 portado seletivamente do #111 para branch da main consolidada: runtime e
+sinal confiáveis, contrato/validadores/testes e CI mínimos, sem release/app/SQL/
+dependências. Candidato com false &&, contents: read, --dry-run e flag OFF;
+controlador ainda ausente da main. 70/70 suítes Node, lint/TypeScript e comparação
+estrutural CI/Gate 1 PASS; build Turbopack PASS (31,73 s, placeholders públicos
+inertes), revisão independente sem bloqueio, diff --check/revisão de segurança
+PASS. Consulta de CI/Preview do candidato no SHA próprio, sem herdar resultados
+da release; detalhes no [HANDOFF](HANDOFF.md). Não é dry-run hospedado nem automação ativa.
+Merge do candidato e Gates 3–5 não autorizados. #111/#112 preservados, sem
+reconciliação funcional ou banco. Históricos AUTO-06 FAIL/07 PASS/08 PASS intactos.
+
 ## AUTO-10B — Gate 1 PASS (08/11/2026 BRT)
 
 Squash #113 em `2561b919da5ab31e0ed1882864ee069b9961b6f7`, pai 38b4349 e árvore idêntica ao candidato53dce23.
