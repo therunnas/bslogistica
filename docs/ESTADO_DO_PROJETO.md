@@ -14,9 +14,11 @@ Observação 2026-11-09T02:22:16Z → 2026-11-09T02:52:26Z (1810.0 s,
 domínios/proteção/Git; nenhum deployment do merge. Total 212→213, novo Preview
 Git READY do controle0732b66 via Draft #114. Push isolado sem PR não comprovado.
 Originais locais AUTO-10 preservados, nenhum banco/credencial ou app alterado.
-Checkpoint neste Draft separado, integração ainda não autorizada; #111/#112
-preservados, Gate 2 somente proposto, controlador ausente da main e desativado
-no #111. Evidências/limites e próxima autorização no [HANDOFF](HANDOFF.md).
+Checkpoint registrado no #114; sua consolidação documental foi autorizada pela
+AUTO-11, com revalidação. #111/#112 preservados, controlador ausente da main e
+desativado no #111. Preparação/publicação do Gate 2 em Draft autorizadas somente
+após verificar a main consolidada; merge/ativação não autorizados. Evidências e
+limites no [HANDOFF](HANDOFF.md).
 
 ## CHECKPOINT-AUTO-09 — Gate 1 preparado (08/11/2026 BRT)
 

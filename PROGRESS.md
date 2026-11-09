@@ -25,29 +25,29 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**AUTO-10B — Gate 1 PASS; checkpoint no Draft #114, integração pendente.**
+**AUTO-10B — Gate 1 PASS; consolidação documental #114 e preparação do Gate 2 na AUTO-11.**
 Somente #113 integrado, main `2561b919da5ab31e0ed1882864ee069b9961b6f7`; 30 minutos observados, Production
 preservada e Preview Git via PR READY. Sem release #111/#112 ou controlador.
 Evidências e limites no [HANDOFF](docs/HANDOFF.md).
 
 ### Fazer agora
 
-Revisar/autorizar integração deste checkpoint documental. Depois autorizar tarefa
-isolada do Gate 2 mínimo desativado; nenhuma instalação foi iniciada.
+Após revalidar #114 integrado, main/CI/Production preservados, preparar/testar/
+publicar PR Draft mínimo do Gate 2 pela AUTO-11. Sem merge ou ativação do Gate 2.
 
 ### Não fazer ainda
 
-Sem merge deste Draft, #111/#112, banco/migrations, recuperação administrativa,
+Sem merge do Gate 2, #111/#112, banco/migrations, recuperação administrativa,
 deploy manual, credenciais ou instalação/ativação do controlador por inferência.
 
 ### Critério de conclusão
 
 Squash exato, CI da nova main, 30 minutos sem Production novo, Preview automático
-READY e checkpoint publicado separado. Integração documental tem aprovação própria.
+READY e checkpoint documental; sua consolidação foi autorizada na AUTO-11, condicionada a diff/checks. Gate 2 continua sem autorização de merge.
 
 ### Próxima etapa
 
-Checkpoint aprovado → Gate 2 mínimo com false &&/read/--dry-run/flag desligada →
+Main revalidada após #114 → Gate 2 mínimo em Draft com false &&/read/--dry-run/flag desligada →
 Gate 3 dry-run → Gate 4 escrita → Gate 5 primeiro recibo, cada qual autorizado.
 
 ### Fila funcional herdada da main — pausada nesta tarefa

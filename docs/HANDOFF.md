@@ -7,27 +7,28 @@ testes de infraestrutura. Somente #113 foi integrado; main:false está na main,
 Production servida foi preservada e Preview automático via PR comprovado.
 Controlador ausente da main, desativado no #111; gates 2–5 não executados.**
 
-Este checkpoint é publicado no [Draft #114](https://github.com/therunnas/bslogistica/pull/114), em branch
-documental, e depende de aprovação adicional para integração. Não há commit
-direto adicional na main. O HANDOFF da main ainda contém o registro AUTO-09 até
-essa integração documental; consultar este PR para o resultado posterior.
+Este checkpoint consolida o resultado do Gate 1 pela linha documental do
+[#114](https://github.com/therunnas/bslogistica/pull/114); consultar no GitHub seu
+estado e o SHA da integração. AUTO-11 autoriza a consolidação após revalidação
+e a preparação de um PR Draft mínimo do Gate 2, mantido desativado. Nenhum merge
+do Gate 2 ou ativação está autorizado.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | AUTO-10B — Gate 1 integrado e PASS; checkpoint documental em Draft |
-| Gate atual | Aprovação da integração deste checkpoint; proposta do Gate 2 preparada, instalação não autorizada |
+| Etapa | AUTO-10B — Gate 1 integrado e PASS; consolidação documental #114 |
+| Gate atual | Preparação do Gate 2 autorizada pela AUTO-11 após revalidar a main; merge/ativação do Gate 2 não autorizados |
 | Último gate concluído | Squash #113 + CI da nova main + observação completa de 30 minutos + Preview Git READY |
 | Worktree | /private/tmp/bs-checkpoint-auto-10b/worktree; worktree original /private/tmp/bs-fin-20d preservado com três documentos locais; redescobrir ao retomar |
 | Branch | docs/checkpoint-auto-10b-gate1-result, criada da main integrada; controle e checkpoint, sem funcionalidade |
 | Base | 2561b919da5ab31e0ed1882864ee069b9961b6f7 — main integrada; base anterior autorizada 38b43490a8e0913c62a4ee6047ef48a8288ca0dc |
 | HEAD validado | 2561b919da5ab31e0ed1882864ee069b9961b6f7 — main/CI; smoke 0732b66e85b3768101da854307ba6a5a32a6d25c. HEAD documental deste PR tem checks próprios a consultar, sem transferir PASS |
 | Alterações não commitadas | Fechamento somente de HANDOFF, PROGRESS e ESTADO_DO_PROJETO nesta branch; os três originais locais anteriores permanecem intocados no outro worktree |
-| PR | #113 MERGED; #114 Draft documental, sem autorização de merge; #111 e #112 preservados nos HEADs abaixo |
+| PR | #113 MERGED; #114 consolidação documental (estado no GitHub); #111 e #112 preservados nos HEADs abaixo |
 | Ambiente-alvo | GitHub/main protegida contra deploy Git; Preview de controle; Production somente observada; nenhum HML/Supabase |
 | Última ação comprovada | 1810.0 s, 49 amostras com histórico completo; 43 Production antes/depois, zero novos; merge sem deployment; CI aprovada e smoke READY |
-| Próxima ação exata | Revisar/autorizar integração documental deste Draft; depois autorizar tarefa isolada de instalação mínima do Gate 2 com todas as travas, sem ativação |
+| Próxima ação exata | Após confirmar #114 integrado e main/CI/Production preservados, preparar/testar/publicar Gate 2 mínimo em PR Draft, com todas as travas; sem merge ou ativação |
 
 ## Última tarefa
 
@@ -37,9 +38,9 @@ essa integração documental; consultar este PR para o resultado posterior.
 | Resultados e testes comprovados | Árvore do squash idêntica ao candidato, pai correto; CI validar/sql-local SUCCESS na nova main; 27 testes locais (22 política/5 documentais) PASS; janela 1810.0 s/49 amostras sem Production novo; Preview Git READY com SHA/branch/PR/recibo corretos. Validação documental, 5 testes documentais, política Vercel e diff --check PASS; revisão dos três documentos sem padrões de segredo |
 | Código e PR afetados | Main contém somente os oito arquivos autorizados do #113. Controle/checkpoint altera apenas documentação em #114; sem release #111/#112, app, SQL, migration ou controlador |
 | Ambientes envolvidos | Main GitHub e Preview automático; Vercel Production só leitura. Sem deploy manual, promoção/cancelamento/aliases ou credenciais; sem operação Supabase |
-| Pendências e decisões | Gate 1 PASS delimitado à janela e fluxo Preview via PR. Push isolado não comprovou Preview. Aprovação extra para integrar checkpoint e tarefa própria para instalar Gate 2; nada ativo |
-| Próxima ação exata | Revisão e autorização nominal do checkpoint; depois Gate 2 mínimo isolado da main atual, preservando main:false e travas false &&/read/--dry-run/flag desligada |
-| Autorizações e proibições | Exercidos apenas Ready/squash #113 exato, smoke Git e publicação documental separada. Sem recuperação administrativa, merge deste checkpoint, merge #111/#112, banco, migração, credenciais, deploy manual ou ativação |
+| Pendências e decisões | Gate 1 PASS delimitado à janela e fluxo Preview via PR. Push isolado não comprovou Preview. AUTO-11 autoriza consolidação #114 e preparação/publicação do Gate 2 desativado após revalidação; merge e ativação do Gate 2 continuam proibidos |
+| Próxima ação exata | Revalidar main após #114; preparar Gate 2 mínimo isolado, preservando main:false e false &&/read/--dry-run/flag desligada; publicar somente Draft |
+| Autorizações e proibições | Exercidos apenas Ready/squash #113 exato, smoke Git e publicação documental separada. AUTO-11 permite squash documental #114 após checks e preparo/publicação do Gate 2; sem merge Gate 2/#111/#112, recuperação administrativa, banco, migração, credenciais, deploy manual ou ativação |
 
 ## Evidências
 
@@ -127,9 +128,9 @@ Validar composição isolada com testes próprios, idempotência, CAS/expectedHe
 reprocessamento, dados incompletos, falha segura, loops e logs sem segredo. Não
 emprestar os testes do #111 como prova de uma composição ainda não criada.
 
-Próxima autorização necessária: criar/publicar PR mínimo do Gate 2 da main então
-atual, com revisão/CI/Preview próprios. A integração exige aprovação nominal
-separada. Instalação não iniciada; gates 3 (dry-run), 4 (escrita) e 5 (recibo)
+AUTO-11 autoriza criar/publicar PR Draft mínimo do Gate 2 da main então atual,
+somente após consolidar #114 e verificar main/CI/Production. A integração do Gate 2
+exige aprovação nominal separada. Instalação na main não realizada; gates 3 (dry-run), 4 (escrita) e 5 (recibo)
 continuam sujeitos a autorizações independentes. Rollback sempre preserva
 main:false; qualquer intervenção administrativa continua sem autorização.
 
@@ -141,8 +142,8 @@ main e desativado no #111. AUTO-06 FAIL/AUTO-07 PASS/AUTO-08 PASS mantêm escopo
 históricos independentes. Nenhuma Production homologada por esta tarefa.
 
 Artefatos sanitizados locais em /private/tmp/bs-checkpoint-auto-10b; evidências
-essenciais constam aqui. Este commit fecha a tarefa no Draft #114;
-consultar HEAD/checks/Preview próprios do PR para o fechamento documental, sem
+essenciais constam aqui. O resultado foi registrado no #114; consultar no GitHub
+o HEAD/SHA de integração e seus checks próprios, sem
 transferir CI da main/smoke nem criar commits recursivos só para registrar checks.
 
 ### Histórico da main anterior ao AUTO-10B
@@ -320,10 +321,10 @@ são o último registro herdado da main, não reconferidos nesta tarefa.
 
 ## Autorizações
 
-AUTO-10B vigente: Ready e squash #113 exato concluídos; smoke e checkpoint em
-branch separada publicados. Nenhuma autorização para integrar este Draft,
-instalar/ativar controlador ou intervir administrativamente em Production.
-Itens seguintes são históricos, não novas permissões.
+AUTO-11 vigente: ajustes transitórios somente nos três docs e squash #114 após
+revalidação do novo HEAD/diff/checks; depois preparar/testar/publicar Gate 2 mínimo
+em PR Draft, sem merge ou ativação. Nenhuma intervenção administrativa em Production.
+Ready/squash #113 e smoke AUTO-10B são históricos concluídos; não repetir.
 
 Histórico AUTO-09: implementação mínima, testes, commit/push normal somente na
 branch chore/gate1-production-deployment-guard e criação de PR Draft contra main.
@@ -338,7 +339,7 @@ Merge e mudanças de main/Production não autorizados. Os itens abaixo são hist
 
 AUTO-10B: não remover main:false; sem rollback cego, deploy manual, promoção,
 cancelamento, alias, credenciais, banco, migrations, #111/#112 ou gates 2–5.
-Merge documental deste PR e instalação futura exigem novas autorizações.
+A consolidação #114 foi autorizada na AUTO-11; merge do Gate 2 e ativações exigem novas autorizações.
 Os limites AUTO-09 abaixo pertencem àquela sessão, não desfazem o squash concluído.
 
 AUTO-09: sem merge, main direta, release #111/#112, Vercel real, HML/Supabase,
@@ -353,12 +354,12 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 
 - Gate 1 PASS é delimitado a esta janela/amostragem e ao Preview automático via PR;
   não é garantia infinita ou bloqueio universal de deploy manual/promoção.
-- Integração deste checkpoint e Gate 2 pendentes de autorização. O bot não está ativo.
+- Merge e ativação do Gate 2 pendentes de autorização; sua preparação em Draft foi autorizada pela AUTO-11. O bot não está ativo.
 - Originais locais AUTO-10 foram preservados; não confundi-los com o checkpoint
-  publicado neste Draft ou substituir o estado da main pela release #111.
+  registrado no #114 ou substituir o estado da main pela release #111.
 - Parágrafos funcionais seguintes são históricos, sem reconciliação nesta tarefa.
 
-- Histórico AUTO-09: a ausência da trava na main foi resolvida no AUTO-10B. Permanece pendente somente a autorização de integração deste checkpoint e dos gates posteriores.
+- Histórico AUTO-09: a ausência da trava na main foi resolvida no AUTO-10B. AUTO-11 autoriza consolidar o checkpoint e preparar Gate 2; integrar Gate 2/ativar continua sujeito a autorização própria.
 - GitHub informa main sem proteção; o check falha diante de regressão, mas não
   impede por si só um merge administrativo. Nenhuma proteção/ruleset/permissão
   foi modificada. Exigir checks e revisão na decisão nominal.
@@ -383,10 +384,10 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 ## Retomada
 
 1. Descobrir worktrees, alterações e HEADs remotos; preservar os três documentos
-   originais no worktree anterior. Ler este Draft #114 e seus checks.
-2. Revisar e pedir aprovação nominal para integrar somente este checkpoint, sem
-   retirar main:false ou misturar releases. Main factual atual: 2561b919da5ab31e0ed1882864ee069b9961b6f7.
-3. Depois preparar Gate 2 apenas em tarefa autorizada, com o manifesto acima,
-   locks preservados e base atualizada. Não instalar/ativar por inferência.
+   originais no worktree anterior. Ler este checkpoint e o estado/checks do #114 no GitHub.
+2. Revalidar o squash documental #114 e a main remota, main:false, CI e Production;
+   o SHA 2561b919da5ab31e0ed1882864ee069b9961b6f7 acima é a integração histórica do Gate 1.
+3. AUTO-11 permite preparar/testar/publicar Gate 2 em Draft a partir da main
+   atualizada, com manifesto mínimo e locks preservados. Não integrar/ativar.
 4. Se houver incidente, STOP e evidências; proprietário decide e autoriza qualquer
    intervenção administrativa. Nunca cancelar/promover/trocar alias ou remover a trava.
