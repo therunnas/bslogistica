@@ -34,6 +34,12 @@ Nenhum SQL remoto, HML, dados reais ou Production alterados. HML045/Production03
 são últimos registros de catálogo, não nova consulta; homologação pendente de
 identidade/catálogo/backup/restauração/janela/Preview e autorização. 048 OFF instalada
 não aprova/ativa fallback; C1–C6 abertas. Controlador OFF, Gates 3–5 PAUSADOS.
+## CONSOLIDAÇÃO PARA O PILOTO — HML na 050 (09/11/2026)
+
+#119 atualizado com a main pós-#117 e mergeado por squash em `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef`; CI validar/sql-local SUCCESS, sem deployment Production (`main:false`). Drafts obsoletos #63, #106–#112 e #118 fechados com motivo; branches preservadas.
+
+HML `qbnfcmrxmssnwkhaitgd` recebeu 046–050 via Management API, uma migration por transação, após backup lógico das 59 tabelas. Receita, custo, faturas, itens, faturados e contagens idênticos antes/depois de cada versão; `tarifas_por_funcao=false` e `vigencia_ativa=true` preservados; catálogo conferido (CHECK inclusivo, ACL das RPCs, triggers de fatura, RLS). **Homologação no navegador pendente.** Production continua na 034 e não foi tocada.
+
 ## TRANSFERÊNCIA ENTRE CONTAS — ponto de retomada (09/11/2026)
 
 FUNC-03 completada no escopo de **preparação local e publicação em PR Draft**, sem integração funcional ou migrações remotas. O #117 traz seis documentos de negócio/continuidade; é o candidato documental autorizado para squash após reconciliação/checks. A main antes desse squash está em `75c47cd9a30e4888b197ca6ae27aa236c71ec589` (reconsultar o SHA efetivo no GitHub). O ponto operacional atual é [HANDOFF.md](HANDOFF.md), não o checkpoint AUTO-12 ainda presente na main anterior.

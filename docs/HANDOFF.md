@@ -45,13 +45,13 @@
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Consolidação para o piloto (09/11/2026): #119 atualizado com a main pós-#117, mergeado por squash; Drafts obsoletos fechados |
-| Resultados e testes comprovados | #119 HEAD `7b1deaf`: lint, TypeScript e test:workflow locais PASS; CI validar/sql-local SUCCESS. Nova main `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef`: CI validar/sql-local SUCCESS; nenhum deployment GitHub registrado para o SHA; `main:false` preservado |
-| Código e PR afetados | Main contém migrations 046–050 e consumidores. Fechados com comentário: #63, #106, #107, #108, #109, #110, #111, #112, #118 (branches preservadas). Nenhum PR aberto |
-| Ambientes envolvidos | Somente GitHub. Nenhuma escrita em Supabase HML ou Production; este container não tem credenciais Supabase/Vercel |
-| Pendências e decisões | **Main à frente dos bancos:** código até 050, HML na 045, Production na 034 (últimos registros, não revalidados). Pendentes: preflight HML, backup restaurado, aplicar 046–050 OFF, matriz curta de homologação, C6 do cliente-piloto, Production 034→050 |
-| Próxima ação exata | Preflight HML somente leitura (identidade `qbnfcmrxmssnwkhaitgd`, migration list, flags OFF), depois backup novo com restauração; exige credenciais |
-| Autorizações e proibições | Usuário autorizou merge do #119 e fechamento dos Drafts. Migration remota, Production e ativação comercial continuam exigindo confirmação nominal do ambiente-alvo; nunca `config push`, nunca Production sem backup novo |
+| Tarefa executada | Aplicação autorizada de 046–050 no HML `qbnfcmrxmssnwkhaitgd` (09/11/2026), após merge do #119 e fechamento dos Drafts obsoletos |
+| Resultados e testes comprovados | Backup lógico pré-aplicação via Management API (59 tabelas, 0 falhas, SHA256) entregue ao usuário e guardado fora do Git. Cada migration aplicada em transação própria, com registro em `schema_migrations` na mesma transação e conferência de versão anterior. Após CADA uma: receita 13236.52, custo 4758.81, faturas 6692.51 = itens, 19 faturados, 51 apontamentos, 9 serviços, 15 adicionais **inalterados**; `tarifas_por_funcao=false`, `vigencia_ativa=true` inalterados. Catálogo final: CHECK `requested_on <= executed_on`; `registrar_adicional` sem EXECUTE para `authenticated`; `registrar_adicional_idempotente`/`corrigir_servico_container` com EXECUTE só `authenticated`; triggers de fatura presentes; RLS ligada em todas as tabelas de `public` |
+| Código e PR afetados | Main `6fd2632` (código até 050). Nenhum PR aberto. Checkpoint na branch `claude/jolly-allen-fqechw` |
+| Ambientes envolvidos | HML: 045 → **050**. Production **não tocada** (token usado não enxerga o projeto de Production). Preview da branch: `https://bs-logistica-sistema-o1xfg3d8m-bslogisticas.vercel.app` (backend HML pela configuração da Vercel; não verificado por cabeçalho porque o proxy desta sessão bloqueia `vercel.app`) |
+| Pendências e decisões | Homologação no navegador (matriz curta do piloto) no Preview acima; C6 do cliente-piloto; backup completo `pg_dump` e plano 034 → 050 para Production |
+| Próxima ação exata | Usuário executa a matriz curta no Preview; depois preparar Production com `pg_dump` novo e autorização nominal |
+| Autorizações e proibições | Usuário autorizou merge, fechamento dos Drafts e aplicação no HML. Production exige backup `pg_dump` novo e confirmação nominal; resolução comercial continua OFF; nunca `config push` |
 
 ## Próxima ação exata, na conta nova
 
