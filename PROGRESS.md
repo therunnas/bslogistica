@@ -25,33 +25,25 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FUNC-03 — composição técnica 046–050 para HML OFF.** #117 documental atualizado;
-candidato técnico em branch própria da main, sem integrar #111/#112/#118.
-Controlador OFF e Gates 3–5 PAUSADOS; main:false preservado.
+**TRANSFERÊNCIA DE CONTA — documentação de retomada.** A FUNC-03 terminou como **composição local/CI aprovada**, publicada no [PR #119](https://github.com/therunnas/bslogistica/pull/119) Draft (HEAD `48a12187ea3562775656dce1b1b767b9e893b426`). O PR #117 incorpora o modelo real de negócio e esta transferência documental; conferir se já foi integrado. O [HANDOFF](docs/HANDOFF.md) é o ponto de entrada da nova conta.
 
-### Fazer agora
+### Situação
 
-Validações/revisão locais concluídas; publicar PR Draft técnico com manifesto,
-checkpoint e CI/Preview próprios. Sequência local completa e consumidores 047/049,
-prévia 048 compatível e regra 050 inclusiva estão compostos.
-
-### Não fazer ainda
-
-Sem merge, migration remota, dados reais, Production, ativação comercial/controlador,
-Gates 3–5, novo Supabase remoto ou infraestrutura remota.
-
-### Critério de conclusão
-
-PR Draft técnico com composição/testes novos de 045→046→047→048→049→050, reenvio,
-concorrência/faturados seguros, CI/Preview aprovados e roteiro HML OFF sem aplicação.
+- #119: 046–050 e consumidores compatíveis, 66 arquivos, 72 suítes Node e 51 SQL locais relatadas; CI e Preview do candidato aprovados. **NÃO mergeado nem homologado no HML.**
+- #118: correção da 050 já incorporada ao #119; evitar duplicidade. #111/#112 antigos: Draft, não integrar por arrasto.
+- `main` antes do #117: `75c47cd9a30e4888b197ca6ae27aa236c71ec589`; reconsultar GitHub após integração documental.
+- Supabase HML e Production existentes; últimos registros HML 045/Production 034, sem reconfirmação nesta transferência. Resolução comercial OFF.
+- Checkpoint automático OFF; Gates 3–5 **da automação** pausados. Production protegida com `main:false`.
 
 ### Próxima etapa
 
-Revisar o HEAD final; autorizar separadamente preflight de HML, catálogo, backup
-restaurado e aplicação/homologação OFF. Decisão comercial ON e integração Git
-continuam separadas, sem homologação automática por CI/Preview.
+**Após a transferência**, novo Claude Code deve fazer check-up somente leitura de `main`, #119 e ambientes, revisar preflight HML (identidade, catálogo, backup/restauração, janela, Preview compatível) e solicitar autorização específica antes de qualquer merge ou SQL remoto. Prioridade: liberar o núcleo financeiro/operacional em HML para testes reais e piloto. Decisões comerciais C1–C6 na [matriz](docs/NEGOCIO_X_SISTEMA.md).
 
-### Fila funcional herdada da main — pausada nesta tarefa
+### Não fazer ainda
+
+Sem merge funcional, migrations remotas, Production, dados reais, resolução comercial ON, novo Supabase, ativação do controlador ou Gates 3–5 automáticos. Não duplicar o trabalho do #119 nem confundir Preview com homologação.
+
+### Fila funcional herdada da main — histórico, não tarefa ativa
 
 Registro anterior preservado, sem atualizar status de PRs ou homologação por
 inferência. Para a release ainda não integrada, consultar o HANDOFF do #111.

@@ -2,52 +2,135 @@
 
 <!-- workflow-handoff:v1 -->
 
-**FUNC-03 — Desenvolvimento / Testes. Composição técnica 046–050 em branch isolada
-para revisão em PR Draft; sem merge, aplicação remota ou homologação HML.**
-Base e infraestrutura da main preservadas. Controlador false &&/contents: read/
---dry-run/OFF; Gates 3–5 PAUSADOS. A resolução comercial permanece OFF nos ambientes
-existentes (sem alteração remota); a configuração HML ainda exige reconfirmação.
-
-Manifesto, decisões e roteiro de HML: [composição técnica](financeiro/composition-046-050.md).
-Negócio/matriz ficam no #117, sem copiar HANDOFF antigo do #111 ou #112.
+**TRANSFERÊNCIA ENTRE CONTAS — FUNC-03 concluída como candidato técnico, ainda sem integração funcional ou homologação.** Este é o ponto de entrada da nova conta Claude Code. Primeiro conferir GitHub, `origin/main` e os PRs; SHAs abaixo são evidências de 09/11/2026, não estados permanentes. Continuar o desenvolvimento a partir do repositório, sem depender de conversas antigas.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | FUNC-03 — composição técnica 046–050 para futura homologação HML OFF |
-| Gate atual | Candidato técnico implementado/testado localmente, publicação em PR Draft autorizada; merge e HML não autorizados |
-| Último gate concluído | #117 documental publicado em 6f1d960ef78254cc6b2b9cc1639c5abe202ef54d, seis documentos, CI validar/sql-local SUCCESS e Preview bem-sucedido; Node/SQL locais da composição aprovados |
-| Worktree | /private/tmp/bs-func-03/composition; demais worktrees e alterações anteriores preservados |
-| Branch | chore/func-03-financial-composition, criada da main reconferida, sem merge/cherry-pick integral da release |
-| Base | 75c47cd9a30e4888b197ca6ae27aa236c71ec589 — main atual; main:false e controlador desativado preservados |
-| HEAD validado | Working tree da composição sobre 75c47cd9a30e4888b197ca6ae27aa236c71ec589; consultar SHA/CI/Preview do commit publicado que contém este checkpoint, sem herdar CI dos PRs fontes |
-| Alterações não commitadas | Migrations 046–050, consumidores/testes/CI mínimos e quatro documentos próprios. Conferir manifesto/status na retomada; sem dependências, lockfile ou migrations históricas alterados |
-| PR | Draft técnico próprio desta branch contra main, sem merge. #117 Draft documental atualizado; #111 7e08270011f74ea5dfe4470097f58659eea81140, #112 2d1c0cde7bd47154a281171d77858b530d0b6de2 e #118 fc51b54c978ac3042f96fb763cb21ab379231490 preservados |
-| Ambiente-alvo | Node/build locais e Supabase LOCAL exclusivo bs-fin11-local-func037709c23; CI/Preview Git automático do candidato. Nenhuma migration/SQL remoto ou operação Production |
-| Última ação comprovada | Baseline 70 suítes Node; composição 72 suítes Node, 51 SQL/55 versões, preservação de dois serviços/uma fatura e replay, concorrência adicionais 128 e fatura 41 asserções PASS; resolução local persistida/efetiva OFF |
-| Próxima ação exata | Publicar Draft técnico após revisão independente concluída; consultar CI/Preview do SHA próprio. Depois revisão nominal e autorização separada para catálogo/backup/restauração/janela/aplicação HML OFF |
+| Etapa | TRANSFERÊNCIA ENTRE CONTAS — fechamento documental FUNC-03 |
+| Gate atual | Consolidação documental do #117 autorizada; #119 permanece Draft, sem merge ou HML |
+| Último gate concluído | FUNC-03: composição 046–050 publicada em #119, CI/Preview do candidato aprovados, sem homologação |
+| Worktree | Caminho histórico /private/tmp/bs-retomada-funcional-01/worktree; não acessado nesta revisão remota; descobrir worktrees no ambiente novo |
+| Branch | Origem deste documento: docs/retomada-funcional-01 (#117); verificar main remota depois da integração |
+| Base | Main conferida antes do fechamento: 75c47cd9a30e4888b197ca6ae27aa236c71ec589 |
+| HEAD validado | Main-base 75c47cd9a30e4888b197ca6ae27aa236c71ec589 e #119 candidato 48a12187ea3562775656dce1b1b767b9e893b426; consultar HEAD #117 e checks próprios |
+| Alterações não commitadas | Não inspecionadas remotamente nos worktrees locais da conta anterior; nunca presumir que inexistem. Documentação deste fechamento versionada na branch #117 |
+| PR | #117 documentação a consolidar; #119 composição técnica Draft; #118 sobreposto pela 050 do #119; #111/#112 históricos Draft |
+| Ambiente-alvo | Somente documentação GitHub/CI e Preview automático da branch; sem escrita no HML ou Production |
+| Última ação comprovada | #117 reconciliado com estado #119, sem modificação de app/SQL/configuração; conferir checks do HEAD final antes do squash |
+| Próxima ação exata | Integrar apenas #117 após CI verde e confirmar novo SHA main; nova conta revalidar #119 e preparar preflight HML com autorização separada |
+
+## Estado atual para retomada
+
+| Campo | Estado comprovado / referência |
+| --- | --- |
+| Projeto | Painel interno BS Soluções Logísticas, repo `therunnas/bslogistica`; site institucional é OUTRO repositório |
+| Main antes deste merge documental | `75c47cd9a30e4888b197ca6ae27aa236c71ec589` — confirmar novo HEAD após squash do #117 |
+| Documento de negócio | [NEGOCIO.md](NEGOCIO.md), portado do #112 sem alteração de regra |
+| Matriz de negócio e decisões | [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md): 17 itens, decisões C1–C6 pendentes |
+| #117 | [Documentação](https://github.com/therunnas/bslogistica/pull/117), fonte deste checkpoint; conferir no GitHub se já integrado |
+| #119 | [Composição técnica](https://github.com/therunnas/bslogistica/pull/119) **Draft NÃO mergeado** no HEAD `48a12187ea3562775656dce1b1b767b9e893b426`; 66 arquivos e migrations 046–050, consumidores, testes e [manifesto HML](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md) |
+| #118 | [Correção de pedido no mesmo dia](https://github.com/therunnas/bslogistica/pull/118) Draft, HEAD `fc51b54c978ac3042f96fb763cb21ab379231490`; 050 já incorporada seletivamente ao #119. **Não integrar duas vezes** |
+| #111 / #112 | [Release candidata](https://github.com/therunnas/bslogistica/pull/111) e [documentação anterior](https://github.com/therunnas/bslogistica/pull/112), Drafts antigos com conflitos; não copiar checkpoints históricos nem fazer merge por arrasto |
+| Testes FUNC-03 | Relatório do #119: 72 suítes Node, 51 SQL locais / 55 versões, concorrência 128+41 asserções, lint, TypeScript, build; checks GitHub `validar` e `sql-local` SUCCESS no HEAD acima. **Não equivalem a homologação HML** |
+| Migrations na main | Até 045; 046–050 existem **somente no candidato #119** até aprovação/merge |
+| Ambientes reais | Preview, HML e Production já existem: [AMBIENTES.md](AMBIENTES.md). Último registro documental de schema: HML 045, Production 034; **revalidar somente leitura antes de agir** |
+| Production | `vercel.json` mantém `git.deploymentEnabled.main:false`; relatório FUNC-03 não identificou novo deploy Production. Não presumir homologação |
+| Checkpoint automático | Controlador instalado, **OFF** (`false &&`, `--dry-run`, permissões de leitura e flag OFF); Gates 3–5 **do checkpoint automático** pausados |
+| Pendências comerciais | C1–C6 (fallback da 048, vigência/reajustes, categorias, custo do avulso, modalidades/unidades, sábado); consultar matriz; resolução comercial OFF até decisão própria |
+| Prioridade de produto | Finalizar núcleo operacional/financeiro para primeiro piloto; não reabrir automações e auditorias gerais desnecessárias |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | FUNC-03: publicar reconciliação documental no #117; compor seletivamente 046–049/consumidores do #111 e correção 050 do #118 em branch técnica da main, sem integrar os PRs fontes |
-| Resultados e testes comprovados | Novos: baseline 70/70 e composição 72/72 suítes Node; backend 13, domínio 23, tela 65; 51 suítes SQL com 55 versões e 049 PRESENTE; preservação/replay de registros prévios a 046–050; concorrência 128+41 asserções, zero falhas. Lint/TypeScript/build final Turbopack 34,8 s PASS; revisão independente sem Critical/Important; CI/Preview técnicos a consultar após publicação |
-| Código e PR afetados | Manifesto de 66 caminhos na composição; migrations 046–049 idênticas ao #111, 050 idêntica ao #118, 045 e anteriores intactas. Consumidor 047, prévia compatível 048, fluxo 049 e datas inclusivas 050. Ajustes 049: replay no servidor conferido pela RPC, UI exige vínculo auditado; marcador anterior não confirma correção e reload oferece substituto. RED/GREEN e revisão independente sem blockers |
-| Ambientes envolvidos | Banco local exclusivo criado para esta tarefa; labels/workdir/volume/rede e ausência de project-ref remoto verificados antes de reset/SQL. Fixtures sintéticas, sem dados BS ou credenciais em arquivos. HML/Production não receberam SQL/deploy manual/flags |
-| Pendências e decisões | CI/Preview próprios após publicar; HML045 e Production034 são últimos registros de catálogo, não inspeção nova. HML requer backup novo/restauração/identidade/catálogo/janela e Preview compatível. Instalar/testar 048 OFF (A) não aprova/ativa fallback (B); C1–C6 abertas |
-| Próxima ação exata | Verificações/revisão locais concluídas: publicar Draft técnico; confirmar diff remoto e checks/Preview por SHA. Não fazer commit recursivo só de checks. Solicitar escopo HML OFF nominal antes de qualquer acesso de escrita/migration remota |
-| Autorizações e proibições | FUNC-03 autoriza preparação/testes/commit/push normal e Draft técnico, além dos seis documentos do #117. Sem merge, main direta, SQL/migrations remotos, alteração de dados reais/HML/Production, ON comercial, controlador ou Gates 3–5, infra remota nova ou alteração do #118 original |
+| Tarefa executada | Atualizar a branch do #119 com a main `cad9f51` (pós-squash do #117), resolvendo conflitos somente nos documentos de estado |
+| Resultados e testes comprovados | Merge sem conflito em código; PROGRESS e HANDOFF adotam a versão da main, ESTADO_DO_PROJETO mantém os dois históricos. Validações locais e CI do novo HEAD: conferir no GitHub, sem transferir a evidência do HEAD `48a1218` |
+| Código e PR afetados | Apenas documentos na branch do #119; nenhuma migration, app ou configuração alterada; #118, #111 e #112 intactos |
+| Ambientes envolvidos | Git/GitHub. Nenhuma escrita em Supabase HML ou Production; sem acesso remoto neste container |
+| Pendências e decisões | #119 segue Draft, sem merge nem homologação HML; preflight HML, backup restaurado, C6 e aplicação 046–050 (resolução OFF) pendentes |
+| Próxima ação exata | Confirmar CI/Preview do novo HEAD; preflight HML somente leitura (exige credenciais Supabase/Vercel) |
+| Autorizações e proibições | Usuário autorizou o plano geral em 09/11/2026; migration remota, Production e merge do #119 exigem confirmação nominal do ambiente-alvo e das credenciais |
+
+## Próxima ação exata, na conta nova
+
+1. Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, [NEGOCIO.md](NEGOCIO.md), [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md) e o [manifesto do #119](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md).
+2. Revalidar `main`, PRs, reviews, CI e a situação real de HML/Production **sem escrita**. Descobrir worktrees locais existentes; trabalho apenas local da conta anterior não é recuperável por clone novo.
+3. Apresentar check-up breve da composição #119 e plano de preflight HML existente: identidade/catálogo reais, backup novo com restauração comprovada, janela, Preview vinculado corretamente e testes com resolução comercial **OFF**.
+4. **Pedir autorização separada** antes de qualquer merge do #119, migration remota, alteração de dados, ativação comercial ou deploy Production. Evitar PR duplicado da 050; decidir tratamento dos Drafts históricos.
+5. A cada tarefa concluída, atualizar este HANDOFF com resultado, SHA/PR, testes, ambiente, bloqueios e próxima ação; incluir no commit/push **da tarefa autorizada**, sem criar PR apenas para checkpoint.
+
+## Segurança e limites da transferência
+
+- **Nenhuma senha/token/`.env` real no Git.** Credenciais e permissões para GitHub, Vercel e Supabase precisam ser configuradas separadamente na outra conta; ambientes existentes não devem ser recriados.
+- CI SUCCESS, Preview READY, migration aplicada, feature flag ON, HML homologado e Production liberada são estados distintos.
+- `docs/ESTADO_DO_PROJETO.md` e as seções posteriores deste HANDOFF preservam **histórico datado**, não instruções vigentes. Esta seção de retomada prevalece sobre tarefas antigas em seus textos.
+
+## Autorizações
+
+A autorização desta etapa é **exclusivamente documental**: reconciliar e integrar o #117 após revisar diff e checks. Não se estende ao #119, ao #118, ao #111/#112 nem aos ambientes. A nova conta deve pedir aprovação própria para ações posteriores.
+
+## Proibições
+
+Sem merge funcional, SQL remoto, alteração em Production, segredos no Git, resolução de tarifas ON, criação de outro Supabase ou execução dos Gates 3–5 do checkpoint automático. PR Draft e Preview não equivalem a produção.
+
+## Retomada
+
+Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, `docs/NEGOCIO.md`, `docs/NEGOCIO_X_SISTEMA.md` e o manifesto do #119; conferir refs, branches, CI, configuração dos ambientes e trabalho local não publicado. Apresentar check-up e próxima tarefa antes de executar operações remotas. As seções históricas abaixo não transferem autorização.
 
 ## Evidência automática de Preview
 
 <!-- checkpoint-preview:start -->
-Controlador instalado desativado: false &&, contents: read, --dry-run, flag OFF.
-Gates 3–5 PAUSADOS. Nenhum recibo automático ou execução ativa realizada.
+Controlador instalado desativado: false &&, contents: read, --dry-run e flag OFF.
+Gates 3–5 PAUSADOS. Nenhum recibo automático ou execução ativa autorizado.
 <!-- checkpoint-preview:end -->
 
 ## Evidências
+
+### RETOMADA-FUNCIONAL-01 — consolidação documental
+
+#116 Ready/revisões/checks reconferidos sem bloqueio; squash do HEAD nominal
+`ccfba1ab5629aa20200959ce8ab74532fa8b9f71`, base
+`92478763af9674ecd327333020ea2a6f240ee404`, em 2026-11-09T11:55:57Z.
+Nova main `75c47cd9a30e4888b197ca6ae27aa236c71ec589`, árvore idêntica ao candidato e quatro documentos.
+[CI da nova main](https://github.com/therunnas/bslogistica/actions/runs/42612890409): validar/sql-local SUCCESS, controlador checkpoint
+SKIPPED. Sem --admin, auto-merge, force push ou commit adicional na main.
+
+Comparação paginada limitada a este merge, sem repetir auditoria: seis amostras,
+217 deployments totais, mesmos43 Production; nenhum deployment do squash em qualquer
+target/estado. Servido dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4, SHA38b43490a8e0913c62a4ee6047ef48a8288ca0dc,
+aliases/domínios/proteção/Git preservados. main:false/Next.js e controlador
+false &&/contents: read/--dry-run/flag ausente OFF continuam vigentes.
+
+### RETOMADA-FUNCIONAL-01 — negócio e implementação
+
+Resultado completo,17 itens, fontes por SHA, impacto/prioridade, aceite,
+dependências/decisões e lotes: [matriz revisada](NEGOCIO_X_SISTEMA.md).
+
+- Fonte de negócio: responsável em 08/11 no #112; cinco práticas ainda não
+  confirmadas e a nova decisão comercial048 não foram inventadas pelo executor.
+- #111/#112 continuam abertos Draft nos HEADs acima, CI atual SUCCESS e conflitos
+  de integração. Não foram mergeados nem tiveram branches atualizadas.
+- A main não mudou src/supabase desde38b, base da matriz antiga. #111 adiciona
+  melhorias/correções e046–049 sem significar schema no HML ou Production.
+- Correções do diagnóstico: função operacional já tem texto livre e catálogo
+  extensível(quatro iniciais); Excel real/Dynamis têm evidências S13/S14. Não
+  duplicar funções existentes nem reaplicar homologação histórica ao candidato.
+- Divergência objetiva: pedido e execução no mesmo dia ainda são recusados por
+  domínio/normalizador/constraint045, na main e no #111. D06 antigo validava essa
+  recusa sob regra superada; a primeira correção proposta deve mudar esse aceite.
+- Resolução comercial OFF não usa diária individual/tarifa na cobrança. A048
+  propõe fallback quando ON e exige decisão comercial, aplicação e homologação
+  próprias. Código local/CI e HML com045/flagsOFF são estados diferentes.
+- 27 casos históricos FIN-PR-13 têm evidências mistas(HML/Excel e e-mail A05 local)
+  e não aprovam todo #111; S19 mantém NO-GO global,
+  283 PASS/64 BLOQUEADO/137 NÃO TESTADO. Sem novo teste de tela/banco nesta tarefa.
+
+### Histórico AUTO-12 e anteriores — preservar escopos
+
+Registros abaixo são históricos; próximas ações de Gate 3 neles contidas estão
+PAUSADAS pela RETOMADA-FUNCIONAL-01. Não são autorização vigente de execução.
 
 ### AUTO-12 — preflight e squash
 
@@ -446,11 +529,11 @@ inferência a partir da release #111.
 
 ## Migrations por ambiente
 
-FUNC-03: somente banco LOCAL com 55 versões, sequência 045→046→047→048→049→050. HML045/Production034 abaixo são últimos registros; sem consulta/escrita remota de banco.
+FUNC-02: nenhuma migration aplicada nesta sessão. Main até 045, #111 candidatas
+046–049, #118 com 050. Registros HML045/Production034 abaixo são históricos, não
+catálogo reconferido. Antes de HML, cumprir o roteiro OFF/catálogo/backup na matriz.
 
-Registros históricos anteriores, sem autorização vigente:
-
-AUTO-12: nenhuma consulta/operação de banco ou alteração SQL. Os estados abaixo
+FUNC-01 documental: nenhuma consulta/operação de banco ou alteração SQL. Os estados abaixo
 são o último registro herdado da main, não reconferidos nesta tarefa.
 
 - Esta etapa não criou nem aplicou migration.
@@ -459,17 +542,21 @@ são o último registro herdado da main, não reconferidos nesta tarefa.
 - Production `ehkduqokntemtmqzdrbd`: 034; apenas leitura do head. Sem backup recente
   (último lógico: 23/10/2026).
 
-## Autorizações
+## Autorizações históricas — não transferem autorização
 
-FUNC-03 vigente: publicar #117 documental e composição técnica em branch/PR Draft próprios, testar localmente. Não herdar autorizações históricas de merge/ambientes.
+FUNC-03 vigente: publicar os cinco ajustes documentais no #117 com commit/push normal; preparar/testar/publicar composição técnica em branch/PR Draft próprios. Sem merge ou migration remota.
 
-Registros históricos anteriores, sem autorização vigente:
+**Histórico FUNC-02:** análise e preparação documental local naquela sessão. Nenhuma
+autorização nova de commit/push, merge ou aplicação HML. A próxima publicação deve
+ser autorizada para o diff documental revisto; depois cada integração/ambiente
+exige seu escopo nominal. Autorizações anteriores abaixo são históricas.
 
-AUTO-12 vigente: Ready e squash #115 exclusivamente no HEAD nominal, verificações,
-observação e preparação do plano Gate 3. Registro factual separado em branch/PR
-documental conforme Fase 7, sem integração automática ou commit adicional na main.
-O merge do registro documental, se pendente, requer decisão nominal própria.
-Gate 3 não foi autorizado a executar; Gates 4–5 permanecem proibidos.
+Histórico da autorização FUNC-01: publicação dos cinco documentos em branch documental própria,
+testes, commit/push normal e PR Draft contra main. A correção funcional do item7
+foi autorizada em branch/PR separados e está sob preparação, sem reutilizar o
+HANDOFF obsoleto do #111/#112. Nenhum merge foi autorizado nesta etapa.
+Gates 3–5 da automação PAUSADOS; HML/Supabase, migrations remotas, Production,
+credenciais e flags exigem autorização própria. O squash #116 é histórico concluído.
 
 Histórico AUTO-09: implementação mínima, testes, commit/push normal somente na
 branch chore/gate1-production-deployment-guard e criação de PR Draft contra main.
@@ -480,17 +567,21 @@ Merge e mudanças de main/Production não autorizados. Os itens abaixo são hist
   com identidades e dados sintéticos, executar a matriz de 27 casos e atualizar a
   documentação. Nenhuma foi usada para alterar Production.
 
-## Proibições
+## Proibições históricas — prevalece o escopo atual acima
 
-FUNC-03 vigente: sem merge, SQL remoto, dados reais, Production, ativação comercial/controlador, Gates 3–5, nova infraestrutura remota ou alteração do #118 original.
+FUNC-03 vigente: sem merge, SQL remoto, Production, dados reais, ON comercial, controlador, Gates 3–5, novas infraestruturas ou alteração do #118 original.
 
-Registros históricos anteriores, sem autorização vigente:
+**Histórico FUNC-02:** sem merge, migrations/SQL remotos, flag comercial ON, Production,
+controlador ou Gates 3–5, nova infraestrutura, dados reais, commit/push não
+autorizados. Não atualizar #111/#112/#118 remotamente por inferência.
 
-AUTO-12: sem remover false &&, ligar flag, dry-run hospedado ativo, contents: write,
---write ou recibos automáticos. Sem integrar #111/#112, alterar app/SQL/migrations,
-Supabase, Production administrativamente, aliases/domínios/credenciais, deploy
-manual, novos projetos, exclusões ou site institucional. Preservar main:false.
-Sem merge automático do checkpoint documental ou execução dos Gates 3–5.
+Sem iniciar Gates 3–5, remover false &&, habilitar flag/contents: write/--write,
+recibos automáticos ou alteração de workflow. Sem merge documental/funcional,
+merge/atualização #111/#112, Supabase/HML/Production, migration remota, limpeza de
+dados, credenciais, aliases/domínios, deploy manual, force push, novos projetos ou
+site institucional. A branch documental só publica os cinco arquivos autorizados;
+app/SQL/migration nova locais do item7 pertencem ao PR funcional separado.
+Preservar main:false e todos os históricos/worktrees.
 
 Os limites AUTO-09 abaixo pertencem àquela sessão, não desfazem o squash concluído.
 
@@ -504,9 +595,10 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 
 ## Bloqueios e riscos
 
-FUNC-03: candidato/Preview precisam de CI própria. HML compartilhado exige catálogo real, backup/restauração e janela com consumidor 047 compatível. Não fazer downgrade que apague chaves/trilhas ou enfraqueça faturados; plano de incidente na composição técnica.
-
-Registros históricos anteriores, sem autorização vigente:
+**FUNC-02:** três conflitos documentais entre #117/#118; prefixo 046–049 e
+consumidores 047/049 ainda precisam de composição/CI. Main/#118 usam RPC antiga
+revogada pela 047. Aplicação HML bloqueada até catálogo/backup/janela e autorização;
+048 OFF não aprova fallback ON. Riscos anteriores abaixo conservam seus escopos.
 
 - Gate 1 PASS é delimitado a esta janela/amostragem e ao Preview automático via PR;
   não é garantia infinita ou bloqueio universal de deploy manual/promoção.
@@ -539,26 +631,39 @@ Registros históricos anteriores, sem autorização vigente:
   limpeza. Regra de arredondamento da HE aprovada e documentada na sessão 13.
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
 
-## Retomada
+## Retomada histórica — não usar como tarefa ativa
 
-1. Descobrir worktrees/status/refs e preservar originais; esta branch contém a composição FUNC-03, não a release inteira.
-2. Revalidar main/#111/#112/#117/#118 e localizar o PR técnico desta branch pelo HEAD remoto.
-3. Ler manifesto/testes/roteiro em financeiro/composition-046-050.md; consultar CI/Preview do SHA próprio, sem transferir evidência histórica.
-4. Obter revisão nominal e autorização HML OFF separada: identidade, catálogo, backup/restauração, janela/Preview compatível e plano de incidente. Sem migrations ou merge por inferência.
-5. Manter main:false/controlador OFF e Gates 3–5 PAUSADOS; C1–C6/ativação comercial são decisões próprias.
+1. Descobrir worktrees/branches/HEADs e preservar alterações de terceiros.
+2. Conferir o novo HEAD do #117, seis documentos, CI e Preview próprios, mantendo Draft.
+3. Localizar a branch técnica FUNC-03 criada da main atual; seu HANDOFF governa a composição.
+4. Executar somente o restante da composição/testes locais 046–050 e publicar Draft técnico.
+5. HML requer identidade/catálogo/backup/restauração/janela/Preview compatível/OFF e autorização separada. Sem merge ou ativação nesta tarefa.
 
-### Retomada AUTO-12 — histórica
+### Retomada FUNC-02 — histórica
 
 
-1. Redescobrir worktrees/status/HEADs; preservar os três docs locais AUTO-10.
-   Ler este checkpoint na branch/PR da tarefa autorizada, sem copiar o #111.
-2. Conferir #115 MERGED e a main remota; 92478763af9674ecd327333020ea2a6f240ee404
-   é a instalação histórica do Gate 2. Revalidar main:false, locks, CI e Production.
-3. Consultar o estado de integração da branch docs/checkpoint-auto-12-gate2-installed;
-   se o registro estiver pendente, revisar diff exclusivamente documental/checks e
-   pedir autorização nominal para integração. Não fazer merge por inferência.
-4. O [protocolo Gate 3](continuidade/CHECKPOINT_AUTOMATICO.md) é somente plano:
-   obter autorização própria para patch/variáveis/allowlist/eventos/repetição/logs/
-   retorno OFF. Não remover false && ou habilitar flag nesta retomada por memória.
-5. Em incidente, FAIL/STOP e evidências sanitizadas; proprietário decide qualquer
-   intervenção administrativa. Não cancelar/promover/trocar alias/remover a trava.
+1. Descobrir worktrees, refs remotas e status; preservar os cinco ajustes locais
+   FUNC-02 e os três originais AUTO-10. Esta branch ainda é #117 no SHA publicado
+   73a3f35b2dca871e92b2623e84790c3b36308330, sem commit dos ajustes.
+2. Ler a consolidação FUNC-02 na matriz e conferir main/#111/#112/#117/#118.
+   Se os HEADs mudaram, reavaliar somente o delta pertinente.
+3. Revisar/publicar documentos só após autorização: NEGOCIO.md idêntico ao #112,
+   item 7 implementado no #118 e plano 046–050, sem checkpoints históricos ativos.
+4. Preparar prefixo técnico com consumidores compatíveis e composição/CI próprias
+   somente no próximo escopo autorizado. Resolver os três documentos e quatro
+   inventários do #118 conforme a base resultante; não fazer merge por inferência.
+5. HML: solicitar autorização própria para catálogo/backup/restauração/janela e
+   aplicação/testes OFF, sem ativação comercial. C1–C6 e Gates 3–5 permanecem pausados
+   ou pendentes conforme o plano; Production não faz parte desta consolidação.
+
+### Retomada FUNC-01 — histórica, substituída pelos passos acima
+
+1. Descobrir worktrees/status/HEADs; preservar os originais dos cinco documentos
+   e os três originais AUTO-10 no outro worktree. Nenhum reset/rebase/descarte.
+2. Ler o HANDOFF da branch/PR da tarefa e conferir HEAD/checks/Preview próprios.
+   A publicação documental não altera main nem transforma Preview em homologação.
+3. Reconfirmar main/#111/#112 e consultar matriz17 itens, decisõesC1–C6 e lotes.
+4. Prosseguir com FUNC-01 item7 na branch/PR funcional separado, sem copiar o
+   checkpoint obsoleto do #111/#112 ou ampliar os lotes comerciais.
+5. Preços/contratos e homologação são gates financeiros independentes. Não aplicar
+   migration remota, publicar Production ou retomar Gates 3–5 por inferência.

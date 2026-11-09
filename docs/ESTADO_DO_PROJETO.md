@@ -34,6 +34,95 @@ Nenhum SQL remoto, HML, dados reais ou Production alterados. HML045/Production03
 são últimos registros de catálogo, não nova consulta; homologação pendente de
 identidade/catálogo/backup/restauração/janela/Preview e autorização. 048 OFF instalada
 não aprova/ativa fallback; C1–C6 abertas. Controlador OFF, Gates 3–5 PAUSADOS.
+## TRANSFERÊNCIA ENTRE CONTAS — ponto de retomada (09/11/2026)
+
+FUNC-03 completada no escopo de **preparação local e publicação em PR Draft**, sem integração funcional ou migrações remotas. O #117 traz seis documentos de negócio/continuidade; é o candidato documental autorizado para squash após reconciliação/checks. A main antes desse squash está em `75c47cd9a30e4888b197ca6ae27aa236c71ec589` (reconsultar o SHA efetivo no GitHub). O ponto operacional atual é [HANDOFF.md](HANDOFF.md), não o checkpoint AUTO-12 ainda presente na main anterior.
+
+O [#119](https://github.com/therunnas/bslogistica/pull/119) Draft, HEAD `48a12187ea3562775656dce1b1b767b9e893b426`, contém composição técnica **046–050**, interfaces financeiras compatíveis, correção auditada de serviços e pedido no mesmo dia, com [manifesto e roteiro HML](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md). Relatório de testes: 72 suítes Node, 51 SQL / 55 versões, 128+41 asserções de concorrência, lint/TypeScript/build PASS; CI Github `validar` e `sql-local` SUCCESS no HEAD. Sem homologação HML. Migrations 046–049 coincidem com #111, 050 coincide com #118; **não integrar 050 duas vezes** nem incluir todos os 121 arquivos do #111.
+
+#111, #112 e #118 permanecem Draft e sem integração nesta etapa. `docs/NEGOCIO.md` e `docs/NEGOCIO_X_SISTEMA.md` distinguem negócio real, implementação, testes e decisões C1–C6 pendentes. Os últimos registros documentais de schema são HML 045 e Production 034, **não revalidados** neste fechamento. Pré-flight HML exige projeto/ledger reais, backup atual com restauração comprovada, janela coordenada, Preview compatível, revisão/merge próprio e autorização para cada ação. A capacidade 048 pode ser testada com resolução comercial OFF, sem ativar fallback comercial.
+
+Production não foi modificada nesta tarefa. `main:false` no Vercel e controlador automático OFF devem permanecer; Gates 3–5 do **checkpoint automático** pausados. A nova conta deve usar `CLAUDE.md` e `AGENTS.md` para invariantes, o HANDOFF para retomada, e verificar GitHub/ambientes por leitura antes de autorizar qualquer escrita. Credenciais não são transferidas por Git.
+
+## FUNC-03 — publicação documental autorizada (09/11/2026)
+
+Base main 75c47cd9a30e4888b197ca6ae27aa236c71ec589 reconferida. Cinco ajustes locais
+FUNC-02 preservados e preparados para commit/push normal na branch existente do
+#117; diff total exclusivamente seis documentos. NEGOCIO.md idêntico ao #112
+2d1c0cde7bd47154a281171d77858b530d0b6de2, sem incorporar seus outros documentos.
+Validar contrato/links/diff antes do commit e consultar CI/Preview do novo HEAD.
+A composição 046–050 usa branch/PR técnicos próprios; resultados locais e remotos
+serão registrados no checkpoint dessa branch. Nenhum merge, SQL remoto, HML,
+Production ou ativação autorizado; controlador OFF e Gates 3–5 PAUSADOS.
+
+## FUNC-02 — consolidação funcional local (09/11/2026)
+
+Refs remotas reconferidas: main 75c47cd9a30e4888b197ca6ae27aa236c71ec589;
+#111 7e08270011f74ea5dfe4470097f58659eea81140;
+#112 2d1c0cde7bd47154a281171d77858b530d0b6de2;
+#117 73a3f35b2dca871e92b2623e84790c3b36308330;
+#118 fc51b54c978ac3042f96fb763cb21ab379231490. Todos os PRs seguem Draft;
+#117/#118 mergeáveis isoladamente, CI validar/sql-local SUCCESS e Previews READY
+nos respectivos SHAs. #111/#112 com conflitos contra main; nenhum merge executado.
+
+Na branch documental do #117 foram preparados cinco ajustes locais, sem commit
+ou push: negócio do #112 byte a byte, matriz com item 7 corrigido no #118, plano
+046–050 e checkpoint/estado/fila. O diff total do candidato documental passa a
+seis arquivos; GitHub ainda contém os cinco originais do #117. Não se transferiu
+CI/Preview para os ajustes não publicados. Main e branch funcional intactas.
+
+Simulações de árvores sem merge de branch: três conflitos documentais #117×#118;
+oito main×#111; quatro conflitos de inventário adicionais em #111×#118. Revisão
+estática da 050/049: datas inclusivas sem alteração financeira; valores, ACL/owner,
+RLS e demais restrições preservados. Aplicar 047 exige consumidor idempotente
+compatível: main/#118 ainda chamam a RPC antiga que a 047 revoga.
+
+Evidência FUNC-01 reutilizada: 70 suítes Node e SQL local 47 suítes (045→050) /
+51 suítes (045→046–049→050), correção 049 presente, replay/faturados e preservação
+antes/depois; lint/TypeScript/build aprovados nos conjuntos identificados. Nenhum
+novo SQL, banco, build, teste HML ou auditoria de infraestrutura nesta FUNC-02.
+Nesta sessão: check:workflow e test:workflow (8/8) PASS; links, diff --check,
+revisão de segredos e preservação de históricos/originais PASS.
+
+Últimos registros de schema: HML045/OFF, Production034, não reconsultados nesta
+sessão. 048 OFF instalada/testada é decisão A, independente de aprovar/ativar C1
+no gate B. Novo catálogo/backup/restauração/janela HML e manifesto/CI compostos
+permanecem pendentes. Nenhum código do controlador ou vercel.json alterado;
+main:false preservado e Gates 3–5 PAUSADOS. Plano/aceites em
+[NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md); próxima ação no [HANDOFF](HANDOFF.md).
+
+## FUNC-01 — publicação documental e correção separada (09/11/2026)
+
+Os cinco documentos da RETOMADA-FUNCIONAL-01 recebem publicação autorizada em
+`docs/retomada-funcional-01`, PR documental Draft contra main, sem merge. Base
+`75c47cd9a30e4888b197ca6ae27aa236c71ec589` preservada; o #116 consolidou o
+checkpoint anterior e não é substituído pelo HANDOFF antigo do #111/#112.
+
+Validação documental: check:workflow, test:workflow (8 casos), links locais,
+matriz17 itens, diff --check e revisão de escopo/segredos. Consultar CI
+validar/sql-local e Preview READY do próprio HEAD no GitHub, sem commit recursivo
+só de status. Nenhum teste funcional, banco local novo ou homologação executado
+por esta publicação. Os resultados anteriores conservam seus SHAs/datas.
+
+A única implementação ativa é FUNC-01, item7: pedido/execução no mesmo dia,
+autorizada em branch/PR separados e sob preparação. Não se declara implementada,
+integrada ou homologada aqui. #111 `7e08270` e #112 `2d1c0cd` continuam Draft,
+sem merge/atualização por esta tarefa. A main conserva src/supabase da base38b.
+
+[Matriz revisada](NEGOCIO_X_SISTEMA.md):17 itens mantidos, decisõesC1–C6 e aceites
+preservados. HML045/Production034 são últimos registros de banco;046–049 do #111
+não foram homologadas no HML. Sem operação Supabase, migration remota ou mudança
+de credencial/flag. Gates 3–5 da automação PAUSADOS; main:false e controlador
+false &&/contents: read/--dry-run/OFF preservados. Próxima ação no
+[HANDOFF](HANDOFF.md); evidência técnica de Preview não é homologação.
+
+### Registro anterior RETOMADA-FUNCIONAL-01
+
+#116 documental squash `75c47cd9a30e4888b197ca6ae27aa236c71ec589`, árvore idêntica
+ao HEAD autorizado ccfba1a, pai9247876. CI validar/sql-local SUCCESS;
+controlador SKIPPED. Seis comparações completas:217 deployments, mesmos43
+Production/servido/aliases/proteção/Git, zero deployment do merge. Revisão local
+de17 itens concluída; sem nova homologação funcional ou consulta de banco.
 
 ## AUTO-12 — Gate 2 instalado desativado, PASS (09/11/2026 UTC)
 
@@ -906,7 +995,7 @@ na comparação canônica sem alterar caixa de textos comerciais. A revisão fin
 independente do HEAD publicado continua sendo o próximo gate.
 
 **Arquivos:** novas rotas/componentes e `_acoes.ts` em
-`src/app/(painel)/containers/`; módulos `container-servico-dados.ts`,
+`src/app/%28painel%29/containers/`; módulos `container-servico-dados.ts`,
 `container-servico-servidor.ts`, `container-servico-intencao.ts` e
 `container-servico-ui.ts`; quatro suítes `test-container-{dados,integracao,intencao,telas}.mjs`,
 runner `testar-container-leitura-local.py`, navegação e adicionais de Faturamento.
