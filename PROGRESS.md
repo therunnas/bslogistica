@@ -25,33 +25,39 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**AUTO-12 — Gate 2 PASS, instalado desativado.** #115 integrado por squash na
-main `92478763af9674ecd327333020ea2a6f240ee404`; CI aprovada, main:false/Production preservados.
-Workflow_run observado com checkpoint SKIPPED/zero steps; sem dry-run ativo,
-escrita ou recibo automático. Registro factual separado desta etapa, estado de
-integração no GitHub e evidências no [HANDOFF](docs/HANDOFF.md).
+**FUNC-01 — primeira correção funcional, item7, em desenvolvimento isolado.**
+A revisão RETOMADA-FUNCIONAL-01 recebe publicação documental em PR Draft próprio,
+sem merge. #116 está integrado; Gate 2 da automação instalado desativado.
+Gates 3–5 da automação PAUSADOS, não concluídos. [HANDOFF](docs/HANDOFF.md) mantém
+os sete campos e o limite de cada entrega; [matriz17 itens](docs/NEGOCIO_X_SISTEMA.md)
+preservada, sem nova auditoria funcional.
 
 ### Fazer agora
 
-Revisar/autorizar nominalmente a integração do checkpoint documental se pendente;
-depois aprovar separadamente o [protocolo Gate 3](docs/continuidade/CHECKPOINT_AUTOMATICO.md)
-read-only. Nenhuma mudança de ativação está autorizada nesta etapa.
+Publicar os cinco documentos com commit/push normal e PR documental Draft contra
+main; consultar CI e Preview no HEAD próprio. Em branch/PR separado, preparar a
+correção FUNC-01 para admitir pedido/execução no mesmo dia. Esta é a única
+implementação ativa e não cria outro motor financeiro. DecisõesC1–C6 permanecem
+pendentes para os lotes pertinentes.
 
 ### Não fazer ainda
 
-Sem remover false &&, flag ON, dry-run hospedado ativo, contents: write, --write,
-recibo, gates 4–5, merge #111/#112, app, banco/migrations ou intervenção Production.
+Sem merge documental/funcional, atualização #111/#112, migration remota, limpeza,
+HML/Supabase/Production, credenciais, flags ou Gates 3–5 da automação. Nenhuma
+funcionalidade implementada ou homologada é inferida desta publicação documental.
 
 ### Critério de conclusão
 
-#115 exato integrado, CI da nova main aprovada, árvore/17 arquivos/travas/Gate 1
-preservados, Production estável e nenhuma escrita automática. Resultado comprovado
-na AUTO-12; publicação documental tem SHA/checks próprios, sem commit recursivo.
+Cinco documentos publicados no PR Draft próprio; checks e Preview conferidos pelo
+HEAD exato, mantendo main/controlador OFF e Production. Correção mesmo dia tem
+validação e PR próprios, com recusas de pedido posterior/data inválida e histórico
+faturado preservados. CI verde continua sem equivaler a homologação.
 
 ### Próxima etapa
 
-Consolidar checkpoint se pendente → autorização Gate 3 para ensaio hospedado em
-leitura e retorno OFF → Gates 4 e 5 somente com autorizações independentes.
+Concluir FUNC-01 isolada → revisão do candidato → autorização específica de
+homologação HML → piloto/rollout separado. Reconciliar #111/#112 e lotes comerciais
+somente com escopo próprio; infraestrutura auxiliar permanece pausada.
 
 ### Fila funcional herdada da main — pausada nesta tarefa
 

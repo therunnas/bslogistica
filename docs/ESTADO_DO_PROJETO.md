@@ -5,6 +5,39 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## FUNC-01 — publicação documental e correção separada (09/11/2026)
+
+Os cinco documentos da RETOMADA-FUNCIONAL-01 recebem publicação autorizada em
+`docs/retomada-funcional-01`, PR documental Draft contra main, sem merge. Base
+`75c47cd9a30e4888b197ca6ae27aa236c71ec589` preservada; o #116 consolidou o
+checkpoint anterior e não é substituído pelo HANDOFF antigo do #111/#112.
+
+Validação documental: check:workflow, test:workflow (8 casos), links locais,
+matriz17 itens, diff --check e revisão de escopo/segredos. Consultar CI
+validar/sql-local e Preview READY do próprio HEAD no GitHub, sem commit recursivo
+só de status. Nenhum teste funcional, banco local novo ou homologação executado
+por esta publicação. Os resultados anteriores conservam seus SHAs/datas.
+
+A única implementação ativa é FUNC-01, item7: pedido/execução no mesmo dia,
+autorizada em branch/PR separados e sob preparação. Não se declara implementada,
+integrada ou homologada aqui. #111 `7e08270` e #112 `2d1c0cd` continuam Draft,
+sem merge/atualização por esta tarefa. A main conserva src/supabase da base38b.
+
+[Matriz revisada](NEGOCIO_X_SISTEMA.md):17 itens mantidos, decisõesC1–C6 e aceites
+preservados. HML045/Production034 são últimos registros de banco;046–049 do #111
+não foram homologadas no HML. Sem operação Supabase, migration remota ou mudança
+de credencial/flag. Gates 3–5 da automação PAUSADOS; main:false e controlador
+false &&/contents: read/--dry-run/OFF preservados. Próxima ação no
+[HANDOFF](HANDOFF.md); evidência técnica de Preview não é homologação.
+
+### Registro anterior RETOMADA-FUNCIONAL-01
+
+#116 documental squash `75c47cd9a30e4888b197ca6ae27aa236c71ec589`, árvore idêntica
+ao HEAD autorizado ccfba1a, pai9247876. CI validar/sql-local SUCCESS;
+controlador SKIPPED. Seis comparações completas:217 deployments, mesmos43
+Production/servido/aliases/proteção/Git, zero deployment do merge. Revisão local
+de17 itens concluída; sem nova homologação funcional ou consulta de banco.
+
 ## AUTO-12 — Gate 2 instalado desativado, PASS (09/11/2026 UTC)
 
 #115 Ready e squash do HEAD exato fda7fcc9df7b64d0393852c9cc5256624a7b9b52 sobre
@@ -876,7 +909,7 @@ na comparação canônica sem alterar caixa de textos comerciais. A revisão fin
 independente do HEAD publicado continua sendo o próximo gate.
 
 **Arquivos:** novas rotas/componentes e `_acoes.ts` em
-`src/app/(painel)/containers/`; módulos `container-servico-dados.ts`,
+`src/app/%28painel%29/containers/`; módulos `container-servico-dados.ts`,
 `container-servico-servidor.ts`, `container-servico-intencao.ts` e
 `container-servico-ui.ts`; quatro suítes `test-container-{dados,integracao,intencao,telas}.mjs`,
 runner `testar-container-leitura-local.py`, navegação e adicionais de Faturamento.
