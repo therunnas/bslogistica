@@ -25,6 +25,38 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
+**CHECKPOINT-AUTO-09 — Gate 1 somente preparado em branch da main.**
+Regra main:false, validador Node e negativos em CI, sem release ou controlador.
+[Draft #113](https://github.com/therunnas/bslogistica/pull/113) publicado; merge não autorizado. Estado/checks e plano de
+integração no [HANDOFF](docs/HANDOFF.md), único checkpoint desta linha.
+
+### Fazer agora
+
+Revisar o HEAD final do Draft #113 e obter autorização nominal de integração do
+Gate 1, com janela e responsável pela resposta a falhas definidos. Production preservada, contenção
+ainda não aplicada na main. Não iniciar gates 2–5.
+
+### Não fazer ainda
+
+Merge, Production, HML/Supabase, migrations, bot, deploy manual, credenciais,
+integração #111/#112 ou reconciliação funcional.
+
+### Critério de conclusão
+
+Draft mínimo da main com testes/checks e Preview próprios, baseline Production
+preservada, riscos/autorizações e próximo gate registrados; sem merge.
+
+### Próxima etapa
+
+Gate 1: integração nominalmente autorizada e comprovação da contenção real;
+depois gates independentes 2 (controlador desativado), 3 (dry-run), 4 (escrita),
+5 (primeiro recibo). Não executar nesta tarefa.
+
+### Fila funcional herdada da main — pausada nesta tarefa
+
+Registro anterior preservado, sem atualizar status de PRs ou homologação por
+inferência. Para a release ainda não integrada, consultar o HANDOFF do #111.
+
 **Homologação integrada FIN-PR-11/12/13 em HML.** O PR
 [#100](https://github.com/therunnas/bslogistica/pull/100) foi mergeado por squash em
 `91513b91b11461ac48d8dfe6af118234bfb6fbc0` (CI de `main` verde). A matriz de 27 casos
@@ -49,7 +81,7 @@ Decisão do usuário (05/11/2026): concluir primeiro as funcionalidades pendente
 ponta**, seguida do manual de utilização e da preparação de Production.
 Nenhuma funcionalidade é declarada homologada só por testes automatizados.
 
-### Fila
+#### Fila anterior
 
 1. **Concluído:** FIN-PR-13 mergeado (PR #100) e matriz E2E executada em HML
    (25 PASS, 1 PARCIAL, 1 BLOQUEADO, 0 FAIL); o PR documental #101 registra os resultados.
@@ -60,7 +92,7 @@ Nenhuma funcionalidade é declarada homologada só por testes automatizados.
    034 → 045](docs/runbooks/producao-034-045.md) redigido, **sem execução** (gate próprio,
    com backup novo).
 
-### Pausadas
+#### Pausadas anteriormente
 
 - `DOC-MASTER-01/B2`: absorvida parcialmente por WORKFLOW-01; reavaliar somente
   lacunas documentais remanescentes, sem reabrir auditorias concluídas.

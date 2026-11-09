@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "check:workflow": "node scripts/validar-workflow-documental.mjs",
+    "check:vercel-deployments": "node scripts/validate-vercel-deployment-policy.mjs",
     "conciliar:fin-pr-13": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/conciliar-fin-pr-13.mjs",
     "test:calendario-territorial": "node --experimental-strip-types scripts/test-calendario-territorial.mjs",
     "test:calendario-runners": "node --experimental-strip-types scripts/test-calendario-runners.mjs",
@@ -79,7 +80,8 @@
     "test:container-intencao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-intencao.mjs",
     "test:container-telas": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/test-container-telas.mjs",
     "test:fin-pr-13": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-fin-pr-13.mjs",
-    "test:workflow": "node --test scripts/testar-workflow-documental.mjs"
+    "test:workflow": "node --test scripts/testar-workflow-documental.mjs",
+    "test:vercel-deployments": "node --test scripts/test-vercel-deployment-policy.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

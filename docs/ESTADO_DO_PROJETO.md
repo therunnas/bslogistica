@@ -1,9 +1,25 @@
 # Estado do projeto
 
-Fotografia factual do sistema de **BS Soluções Logísticas**. É a **fonte única**
-dos dados que mudam com o tempo (o que está em Production, cobertura de testes,
-estado das dependências): os demais documentos apontam para cá em vez de repeti-los.
-Etapa atual e próximos passos ficam em [PROGRESS.md](../PROGRESS.md).
+Registros factuais por etapa de BS Soluções Logísticas. O checkpoint operacional
+atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
+[PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
+originais; não são nova verificação de banco/Production.
+
+## CHECKPOINT-AUTO-09 — Gate 1 preparado (08/11/2026 BRT)
+
+Branch chore/gate1-production-deployment-guard criada exclusivamente da main
+38b43490a8e0913c62a4ee6047ef48a8288ca0dc, sem release #111 ou docs #112.
+Contenção proposta em vercel.json e validação determinística Node/CI, sem nova
+dependência ou app/SQL. [Draft #113](https://github.com/therunnas/bslogistica/pull/113) publicado,
+CI/Preview do código 75fe207 PASS; fechamento documental com checks próprios.
+Merge não autorizado: a main ainda não
+recebeu main:false. Baseline Production dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4,
+mesmo SHA 38b4349, aliases/proteção preservados; sem consulta de banco.
+AUTO-06 FAIL/AUTO-07 PASS/AUTO-08 TRANS-MAIN PASS consultados na linha #111,
+sem repetir auditorias. Controlador ausente da main/candidato e desativado no
+#111. Evidências locais, publicação e próximo gate somente no
+[HANDOFF](HANDOFF.md). Históricos abaixo pertencem à main original; não descrevem
+funcionalidades/migrations da release ainda não integrada.
 
 ## Sessão 16 (05/11/2026)
 
