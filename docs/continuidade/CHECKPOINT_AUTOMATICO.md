@@ -4,6 +4,19 @@ SDLC: Desenvolvimento / Testes. A entrada de estado atual é sempre
 [HANDOFF](../HANDOFF.md). Este documento define o mecanismo; não duplica o estado
 da tarefa nem concede autorização para publicar ou ativar automação.
 
+## Prioridade vigente: trilha auxiliar PAUSADA
+
+RETOMADA-FUNCIONAL-01 consolidou #116 e priorizou a primeira versão funcional da
+BS. Gate 1/2 preservados; Gates 3, 4 e 5 PAUSADOS, não concluídos. Não executar o
+protocolo futuro abaixo sem nova solicitação explícita. Manter false &&,
+contents: read, --dry-run e CHECKPOINT_AUTO_ENABLED OFF; nenhum workflow removido.
+A continuidade passa pelo HANDOFF escrito pelo agente no conjunto publicado
+com a autorização vigente. O #117 contém os seis documentos da retomada e da
+transferência; conferir no GitHub o estado de integração do PR. A correção do item 7
+e as migrations 046–050 estão no #119 Draft, **não** na main até merge autorizado.
+Nenhum desses PRs autoriza ativação do controlador ou Gates 3–5.
+Consultar CI e Preview pelo HEAD de cada PR, sem commit recursivo somente para atualizar status.
+
 ## Após cada tarefa
 
 Claude Code, Codex e outros executores seguem o mesmo contrato em `AGENTS.md` e
@@ -133,7 +146,7 @@ mas o job é impedido pelas condições versionadas e flag. Workflow_run do AUTO
 observado com checkpoint SKIPPED/zero steps; nenhuma CLI, escrita ou recibo real.
 Esta é instalação desativada, sem prova de execução ativa ou dry-run hospedado.
 
-## Gate 3 — protocolo proposto, não executado
+## Gate 3 — PAUSADO; protocolo proposto, não executado
 
 SDLC: planejamento do ensaio de infraestrutura. Gate 2 instalado desativado não é
 Gate 3 aprovado. Nenhuma mudança deste protocolo foi executada no AUTO-12.

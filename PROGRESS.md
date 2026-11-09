@@ -25,35 +25,25 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**AUTO-12 — Gate 2 PASS, instalado desativado.** #115 integrado por squash na
-main `92478763af9674ecd327333020ea2a6f240ee404`; CI aprovada, main:false/Production preservados.
-Workflow_run observado com checkpoint SKIPPED/zero steps; sem dry-run ativo,
-escrita ou recibo automático. Registro factual separado desta etapa, estado de
-integração no GitHub e evidências no [HANDOFF](docs/HANDOFF.md).
+**TRANSFERÊNCIA DE CONTA — documentação de retomada.** A FUNC-03 terminou como **composição local/CI aprovada**, publicada no [PR #119](https://github.com/therunnas/bslogistica/pull/119) Draft (HEAD `48a12187ea3562775656dce1b1b767b9e893b426`). O PR #117 incorpora o modelo real de negócio e esta transferência documental; conferir se já foi integrado. O [HANDOFF](docs/HANDOFF.md) é o ponto de entrada da nova conta.
 
-### Fazer agora
+### Situação
 
-Revisar/autorizar nominalmente a integração do checkpoint documental se pendente;
-depois aprovar separadamente o [protocolo Gate 3](docs/continuidade/CHECKPOINT_AUTOMATICO.md)
-read-only. Nenhuma mudança de ativação está autorizada nesta etapa.
-
-### Não fazer ainda
-
-Sem remover false &&, flag ON, dry-run hospedado ativo, contents: write, --write,
-recibo, gates 4–5, merge #111/#112, app, banco/migrations ou intervenção Production.
-
-### Critério de conclusão
-
-#115 exato integrado, CI da nova main aprovada, árvore/17 arquivos/travas/Gate 1
-preservados, Production estável e nenhuma escrita automática. Resultado comprovado
-na AUTO-12; publicação documental tem SHA/checks próprios, sem commit recursivo.
+- #119: 046–050 e consumidores compatíveis, 66 arquivos, 72 suítes Node e 51 SQL locais relatadas; CI e Preview do candidato aprovados. **NÃO mergeado nem homologado no HML.**
+- #118: correção da 050 já incorporada ao #119; evitar duplicidade. #111/#112 antigos: Draft, não integrar por arrasto.
+- `main` antes do #117: `75c47cd9a30e4888b197ca6ae27aa236c71ec589`; reconsultar GitHub após integração documental.
+- Supabase HML e Production existentes; últimos registros HML 045/Production 034, sem reconfirmação nesta transferência. Resolução comercial OFF.
+- Checkpoint automático OFF; Gates 3–5 **da automação** pausados. Production protegida com `main:false`.
 
 ### Próxima etapa
 
-Consolidar checkpoint se pendente → autorização Gate 3 para ensaio hospedado em
-leitura e retorno OFF → Gates 4 e 5 somente com autorizações independentes.
+**Após a transferência**, novo Claude Code deve fazer check-up somente leitura de `main`, #119 e ambientes, revisar preflight HML (identidade, catálogo, backup/restauração, janela, Preview compatível) e solicitar autorização específica antes de qualquer merge ou SQL remoto. Prioridade: liberar o núcleo financeiro/operacional em HML para testes reais e piloto. Decisões comerciais C1–C6 na [matriz](docs/NEGOCIO_X_SISTEMA.md).
 
-### Fila funcional herdada da main — pausada nesta tarefa
+### Não fazer ainda
+
+Sem merge funcional, migrations remotas, Production, dados reais, resolução comercial ON, novo Supabase, ativação do controlador ou Gates 3–5 automáticos. Não duplicar o trabalho do #119 nem confundir Preview com homologação.
+
+### Fila funcional herdada da main — histórico, não tarefa ativa
 
 Registro anterior preservado, sem atualizar status de PRs ou homologação por
 inferência. Para a release ainda não integrada, consultar o HANDOFF do #111.
