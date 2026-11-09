@@ -59,7 +59,7 @@
 ## Próxima ação exata, na conta nova
 
 1. Ler `CLAUDE.md`, `AGENTS.md`, este HANDOFF e `PROGRESS.md`; conferir main, PRs e HML (somente leitura).
-2. Obter do usuário o resultado da interface dos 9 cenários no Preview.
+2. Interface dos 9 cenários concluída em localhost → HML (9/9 PASS).
 3. Para Production: `pg_dump` completo novo, token com acesso ao projeto de Production, janela e autorização nominal antes de aplicar 035–050.
 
 ## Segurança e limites da transferência
@@ -70,11 +70,11 @@
 
 ## Autorizações
 
-Vigentes nesta etapa: testes funcionais sintéticos no HML, sem persistência, com resolução comercial OFF. Não se estendem a correções, Production ou ativação comercial.
+Escrita sintética `HOMOLOG-SINT` no HML pelas telas, incluindo uma fatura, autorizada e concluída em 09/11/2026, com resolução comercial OFF; não está mais vigente. UX-AVULSA-01: três textos da tela Operações, commit/push na branch `ux/operacoes-avulsa-rotulos` e PR Draft #120. Nenhuma correção pendente de aprovação. Não se estendem a outras escritas, Production ou ativação comercial.
 
 ## Proibições
 
-Sem deploy ou migration em Production, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático ou correção de código antes de aprovação do relatório.
+Sem deploy ou migration em Production, nova escrita no HML, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, merge ou Ready do #120 sem autorização nominal.
 
 ## Retomada
 
