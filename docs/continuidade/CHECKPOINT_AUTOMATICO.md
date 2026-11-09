@@ -115,87 +115,121 @@ open`; depois `gh pr view <PR> --repo therunnas/bslogistica --json
 headRefName,headRefOid,url` e leitura do HANDOFF nessa referência. Não colocar
 tokens em comandos ou arquivos.
 
-## Gate 2 mínimo: publicação desativada
+## Gate 2 instalado desativado
 
-Esta composição é candidata em PR Draft próprio a partir da main consolidada.
-O estado factual/SHAs e a decisão atual ficam no [HANDOFF](../HANDOFF.md).
-Não copiar a release funcional nem o checkpoint do #111 para a main. O mecanismo
-Node foi portado seletivamente; não requer pacote npm, token Vercel/Supabase ou
-bypass. A CI preserva main:false, os testes/step do Gate 1 e permissões globais read.
+AUTO-12 integrou [#115](https://github.com/therunnas/bslogistica/pull/115) por squash
+na main `92478763af9674ecd327333020ea2a6f240ee404`. O [HANDOFF](../HANDOFF.md) é a entrada principal para estado,
+CI/eventos observados e limites. O mecanismo não incorpora a release #111/#112,
+nova dependência, token Vercel/Supabase ou bypass.
 
-Travas obrigatórias nesta versão:
+Travas preservadas: false && no controlador, contents/actions/deployments/
+pull-requests read, --dry-run, CHECKPOINT_AUTO_ENABLED ausente/OFF, sinalizador com
+permissions vazio e sem checkout/escrita. Controlador confiável em
+`github.workflow_sha`, persist-credentials false, sem código/cache/artefatos de PR.
+Gate 1/main:false/Next.js/validação de CI permanecem intactos.
 
-- controlador com false &&, contents: read e --dry-run;
-- CHECKPOINT_AUTO_ENABLED ausente ou false (OFF); nenhuma variável foi configurada;
-- sinal com permissions: {}, sem checkout/código do candidato;
-- controlador confiável em github.workflow_sha e persist-credentials false;
-- escrita local recusada, allowWrites false em dry-run e nenhuma credencial nova.
+As duas definições estão na branch padrão. A API pode registrá-las como active,
+mas o job é impedido pelas condições versionadas e flag. Workflow_run do AUTO-12
+observado com checkpoint SKIPPED/zero steps; nenhuma CLI, escrita ou recibo real.
+Esta é instalação desativada, sem prova de execução ativa ou dry-run hospedado.
 
-workflow_run só funciona com a definição na branch padrão. Publicar o Draft não
-instala o controlador na main; seu merge exige autorização nominal futura e novas
-verificações de main:false/CI/Production. Mesmo após merge, estas travas mantêm o
-job desligado. Não confundir workflow sinalizador com autorização de escrita.
+## Gate 3 — protocolo proposto, não executado
 
-## Gate 3: plano de dry-run hospedado, não executado
+SDLC: planejamento do ensaio de infraestrutura. Gate 2 instalado desativado não é
+Gate 3 aprovado. Nenhuma mudança deste protocolo foi executada no AUTO-12.
+Gates 4 (escrita) e 5 (primeiro recibo) continuam sem autorização.
 
-### Condições e autorizações
+### 1. Autorização nominal e instalação do modo de leitura
 
-1. Gate 2 integrado por aprovação específica, composição/CI e contenção real
-   preservadas. Reconfirmar SHA/default branch, projeto, integração Git e eventos.
-2. Nova autorização para dry-run: remover somente false && e adequar os testes
-   que fixam a versão desativada; manter contents: read e --dry-run. Essa mudança
-   não foi realizada nesta tarefa. Não autoriza --write nem contents: write.
-3. Autorizar quatro variáveis não secretas: CHECKPOINT_AUTO_ENABLED=true para
-   o ensaio em leitura, allowlist exata CHECKPOINT_PREVIEW_BRANCHES, projeto
-   CHECKPOINT_PREVIEW_PROJECT=bs-logistica-sistema e time
-   CHECKPOINT_PREVIEW_TEAM=bslogisticas. Não incluir main/default/staging/HML/forks.
-   Sem PAT, segredo Vercel/Supabase ou ampliação de permissões globais.
-4. Permissões do job: contents/actions/deployments/pull-requests read. Nenhum
-   environments/secrets write. Se faltar acesso, diagnosticar sem contornar controles.
+Autorizar separadamente um PR mínimo da main então atual para remover somente
+`false &&` do controlador e adequar seus testes da versão desativada. Preservar
+`contents/actions/deployments/pull-requests: read`, permissões globais read,
+`--dry-run`, checkout em `github.workflow_sha`, credenciais não persistidas,
+sinalizador sem escrita e toda a contenção `main:false`. Nenhum PAT ou segredo novo.
+Manter a flag OFF durante preparação, CI e eventual integração desse PR; o merge
+é outra ação nominal. Não habilitar `--write` ou `contents: write`.
 
-### Evento seguro e evidências
+A CLI atual imprime decisão e motivo, sem IDs do recibo dry-run. Antes de ligar a
+flag, aprovar se necessário um patch mínimo de observabilidade no mesmo PR:
+logs JSON somente com status, SHA validado, PR, deployment GitHub e run/tentativa da
+CI, derivados da evidência validada, e ID numérico do evento de origem. Testar
+sanitização e ausência de tokens/eventos/respostas brutas. Não imprimir o objeto
+inteiro de evento/API/recibo nem URLs com parâmetros. Sem vínculo verificável dos
+IDs entre evento, CI e Preview, o ensaio fica BLOQUEADO, não PASS.
 
-Autorizar uma branch de prova da main atual, PR aberto e artefato sintético
-inerte fora do app, sem import/efeito funcional, junto ao HANDOFF atualizado.
-O diff deve ser não exclusivamente documental para alcançar o caminho completo;
-push só de Markdown será skipped por desenho. O PR é necessário para CI e foi
-o caminho de Preview automático comprovado no Gate 1; não usar deploy manual.
+### 2. Variáveis e branch de prova
 
-Exigir CI validar/sql-local SUCCESS e Preview Vercel success no mesmo SHA, PR/HEAD
-atuais e branch permitida. O controlador de workflow_run usa apenas código da
-branch padrão, nunca candidato, cache ou artefato do PR. Consultar evidências
-independentemente na API, incluindo deployment_status e ordem CI/sinal, sem inventar
-evento ausente. Logs esperados: run/evento, decisão dry-run/skipped/recusa e motivo
-sanitizado; vincular SHA/PR/deployment/CI pelos metadados GitHub. Se o diagnóstico
-atual não permitir a vinculação, preparar patch de logs só com IDs/status sob
-revisão; nunca corpos de API, headers, tokens, cookies ou URLs com query.
+Autorizar exclusivamente quatro variáveis não secretas, inicialmente com flag OFF:
 
-### Critérios PASS / FAIL / BLOQUEADO
+| Variável | Valor proposto |
+| --- | --- |
+| CHECKPOINT_AUTO_ENABLED | false durante preparação; true somente na janela nominal; false ao encerrar |
+| CHECKPOINT_PREVIEW_BRANCHES | test/gate3-checkpoint-dry-run — uma única linha, correspondência exata |
+| CHECKPOINT_PREVIEW_PROJECT | bs-logistica-sistema |
+| CHECKPOINT_PREVIEW_TEAM | bslogisticas |
 
-- PASS: evento hospedado confiável no SHA correto alcança dry-run com evidência
-  completa, sem qualquer commit/recibo remoto, e Production/configuração preservadas.
-  Reentrega não escreve; evento documental é skipped; cabeça concorrente, CI/SHA/
-  origem incorretos ou evidência falha são recusados. Provar negativo hospedado
-  somente no escopo sintético aprovado; fixtures locais não viram prova remota.
-- FAIL: tentativa/escrita remota, execução de candidato não confiável, permissão
-  ampliada indevida, Production inesperado ou violação de branch/SHA/loop.
-- BLOQUEADO: falta de evento, acesso, campos/paginação, logs suficientes ou outro
-  requisito de prova. Não inferir dry-run aprovado nem homologação de READY/CI.
+Redescobrir refs e conferir se o nome está livre; se ocupado, definir outro nome e
+sua allowlist antes de ativar. Nunca autorizar main/default/master/prod/staging/
+HML, forks ou a release #111 por arrasto. Sem nova integração Vercel/Supabase.
+O token efêmero é somente `github.token` com os quatro escopos read declarados.
+Se o acesso for insuficiente, STOP; não elevar permissões para obter PASS.
 
-### Reversão segura
+### 3. Evento sintético seguro
 
-Se autorizado no ensaio futuro, desligar flag, cancelar apenas jobs do controlador
-explicitamente autorizados e restaurar false &&/read/--dry-run. Preservar recibos,
-histórico e main:false; não reverter a configuração inteira removendo a trava.
-Evento de Production exige FAIL/STOP e decisão administrativa do proprietário
-antes de cancelar/promover/mudar aliases. Não desconectar Git nem restaurar B1.
-Gates 4 (escrita) e 5 (primeiro recibo) exigem aprovações independentes posteriores.
+Autorizar uma branch da main atual e PR próprio com arquivo sintético inerte
+`scripts/fixtures/checkpoint-preview-smoke.txt`, sem import/efeito no app, mais
+HANDOFF atualizado. Essa extensão/caminho não é exclusivamente documental para o
+classificador; nenhum código do candidato deve ser executado pelo controlador.
+Usar somente Preview automático Git; não dispatch/deploy manual ou promoção.
+
+Com os controles read-only já integrados e a allowlist conferida, habilitar a
+flag por autorização específica e publicar um commit sintético na branch de
+prova. Capturar HEAD/PR, CI `validar` e `sql-local` SUCCESS e deployment Preview
+Vercel success/READY no mesmo SHA. Reconsultar autoria Vercel, status mais recente,
+URL canônica, head_repository/origem, branch, PR/HEAD atual e paginação. Observar
+`workflow_run` de CI e/ou Preview signal; não fabricar evento ausente.
+
+### 4. Provas e repetição
+
+- Exigir logs dry-run com IDs sanitizados correlacionados às APIs e ao código
+  confiável da branch padrão. Zero commit, recibo ou mutação remota pelo token.
+- Observar as duas entregas naturais CI/sinal do mesmo SHA e comparar decisões e
+  identidade do recibo proposto. Se faltar repetição observável, solicitar
+  autorização nominal de reexecução pelo proprietário; não conceder actions:write
+  ao job. Sem repetição comprovada, esse item permanece BLOQUEADO.
+- Publicar depois um commit somente HANDOFF/Markdown na mesma branch autorizada:
+  esperar classificação skipped para impedir loops, sem escrita/recibo.
+- Evento atrasado de HEAD substituído, branch proibida, origem/CI/SHA divergentes
+  ou consulta incompleta devem recusar evidência. Exercitar remotamente apenas os
+  negativos sintéticos expressamente autorizados; manter os demais nas fixtures.
+- O dry-run pode provar repetição sem escrita e checagens de HEAD, mas não prova
+  CAS de uma escrita real. expectedHeadOid/resposta perdida/commit atômico continuam
+  evidências locais até o gate de escrita autorizado; não transferir esse PASS.
+- Comparar refs/árvores/receipts, histórico completo Production, servido/aliases/
+  domínios/proteção/Git antes/depois. CI verde ou HTTP 200 não são homologação.
+
+### 5. Critérios e encerramento
+
+PASS somente com evento confiável, correlação SHA/PR/CI/Preview completa, decisão
+dry-run observável, repetição e documental skipped comprovados no escopo, zero
+escrita e Production preservada. FAIL para qualquer escrita, candidato/artefato
+não confiável executado, privilégio indevido ou Production inesperado. BLOQUEADO
+quando faltar evento, acesso, IDs/logs, repetição ou outra prova. Documentar cada
+item separando hospedado e simulado/local; não converter parcial em PASS.
+
+Ao encerrar, sob a autorização específica do ensaio, voltar a flag para false e
+revalidar SKIPPED/ausência de escrita. Restaurar false && e seus testes por PR
+revisado se previsto na autorização, preservando read/--dry-run/main:false e todo
+histórico. Nunca restaurar vercel.json retirando a trava. Qualquer cancelamento,
+promoção, alias ou intervenção administrativa em Production exige nova decisão
+do proprietário. Nenhuma recuperação administrativa foi autorizada pelo AUTO-12.
 
 ## Fonte e limites
 
 O mecanismo e seus testes foram reutilizados da implementação publicada no #111;
 o [plano histórico](https://github.com/therunnas/bslogistica/blob/7e08270011f74ea5dfe4470097f58659eea81140/docs/continuidade/CHECKPOINT_AUTOMATICO.md)
-permanece disponível. Esta composição precisa de seus próprios testes/CI/Preview.
+permanece disponível. A composição foi testada no AUTO-11 e a main integrada
+revalidada no AUTO-12; não transferir esses resultados para futuras alterações.
 O controlador não lê .env, não acessa Preview/Supabase/Auth e não deduz saúde,
 homologação, banco aplicado ou decisões comerciais. Nenhuma sessão real de outra
 IA ou dry-run hospedado foi simulada como aprovada.
