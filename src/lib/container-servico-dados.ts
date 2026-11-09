@@ -55,11 +55,13 @@ export interface DetalheContainer {
   participantes: { employee_id: string; nome: string; cost_cents: number }[];
   auditoria: {
     id: string;
-    action: "registered" | "canceled";
+    action: "registered" | "canceled" | "corrected";
     reason: string;
     created_at: string;
   }[];
   competencia: { inicio: string; fim: string };
+  /** Serviço que substituiu este por correção (049); nulo se não foi corrigido. */
+  substituidoPor: string | null;
 }
 export interface CatalogosContainer {
   userId: string;
@@ -355,21 +357,32 @@ export async function detalharContainer(
     participantes.reduce((n, p) => n + p.cost_cents, 0) !== s.cost_total_cents
   )
     return inconsistente();
-  const audit = await paginas(db, "container_service_audit", "id,action,reason,created_at", "id", [
-    ["service_id", serviceId],
-  ]);
+  const audit = await paginas(
+    db,
+    "container_service_audit",
+    "id,action,reason,created_at,substituto:after_data->>id",
+    "id",
+    [["service_id", serviceId]],
+  );
+  let substituidoPor: string | null = null;
   const auditoria = audit.map((a) => {
-    if (!["registered", "canceled"].includes(String(a["action"]))) return inconsistente();
+    if (!["registered", "canceled", "corrected"].includes(String(a["action"])))
+      return inconsistente();
+    // 049: a correção cancela o original e aponta o substituto (id lido da própria trilha).
+    if (a["action"] === "corrected") substituidoPor = id(a["substituto"]);
     return {
       id: id(a["id"]),
-      action: a["action"] as "registered" | "canceled",
+      action: a["action"] as "registered" | "canceled" | "corrected",
       reason: texto(a["reason"]),
       created_at: texto(a["created_at"]),
     };
   });
+  const corrigidos = auditoria.filter((a) => a["action"] === "corrected").length;
   if (
     auditoria.filter((a) => a["action"] === "registered").length !== 1 ||
-    auditoria.filter((a) => a["action"] === "canceled").length !== (s.canceled_at ? 1 : 0)
+    auditoria.filter((a) => a["action"] === "canceled").length !== (s.canceled_at ? 1 : 0) ||
+    corrigidos > 1 ||
+    (corrigidos === 1 && !s.canceled_at)
   )
     return inconsistente();
   auditoria.sort(
@@ -383,6 +396,47 @@ export async function detalharContainer(
       inicio: data(adicional["billing_period_start"] ?? adicional["period_start"]),
       fim: data(adicional["billing_period_end"] ?? adicional["period_end"]),
     },
+    substituidoPor,
+  };
+}
+
+/** O banco anuncia a correção atômica de serviço (049)? Erro ou ausência = não oferecer. */
+export async function lerCapacidadeCorrecaoContainer(db: ClienteContainer): Promise<boolean> {
+  const r = await db.rpc("estado_motor_vigencia", {});
+  if (r["error"]) return false;
+  const dados = r["data"];
+  return (
+    typeof dados === "object" &&
+    dados !== null &&
+    (dados as Record<string, unknown>)["correcao_container"] === true
+  );
+}
+
+const centavosEmTexto = (c: number) => (c / 100).toFixed(2).replace(".", ",");
+
+/**
+ * Lote pré-preenchido para CORRIGIR um serviço (049): os mesmos dados do original, no formato do
+ * formulário de registro. O cliente é o do original (a correção não troca o cliente).
+ */
+export function loteParaCorrecao(d: DetalheContainer): LoteDeContainers {
+  const s = d.servico;
+  return {
+    clienteId: s.client_id,
+    operacaoId: s.operation_id,
+    solicitadoEm: s.requested_on,
+    executadoEm: s.executed_on,
+    descricao: s.description,
+    quantidade: s.quantity,
+    totalCobrado: centavosEmTexto(s.revenue_cents),
+    referencia: s.reference,
+    participantes: d.participantes.map((p) => ({
+      colaboradorId: p.employee_id,
+      valorDevido: centavosEmTexto(p.cost_cents),
+    })),
+    modalidadeCusto: s.cost_mode,
+    totalDistribuido:
+      s.cost_mode === "total_distribuido" ? centavosEmTexto(s.cost_total_cents) : null,
+    competenciaCobranca: { inicio: d.competencia.inicio, fim: d.competencia.fim },
   };
 }
 export async function lerCatalogosContainer(

@@ -256,9 +256,20 @@ select pg_temp.save('standard','2026-03-01','2','06:00','07:00');
 select pg_temp.assert_eq('05 sem individual usa padrão 250',
  (select billed_amount::text||'|'||daily_rate_snapshot||'|'||price_source from public.timesheet_entries where id=pg_temp.id_de('2','2026-03-01')),
  '62.50|250.00|funcao_periodo');
-select pg_temp.assert_eq('06 sem fonte não aceita zero ou genérica', pg_temp.save('no-rate','2026-03-01','6','06:00','07:00'),'erro P0002');
-select pg_temp.assert_eq('07 tarifa de outra função não atende operador', pg_temp.save('no-function','2026-03-01','4','06:00','07:00'),'erro P0002');
-select pg_temp.assert_eq('08 tarifa diurna não atende turno noturno', pg_temp.save('no-night','2026-03-01','2','22:00','23:00',0,'a1','a2'),'erro P0002');
+-- 048 (FUNC-READY-01): sem diária individual e sem tarifa da função/período, o domingo é precificado pelo
+-- PREÇO-BASE do contrato (100; 1 h com fator 2 = 25,00), nunca por zero (antes da 048: P0002).
+select pg_temp.save('no-rate','2026-03-01','6','06:00','07:00');
+select pg_temp.assert_eq('06 sem individual e sem tarifa: preço-base, nunca zero',
+ (select billed_amount::text||'|'||daily_rate_snapshot||'|'||coalesce(price_source,'generica') from public.timesheet_entries where id=pg_temp.id_de('6','2026-03-01')),
+ '25.00|100.00|generica');
+select pg_temp.save('no-function','2026-03-01','4','06:00','07:00');
+select pg_temp.assert_eq('07 tarifa de outra função não atende operador: vale o preço-base',
+ (select billed_amount::text||'|'||coalesce(price_source,'generica') from public.timesheet_entries where id=pg_temp.id_de('4','2026-03-01')),
+ '25.00|generica');
+select pg_temp.save('no-night','2026-03-29','2','22:00','23:00',0,'a1','a2');
+select pg_temp.assert_eq('08 tarifa diurna não atende turno noturno: vale o preço-base',
+ (select billed_amount::text||'|'||coalesce(price_source,'generica') from public.timesheet_entries where id=pg_temp.id_de('2','2026-03-29')),
+ '25.00|generica');
 select pg_temp.assert_eq('09 fora da vigência não usa valor atual', pg_temp.save('no-date','2025-12-28','2','06:00','07:00'),'erro P0002');
 select pg_temp.save('other-contract','2026-03-01','1','06:00','07:00',0,'a3','a5',pg_temp.fn('conferente')::text);
 select pg_temp.assert_eq('10 individual de outro contrato não atravessa',

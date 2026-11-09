@@ -81,13 +81,21 @@ caso("6. operação é opcional, mas não pode ser vazia", () => {
 caso("7. solicitação com um dia de antecedência é válida", () => {
   assert.deepEqual(erros({ solicitadoEm: "2026-11-03" }), []);
 });
-caso("8. solicitação no mesmo dia ou posterior é recusada", () => {
-  recusa({ solicitadoEm: "2026-11-04" }, "dia anterior");
-  recusa({ solicitadoEm: "2026-11-05" }, "dia anterior");
+caso("8. solicitação no mesmo dia é válida; posterior é recusada", () => {
+  assert.deepEqual(erros({ solicitadoEm: base.executadoEm }), []);
+  const normalizado = prepararLoteDeContainers({ ...base, solicitadoEm: base.executadoEm });
+  assert.equal(normalizado.solicitadoEm, normalizado.executadoEm);
+  assert.equal(normalizado.receitaCentavos, 150000);
+  assert.equal(normalizado.custoTotalCentavos, 90000);
+  recusa({ solicitadoEm: "2026-11-05" }, "posterior");
 });
-caso("9. datas inexistentes são recusadas", () =>
-  recusa({ solicitadoEm: "2026-02-30" }, "datas válidas"),
-);
+caso("9. datas civis inválidas são recusadas em ambos os campos", () => {
+  for (const data of ["2026-02-30", "2026-02-29", "2026-13-01", "2026-2-03", "", "invalida"]) {
+    recusa({ solicitadoEm: data }, "datas válidas");
+    recusa({ executadoEm: data }, "datas válidas");
+  }
+  assert.deepEqual(erros({ solicitadoEm: "2028-02-29", executadoEm: "2028-02-29" }), []);
+});
 caso("10. descrição obrigatória e limitada", () => {
   recusa({ descricao: "   " }, "Descreva");
   recusa({ descricao: "A".repeat(501) }, "500 caracteres");

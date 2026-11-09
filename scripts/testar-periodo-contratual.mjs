@@ -666,7 +666,8 @@ verificar(
   "C3. adicionais: a competência só é pedida e enviada com o anúncio do banco",
   [
     /\.\.\.\(periodoContratual \? \{ competencia: /.test(telaAdicionais),
-    /"p_billing_period_start" in params/.test(dadosAdicionais),
+    /registrarAdicional\(/.test(dadosAdicionais) &&
+      /"p_billing_period_start" in params/.test(ler("src/lib/adicionais-registro.ts")),
   ],
   [true, true],
 );

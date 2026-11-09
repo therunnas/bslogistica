@@ -53,3 +53,28 @@ export async function cancelarServicoContainer(
   const { error } = await cliente.rpc("cancelar_servico_container", parametros);
   if (error) throw error;
 }
+
+/**
+ * Correção atômica (049): o banco cancela o original e registra o substituto na MESMA transação, com a
+ * chave da intenção (repetir devolve o mesmo substituto). Só serviço disponível e do mesmo cliente.
+ */
+export async function corrigirServicoContainer(
+  cliente: ClienteRpcDeContainer,
+  servicoId: string,
+  lote: LoteDeContainers,
+  chaveDeIdempotencia: string,
+  motivo: string,
+): Promise<string> {
+  const parametros = {
+    p_id: exigirUuid(servicoId),
+    p_dados: prepararLoteDeContainers(lote),
+    p_idempotency_key: exigirUuid(chaveDeIdempotencia),
+    p_reason: exigirMotivo(motivo),
+  };
+  const { data, error } = await cliente.rpc("corrigir_servico_container", parametros);
+  if (error) throw error;
+  if (typeof data !== "string" || !UUID.test(data)) {
+    throw new Error("O banco não confirmou o identificador do serviço corrigido.");
+  }
+  return data;
+}

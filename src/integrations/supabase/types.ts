@@ -48,11 +48,13 @@ export type Database = {
           created_by: string | null;
           description: string;
           id: string;
+          idempotency_key: string | null;
           invoice_id: string | null;
           operation_id: string | null;
           period_end: string;
           period_start: string;
           reference: string | null;
+          request_payload: Json | null;
         };
         Insert: {
           amount: number;
@@ -66,11 +68,13 @@ export type Database = {
           created_by?: string | null;
           description: string;
           id?: string;
+          idempotency_key?: string | null;
           invoice_id?: string | null;
           operation_id?: string | null;
           period_end: string;
           period_start: string;
           reference?: string | null;
+          request_payload?: Json | null;
         };
         Update: {
           amount?: number;
@@ -84,11 +88,13 @@ export type Database = {
           created_by?: string | null;
           description?: string;
           id?: string;
+          idempotency_key?: string | null;
           invoice_id?: string | null;
           operation_id?: string | null;
           period_end?: string;
           period_start?: string;
           reference?: string | null;
+          request_payload?: Json | null;
         };
         Relationships: [
           {
@@ -2112,6 +2118,23 @@ export type Database = {
           p_billing_period_start?: string;
           p_client_id: string;
           p_description: string;
+          p_idempotency_key?: string;
+          p_operation_id?: string;
+          p_period_end: string;
+          p_period_start: string;
+          p_reference?: string;
+          p_request_payload?: Json;
+        };
+        Returns: string;
+      };
+      registrar_adicional_idempotente: {
+        Args: {
+          p_amount: number;
+          p_billing_period_end?: string;
+          p_billing_period_start?: string;
+          p_client_id: string;
+          p_description: string;
+          p_idempotency_key: string;
           p_operation_id?: string;
           p_period_end: string;
           p_period_start: string;

@@ -25,33 +25,31 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**AUTO-12 — Gate 2 PASS, instalado desativado.** #115 integrado por squash na
-main `92478763af9674ecd327333020ea2a6f240ee404`; CI aprovada, main:false/Production preservados.
-Workflow_run observado com checkpoint SKIPPED/zero steps; sem dry-run ativo,
-escrita ou recibo automático. Registro factual separado desta etapa, estado de
-integração no GitHub e evidências no [HANDOFF](docs/HANDOFF.md).
+**FUNC-03 — composição técnica 046–050 para HML OFF.** #117 documental atualizado;
+candidato técnico em branch própria da main, sem integrar #111/#112/#118.
+Controlador OFF e Gates 3–5 PAUSADOS; main:false preservado.
 
 ### Fazer agora
 
-Revisar/autorizar nominalmente a integração do checkpoint documental se pendente;
-depois aprovar separadamente o [protocolo Gate 3](docs/continuidade/CHECKPOINT_AUTOMATICO.md)
-read-only. Nenhuma mudança de ativação está autorizada nesta etapa.
+Validações/revisão locais concluídas; publicar PR Draft técnico com manifesto,
+checkpoint e CI/Preview próprios. Sequência local completa e consumidores 047/049,
+prévia 048 compatível e regra 050 inclusiva estão compostos.
 
 ### Não fazer ainda
 
-Sem remover false &&, flag ON, dry-run hospedado ativo, contents: write, --write,
-recibo, gates 4–5, merge #111/#112, app, banco/migrations ou intervenção Production.
+Sem merge, migration remota, dados reais, Production, ativação comercial/controlador,
+Gates 3–5, novo Supabase remoto ou infraestrutura remota.
 
 ### Critério de conclusão
 
-#115 exato integrado, CI da nova main aprovada, árvore/17 arquivos/travas/Gate 1
-preservados, Production estável e nenhuma escrita automática. Resultado comprovado
-na AUTO-12; publicação documental tem SHA/checks próprios, sem commit recursivo.
+PR Draft técnico com composição/testes novos de 045→046→047→048→049→050, reenvio,
+concorrência/faturados seguros, CI/Preview aprovados e roteiro HML OFF sem aplicação.
 
 ### Próxima etapa
 
-Consolidar checkpoint se pendente → autorização Gate 3 para ensaio hospedado em
-leitura e retorno OFF → Gates 4 e 5 somente com autorizações independentes.
+Revisar o HEAD final; autorizar separadamente preflight de HML, catálogo, backup
+restaurado e aplicação/homologação OFF. Decisão comercial ON e integração Git
+continuam separadas, sem homologação automática por CI/Preview.
 
 ### Fila funcional herdada da main — pausada nesta tarefa
 

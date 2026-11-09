@@ -1,4 +1,8 @@
-import { cancelarServicoContainer, registrarServicoContainer } from "./container-servico-backend";
+import {
+  cancelarServicoContainer,
+  corrigirServicoContainer,
+  registrarServicoContainer,
+} from "./container-servico-backend";
 import {
   prepararLoteDeContainers,
   type LoteDeContainers,
@@ -10,6 +14,7 @@ import {
   listarContainers,
   lerCatalogosContainer,
   lerCapacidadeContainers,
+  lerCapacidadeCorrecaoContainer,
   recuperarRegistroContainer,
   recuperarMarcadorContainer,
   lerVinculoAdicionalContainer,
@@ -72,6 +77,35 @@ export function criarAcoesContainer(deps: {
         if (recuperado.estado === "registrado") return { id: recuperado.id };
         return {
           id: await registrarServicoContainer(db, entrada.lote, entrada.chave, entrada.motivo),
+        };
+      }),
+    capacidadeCorrecao: () => executar((db) => lerCapacidadeCorrecaoContainer(db)),
+    corrigir: (entrada: { id: string; lote: LoteDeContainers; chave: string; motivo: string }) =>
+      executar(async (db) => {
+        try {
+          exigirIdContainer(entrada.id);
+          exigirIdContainer(entrada.chave);
+          if (
+            typeof entrada.motivo !== "string" ||
+            !entrada.motivo.trim() ||
+            entrada.motivo.trim().length > 1000
+          )
+            throw new Error();
+          prepararLoteDeContainers(entrada.lote);
+        } catch {
+          throw { code: "22023" };
+        }
+        // A RPC 049 confere também o vínculo corrected com ESTE original no replay.
+        // Uma leitura genérica pela chave/payload não prova esse vínculo; reenviar a
+        // mesma correção é idempotente no banco, inclusive após faturar o substituto.
+        return {
+          id: await corrigirServicoContainer(
+            db,
+            entrada.id,
+            entrada.lote,
+            entrada.chave,
+            entrada.motivo,
+          ),
         };
       }),
     cancelar: (entrada: { id: string; motivo: string }) =>

@@ -22,6 +22,12 @@
 
 begin;
 
+-- FIN-20C (046): a API deixou de escrever em fatura (REVOKE de INSERT/UPDATE/DELETE em invoices e invoice_items;
+-- só gerar_fatura escreve, e o 046_imutabilidade_fatura_adicionais.sql cobre isso). Este teste continua exercitando as
+-- POLÍTICAS RLS dessas tabelas, que seguem como segunda camada. Por isso o privilégio é restaurado SÓ nesta transação;
+-- o ROLLBACK final o desfaz e nada disso vaza para o banco.
+grant insert, update, delete on table public.invoices, public.invoice_items to authenticated;
+
 create temporary table _resultado (
   ordem     serial,
   caso      text,

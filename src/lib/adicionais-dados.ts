@@ -2,6 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { RPC_ADICIONAIS, montarRegistroDeAdicional, type Adicional } from "@/lib/adicionais";
+import { criarExclusaoEntreAbas, executarIntencaoDeAdicional } from "@/lib/adicional-intencao";
+import {
+  CODIGO_DE_CHAVE_REUTILIZADA,
+  MENSAGEM_CHAVE_REUTILIZADA,
+  registrarAdicional,
+  type ChamadaDeRpc,
+} from "@/lib/adicionais-registro";
 import type { FormularioDeAdicional } from "@/lib/adicionais";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { toast } from "@/lib/notificacoes";
@@ -83,37 +90,60 @@ function invalidar(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: CHAVE_DOS_ADICIONAIS });
 }
 
+/** A chamada tipada do cliente do navegador, vista pelo transporte como uma função de RPC por nome. */
+const chamarRpc: ChamadaDeRpc = (nome, args) =>
+  cliente().rpc(nome as never, args as never) as unknown as ReturnType<ChamadaDeRpc>;
+
+function codigoDoErro(erro: unknown): string | undefined {
+  return typeof erro === "object" && erro !== null ? (erro as { code?: string }).code : undefined;
+}
+
+/**
+ * Registra o adicional pela RPC idempotente (047). A CHAVE acompanha a intenção: o duplo clique e o retry
+ * depois de um erro ou timeout reconciliam a mesma chave. Só o marcador opaco sobrevive à navegação;
+ * payload e valores permanecem na memória. Fechar o formulário não encerra uma intenção pendente.
+ */
 export function useRegistrarAdicional() {
   const queryClient = useQueryClient();
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async (f: FormularioDeAdicional) => {
       const params = montarRegistroDeAdicional(f);
-      const { error } = await cliente().rpc(RPC_ADICIONAIS.registrar, {
-        p_client_id: params["p_client_id"] as string,
-        p_period_start: params["p_period_start"] as string,
-        p_period_end: params["p_period_end"] as string,
-        p_description: params["p_description"] as string,
-        p_amount: params["p_amount"] as number,
-        ...(params["p_reference"] !== null ? { p_reference: params["p_reference"] as string } : {}),
-        ...(params["p_operation_id"] !== null
-          ? { p_operation_id: params["p_operation_id"] as string }
-          : {}),
-        ...("p_billing_period_start" in params
-          ? {
-              p_billing_period_start: params["p_billing_period_start"] as string,
-              p_billing_period_end: params["p_billing_period_end"] as string,
-            }
-          : {}),
+      const db = cliente();
+      const { data, error } = await db.auth.getUser();
+      if (error || !data.user) throw new Error("Não foi possível confirmar a sessão.");
+      return executarIntencaoDeAdicional({
+        storage: localStorage,
+        exclusivo: criarExclusaoEntreAbas(navigator.locks),
+        userId: data.user.id,
+        gerar: () => crypto.randomUUID(),
+        consultar: async (chave) => {
+          const resposta = await db
+            .from("billing_additionals")
+            .select("id")
+            .eq("idempotency_key", chave)
+            .maybeSingle();
+          if (resposta.error) throw resposta.error;
+          return resposta.data?.id ?? null;
+        },
+        registrar: (chave, marcarLegado) =>
+          registrarAdicional(chamarRpc, params, chave, marcarLegado),
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       invalidar(queryClient);
       toast.success("Adicional registrado.");
     },
-    onError: (erro: unknown) =>
-      toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
+    onError: (erro: unknown) => {
+      invalidar(queryClient);
+      if (codigoDoErro(erro) === CODIGO_DE_CHAVE_REUTILIZADA) {
+        // O marcador continua pendente: a próxima tentativa deve reconciliar a chave.
+        toast.error(MENSAGEM_CHAVE_REUTILIZADA);
+        return;
+      }
+      toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro));
+    },
   });
+  return mutation;
 }
 
 export function useCancelarAdicional() {

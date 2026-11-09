@@ -24,7 +24,7 @@ export type ModalidadeDeCusto = "por_pessoa" | "total_distribuido";
 export interface LoteDeContainers {
   clienteId: string;
   operacaoId?: string | null;
-  /** Data da solicitação: a BS recebe o pedido no mínimo no dia anterior. */
+  /** Data da solicitação: o pedido pode ocorrer até o dia da execução, inclusive. */
   solicitadoEm: string;
   /** Data de execução do serviço, sem inferir horas ou apontamento. */
   executadoEm: string;
@@ -107,8 +107,8 @@ export function validarLoteDeContainers(lote: LoteDeContainers): string[] {
   const execucaoValida = dataCivilValida(lote.executadoEm);
   if (!pedidoValido || !execucaoValida) {
     erros.push("Informe datas válidas de solicitação e execução.");
-  } else if (lote.solicitadoEm >= lote.executadoEm) {
-    erros.push("O serviço precisa ser solicitado até o dia anterior à execução.");
+  } else if (lote.solicitadoEm > lote.executadoEm) {
+    erros.push("A solicitação não pode ser posterior à execução.");
   }
   if (lote.descricao.trim().length < 1 || lote.descricao.trim().length > 500) {
     erros.push("Descreva o produto e o serviço (até 500 caracteres).");

@@ -102,7 +102,7 @@ create or replace function pg_temp.adicional(_k text, _cli text, _exec_ini date,
                                               _cob_ini date, _cob_fim date) returns text language plpgsql as $$
 declare _r text;
 begin
-  _r := pg_temp.adm(format($q$select public.registrar_adicional(%L, %L, %L, 'ADI sintético ' || %L, %s, null, null, %L, %L)::text$q$,
+  _r := pg_temp.adm(format($q$select public.registrar_adicional_idempotente(gen_random_uuid(), %L, %L, %L, 'ADI sintético ' || %L, %s, null, null, %L, %L)::text$q$,
     pg_temp.cli(_cli), _exec_ini, _exec_fim, _k, _valor, _cob_ini, _cob_fim));
   if _r like 'erro %' then
     return _r;
@@ -466,11 +466,11 @@ select pg_temp.registrar('S2. funções internas sem EXECUTE para authenticated;
   || '|' || has_function_privilege('authenticated', 'public.periodo_contratual_conferir(uuid, date, date)', 'EXECUTE')::text
   || '|' || has_function_privilege('authenticated', 'public.competencia_de_cobranca(uuid, date)', 'EXECUTE')::text
   || '|' || has_function_privilege('anon', 'public.competencia_de_cobranca(uuid, date)', 'EXECUTE')::text
-  || '|' || has_function_privilege('authenticated', 'public.registrar_adicional(uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
+  || '|' || has_function_privilege('authenticated', 'public.registrar_adicional_idempotente(uuid, uuid, date, date, text, numeric, text, uuid, date, date)', 'EXECUTE')::text
   || '|' || has_function_privilege('service_role', 'public.registrar_condicao_contrato(uuid, date, numeric, numeric, numeric, integer, text, date, boolean, text, numeric, numeric, text)', 'EXECUTE')::text);
 select pg_temp.registrar('S3. operacional: competência, adicional e condição recusados (42501); anon também', 'erro 42501|erro 42501|erro 42501|erro 42501',
   pg_temp.ope($q$select frequencia from public.competencia_de_cobranca(pg_temp.cli('c1'), date '2026-03-01')$q$)
-  || '|' || pg_temp.ope($q$select public.registrar_adicional(pg_temp.cli('c1'), date '2026-03-02', date '2026-03-02', 'x', 1, null, null, date '2026-03-01', date '2026-03-15')::text$q$)
+  || '|' || pg_temp.ope($q$select public.registrar_adicional_idempotente(gen_random_uuid(), pg_temp.cli('c1'), date '2026-03-02', date '2026-03-02', 'x', 1, null, null, date '2026-03-01', date '2026-03-15')::text$q$)
   || '|' || pg_temp.ope(format($q$select public.registrar_condicao_contrato(%L, date '2027-08-01', 100, 8, 1.5, 10, 'x', null, true, 'diario', null, null, 'mensal')::text$q$, (select id from _ids where k = 'kq')))
   || '|' || pg_temp.anon($q$select frequencia from public.competencia_de_cobranca('5c38c000-0000-4000-8000-0000000000c1', date '2026-03-01')$q$));
 select pg_temp.registrar('S4. a frequência de uma versão não muda por UPDATE (admin sem privilégio; dono barrado pela imutabilidade)',
