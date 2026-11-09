@@ -2,52 +2,46 @@
 
 <!-- workflow-handoff:v1 -->
 
-**FUNC-01 — Documentação / Desenvolvimento isolado.** A revisão funcional
-RETOMADA-FUNCIONAL-01 é publicada em PR documental Draft próprio. A única
-implementação ativa é a correção do item7 (pedido/execução no mesmo dia), em branch
-separada e sob preparação. Gates 3–5 da automação PAUSADOS, não concluídos.
-
-**Local × GitHub:** a main permanece em
-`75c47cd9a30e4888b197ca6ae27aa236c71ec589`, consolidada pelo #116. Os cinco
-documentos desta branch recebem commit/push normal e PR Draft autorizados na
-FUNC-01, sem merge. A matriz de17 itens e os históricos foram preservados; não
-substituir a main pelo HANDOFF antigo do #111 ou do #112. CI e Preview deste PR
-são consultados pelo seu HEAD no GitHub, sem commit recursivo só de status.
+**FUNC-03 — Documentação / Desenvolvimento isolado.** Publicação autorizada dos
+ajustes FUNC-02 exclusivamente no #117 Draft. Esta branch permanece documental;
+a composição técnica 046–050 usa branch própria criada da main reconferida.
+Nenhum merge, migration remota, homologação HML ou ativação comercial autorizado.
+Controlador OFF, main:false preservado; Gates 3–5 PAUSADOS.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | FUNC-01 — publicação documental da retomada e desenvolvimento separado do item7 |
-| Gate atual | Documentação em Gate 2; correção funcional em Gate 1 isolado, sob preparação. Gates 3–5 da automação PAUSADOS |
-| Último gate concluído | #116 documental integrado; CI da main e preservação de Production/controlador OFF comprovados no registro anterior |
-| Worktree | /private/tmp/bs-retomada-funcional-01/worktree; originais dos cinco documentos preservados fora do Git; redescobrir na retomada |
-| Branch | docs/retomada-funcional-01 — publicação documental em PR Draft próprio contra main |
-| Base | 75c47cd9a30e4888b197ca6ae27aa236c71ec589 — squash #116, preservado |
-| HEAD validado | 75c47cd9a30e4888b197ca6ae27aa236c71ec589 como base; testes documentais executados no working tree dos cinco arquivos. Consultar HEAD/checks/Preview do próprio PR; sem herdar CI funcional |
-| Alterações não commitadas | Conjunto documental exclusivo: docs/HANDOFF.md; PROGRESS.md; docs/ESTADO_DO_PROJETO.md; docs/continuidade/CHECKPOINT_AUTOMATICO.md; docs/NEGOCIO_X_SISTEMA.md. Após o commit autorizado, conferir git status; demais worktrees preservados |
-| PR | Documental Draft próprio desta branch, sem merge; #111/#112 preservados abertos Draft nos HEADs registrados abaixo. Correção FUNC-01 em PR separado sob preparação |
-| Ambiente-alvo | Arquivos locais, GitHub/CI e evidência técnica de Preview; nenhuma operação HML/Supabase, navegador funcional ou dado real |
-| Última ação comprovada | Cinco documentos revisados para publicação, matriz17 itens mantida, históricos e travas preservados; verificações documentais descritas em Última tarefa |
-| Próxima ação exata | Conferir CI validar/sql-local e Preview READY no HEAD publicado do PR documental; prosseguir somente com a correção FUNC-01 em branch separada, sem merge ou promoção |
+| Etapa | FUNC-03 — publicação documental FUNC-02 e preparação técnica separada |
+| Gate atual | Publicação documental autorizada no #117; composição 046–050 em branch/PR próprios, sem merge ou HML |
+| Último gate concluído | FUNC-02: parecer, conflitos simulados e roteiro HML OFF preparados; FUNC-01 publicou #117/#118, com CI/Preview próprios |
+| Worktree | /private/tmp/bs-retomada-funcional-01/worktree; originais FUNC-02 preservados fora do Git; demais worktrees e três docs AUTO-10 intactos |
+| Branch | docs/retomada-funcional-01, exclusivamente os seis documentos do #117 |
+| Base | Main remota 75c47cd9a30e4888b197ca6ae27aa236c71ec589 reconferida; nenhuma mudança direta na main |
+| HEAD validado | #117 anterior 73a3f35b2dca871e92b2623e84790c3b36308330; alterações documentais revisadas no working tree. Consultar HEAD/CI/Preview do commit que contém este checkpoint |
+| Alterações não commitadas | Cinco ajustes locais FUNC-02 preservados/revistos: NEGOCIO novo, matriz, HANDOFF, ESTADO e PROGRESS. Diff total contra main contém seis documentos, incluindo CHECKPOINT_AUTOMATICO já publicado; conferir status após commit/push |
+| PR | #117 Draft documental; #118 fc51b54c978ac3042f96fb763cb21ab379231490 preservado; #111 7e08270011f74ea5dfe4470097f58659eea81140 e #112 2d1c0cde7bd47154a281171d77858b530d0b6de2 Draft preservados |
+| Ambiente-alvo | Git local, GitHub/CI e Preview Git automático; nenhuma operação HML/Supabase remoto ou Production |
+| Última ação comprovada | NEGOCIO.md byte idêntico ao #112; cinco ajustes preservados, históricos e limites revistos. Validações documentais pertinentes antes do commit; CI/Preview novos exigem consulta por SHA |
+| Próxima ação exata | Conferir publicação/CI/Preview do novo HEAD #117; preparar e testar 046–050/consumidores em branch isolada da main e publicar Draft técnico próprio, sem merge |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | FUNC-01: preparar e publicar os cinco documentos da retomada em branch e PR Draft documentais próprios; registrar autorização separada da primeira correção funcional, item7 |
-| Resultados e testes comprovados | check:workflow e test:workflow (8 casos), links locais, 17 itens, diff --check e revisão local de escopo/segredos no conjunto documental. CI validar/sql-local e Preview do próprio HEAD devem ser consultados no PR; resultado funcional, SQL local novo e homologação não executados por esta tarefa documental |
-| Código e PR afetados | Somente cinco documentos; sem app/SQL/workflow executável. #111 7e08270011f74ea5dfe4470097f58659eea81140 e #112 2d1c0cde7bd47154a281171d77858b530d0b6de2 preservados. Implementação FUNC-01, commit e PR funcionais são separados |
-| Ambientes envolvidos | GitHub/CI e Vercel apenas para publicação documental automática e leitura da evidência técnica. HML045/Production034 são últimos registros de banco, sem nova consulta Supabase ou operação de dados |
-| Pendências e decisões | C1–C6 continuam pendentes em seus escopos; 046–049 do #111 não foram homologadas no HML. Item7 autorizado para desenvolvimento separado, ainda sem comprovação de implementação/homologação neste documento. Gates 3–5 da automação PAUSADOS |
-| Próxima ação exata | Verificar checks e Preview do HEAD documental sem novo commit só de status; concluir no PR funcional separado domínio/formulário/normalização/migration nova e testes da regra mesmo dia, preservando recusas de pedido posterior e históricos |
-| Autorizações e proibições | Autorizados os cinco documentos, testes, commit/push normal da branch documental e PR Draft; desenvolvimento/testes/publicação em PR funcional separado para item7. Sem merge, Production, HML/Supabase, migration remota, credenciais, ativação/flags ou Gates 3–5. Preservar main:false e controlador false &&/contents: read/--dry-run/OFF |
+| Tarefa executada | FUNC-03 fase documental: revisar e publicar os ajustes FUNC-02 no #117, com NEGOCIO seletivo idêntico ao #112, matriz e roteiro 046–050 sem checkpoints históricos ativos |
+| Resultados e testes comprovados | FUNC-02 já comprovou check:workflow/test:workflow 8/8, links, 17 itens, diff --check e preservação. FUNC-03 repete as verificações documentais do conjunto atualizado antes de publicar; consultar CI/Preview no novo HEAD, não herdar aprovação anterior. Nenhum teste SQL/Node funcional novo por esta publicação documental |
+| Código e PR afetados | #117: seis documentos no diff total; cinco ajustes locais. Sem app, SQL, dependências, auth, vercel.json ou workflow executável. #111/#112/#118 inalterados |
+| Ambientes envolvidos | GitHub/CI e Preview automático; fontes de negócio do #112 por SHA. Sem banco remoto ou infraestrutura nova |
+| Pendências e decisões | Composição 046–050, consumidores 047/049, inventários 55 e testes próprios ainda precisam da branch técnica. 048 instalada OFF é decisão A, ativação comercial é decisão B. C1–C6 continuam pendentes; schema HML045/Production034 são últimos registros, não reconsultados |
+| Próxima ação exata | Consultar SHA/CI/Preview #117 sem commit recursivo só de checks; seguir na branch técnica da main para testes locais completos e Draft próprio, mantendo resolução comercial OFF e checkpoint atual |
+| Autorizações e proibições | FUNC-03 autoriza commit/push normal só documental no #117 e composição/testes/publicação em Draft técnico separado. Sem merge, migration remota, dados reais, Production, ativação comercial/controlador ou Gates 3–5. Não alterar #118 original |
 
 ## Evidência automática de Preview
 
 <!-- checkpoint-preview:start -->
 Controlador instalado desativado: false &&, contents: read, --dry-run e flag OFF.
-Gates 3–5 PAUSADOS. Nenhum dry-run ativo, escrita ou recibo automático autorizado.
+Gates 3–5 PAUSADOS. Nenhum recibo automático ou execução ativa autorizado.
 <!-- checkpoint-preview:end -->
 
 ## Evidências
@@ -493,6 +487,10 @@ inferência a partir da release #111.
 
 ## Migrations por ambiente
 
+FUNC-02: nenhuma migration aplicada nesta sessão. Main até 045, #111 candidatas
+046–049, #118 com 050. Registros HML045/Production034 abaixo são históricos, não
+catálogo reconferido. Antes de HML, cumprir o roteiro OFF/catálogo/backup na matriz.
+
 FUNC-01 documental: nenhuma consulta/operação de banco ou alteração SQL. Os estados abaixo
 são o último registro herdado da main, não reconferidos nesta tarefa.
 
@@ -504,7 +502,14 @@ são o último registro herdado da main, não reconferidos nesta tarefa.
 
 ## Autorizações
 
-FUNC-01 vigente: publicação dos cinco documentos em branch documental própria,
+FUNC-03 vigente: publicar os cinco ajustes documentais no #117 com commit/push normal; preparar/testar/publicar composição técnica em branch/PR Draft próprios. Sem merge ou migration remota.
+
+**Histórico FUNC-02:** análise e preparação documental local naquela sessão. Nenhuma
+autorização nova de commit/push, merge ou aplicação HML. A próxima publicação deve
+ser autorizada para o diff documental revisto; depois cada integração/ambiente
+exige seu escopo nominal. Autorizações anteriores abaixo são históricas.
+
+Histórico da autorização FUNC-01: publicação dos cinco documentos em branch documental própria,
 testes, commit/push normal e PR Draft contra main. A correção funcional do item7
 foi autorizada em branch/PR separados e está sob preparação, sem reutilizar o
 HANDOFF obsoleto do #111/#112. Nenhum merge foi autorizado nesta etapa.
@@ -521,6 +526,12 @@ Merge e mudanças de main/Production não autorizados. Os itens abaixo são hist
   documentação. Nenhuma foi usada para alterar Production.
 
 ## Proibições
+
+FUNC-03 vigente: sem merge, SQL remoto, Production, dados reais, ON comercial, controlador, Gates 3–5, novas infraestruturas ou alteração do #118 original.
+
+**Histórico FUNC-02:** sem merge, migrations/SQL remotos, flag comercial ON, Production,
+controlador ou Gates 3–5, nova infraestrutura, dados reais, commit/push não
+autorizados. Não atualizar #111/#112/#118 remotamente por inferência.
 
 Sem iniciar Gates 3–5, remover false &&, habilitar flag/contents: write/--write,
 recibos automáticos ou alteração de workflow. Sem merge documental/funcional,
@@ -541,6 +552,11 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 - sem inferir regra comercial nem usar R$ 35.118,12 como fixture de outra base.
 
 ## Bloqueios e riscos
+
+**FUNC-02:** três conflitos documentais entre #117/#118; prefixo 046–049 e
+consumidores 047/049 ainda precisam de composição/CI. Main/#118 usam RPC antiga
+revogada pela 047. Aplicação HML bloqueada até catálogo/backup/janela e autorização;
+048 OFF não aprova fallback ON. Riscos anteriores abaixo conservam seus escopos.
 
 - Gate 1 PASS é delimitado a esta janela/amostragem e ao Preview automático via PR;
   não é garantia infinita ou bloqueio universal de deploy manual/promoção.
@@ -574,6 +590,31 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
 
 ## Retomada
+
+1. Descobrir worktrees/branches/HEADs e preservar alterações de terceiros.
+2. Conferir o novo HEAD do #117, seis documentos, CI e Preview próprios, mantendo Draft.
+3. Localizar a branch técnica FUNC-03 criada da main atual; seu HANDOFF governa a composição.
+4. Executar somente o restante da composição/testes locais 046–050 e publicar Draft técnico.
+5. HML requer identidade/catálogo/backup/restauração/janela/Preview compatível/OFF e autorização separada. Sem merge ou ativação nesta tarefa.
+
+### Retomada FUNC-02 — histórica
+
+
+1. Descobrir worktrees, refs remotas e status; preservar os cinco ajustes locais
+   FUNC-02 e os três originais AUTO-10. Esta branch ainda é #117 no SHA publicado
+   73a3f35b2dca871e92b2623e84790c3b36308330, sem commit dos ajustes.
+2. Ler a consolidação FUNC-02 na matriz e conferir main/#111/#112/#117/#118.
+   Se os HEADs mudaram, reavaliar somente o delta pertinente.
+3. Revisar/publicar documentos só após autorização: NEGOCIO.md idêntico ao #112,
+   item 7 implementado no #118 e plano 046–050, sem checkpoints históricos ativos.
+4. Preparar prefixo técnico com consumidores compatíveis e composição/CI próprias
+   somente no próximo escopo autorizado. Resolver os três documentos e quatro
+   inventários do #118 conforme a base resultante; não fazer merge por inferência.
+5. HML: solicitar autorização própria para catálogo/backup/restauração/janela e
+   aplicação/testes OFF, sem ativação comercial. C1–C6 e Gates 3–5 permanecem pausados
+   ou pendentes conforme o plano; Production não faz parte desta consolidação.
+
+### Retomada FUNC-01 — histórica, substituída pelos passos acima
 
 1. Descobrir worktrees/status/HEADs; preservar os originais dos cinco documentos
    e os três originais AUTO-10 no outro worktree. Nenhum reset/rebase/descarte.

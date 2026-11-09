@@ -5,6 +5,53 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## FUNC-03 — publicação documental autorizada (09/11/2026)
+
+Base main 75c47cd9a30e4888b197ca6ae27aa236c71ec589 reconferida. Cinco ajustes locais
+FUNC-02 preservados e preparados para commit/push normal na branch existente do
+#117; diff total exclusivamente seis documentos. NEGOCIO.md idêntico ao #112
+2d1c0cde7bd47154a281171d77858b530d0b6de2, sem incorporar seus outros documentos.
+Validar contrato/links/diff antes do commit e consultar CI/Preview do novo HEAD.
+A composição 046–050 usa branch/PR técnicos próprios; resultados locais e remotos
+serão registrados no checkpoint dessa branch. Nenhum merge, SQL remoto, HML,
+Production ou ativação autorizado; controlador OFF e Gates 3–5 PAUSADOS.
+
+## FUNC-02 — consolidação funcional local (09/11/2026)
+
+Refs remotas reconferidas: main 75c47cd9a30e4888b197ca6ae27aa236c71ec589;
+#111 7e08270011f74ea5dfe4470097f58659eea81140;
+#112 2d1c0cde7bd47154a281171d77858b530d0b6de2;
+#117 73a3f35b2dca871e92b2623e84790c3b36308330;
+#118 fc51b54c978ac3042f96fb763cb21ab379231490. Todos os PRs seguem Draft;
+#117/#118 mergeáveis isoladamente, CI validar/sql-local SUCCESS e Previews READY
+nos respectivos SHAs. #111/#112 com conflitos contra main; nenhum merge executado.
+
+Na branch documental do #117 foram preparados cinco ajustes locais, sem commit
+ou push: negócio do #112 byte a byte, matriz com item 7 corrigido no #118, plano
+046–050 e checkpoint/estado/fila. O diff total do candidato documental passa a
+seis arquivos; GitHub ainda contém os cinco originais do #117. Não se transferiu
+CI/Preview para os ajustes não publicados. Main e branch funcional intactas.
+
+Simulações de árvores sem merge de branch: três conflitos documentais #117×#118;
+oito main×#111; quatro conflitos de inventário adicionais em #111×#118. Revisão
+estática da 050/049: datas inclusivas sem alteração financeira; valores, ACL/owner,
+RLS e demais restrições preservados. Aplicar 047 exige consumidor idempotente
+compatível: main/#118 ainda chamam a RPC antiga que a 047 revoga.
+
+Evidência FUNC-01 reutilizada: 70 suítes Node e SQL local 47 suítes (045→050) /
+51 suítes (045→046–049→050), correção 049 presente, replay/faturados e preservação
+antes/depois; lint/TypeScript/build aprovados nos conjuntos identificados. Nenhum
+novo SQL, banco, build, teste HML ou auditoria de infraestrutura nesta FUNC-02.
+Nesta sessão: check:workflow e test:workflow (8/8) PASS; links, diff --check,
+revisão de segredos e preservação de históricos/originais PASS.
+
+Últimos registros de schema: HML045/OFF, Production034, não reconsultados nesta
+sessão. 048 OFF instalada/testada é decisão A, independente de aprovar/ativar C1
+no gate B. Novo catálogo/backup/restauração/janela HML e manifesto/CI compostos
+permanecem pendentes. Nenhum código do controlador ou vercel.json alterado;
+main:false preservado e Gates 3–5 PAUSADOS. Plano/aceites em
+[NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md); próxima ação no [HANDOFF](HANDOFF.md).
+
 ## FUNC-01 — publicação documental e correção separada (09/11/2026)
 
 Os cinco documentos da RETOMADA-FUNCIONAL-01 recebem publicação autorizada em

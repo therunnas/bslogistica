@@ -25,39 +25,31 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FUNC-01 — primeira correção funcional, item7, em desenvolvimento isolado.**
-A revisão RETOMADA-FUNCIONAL-01 recebe publicação documental em PR Draft próprio,
-sem merge. #116 está integrado; Gate 2 da automação instalado desativado.
-Gates 3–5 da automação PAUSADOS, não concluídos. [HANDOFF](docs/HANDOFF.md) mantém
-os sete campos e o limite de cada entrega; [matriz17 itens](docs/NEGOCIO_X_SISTEMA.md)
-preservada, sem nova auditoria funcional.
+**FUNC-03 — composição técnica 046–050 para HML.** Fase documental publica no #117
+os ajustes FUNC-02 e NEGOCIO.md idêntico ao #112. Em branch separada da main,
+portar somente migrations/consumidores/testes necessários e a correção #118.
+Gates 3–5 PAUSADOS, controlador OFF, main:false preservado.
 
 ### Fazer agora
 
-Publicar os cinco documentos com commit/push normal e PR documental Draft contra
-main; consultar CI e Preview no HEAD próprio. Em branch/PR separado, preparar a
-correção FUNC-01 para admitir pedido/execução no mesmo dia. Esta é a única
-implementação ativa e não cria outro motor financeiro. DecisõesC1–C6 permanecem
-pendentes para os lotes pertinentes.
+Validar/publicar seis documentos do #117 e conferir CI/Preview do novo SHA;
+preparar composição técnica isolada 045→046→047→048→049→050, testes locais próprios
+e PR Draft técnico. Preservar #111/#112/#118, sem incorporar release integral.
 
 ### Não fazer ainda
 
-Sem merge documental/funcional, atualização #111/#112, migration remota, limpeza,
-HML/Supabase/Production, credenciais, flags ou Gates 3–5 da automação. Nenhuma
-funcionalidade implementada ou homologada é inferida desta publicação documental.
+Sem merge, migration/SQL remoto, alteração de dados reais, Production, nova
+infraestrutura, resolução comercial ON, controlador ou Gates 3–5.
 
 ### Critério de conclusão
 
-Cinco documentos publicados no PR Draft próprio; checks e Preview conferidos pelo
-HEAD exato, mantendo main/controlador OFF e Production. Correção mesmo dia tem
-validação e PR próprios, com recusas de pedido posterior/data inválida e histórico
-faturado preservados. CI verde continua sem equivaler a homologação.
+#117 atualizado e Draft técnico próprio com manifesto/testes/checkpoint,
+CI/Preview por SHA e roteiro HML OFF, sem atribuir homologação aos testes locais.
 
 ### Próxima etapa
 
-Concluir FUNC-01 isolada → revisão do candidato → autorização específica de
-homologação HML → piloto/rollout separado. Reconciliar #111/#112 e lotes comerciais
-somente com escopo próprio; infraestrutura auxiliar permanece pausada.
+Revisão dos novos HEADs e autorização separada para catálogo/backup/restauração/
+aplicação e homologação HML OFF. C1–C6 e ativação comercial continuam separadas.
 
 ### Fila funcional herdada da main — pausada nesta tarefa
 
