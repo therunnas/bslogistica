@@ -1233,10 +1233,13 @@ for (const evento of ["SIGNED_OUT", "SIGNED_IN"]) {
   });
 }
 
-test("operação existente oferece atalho de container sem acionar criação de operação", () => {
+// Serviço pontual é registrado como operação avulsa (decisão de 09/11/2026): o cartão
+// da operação não oferece mais atalho para o módulo Containers, evitando cobrar o mesmo
+// serviço por diária e por container. A rota /containers/novo?operacao= continua válida.
+test("operação existente não oferece atalho de container", () => {
   const source = fs.readFileSync("src/app/(painel)/operacoes/painel-operacoes.tsx", "utf8");
-  assert.match(source, /href=\{`\/containers\/novo\?operacao=\$\{operation\.id\}`\}/);
-  assert.match(source, /Adicionar serviço de container/);
+  assert.doesNotMatch(source, /\/containers\/novo\?operacao=/);
+  assert.doesNotMatch(source, /Adicionar serviço de container/);
 });
 
 test("rota nova conserva guarda administrativa e transmite operação de origem", async () => {
