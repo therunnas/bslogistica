@@ -2,47 +2,44 @@
 
 <!-- workflow-handoff:v1 -->
 
-**Fonte principal do estado atual. CHECKPOINT-AUTO-07, 08/11/2026: PASS no ensaio de novos eventos em sandbox já inicializado. AUTO-06 continua FAIL histórico. Gate 1 da BS ainda BLOQUEADO por falta da prova do primeiro commit que introduz main:false. Controlador desativado.**
+**Fonte principal do estado atual. CHECKPOINT-AUTO-08 / TRANS-MAIN, 08/11/2026 BRT: PASS no sandbox existente. AUTO-06 continua FAIL histórico e AUTO-07 PASS no seu escopo. Prova da introdução da trava concluída; próximo Gate 1 real depende de revisão e autorização, não foi executado. Controlador desativado.**
 
-**Retomada:** seis documentos oficiais lidos diretamente do GitHub e conferidos
-contra o checkout; início local/remoto do #111 em
-`1af74ed60f4e6f4a8969a4e4b4dc88ccd53918d2`, branch
-`integracao/release-preview-01`, worktree limpo; main BS `38b4349`. Reutilizados
-somente o repositório/projeto sandbox existentes, sem novos recursos ou chaves.
-SDLC: Testes de infraestrutura / Design da instalação controlada. PASS significa
-A/B/C hospedados e D local aprovados no escopo descrito; não aprova bootstrap de
-projeto novo nem instalação real. Este registro e o plano serão publicados somente
-nos quatro documentos autorizados, com CI/Preview próprios conferidos no PR,
-sem commit recursivo apenas para registrar checks.
+**Retomada:** seis documentos oficiais consultados diretamente no GitHub e
+conferidos contra o checkout limpo; início local/remoto do #111 em `3fe2f1d58ec61c1b1198418eb486892dbaa291db`,
+branch `integracao/release-preview-01`. Main real `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`; #112 aberto Draft
+em `2d1c0cde7bd47154a281171d77858b530d0b6de2`, sem alteração ou reconciliação funcional.
+Reutilizado somente o sandbox existente, sem novos recursos, chaves ou banco.
+SDLC: Testes de infraestrutura / Design da instalação controlada. Horários abaixo
+em UTC, inclusive 09/11 após meia-noite UTC; data da sessão em BRT é 08/11.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | CHECKPOINT-AUTO-07 PASS para projeto inicializado; plano mínimo preparado; Gate 1 ainda BLOQUEADO |
-| Gate atual | Falta prova remota da transição main sem regra → primeiro commit main:false; nenhuma alteração real da BS ou ativação autorizada |
-| Último gate concluído | A: 2 Previews READY; B: 2 pushes main sem deployment; C: terceiro Preview READY; D: 22 negativos/modelos locais PASS. Zero novos Production |
-| Worktree | `/private/tmp/bs-fin-20d`; sandbox existente em `/private/tmp/bs-checkpoint-auto-06/sandbox` |
+| Etapa | CHECKPOINT-AUTO-08 / TRANS-MAIN PASS; plano mínimo preparado para revisão |
+| Gate atual | Gate 1 real: prova sandbox concluída, execução não autorizada; nenhum gate real executado |
+| Último gate concluído | T1 baseline sem trava com um Production automático esperado; T2 primeiro commit main:false sem deployment; T3 Preview READY; T4 main posterior bloqueada; zero Production inesperados |
+| Worktree | `/private/tmp/bs-fin-20d`; sandbox existente em `/private/tmp/bs-checkpoint-auto-06/sandbox`; descobrir novamente na retomada |
 | Branch | `integracao/release-preview-01` na BS; main e preview/checkpoint no sandbox |
 | Base | main BS `38b43490a8e0913c62a4ee6047ef48a8288ca0dc`, sem alteração |
-| HEAD validado | 1af74ed60f4e6f4a8969a4e4b4dc88ccd53918d2 — início local/remoto do #111 e fonte do manifesto; novo commit documental tem checks próprios |
-| Alterações não commitadas | Somente HANDOFF, PROGRESS, ESTADO_DO_PROJETO e CHECKPOINT_AUTOMATICO nesta tarefa; conferir status após publicação |
-| PR | #111 e #112 abertos Draft; #112 segue 2d1c0cde7bd47154a281171d77858b530d0b6de2; sem merge, novo PR ou alteração funcional |
-| Ambiente-alvo | Novos eventos Git automáticos apenas no sandbox já inicializado; BS somente leitura e publicação documental na branch do #111; sem Supabase |
-| Última ação comprovada | Baseline 1 Production histórico/0 Preview; final 1 Production histórico/3 Preview READY, sem novos Production ou staged Production; configurações preservadas |
-| Próxima ação exata | Aprovar protocolo TRANS-MAIN para comprovar introdução da trava somente no sandbox; qualquer baseline deliberadamente sem trava/Production sintético esperado exige autorização específica; não avançar ao Gate 1 real antes da prova |
+| HEAD validado | 3fe2f1d58ec61c1b1198418eb486892dbaa291db — início remoto/local do #111 e fonte do plano; SHA deste checkpoint documental é o commit que contém este registro e tem checks próprios |
+| Alterações não commitadas | Antes da publicação, somente os quatro documentos autorizados; este commit contém esse conjunto. Conferir status e HEAD remoto na retomada, sem presumir o caminho |
+| PR | #111 e #112 abertos Draft; sem merge, novo PR, incorporação do #112 ou alteração funcional |
+| Ambiente-alvo | Commits sintéticos e deployments Git somente no sandbox; BS somente leitura e publicação documental no #111; sem Supabase |
+| Última ação comprovada | Histórico final completo: 2 Production (1 histórico + 1 baseline sintético autorizado), 4 Preview; 0 Production inesperados; main:false e Git preservados |
+| Próxima ação exata | Revisar o diff mínimo e autorizar separadamente a preparação/publicação do Gate 1 a partir da main atual, incluindo PR próprio, critérios de integração e contenção; nenhum merge ou alteração real autorizado nesta sessão |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | CHECKPOINT-AUTO-07: A/B/C hospedados com cinco commits sintéticos; D local; comparação sandbox/BS, manifesto mínimo e cinco gates; continuidade #112 preservada |
-| Resultados e testes comprovados | A1/A2/C1 source git, SHA/branch corretos, target Preview e READY; B.1/B.2 listas antes/depois idênticas por 96,7/92,3 s; zero novos Production. 22 casos locais, 26 testes do motor e parsing/guardas de 3 workflows PASS; check:workflow, 8/8 testes documentais, diff --check e revisão dos quatro documentos sem padrões de segredo PASS |
-| Código e PR afetados | Sandbox: apenas alterações sintéticas index.html, vercel.json main:false preservado. BS: somente quatro documentos, sem código/workflows/configuração alterados; publicação no #111 autorizada |
-| Ambientes envolvidos | Sandbox Git/Vercel existentes; HEAD anônimo de Preview retorna 302 pela proteção, sem credenciais/cookies/redirects. BS em leitura, sem deploy manual, banco ou homologação funcional |
-| Pendências e decisões | AUTO-07 PASS limitado ao projeto inicializado; AUTO-06 FAIL preservado. Gate 1 não reúne todas as condições: falta transição ausente→false. Combinação mínima sobre main ainda exige preparação/CI próprias em gate autorizado; nenhum escritor instalado/ativado |
-| Próxima ação exata | Autorizar e executar prova adicional TRANS-MAIN apenas no sandbox após aprovar seu risco; depois decidir contenção real via PR mínimo, sem integrar #111/#112 inteiros |
-| Autorizações e proibições | Executados somente commits/pushes sintéticos e deployments Git no sandbox; permitida publicação documental no #111. Sem main BS, merge, Production BS, Vercel BS, migrations, Supabase, chaves, domínios reais, novos recursos, force push ou bot |
+| Tarefa executada | AUTO-08 / TRANS-MAIN: quatro commits sintéticos no sandbox, observação hospedada T1–T4, diff mínimo aplicado apenas em pasta isolada e plano de cinco gates atualizado |
+| Resultados e testes comprovados | T1 READY/PROMOTED estabilizado 60,6 s; T2 sem deployment por 188,5 s; T3 Preview READY; T4 sem deployment por 186,7 s; leitura final dos seis IDs preservados. 26 testes do motor, 22 negativos locais, 7 guardas locais do protocolo e parsing/travas de 3 workflows PASS; check:workflow, 8/8 testes documentais e diff --check PASS; revisão de segurança dos quatro documentos concluída sem padrões de segredo |
+| Código e PR afetados | Sandbox: T1/T2 apenas vercel.json, T3/T4 apenas marcador index.html. BS: somente HANDOFF, PROGRESS, ESTADO_DO_PROJETO e CHECKPOINT_AUTOMATICO; vercel.json/código/workflows reais sem alteração |
+| Ambientes envolvidos | Sandbox estático existente, sem dados/segredos BS; um Production sintético automático autorizado, nenhum deployment manual. BS protegida e servida no mesmo Production; sem teste funcional autenticado, HML ou banco |
+| Pendências e decisões | AUTO-06 FAIL e AUTO-07 PASS preservados. Lacuna TRANS-MAIN resolvida no sandbox inicializado; diferenças Next.js/env/domínios/eventos GitHub continuam limites. Gate 1 real requer revisão/autorização; combinação mínima do controlador ainda exige CI própria |
+| Próxima ação exata | Autorizar Gate 1 em tarefa própria: branch isolada da main atual, patch mínimo de contenção e checkpoint correspondente, PR/revisão/CI, autorização de integração e janela com resposta administrativa pré-definida; sem incluir release #111 |
+| Autorizações e proibições | Exercida autorização nominal de remover/repor trava e de um Production sintético esperado somente no sandbox; publicação normal somente dos quatro documentos no #111. Sem main/Vercel/Production BS, merge, migrations, Supabase, novas chaves/recursos, domínios/aliases manuais, force push, bot ou funcionalidade |
 
 ## Evidência automática de Preview
 
@@ -73,8 +70,9 @@ mantém o comportamento anterior sem os anúncios `preco_base_recuo` e `correcao
 - **AUTO-04B publicada:** os quatro documentos estão em 85128d1, incluindo evidências sanitizadas AUTO-04. Este registro final é publicado em commit posterior exclusivo do HANDOFF; seu SHA/checks devem ser consultados no #111. Nenhuma alteração documental desta tarefa permanece exclusivamente local após a publicação final.
 - **Publicado antes da AUTO-06:** resultado SEC-BYPASS-02/AUTO-05 em `e01fffa54bbc567b92b9f0b21a8c84dfe3460563`, ponto de partida remoto conferido.
 - **AUTO-06 publicada:** checkpoint FAIL em `1af74ed60f4e6f4a8969a4e4b4dc88ccd53918d2`, preservado como histórico.
-- **Conjunto AUTO-07:** quatro documentos de continuidade; o commit que contém este registro é o checkpoint desta tarefa. Consultar seu SHA/CI/Preview no #111; não transferir resultados de 1af74ed nem criar commit recursivo só de checks.
-- **Sandbox remoto preservado:** [repositório privado](https://github.com/therunnas/bs-checkpoint-sandbox), projeto `bs-checkpoint-sandbox`; três commits históricos AUTO-06 e cinco commits sintéticos AUTO-07 descritos abaixo. Não fazem parte da release BS.
+- **AUTO-07 publicada:** quatro documentos em `3fe2f1d58ec61c1b1198418eb486892dbaa291db`, preservados como histórico PASS limitado.
+- **Conjunto AUTO-08:** somente quatro documentos; o commit que contém este registro é o checkpoint TRANS-MAIN. Consultar SHA/checks/Preview próprios no #111; nenhum resultado de SHA anterior é transferido e nenhum commit recursivo só de checks é necessário.
+- **Sandbox remoto preservado:** [repositório privado](https://github.com/therunnas/bs-checkpoint-sandbox), projeto `bs-checkpoint-sandbox`; três commits históricos AUTO-06, cinco AUTO-07 e quatro AUTO-08 descritos abaixo. Não fazem parte da release BS.
 - **Outros artefatos somente locais:** logs `/private/tmp/checkpoint-auto-01-*`, inventário de backups e stack sintética. Não são necessários para executar o controlador ou ler o estado publicado.
 - **Nunca publicar:** credenciais, `.env`, dumps, respostas brutas, URLs/identificadores secretos ou fingerprints. B2 foi criada somente na Vercel e selecionada como variável de sistema, sem cópia para Git/chat/arquivos. A exposição original foi tratada pela revogação de B1, preservando o registro histórico sanitizado.
 
@@ -101,6 +99,115 @@ Arquivos publicados (mesmo conjunto revisado):
 - `scripts/validar-workflow-documental.mjs`
 
 ## Evidências
+
+### CHECKPOINT-AUTO-08 / TRANS-MAIN — 08/11/2026 BRT — PASS
+
+#### Retomada, baseline e histórico completo
+
+Sandbox existente `therunnas/bs-checkpoint-sandbox`, projeto
+`prj_mywfRcPkdzLckvuZwHyNNHPFcltS`, time bslogisticas. Baseline em
+`2026-11-08T23:39:36Z`: **1 Production histórico + 3 Preview**, todos READY,
+main 854cb83 e preview/checkpoint eac4fa6, ambas com main:false. Checkout limpo,
+somente README.md, index.html e vercel.json rastreados; fixture sintética sem
+segredo/dado BS. Projeto inicializado, Git conectado, Production Branch main,
+framework null/estático, outputDirectory `.`, zero env/hook/custom environment,
+nenhum build/install/root/ignored-step concorrente no retorno efetivo. Domínio
+nativo único cadastrado bs-checkpoint-sandbox.vercel.app; sem domínio customizado.
+Proteção all_except_custom_domains, autoatribuição e opções Git preservadas;
+fingerprint de configuração e nomes de domínios iguais em todas as observações.
+Não houve evidência de alteração administrativa concorrente.
+
+Lista completa final (paginação conferida, sem filtro de estado; source git em
+todos). Histórico anterior mantido, sem exclusão ou reclassificação:
+
+| Criado UTC | Deployment ID | SHA completo | Branch | Target | Estado/subestado | Escopo |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-08T21:02:22.745Z | dpl_3iP5NBVhdCp9gCifkNNFT5NDXwPJ | 54f799d4f474bcadd81bd721a986f8301eead691 | preview/checkpoint | Production | READY/PROMOTED | histórico AUTO-06 |
+| 2026-11-08T22:02:16.560Z | dpl_DSjkkhPaSvvMXBPQk937ZYAnzfzK | 5d688b74d70799e8d0f7d08798c792aeaa3dd0ea | preview/checkpoint | Preview (target null) | READY/STAGED | Preview AUTO-07 |
+| 2026-11-08T22:05:00.479Z | dpl_9xWpBoAbDBG7FBntFwfZNhwjS2Pu | 319213dff1e4276af87a459adbfda086fbeb1100 | preview/checkpoint | Preview (target null) | READY/STAGED | Preview AUTO-07 |
+| 2026-11-08T22:13:58.336Z | dpl_DeDQbY7khFDBeqi4C8AAUE4f43N5 | eac4fa6801a2a2eec596092041a66cf4f77cf0eb | preview/checkpoint | Preview (target null) | READY/STAGED | Preview AUTO-07 |
+| 2026-11-08T23:40:10.959Z | dpl_DLx4maWCpH9PGDSCWJfChYngwNBw | d2e10d1dc9a0ca26e4d2bb73fd13dc40250eef93 | main | Production | READY/PROMOTED | baseline T1 autorizada |
+| 2026-11-08T23:51:47.676Z | dpl_8AJ5T1TnufqakcmMhg6B1Sa6AnZ9 | e85390c5e3d3721d2737272f26a576b3acceb4f6 | preview/checkpoint | Preview (target null) | READY/STAGED | Preview T3 |
+
+#### Quatro testes hospedados
+
+| Teste | Branch | SHA completo | Registro pré-push → conclusão UTC | Evidência | Resultado |
+| --- | --- | --- | --- | --- | --- |
+| T1 | main | d2e10d1dc9a0ca26e4d2bb73fd13dc40250eef93 | 2026-11-08T23:40:07Z → 2026-11-08T23:42:43Z | dpl_DLx4maWCpH9PGDSCWJfChYngwNBw; [URL](https://bs-checkpoint-sandbox-53rb4n014-bslogisticas.vercel.app) | PASS |
+| T2 | main | deb9214fc940e06af82055aca9ecea5adcf8ab1c | 2026-11-08T23:46:01Z → 2026-11-08T23:49:13Z | 0 deployment; IDs antes/depois idênticos por 188,5 s | PASS |
+| T3 | preview/checkpoint | e85390c5e3d3721d2737272f26a576b3acceb4f6 | 2026-11-08T23:51:44Z → 2026-11-08T23:52:23Z | dpl_8AJ5T1TnufqakcmMhg6B1Sa6AnZ9; [URL](https://bs-checkpoint-sandbox-k1zvca8az-bslogisticas.vercel.app) | PASS |
+| T4 | main | 55c1b33f859ba5e512483419be38ceb3390aeef1 | 2026-11-08T23:56:23Z → 2026-11-08T23:59:33Z | 0 deployment; IDs antes/depois idênticos por 186,7 s | PASS |
+
+Cada SHA foi reconfirmado no ref remoto após o push normal; a tabela usa o horário
+do registro pré-push, distinto do recebimento do evento na Vercel.
+
+T1 retirou somente a regra, com seus objetos git/deploymentEnabled que não tinham
+outra configuração; $schema preservado, nenhuma alteração de app. Houve exatamente
+**um Production automático esperado**, source git no SHA correto, READY/PROMOTED,
+estabilizado por 60,6 s. Targets/aliases nativos avançaram automaticamente com esse
+deployment autorizado; nenhuma promoção, domínio ou alias foi modificado à mão.
+O histórico AUTO-06 `dpl_3iP5NBVhdCp9gCifkNNFT5NDXwPJ` foi preservado.
+
+T2 restaurou exatamente o vercel.json inicial, introduzindo main:false a partir
+do estado sem regra já comprovadamente operante. Baseline e estado posterior
+contêm os mesmos cinco IDs (quatro históricos + T1); **zero deployment de qualquer
+target/estado**, inclusive staged/cancelled/failed, associado ao SHA sob prova.
+T3 produziu um único Preview READY, target null/source git/SHA/ref confirmados;
+readySubstate STAGED de Preview não é staged Production. T4 manteve o guard e
+alterou apenas marcador sintético; os seis IDs antes/depois permaneceram iguais.
+
+Leitura final em `2026-11-08T23:59:38Z`: **2 Production totais (1 histórico + 1 sintético
+esperado), 4 Preview, 0 Production inesperados**. Nenhum deployment tardio dos
+SHAs T2/T4 nessa reconferência. Main remota `55c1b33f859ba5e512483419be38ceb3390aeef1` com main:false;
+Preview T3 `e85390c5e3d3721d2737272f26a576b3acceb4f6` e seu target intactos. Conexão Git, configuração,
+proteção e domínios preservados. Reconferência pré-publicação em `2026-11-09T00:06:28Z`: mesmos seis IDs,
+nenhum evento atrasado de T2/T4, configuração e targets preservados.
+As janelas são medições reais e delimitadas,
+reconfirmadas após os eventos seguintes; não constituem garantia de tempo infinito.
+
+#### Segurança, testes e limites
+
+- 26/26 testes existentes do motor/adaptador PASS; 22/22 negativos locais PASS;
+  7/7 guardas locais do protocolo PASS (transição, histórico incompleto e novos
+  eventos atrasados/staged/failed); parsing e travas dos 3 workflows PASS.
+- Patch mínimo da configuração real aplicado e conferido somente em pasta local
+  isolada: git apply --check e aplicação PASS, JSON resultante com apenas a regra
+  nova e demais campos intactos. Nenhum arquivo de configuração da BS foi editado.
+- Nenhum segredo criado, removido, reutilizado, enviado a Preview ou registrado;
+  B1/B2 de segurança não foram retestadas. Nenhum cookie ou conteúdo autenticado
+  foi usado como prova; READY/target não são homologação funcional.
+- Histórico Vercel completo é a fonte dos IDs/targets. Sandbox mantém notificações
+  GitHub createDeployments disabled/repository_dispatch desativado; não afirmar
+  teste hospedado de deployment_status/workflow_run ou recibo automático.
+- AUTO-06 continua FAIL de bootstrap; AUTO-07 continua PASS de main já bloqueada.
+  TRANS-MAIN PASS cobre a introdução da trava em projeto inicializado, sem apagar
+  esses resultados independentes ou provar comportamento de projeto novo.
+
+#### Plano real e publicação
+
+Comparação somente leitura e candidato local em `2026-11-09T00:02:05Z`: BS segue
+Next.js/main, 11 env explícitas (somente contagem, sem valores), zero hooks e sem
+overrides build/install/output/root/ignored-step no retorno. Proteção e Production
+`dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4`/main38b4349/aliases reais iguais ao início;
+nenhum gate real executado. Manifesto do controlador do AUTO-07 sem mudança nos
+dez caminhos de código/configuração conferidos; reutilizado, sem nova auditoria.
+
+A lacuna da transição foi resolvida no sandbox; diferenças de framework/env/
+domínios/notificações continuam limites de extrapolação. O [plano AUTO-08](continuidade/CHECKPOINT_AUTOMATICO.md#plano-técnico-checkpoint-auto-08--trans-main)
+contém o diff mínimo verificável, gates, testes, rollback e autorizações. Gate 1
+está preparado para revisão, **não autorizado nem aplicado**; gates 2–5 continuam
+pendentes e o controlador conserva false &&, contents: read e --dry-run.
+
+#111/#112 continuam Draft nos HEADs conferidos na retomada; sem reconciliação
+funcional, incorporação dos docs de negócio ou nova análise de conflitos. Preservar
+o diagnóstico anterior e nunca substituir este HANDOFF pelo checkpoint antigo.
+
+Artefatos sanitizados somente locais em `/private/tmp/bs-checkpoint-auto-08`:
+baseline, intenções/resultados/observações, candidato e patch isolados. Não são
+dependências para a retomada e não serão commitados. Evidências suficientes estão
+neste registro/plano. Publicação exclusiva dos quatro docs no #111; conferir
+SHA/CI/Preview do commit que contém este registro. Resultados futuros dos checks
+não são antecipados; entrega final informa a conferência sem commit recursivo.
 
 ### CHECKPOINT-AUTO-07 — 08/11/2026 — PASS no projeto inicializado
 
@@ -841,7 +948,13 @@ fora do Mac. Não há senha, chave nem conteúdo de dump neste repositório.
 
 ## Autorizações
 
-CHECKPOINT-AUTO-07 (vigente): leituras necessárias, commits/pushes exclusivamente sintéticos no sandbox existente, deployments Git automáticos nele, modelos locais e preparação do plano; commit/push normal somente documental no #111. Sem autorização para alterar a BS real. TRANS-MAIN com baseline sem regra/Production sintético esperado não executado nem autorizado por inferência.
+CHECKPOINT-AUTO-08 / TRANS-MAIN (vigente): autorização nominal somente no
+sandbox para retirar/repor main:false, um Production sintético automático
+esperado e commits adicionais de Preview/bloqueio; executada. Permitida publicação
+normal somente dos quatro documentos no #111. Nenhum gate real autorizado.
+
+Histórico AUTO-07: ensaio de main já bloqueada aprovado; não abrangia baseline sem
+trava. A autorização TRANS-MAIN foi concedida especificamente na AUTO-08.
 
 Histórico AUTO-06: criação nominal e ensaio de bootstrap interrompido em FAIL; recursos preservados. AUTO-07 não altera sua classificação.
 
@@ -867,14 +980,18 @@ deployment.
 
 ## Proibições
 
-CHECKPOINT-AUTO-07: sem main BS, merge #111/#112, Production BS, Vercel BS, migrations, HML/Supabase, criação de recursos/bancos, remoção/recriação de chaves, domínios reais, exclusão do sandbox, force push, escrita do bot ou implementação funcional. Sem deploy manual ou Production sintético intencional nos negativos; publicação somente documental no #111.
+CHECKPOINT-AUTO-08: sem main/Vercel/Production BS, merge #111/#112, migrations,
+HML/Supabase, novas chaves/recursos, exclusões, domínios/aliases manuais, force push,
+deploy manual, ativação do bot, funcionalidade ou reconciliação funcional. Única
+exceção de Production foi o baseline sintético automático nominal no sandbox;
+publicação BS exclusivamente documental no #111.
 Sem merge em `main`, deploy em Production, migration em HML ou Production (046–049 inclusive), limpeza ou escrita
 de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups redundantes e force push.
 
 ## Bloqueios e riscos
 
 - B1 revogada e rejeitada; B2 única e selecionada. Valor antigo embutido em builds e usos externos desconhecidos continuam riscos residuais; não restaurar a credencial comprometida.
-- AUTO-06 continua FAIL histórico. AUTO-07 passou para projeto inicializado, com zero novos Production; Gate 1 permanece bloqueado por falta da prova do primeiro commit ausente→main:false. Nenhuma instalação real autorizada.
+- AUTO-06 FAIL, AUTO-07 PASS e AUTO-08 TRANS-MAIN PASS têm escopos independentes. Prova da transição resolvida no sandbox; Gate 1 real ainda depende de revisão/autorização e não foi executado. Next.js/env/domínios/eventos e janelas de observação são limites explícitos.
 - Sandbox não emite deployment_status/repository_dispatch como a BS; dry-run hospedado/primeiro recibo continuam não comprovados. Conteúdo protegido de Preview não foi autenticado.
 - #112 tem três conflitos documentais com #111; não substituir o checkpoint atual nem inferir implementação/homologação a partir dos novos documentos de negócio.
 
@@ -888,7 +1005,7 @@ de dados no HML, novo Supabase, novo PR, alteração dos PRs de origem, backups 
 
 1. Descobrir o checkout/worktree e a branch reais; conferir status, HEAD local e HEAD remoto pelo PR autorizado.
 2. Ler a identificação e “Última tarefa”; preservar alterações locais e não reutilizar autorização histórica.
-3. Ler AUTO-07 PASS limitado e Gate 1 BLOQUEADO; preservar AUTO-06 FAIL e não repetir rotação. Obter autorização específica do ensaio TRANS-MAIN antes de novo experimento; instalação real e escrita do bot continuam sem autorização. Conferir SHA/checks deste checkpoint documental.
+3. Ler AUTO-08 TRANS-MAIN PASS e seu plano; preservar AUTO-06 FAIL/AUTO-07 PASS e não repetir rotação ou ensaios válidos sem divergência. Próxima decisão é a autorização específica do Gate 1 real; instalação/ativação do bot permanecem sem autorização. Conferir SHA/checks deste checkpoint documental.
 4. Ativação permanece bloqueada independentemente de variáveis; seguir os gates futuros de [Checkpoint automático](continuidade/CHECKPOINT_AUTOMATICO.md), sem alterar main ou Production por inferência.
 5. Não repetir a triagem de PRs abaixo sem nova divergência; nenhuma recomendação equivale a autorização de fechamento.
 

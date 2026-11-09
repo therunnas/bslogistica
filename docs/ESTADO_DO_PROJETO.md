@@ -5,6 +5,20 @@ respectiva sessão; **não é checkpoint ativo**. Estado atual e próxima ação
 [HANDOFF](HANDOFF.md). Resultados por controle: [livro versionado](continuidade/controles-sessao-19.json).
 Se um texto abaixo disser “atual”, “sem PR” ou “sem push”, leia no contexto da data.
 
+## CHECKPOINT-AUTO-08 / TRANS-MAIN — 08/11/2026 BRT — PASS
+
+Sandbox existente: retirada da trava gerou um único Production Git sintético
+esperado, READY/PROMOTED e estabilizado. Primeiro commit main:false sem deployment
+por 188,5 s; Preview automático READY; push main posterior sem deployment por
+186,7 s; leitura final sem eventos atrasados inesperados. Contagem final: 2
+Production (1 histórico + 1 baseline autorizado), 4 Preview; zero Production
+inesperados. AUTO-06 FAIL e AUTO-07 PASS preservados. Configuração/Git mantidos.
+Diff mínimo da BS testado somente em pasta isolada, sem alterar o projeto real;
+Gate 1 preparado para revisão, nenhum gate real autorizado/executado e controlador
+desativado. 26 testes do motor, 22 negativos locais, 7 guardas locais e YAML PASS.
+Evidências completas/limites no [HANDOFF](HANDOFF.md); cinco gates e patch no
+[plano AUTO-08](continuidade/CHECKPOINT_AUTOMATICO.md#plano-técnico-checkpoint-auto-08--trans-main).
+
 ## CHECKPOINT-AUTO-07 — 08/11/2026 — PASS limitado
 
 Reutilizado sandbox inicializado: dois Previews antes e um depois de dois pushes

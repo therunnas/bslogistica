@@ -25,37 +25,36 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**CHECKPOINT-AUTO-07 — PASS para sandbox inicializado; Gate 1 real BLOQUEADO.**
-Três Previews READY, dois pushes da main sem deployment e zero novos Production.
-AUTO-06 continua FAIL histórico; controlador desativado. Evidências e limites no
-[HANDOFF](docs/HANDOFF.md), plano mínimo e gates no
-[plano](docs/continuidade/CHECKPOINT_AUTOMATICO.md#plano-técnico-checkpoint-auto-07).
+**CHECKPOINT-AUTO-08 / TRANS-MAIN — PASS; Gate 1 real preparado, não autorizado.**
+Baseline sem trava gerou um Production sintético esperado; primeiro commit
+main:false e push posterior sem deployment, Preview automático READY. AUTO-06
+permanece FAIL e AUTO-07 PASS, cada qual no seu escopo. Estado factual no
+[HANDOFF](docs/HANDOFF.md), plano/diff no
+[AUTO-08](docs/continuidade/CHECKPOINT_AUTOMATICO.md#plano-técnico-checkpoint-auto-08--trans-main).
 
 ### Fazer agora
 
-Publicar os quatro documentos e conferir CI/Preview próprios. Aprovar protocolo
-TRANS-MAIN apenas no sandbox para provar o primeiro commit que introduz main:false;
-baseline deliberadamente sem trava exige autorização específica, não inferida.
+Revisar o diff mínimo e decidir autorização nominal do Gate 1: branch isolada da
+main atual, PR mínimo/checkpoint próprio, CI e integração somente com aprovação
+específica. Prova sandbox já concluída; não repetir sem divergência factual.
 
 ### Não fazer ainda
 
-Sem instalação/ativação real, main/merge BS, Vercel BS, deploy manual, Supabase,
-migrations, novas chaves/recursos, exclusão do sandbox ou implementação funcional.
-Não declarar a transição de Gate 1 comprovada com os testes da main já bloqueada.
+Sem gate real, main/merge BS, Vercel BS, deploy manual, HML/Supabase, migrations,
+chaves/recursos, exclusões, domínios/aliases, ativação do bot ou implementação/
+reconciliação funcional. Sem integrar a release #111 ou docs antigos por arrasto.
 
 ### Critério de conclusão
 
-A/B/C hospedados e D local registrados como PASS no seu escopo, AUTO-06 preservado,
-plano mínimo preparado com Gate 1 bloqueado e documentação publicada com checks
-próprios. O modelo local não é prova remota nem homologação funcional.
+T1–T4 PASS com IDs/SHAs/tempos, zero Production inesperados e histórico preservado;
+diff mínimo testado apenas localmente, quatro documentos publicados no #111 com
+CI/Preview próprios conferidos na entrega, sem commit recursivo só de checks.
 
 ### Próxima etapa
 
-Prova TRANS-MAIN após decisão específica → Gate 1 contenção → Gate 2 instalação
-mínima desativada → Gate 3 dry-run → Gate 4 escrita autorizada → Gate 5 primeiro
-recibo. Fila funcional futura: docs de negócio #112 → reconciliação dos PRs →
-divergências funcionais → financeiro → Serviços Avulsos → homologação, sem merges
-ou implementação autorizados por esta fila.
+Gate 1 contenção, mediante autorização → Gate 2 controlador mínimo desativado →
+Gate 3 dry-run hospedado → Gate 4 escrita autorizada → Gate 5 primeiro recibo.
+Fila funcional anterior preservada, sem execução ou reconciliação nesta sessão.
 
 ## Marcos concluídos
 
