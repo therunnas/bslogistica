@@ -33,6 +33,11 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Validar política Git de Production e Preview
+        run: |
+          npm run check:vercel-deployments
+          npm run test:vercel-deployments
+
       - name: Instalar dependências
         run: npm ci
 
