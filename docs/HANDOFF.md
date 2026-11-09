@@ -2,82 +2,83 @@
 
 <!-- workflow-handoff:v1 -->
 
-**TRANSFERÊNCIA ENTRE CONTAS — FUNC-03 concluída como candidato técnico, ainda sem integração funcional ou homologação.** Este é o ponto de entrada da nova conta Claude Code. Primeiro conferir GitHub, `origin/main` e os PRs; SHAs abaixo são evidências de 09/11/2026, não estados permanentes. Continuar o desenvolvimento a partir do repositório, sem depender de conversas antigas.
+**UX-AVULSA-01 — três rótulos da operação avulsa desvinculados de "carga e descarga", em PR Draft. Matriz curta de 9 cenários PASS no banco/RPC e na interface (localhost → HML).** SHAs e contagens abaixo são evidências de 09/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | TRANSFERÊNCIA ENTRE CONTAS — fechamento documental FUNC-03 |
-| Gate atual | Consolidação documental do #117 autorizada; #119 permanece Draft, sem merge ou HML |
-| Último gate concluído | FUNC-03: composição 046–050 publicada em #119, CI/Preview do candidato aprovados, sem homologação |
-| Worktree | Caminho histórico /private/tmp/bs-retomada-funcional-01/worktree; não acessado nesta revisão remota; descobrir worktrees no ambiente novo |
-| Branch | Origem deste documento: docs/retomada-funcional-01 (#117); verificar main remota depois da integração |
-| Base | Main conferida antes do fechamento: 75c47cd9a30e4888b197ca6ae27aa236c71ec589 |
-| HEAD validado | Main-base 75c47cd9a30e4888b197ca6ae27aa236c71ec589 e #119 candidato 48a12187ea3562775656dce1b1b767b9e893b426; consultar HEAD #117 e checks próprios |
-| Alterações não commitadas | Não inspecionadas remotamente nos worktrees locais da conta anterior; nunca presumir que inexistem. Documentação deste fechamento versionada na branch #117 |
-| PR | #117 documentação a consolidar; #119 composição técnica Draft; #118 sobreposto pela 050 do #119; #111/#112 históricos Draft |
-| Ambiente-alvo | Somente documentação GitHub/CI e Preview automático da branch; sem escrita no HML ou Production |
-| Última ação comprovada | #117 reconciliado com estado #119, sem modificação de app/SQL/configuração; conferir checks do HEAD final antes do squash |
-| Próxima ação exata | Integrar apenas #117 após CI verde e confirmar novo SHA main; nova conta revalidar #119 e preparar preflight HML com autorização separada |
+| Etapa | UX-AVULSA-01 — Gate 1/2, desenvolvimento e validação local/CI |
+| Gate atual | Gate 2: PR Draft com validação local; CI do HEAD publicado a conferir no GitHub. Sem homologação, merge ou Production |
+| Último gate concluído | Homologação da matriz curta (9/9 PASS na interface, 38/38 no banco/RPC); HML 045 → 050 verificado; #119 integrado na main |
+| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-avulsa` (git worktree; o checkout `...\bslogistica` segue em `claude/jolly-allen-fqechw`). Descobrir de novo na retomada |
+| Branch | `ux/operacoes-avulsa-rotulos`, criada de `origin/claude/jolly-allen-fqechw` `d0e71432db5d6e2531d36c9ab3be25967c6a9230` |
+| Base | main `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef`; a branch herda 3 commits só de documentação (`2e0f91a`, `1999494`, `d0e7143`) |
+| HEAD validado | d0e71432db5d6e2531d36c9ab3be25967c6a9230 + o diff deste commit (três textos + HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Alterações não commitadas | Nenhuma além deste conjunto |
+| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119 mergeado; #63, #106–#112 e #118 fechados com motivo |
+| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) não escrito nesta tarefa. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
+| Última ação comprovada | Três textos trocados; lint, TypeScript, check:workflow, check:vercel-deployments, 69/72 suítes e build PASS no Windows; 3 suítes com falha idêntica sem a mudança (ambiente) |
+| Próxima ação exata | Conferir CI `validar` e `sql-local` no HEAD do PR; usuário revisa o Draft. Depois: decisões dos serviços avulsos e plano de Production 034 → 050 com `pg_dump` e autorização nominal |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Projeto | Painel interno BS Soluções Logísticas, repo `therunnas/bslogistica`; site institucional é OUTRO repositório |
-| Main antes deste merge documental | `75c47cd9a30e4888b197ca6ae27aa236c71ec589` — confirmar novo HEAD após squash do #117 |
-| Documento de negócio | [NEGOCIO.md](NEGOCIO.md), portado do #112 sem alteração de regra |
-| Matriz de negócio e decisões | [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md): 17 itens, decisões C1–C6 pendentes |
-| #117 | [Documentação](https://github.com/therunnas/bslogistica/pull/117), fonte deste checkpoint; conferir no GitHub se já integrado |
-| #119 | [Composição técnica](https://github.com/therunnas/bslogistica/pull/119) **Draft NÃO mergeado** no HEAD `48a12187ea3562775656dce1b1b767b9e893b426`; 66 arquivos e migrations 046–050, consumidores, testes e [manifesto HML](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md) |
-| #118 | [Correção de pedido no mesmo dia](https://github.com/therunnas/bslogistica/pull/118) Draft, HEAD `fc51b54c978ac3042f96fb763cb21ab379231490`; 050 já incorporada seletivamente ao #119. **Não integrar duas vezes** |
-| #111 / #112 | [Release candidata](https://github.com/therunnas/bslogistica/pull/111) e [documentação anterior](https://github.com/therunnas/bslogistica/pull/112), Drafts antigos com conflitos; não copiar checkpoints históricos nem fazer merge por arrasto |
-| Testes FUNC-03 | Relatório do #119: 72 suítes Node, 51 SQL locais / 55 versões, concorrência 128+41 asserções, lint, TypeScript, build; checks GitHub `validar` e `sql-local` SUCCESS no HEAD acima. **Não equivalem a homologação HML** |
-| Migrations na main | Até 045; 046–050 existem **somente no candidato #119** até aprovação/merge |
-| Ambientes reais | Preview, HML e Production já existem: [AMBIENTES.md](AMBIENTES.md). Último registro documental de schema: HML 045, Production 034; **revalidar somente leitura antes de agir** |
-| Production | `vercel.json` mantém `git.deploymentEnabled.main:false`; relatório FUNC-03 não identificou novo deploy Production. Não presumir homologação |
-| Checkpoint automático | Controlador instalado, **OFF** (`false &&`, `--dry-run`, permissões de leitura e flag OFF); Gates 3–5 **do checkpoint automático** pausados |
-| Pendências comerciais | C1–C6 (fallback da 048, vigência/reajustes, categorias, custo do avulso, modalidades/unidades, sábado); consultar matriz; resolução comercial OFF até decisão própria |
-| Prioridade de produto | Finalizar núcleo operacional/financeiro para primeiro piloto; não reabrir automações e auditorias gerais desnecessárias |
+| Main | `6fd2632`: migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119), mergeado). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
+| Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
+| Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
+| Negócio | [NEGOCIO.md](NEGOCIO.md) e [matriz](NEGOCIO_X_SISTEMA.md); C1–C6 seguem pendentes e não bloqueiam o piloto com resolução OFF |
+| Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Atualizar a branch do #119 com a main `cad9f51` (pós-squash do #117), resolvendo conflitos somente nos documentos de estado |
-| Resultados e testes comprovados | Merge sem conflito em código; PROGRESS e HANDOFF adotam a versão da main, ESTADO_DO_PROJETO mantém os dois históricos. Validações locais e CI do novo HEAD: conferir no GitHub, sem transferir a evidência do HEAD `48a1218` |
-| Código e PR afetados | Apenas documentos na branch do #119; nenhuma migration, app ou configuração alterada; #118, #111 e #112 intactos |
-| Ambientes envolvidos | Git/GitHub. Nenhuma escrita em Supabase HML ou Production; sem acesso remoto neste container |
-| Pendências e decisões | #119 segue Draft, sem merge nem homologação HML; preflight HML, backup restaurado, C6 e aplicação 046–050 (resolução OFF) pendentes |
-| Próxima ação exata | Confirmar CI/Preview do novo HEAD; preflight HML somente leitura (exige credenciais Supabase/Vercel) |
-| Autorizações e proibições | Usuário autorizou o plano geral em 09/11/2026; migration remota, Production e merge do #119 exigem confirmação nominal do ambiente-alvo e das credenciais |
+| Tarefa executada | UX-AVULSA-01 (09/11/2026): trocar três textos da tela Operações que prendiam a avulsa a "carga e descarga". O tipo do serviço avulso passa a ser dito pelo nome da operação (decisão do responsável). Menu e módulo "Containers" inalterados |
+| Resultados e testes comprovados | Trocas: (1) `painel-operacoes.tsx`, opção do tipo "Avulsa (carga/descarga)" → "Avulsa"; (2) `painel-operacoes.tsx`, cartão "Avulsas" description "Carga e descarga" → "Serviços pontuais"; (3) `operacoes/page.tsx`, metadata description → "Operações fixas e avulsas, com turnos, intervalos e equipe alocada." (uma linha, exigência do Prettier corrigida à mão). Nenhuma suíte conferia os textos antigos. Windows, Node 26.13: `npm run lint` PASS, `npx tsc --noEmit` PASS, `check:workflow` PASS, `check:vercel-deployments` PASS, 69/72 `test:*` PASS, `npm run build` PASS (66 s, 24 páginas), `git diff --check` PASS. Falham `test:calendario-runners` (Python ausente), `test:workflow` (separador `\`) e `test:vercel-deployments` (caminho `C:\C:\…PC%20CASA`) com contagens idênticas no checkout original em `d0e7143` sem a mudança: ambiente Windows, a confirmar na CI Linux |
+| Código e PR afetados | `src/app/(painel)/operacoes/painel-operacoes.tsx`, `src/app/(painel)/operacoes/page.tsx`, `docs/HANDOFF.md`. PR Draft desta branch contra main, incluindo os 3 commits de documentação herdados |
+| Ambientes envolvidos | Local (worktree, `npm ci`) e CI. Nenhum banco, HML, Production, `.env`, chave de serviço, flag, migration, cálculo, faturamento, auth, `vercel.json` ou workflow tocado |
+| Pendências e decisões | Evolução dos serviços avulsos: lista de tipos reais, unidade/modalidade de cobrança (diária, unidade, valor fechado), se toda avulsa é por diária, remuneração por pessoa ou rateio, futuro do menu "Containers". Outras ocorrências não alteradas (fora do escopo): `painel-operacoes.tsx` "Operações fixas usam turnos diários; avulsas registram data e valor acordado." e "Valor acordado por diária (avulsa)"; `operacoes/page.tsx` openGraph "Operações fixas e avulsas com turnos e equipe alocada."; dashboard "Distribuição entre operações fixas e avulsas."; `/containers` "Serviços avulsos, valores negociados e custos por participante." Nenhuma outra menção de interface a carga/descarga em `src/` ou `scripts/`. Pendentes anteriores abaixo seguem válidos |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, os três textos, commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo/faturamento, `billing.ts`, auth/MFA, `vercel.json`, workflows, HML, Production, `.env`, chave de serviço, módulo/menu "Containers", tipo/unidade/quantidade de serviço, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — homologação da interface (09/11/2026)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | Homologação funcional da interface dos 9 cenários (09/11/2026), app Next local (`localhost:3000`, `.env` → HML `qbnfcmrxmssnwkhaitgd`), navegador do app; admin `bcviniciuslc@gmail.com` (sem MFA) nos cenários 1–8 e `s11-op@e2e-sintetico.invalid` no 9. Preview não usado (exige login Vercel; vínculo não comprovado) |
+| Resultados e testes comprovados | **9/9 PASS** (prints na sessão). 1 Dashboard abre com R$. 2 container pedido = execução (09/11) salvo. 3 pedido 10/11 > execução 09/11 recusado na tela ("A solicitação não pode ser posterior à execução."), lista continua com 10 serviços. 4 correção 300 → 320: novo `6872ba95…` disponível, original `a3cf5ae1…` Cancelado/substituído com vínculo e auditoria. 5 adicional R$ 75 com duplo clique: um só. 6 8h = R$ 250,00; 9h30 = R$ 320,31 (HE R$ 70,31), custo R$ 120,00 e R$ 154,38, conferido após recarregar. 7 Fechamento 01–15/11 R$ 965,31, conciliação com banco "Confere" em todas as parcelas; Excel do cliente (2 abas) sem custo/margem/resultado, total R$ 965,31. 8 fatura `c40428d0…` R$ 965,31/custo R$ 324,38 Fechada; sem ação de edição; container faturado sem Corrigir/Cancelar e `/corrigir` recusado; apontamento faturado com campos desabilitados ("Nenhuma alteração para salvar"). 9 operacional entra em `/operacional`, vê só "E2E-S11 Operação A1", nenhum `R$`/termo financeiro na página, menu só `/operacional`; `/dashboard` redireciona para `/operacional`; `/faturamento` e `/fechamento` mostram "Área administrativa restrita". Somado à camada banco/RPC anterior (38/38 PASS) |
+| Código e PR afetados | Nenhum código alterado. Apenas este checkpoint, local |
+| Ambientes envolvidos | HML com escrita sintética autorizada e persistida: cliente `HOMOLOG-SINT-UI` (`a7c38a8c…`), contrato `HOMOLOG-SINT Contrato UI` (R$ 250, 8h, 1,5, vigência 01/11/2026), colaboradores `HOMOLOG-SINT Colaborador 1/2` (custo R$ 120/130 desde 01/11), operação `HOMOLOG-SINT Operacao UI` (`4a5a47dc…`) e turno, 2 containers, 1 adicional, 2 apontamentos de 09/11, fatura `c40428d0…` (imutável). Nenhum registro existente alterado; contas de usuário, Configurações e Implantação de vigências intocadas; resolução comercial OFF. Production não tocada |
+| Pendências e decisões | Observações de UX (não reprovam cenário): "Gerar fatura" emite sem confirmação; apontamento faturado não exibe "Faturado", folha segue "Aberto" e "Salvar"/"Fechar dia" ficam habilitados; cenário 3 recusado no cliente antes do servidor (recusa do banco provada na rodada banco/RPC); aviso "Localidade ausente" na operação não bloqueou apontamento. Download do Excel no navegador do app ficou como `.tmp` em Downloads. Pendentes anteriores: Production 034 → 050 com `pg_dump`; três particularidades da Dynamis; prévia `src/lib/billing.ts` `<= 15`/`<= 45` × banco `< 15`/`< 45`; dados `HOMOLOG-SINT` no HML exigem tarefa própria se for limpar |
+| Próxima ação exata | Superada pela UX-AVULSA-01 acima (checkpoint publicado nesta branch por autorização do usuário) |
+| Autorizações e proibições | Autorizada naquela tarefa: escrita sintética `HOMOLOG-SINT` no HML pelas telas, incluindo uma fatura. Não se estende a outras escritas |
 
 ## Próxima ação exata, na conta nova
 
-1. Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, [NEGOCIO.md](NEGOCIO.md), [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md) e o [manifesto do #119](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md).
-2. Revalidar `main`, PRs, reviews, CI e a situação real de HML/Production **sem escrita**. Descobrir worktrees locais existentes; trabalho apenas local da conta anterior não é recuperável por clone novo.
-3. Apresentar check-up breve da composição #119 e plano de preflight HML existente: identidade/catálogo reais, backup novo com restauração comprovada, janela, Preview vinculado corretamente e testes com resolução comercial **OFF**.
-4. **Pedir autorização separada** antes de qualquer merge do #119, migration remota, alteração de dados, ativação comercial ou deploy Production. Evitar PR duplicado da 050; decidir tratamento dos Drafts históricos.
-5. A cada tarefa concluída, atualizar este HANDOFF com resultado, SHA/PR, testes, ambiente, bloqueios e próxima ação; incluir no commit/push **da tarefa autorizada**, sem criar PR apenas para checkpoint.
+1. Ler `CLAUDE.md`, `AGENTS.md`, este HANDOFF e `PROGRESS.md`; conferir main, PRs e HML (somente leitura).
+2. Interface dos 9 cenários concluída em localhost → HML (9/9 PASS).
+3. Para Production: `pg_dump` completo novo, token com acesso ao projeto de Production, janela e autorização nominal antes de aplicar 035–050.
 
 ## Segurança e limites da transferência
 
-- **Nenhuma senha/token/`.env` real no Git.** Credenciais e permissões para GitHub, Vercel e Supabase precisam ser configuradas separadamente na outra conta; ambientes existentes não devem ser recriados.
-- CI SUCCESS, Preview READY, migration aplicada, feature flag ON, HML homologado e Production liberada são estados distintos.
-- `docs/ESTADO_DO_PROJETO.md` e as seções posteriores deste HANDOFF preservam **histórico datado**, não instruções vigentes. Esta seção de retomada prevalece sobre tarefas antigas em seus textos.
+- Nenhuma senha, token ou `.env` real no Git. O token Supabase desta sessão está salvo no ambiente Default do Claude Code e só enxerga o HML.
+- CI SUCCESS, Preview READY, migration aplicada, flag ON, HML homologado e Production liberada são estados distintos.
+- As seções históricas abaixo preservam registros datados; não são instruções vigentes.
 
 ## Autorizações
 
-A autorização desta etapa é **exclusivamente documental**: reconciliar e integrar o #117 após revisar diff e checks. Não se estende ao #119, ao #118, ao #111/#112 nem aos ambientes. A nova conta deve pedir aprovação própria para ações posteriores.
+Escrita sintética `HOMOLOG-SINT` no HML pelas telas, incluindo uma fatura, autorizada e concluída em 09/11/2026, com resolução comercial OFF; não está mais vigente. UX-AVULSA-01: três textos da tela Operações, commit/push na branch `ux/operacoes-avulsa-rotulos` e PR Draft #120. Nenhuma correção pendente de aprovação. Não se estendem a outras escritas, Production ou ativação comercial.
 
 ## Proibições
 
-Sem merge funcional, SQL remoto, alteração em Production, segredos no Git, resolução de tarifas ON, criação de outro Supabase ou execução dos Gates 3–5 do checkpoint automático. PR Draft e Preview não equivalem a produção.
+Sem deploy ou migration em Production, nova escrita no HML, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, merge ou Ready do #120 sem autorização nominal.
 
 ## Retomada
 
-Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, `docs/NEGOCIO.md`, `docs/NEGOCIO_X_SISTEMA.md` e o manifesto do #119; conferir refs, branches, CI, configuração dos ambientes e trabalho local não publicado. Apresentar check-up e próxima tarefa antes de executar operações remotas. As seções históricas abaixo não transferem autorização.
+Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF e `PROGRESS.md`; conferir refs, CI e HML por leitura. As seções históricas abaixo não transferem autorização.
 
 ## Evidência automática de Preview
 
@@ -529,6 +530,8 @@ inferência a partir da release #111.
 
 ## Migrations por ambiente
 
+**09/11/2026 (vigente):** main até 050; HML 050 (046–050 aplicadas uma a uma, verificadas); Production 034. Registros abaixo são históricos.
+
 FUNC-02: nenhuma migration aplicada nesta sessão. Main até 045, #111 candidatas
 046–049, #118 com 050. Registros HML045/Production034 abaixo são históricos, não
 catálogo reconferido. Antes de HML, cumprir o roteiro OFF/catálogo/backup na matriz.
@@ -594,6 +597,8 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 - sem inferir regra comercial nem usar R$ 35.118,12 como fixture de outra base.
 
 ## Bloqueios e riscos
+
+**09/11/2026 (vigente):** interface dos 9 cenários PASS em app local ligado ao HML (Preview segue sem vínculo comprovado); Production 034 com frontend posterior (telas de schema novo indisponíveis até 034 → 050); backup `pg_dump` de Production pendente. Registros abaixo são históricos.
 
 **FUNC-02:** três conflitos documentais entre #117/#118; prefixo 046–049 e
 consumidores 047/049 ainda precisam de composição/CI. Main/#118 usam RPC antiga

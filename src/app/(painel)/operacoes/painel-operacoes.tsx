@@ -610,7 +610,7 @@ export function PainelOperacoes() {
         <Resumo
           label="Avulsas"
           value={String(operacoesAvulsas)}
-          description="Carga e descarga"
+          description="Serviços pontuais"
           icon={CalendarDays}
         />
 
@@ -952,7 +952,7 @@ export function PainelOperacoes() {
                 <SelectContent>
                   <SelectItem value="fixed">Fixa</SelectItem>
 
-                  <SelectItem value="spot">Avulsa (carga/descarga)</SelectItem>
+                  <SelectItem value="spot">Avulsa</SelectItem>
                 </SelectContent>
               </Select>
             </div>

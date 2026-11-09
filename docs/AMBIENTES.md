@@ -4,7 +4,7 @@ Inventário factual, sem credenciais, dos ambientes do painel. Cada afirmação 
 o limite da evidência. Mudanças de configuração exigem autorização própria e não
 são executadas por este documento.
 
-Última verificação: **05/11/2026**, após a aplicação autorizada de 035–045 no HML
+Atualização de 09/11/2026: HML recebeu 046–050 (ver [HANDOFF](HANDOFF.md)); o restante desta página é a verificação de **05/11/2026**, após a aplicação autorizada de 035–045 no HML
 (sessão 05), por consultas somente leitura ao GitHub, à API da Vercel (nomes,
 escopos e host do Supabase, sem chaves) e à Supabase CLI. A única escrita remota
 foi o `db push` no HML.
@@ -27,8 +27,8 @@ vínculo explícito com o HML autorizado estiver comprovado.
 | ---------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------- |
 | Local      | Next.js local                                                                                       | Instância descartável por tarefa                       | Conforme reset local                 | Permitido apenas após comprovar isolamento                  |
 | CI         | GitHub Actions, jobs `validar` e `sql-local`                                                        | Supabase local efêmero no job SQL                      | Até a migration versionada no commit | Sem secrets nem vínculo remoto                              |
-| Preview    | Deployment automático de branch/PR; URL gerada protegida por Vercel SSO                             | HML `qbnfcmrxmssnwkhaitgd` pela configuração vigente   | 045 (o do HML)                       | Pronto para homologar Containers; homologação não executada |
-| HML        | Não há domínio Vercel distinto comprovado; pode servir de backend de Preview após vínculo explícito | `bs-logistica-homologacao`, ref `qbnfcmrxmssnwkhaitgd` | 045 — `20261112120000`               | 035–045 aplicadas em 05/11/2026 13:03 UTC, verificadas      |
+| Preview    | Deployment automático de branch/PR; URL gerada protegida por Vercel SSO                             | HML `qbnfcmrxmssnwkhaitgd` pela configuração vigente   | 050 (o do HML)                       | Vínculo não comprovado; homologação das telas feita em localhost → HML (9/9 PASS, 09/11/2026) |
+| HML        | Não há domínio Vercel distinto comprovado; pode servir de backend de Preview após vínculo explícito | `bs-logistica-homologacao`, ref `qbnfcmrxmssnwkhaitgd` | 050 — `20261117120000`               | 046–050 aplicadas em 09/11/2026, verificadas (ver HANDOFF)  |
 | Production | Vercel `bs-logistica-sistema`, domínio `admin.bslogisticas.com.br`, deploy de `main`                | `bs-logistica-sistema`, ref `ehkduqokntemtmqzdrbd`     | 034 — `20261101120000`               | Frontend de `314c08c` publicado; schema 045 indisponível    |
 
 O repositório contém migrations até a **045**
