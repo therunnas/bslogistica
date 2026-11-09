@@ -2,54 +2,123 @@
 
 <!-- workflow-handoff:v1 -->
 
-**CHECKPOINT-AUTO-12 — Gate 2 PASS: INSTALADO DESATIVADO na main. SDLC:
-integração / testes / manutenção. #115 integrado por squash no HEAD autorizado;
-CI aprovada, Production preservada, controlador com job SKIPPED. Gate 3 somente
-planejado; nenhuma ativação, dry-run hospedado ativo ou escrita automática.**
+**FUNC-01 — Desenvolvimento / Testes. Correção de pedido avulso no mesmo dia
+implementada e testada localmente em branch funcional própria; PR Draft sem merge.
+Publicação documental separada no #117. Gates 3–5 PAUSADOS; controlador OFF;
+nenhuma migration remota, HML/Production ou dado real alterado.**
 
-Este registro documental separado conserva o histórico da main e da release.
-Consultar no GitHub o estado de integração deste checkpoint; sua publicação não
-faz merge nem habilita o Gate 3. Os estados abaixo são evidências datadas, não
-SHAs/caminhos permanentes ou autorização para retomar operações remotas.
+Este checkpoint pertence à branch funcional, criada da main então atual. Não
+copia HANDOFF histórico do #111/#112 nem a matriz geral para dentro do código.
+O commit publicado que contém este arquivo tem SHA/CI/Preview próprios no GitHub;
+consultar os checks sem herdar PASS da main ou criar commit recursivo só de status.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | AUTO-12 — Gate 2 instalado desativado; registro documental separado |
-| Gate atual | Gate 2 PASS; Gate 3 somente planejamento, sem autorização de execução |
-| Último gate concluído | #115 squash exato, árvore idêntica ao candidato, CI da nova main, travas e Production verificadas; workflow_run observado com job SKIPPED |
-| Worktree | /private/tmp/bs-checkpoint-auto-12/checkpoint; worktrees anteriores preservados; redescobrir todos os caminhos/status ao retomar |
-| Branch | docs/checkpoint-auto-12-gate2-installed — documental, criada da main integrada; consultar PR desta branch e seu estado no GitHub |
-| Base | 92478763af9674ecd327333020ea2a6f240ee404 — squash #115; a base anterior foi b26b6d8a93c71d30f26b52dbe7da02e34a10ee4b |
-| HEAD validado | 92478763af9674ecd327333020ea2a6f240ee404 — main/CI/árvore/travas/Production. O registro documental tem HEAD/checks próprios no PR desta branch; não transferir a CI da main |
-| Alterações não commitadas | Quatro documentos compõem este registro; conferir status na retomada. Três docs locais AUTO-10 permanecem intocados no worktree original, fora da publicação |
-| PR | #115 MERGED; registro AUTO-12 na branch documental acima, estado no GitHub; #111/#112 abertos Draft e preservados |
-| Ambiente-alvo | Main GitHub/Actions; Vercel somente leitura e eventual Preview Git da documentação. Nenhum HML/Supabase ou deploy manual |
-| Última ação comprovada | Sete leituras completas; última Vercel 309 s após squash, processo de consultas 315,0 s: mesmos 43 Production/servido/aliases/domínios/proteção/Git, zero deployment do merge, zero recibo/escrita automática; CI SUCCESS |
-| Próxima ação exata | Revisar e autorizar nominalmente a integração deste checkpoint documental se pendente; depois autorizar separadamente o protocolo Gate 3 read-only, sem executar Gates 4–5 |
+| Etapa | FUNC-01 — solicitação anterior ou igual à execução |
+| Gate atual | Implementado e validado localmente; publicação em PR Draft, sem merge ou aplicação remota autorizados |
+| Último gate concluído | TDD RED/GREEN, 70 suítes Node, SQL em duas composições, preservação pré-migration, lint/TypeScript/build e revisão independente |
+| Worktree | /private/tmp/bs-func-01/functional; outros worktrees e originais anteriores preservados; redescobrir caminhos/status ao retomar |
+| Branch | fix/func-01-same-day-requests — isolada da main, publicação funcional separada |
+| Base | 75c47cd9a30e4888b197ca6ae27aa236c71ec589; main permanece preservada, conferir remoto antes de qualquer continuação |
+| HEAD validado | 75c47cd9a30e4888b197ca6ae27aa236c71ec589 — base; testes funcionais no working tree desta tarefa. HEAD do PR funcional e CI próprios devem ser consultados no GitHub |
+| Alterações não commitadas | Conjunto desta tarefa inclui correção, migration/testes e checkpoint; após publicação conferir status. Sem matriz geral, dependência nova, migration histórica editada ou workflow alterado |
+| PR | #117 Draft documental, HEAD 73a3f35b2dca871e92b2623e84790c3b36308330 CI/Preview aprovados; funcional: PR Draft desta branch contra main, sem merge; #111/#112 preservados |
+| Ambiente-alvo | Node/build locais, Supabase descartável próprio e CI/Preview automático. Nenhum SQL/Supabase/HML remoto, deploy manual ou Production |
+| Última ação comprovada | Domínio/formulário/RPC/CHECK aceitam mesmo dia; SQL 47 suítes em 045→050 e 51 em 045→046–049→050 PASS; dois registros prévios e uma fatura intactos/replay seguro; code review sem achado importante |
+| Próxima ação exata | Revisar ambos os PRs Draft e autorizar nominalmente a integração/base e a sequência 046–049→050 antes de qualquer aplicação em HML. Não aplicar050direto nem ativar resolução/controlador por inferência |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Revalidar o #115 exato, tornar Ready, reconferir checks/reviews/threads, squash condicionado ao HEAD autorizado, comprovar instalação desativada e preparar o protocolo futuro Gate 3 |
-| Resultados e testes comprovados | 56 casos Node pertinentes PASS nesta sessão, validators/YAML/integridade Gate 1/dependências/diff PASS; CI validar/sql-local SUCCESS na nova main; árvore e 17 arquivos idênticos ao candidato; evento workflow_run com checkpoint SKIPPED/zero steps; mesmos 43 Production, zero deployment do merge e nenhuma escrita automática. CI/testes anteriores AUTO-11 mantêm data/SHA, não são prova nova |
-| Código e PR afetados | #115, HEAD fda7fcc9df7b64d0393852c9cc5256624a7b9b52, integrado em 92478763af9674ecd327333020ea2a6f240ee404; composição mínima sem app/SQL/migrations/dependências/vercel.json. Registro posterior somente HANDOFF, PROGRESS, ESTADO e CHECKPOINT_AUTOMATICO; sem alterar os workflows integrados |
-| Ambientes envolvidos | GitHub/default main e Actions. Projeto Vercel real só consultado; Git Preview documental automático pode ser criado. Nenhuma operação Supabase, credencial, domínio, alias, promoção ou cancelamento |
-| Pendências e decisões | Gate 2 instalado desativado, não ativo/validado. main:false e todas as travas preservadas; flag ausente/OFF. Callback observado não executou CLI/checkout, não comprova dry-run. Consolidar este registro e obter autorização própria para Gate 3; Gates 4–5 proibidos |
-| Próxima ação exata | Revalidar HEAD/base/diff/checks do PR documental e autorizar sua integração se pendente; depois aprovar escopo read-only, allowlist/evento/logs/retorno OFF do Gate 3 antes de qualquer mudança |
-| Autorizações e proibições | AUTO-12 usada somente para Ready/squash #115 exato, verificações/observação e checkpoint separado conforme Fase 7. Sem merge automático deste registro, sem Gate 3 ativo, remoção false &&, flag ON, contents: write, --write, recibos, #111/#112, alterações Production/Supabase, migrations ou deploy manual |
+| Tarefa executada | Publicar matriz/documentos no #117 Draft e implementar somente solicitação<=execução em PR funcional separado da main, abrangendo domínio/formulário/SQL/registro e compatibilidade da correção 049 |
+| Resultados e testes comprovados | RED observado Node e SQL antes do código; GREEN 70/70 suítes Node; focais domínio 23/backend 10/tela 60; SQL 47+51 suítes em stacks locais com schemas respectivos. 045: 90 asserções e 050: 42 no baseline/45 com 049; preservação de dois serviços prévios/uma fatura e replay antigos PASS; lint, TypeScript e build Turbopack 66 s com placeholders inertes PASS. Revisão independente sem bloqueio. CI/Preview do novo SHA exigem consulta própria |
+| Código e PR afetados | #117 só cinco documentos. Funcional:2src,7suitesNode(mudança de esperado/inventário),050 nova,SQL 045/050,testes e docs estritamente relacionados/checkpoint. Não incorpora 046–049 do #111 nem docs de negócio do #112 por arrasto |
+| Ambientes envolvidos | Supabase LOCAL novo bs-fin11-local-func0142f30e3, com labels/workdir/rede/volume conferidos antes de cada reset/SQL; fixtures sintéticas. CI efêmera e Preview Git. Nenhum HML/Production/Supabase remoto ou dado real |
+| Pendências e decisões | Aplicação HML bloqueada até definir/integrar prefixo 046–049 aprovado e autorizar ambiente ; 050 fica depois 049. Preview com banco 045 continua recusando mesmo dia. Decisão comercial 048 e C1–C6 do #117 permanecem abertas; não fazem parte desta correção. Gates 3–5 PAUSADOS |
+| Próxima ação exata | Revisar diff/checks dos dois Drafts; decidir integração do código/migrations e autorização de homologação HML separadas. Revalidar catálogo e backup antes de aplicar qualquer versão. Sem merge ou migration nesta tarefa |
+| Autorizações e proibições | FUNC-01 autoriza preparar/testar/commitar/push normal e dois PRs Draft. Sem qualquer merge, SQL/migration remoto, dados reais, deploy Production, alteração Vercel/credenciais/flags, controlador ou Gates 3–5; sem mudanças funcionais fora da regra de datas |
 
 ## Evidência automática de Preview
 
 <!-- checkpoint-preview:start -->
-Controlador instalado na main, totalmente desativado: false &&, contents: read,
---dry-run e flag ausente/OFF. AUTO-12 observou workflow_run/job SKIPPED, zero steps.
-Nenhum recibo automático ou dry-run hospedado ativo foi executado.
+Controlador instalado desativado: false &&, contents: read, --dry-run e flag OFF.
+Gates 3–5 PAUSADOS. Nenhum recibo automático, escrita ou dry-run ativo executado.
 <!-- checkpoint-preview:end -->
 
 ## Evidências
+
+### FUNC-01 — correção isolada e TDD
+
+A regra confirmada é `solicitadoEm <= executadoEm`, sem alterar preço, equipe,
+competência, quantidade, custo ou receita. Domínio e adaptador receberam testes
+novos observados falhando antes da implementação; o teste de formulário falhou
+pela ausência dos limites inclusivos. SQL 045 novo recusou mesmo dia sob o baseline,
+e SQL 050falhou pelo CHECK ainda `<`. Depois da 050, todos os caminhos passaram.
+
+Migration nova `20261117120000_050_container_same_day_request.sql`, criada localmente pelo CLI e nomeada após as candidatas
+046–049 já versionadas; nenhum arquivo histórico foi editado. CHECK conhecido da
+045 é verificado antes de trocar somente `<` por `<=`. CREATE OR REPLACE preserva
+assinatura, corpo/ACL/owner/IMMUTABLE/INVOKER fora da comparação e mensagem; teste
+Node compara o corpo à 045. Registro/cancelamento continuam nas RPCs existentes.
+A 049 do #111 chama o mesmo normalizador; não foi incorporada à main por este PR.
+
+Formulário tem limites min/max inclusivos e orientação acessível de mesmo dia.
+Datas civis inválidas e pedido posterior são recusados pelo domínio/SQL; backend
+não confia na validação do cliente. Serviços anteriores, idempotência, trilhas,
+participantes/adicionais e lastro faturado foram preservados.
+
+### FUNC-01 — resultados por ambiente e limite
+
+- **Node local:**70 suítes PASS; focais domínio 23/backend 10/tela 60. Inventário de
+  migrations atualizado em quatro testes antigos que fixavam 045/50 arquivos;
+  não alteram regras do motor ou Configurações. Sem pacote novo/lockfile/CI nova.
+- **SQL local 045→050:** 51 versões e 47 suítes PASS; SQL 045 com fixture mesmo dia:
+  90 asserções; SQL 050: 42 asserções, com caminho cancelar+registrar do baseline.
+- **SQL local 045→046→047→048→049→050:** 55 versões e 51 suítes PASS. A 050 exercitou
+  correção 049atômica/replay/auditoria e bloqueio de faturado (45 asserções).
+- **Preservação pré-migration:**dois serviços criados na 045, um livre e outro
+  faturado, permaneceram idênticos após 050: valores, participantes, adicionais,
+  trilhas, fatura/itens e snapshots; replay das chaves antigas não escreveu nada.
+  ACL/owner/características do normalizador e ACL/RLS da tabela iguais.
+- **Compatibilidade frontend #111:**patch seletivo aplicado sem conflitos num
+  worktree de teste do HEAD 7e08270011f74ea5dfe4470097f58659eea81140; três suítes
+  focais e func-ready PASS; adaptador real049aceitou payload de mesmo dia com
+  transporte simulado. Não é merge, PR novo de release ou teste autenticado HML.
+- **Lint/TypeScript/build:**PASS; Turbopack 66 s com valores públicos inertes de CI,
+  sem arquivo.env/credencial real ou acesso ao banco no build. Diff/contrato/links
+  e segurança reconferidos antes da publicação.
+- **Publicado #117:**73a3f35b2dca871e92b2623e84790c3b36308330,
+  [CI](https://github.com/therunnas/bslogistica/actions/runs/42617825226)SUCCESS e
+  Preview READY(dpl_BRx4QiPMu4hVkudRPe9VXLuGtgHz). Sem merge.
+- **Funcional CI/Preview:**consultar o SHA do PR desta branch. Local PASS não
+  aprova automaticamente esses checks. Não fazer commit recursivo só de status.
+- **HML/Production:**não aplicadas migrations nem executados fluxos reais. Último
+  registro documental do HML 045/Production 034 não foi transformado em leitura nova.
+  Preview READYserá só código; mesmo dia exige 050 no banco-alvo e homologação própria.
+
+Logs/manifestos locais sanitizados em /private/tmp/bs-func-01; resultados essenciais
+estão neste checkpoint. SQLtestes são canônicos/reexecutáveis pelo runner existente;
+nenhum script de teste usou alvo remoto ou resetou instância local preexistente.
+Código SQL e teste têm os mesmos bytes das execuções, com nomes finais em inglês.
+
+### FUNC-01 — ordem de integração e aplicação
+
+[Contrato e sequência detalhada](financeiro/container-servico-avulso.md#func-01--mesmo-dia-versão-050-e-integração).
+050 depende tecnicamente só da 045 e foi testada isolada. A versão é posterior às
+046–049 do #111: para HML, revisar e integrar primeiro o prefixo aprovado, então
+aplicar046,047,048,049e 050 em ordem, com autorização/backup/catalogo por ambiente.
+Não executar dbpush desta branch diretamente em HML 045 ou improvisar --include-all.
+Se o prefixo/decisão 048 não estiver aprovado, aplicação fica BLOQUEADA; código/testes
+continuam revisáveis. Nenhuma integração/aplicação é autorizada pelo estado Draft.
+Não reverter CHECK excluindo/modificando histórico de serviços do mesmo dia.
+
+### Histórico anterior da main — datas e limites preservados
+
+Registros abaixo antecedem o FUNC-01 e não autorizam Gates 3–5 ou aplicação remota.
+A documentação geral revisada está separada no #117; não foi copiada para este PR.
 
 ### AUTO-12 — preflight e squash
 
@@ -448,10 +517,14 @@ inferência a partir da release #111.
 
 ## Migrations por ambiente
 
-AUTO-12: nenhuma consulta/operação de banco ou alteração SQL. Os estados abaixo
-são o último registro herdado da main, não reconferidos nesta tarefa.
+FUNC-01 criou a 050 e a aplicou somente no Supabase LOCAL descartável próprio,
+com as sequências 045→050 e 045→046–049→050. Nenhuma migration foi aplicada em
+HML/Production ou Supabase remoto. As duas composições e a preservação de dados
+sintéticos anteriores foram verificadas; aplicação remota permanece bloqueada.
 
-- Esta etapa não criou nem aplicou migration.
+Estados de banco abaixo são registros históricos herdados, não reconferidos por
+SQL nesta tarefa. Suas datas/limites não devem ser confundidos com os testes locais:
+
 - HML `qbnfcmrxmssnwkhaitgd`: 045; escritas apenas de dados sintéticos pelas RPCs e
   tabelas da própria aplicação, e uma transação com `ROLLBACK` (último admin).
 - Production `ehkduqokntemtmqzdrbd`: 034; apenas leitura do head. Sem backup recente
@@ -459,11 +532,10 @@ são o último registro herdado da main, não reconferidos nesta tarefa.
 
 ## Autorizações
 
-AUTO-12 vigente: Ready e squash #115 exclusivamente no HEAD nominal, verificações,
-observação e preparação do plano Gate 3. Registro factual separado em branch/PR
-documental conforme Fase 7, sem integração automática ou commit adicional na main.
-O merge do registro documental, se pendente, requer decisão nominal própria.
-Gate 3 não foi autorizado a executar; Gates 4–5 permanecem proibidos.
+FUNC-01 vigente: preparação, testes Node/SQL em ambiente próprio isolado, commits,
+pushes normais e dois PRs Draft separados(documental #117 e funcional desta branch).
+Nenhum merge, migration remota, HML/Production ou ativação foi autorizado.
+A regra do mesmo dia já está confirmada; demais decisões comerciais são separadas.
 
 Histórico AUTO-09: implementação mínima, testes, commit/push normal somente na
 branch chore/gate1-production-deployment-guard e criação de PR Draft contra main.
@@ -476,11 +548,11 @@ Merge e mudanças de main/Production não autorizados. Os itens abaixo são hist
 
 ## Proibições
 
-AUTO-12: sem remover false &&, ligar flag, dry-run hospedado ativo, contents: write,
---write ou recibos automáticos. Sem integrar #111/#112, alterar app/SQL/migrations,
-Supabase, Production administrativamente, aliases/domínios/credenciais, deploy
-manual, novos projetos, exclusões ou site institucional. Preservar main:false.
-Sem merge automático do checkpoint documental ou execução dos Gates 3–5.
+Sem merge de qualquer PR, especialmente #111/#112; sem migration/SQL no Supabase
+remoto, dados reais, limpeza de HML, Production/deploy manual, Vercel/aliases/
+domínios/credenciais, force push ou mudanças funcionais fora da regra de datas.
+Preservar main:false, false &&, contents: read, --dry-run e flag OFF. Gates 3–5
+PAUSADOS; sem novos recursos remotos ou alterações do site institucional.
 
 Os limites AUTO-09 abaixo pertencem àquela sessão, não desfazem o squash concluído.
 
@@ -493,6 +565,14 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 - sem inferir regra comercial nem usar R$ 35.118,12 como fixture de outra base.
 
 ## Bloqueios e riscos
+
+- Aplicação 050 em HML não autorizada: definir/integrar o prefixo 046–049 e obter
+  aprovação do ambiente antes de qualquer db push. Sem versão anterior ignorada.
+- Preview com banco 045 não valida o mesmo dia; novos fluxos precisam de schema
+  atualizado e homologação própria, sem alterar dados reais nesta tarefa.
+- Gates 3–5 PAUSADOS; main:false e controlador desativado são preservados.
+
+Histórico herdado anterior ao FUNC-01 (não é autorização vigente):
 
 - Gate 1 PASS é delimitado a esta janela/amostragem e ao Preview automático via PR;
   não é garantia infinita ou bloqueio universal de deploy manual/promoção.
@@ -527,15 +607,13 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 
 ## Retomada
 
-1. Redescobrir worktrees/status/HEADs; preservar os três docs locais AUTO-10.
-   Ler este checkpoint na branch/PR da tarefa autorizada, sem copiar o #111.
-2. Conferir #115 MERGED e a main remota; 92478763af9674ecd327333020ea2a6f240ee404
-   é a instalação histórica do Gate 2. Revalidar main:false, locks, CI e Production.
-3. Consultar o estado de integração da branch docs/checkpoint-auto-12-gate2-installed;
-   se o registro estiver pendente, revisar diff exclusivamente documental/checks e
-   pedir autorização nominal para integração. Não fazer merge por inferência.
-4. O [protocolo Gate 3](continuidade/CHECKPOINT_AUTOMATICO.md) é somente plano:
-   obter autorização própria para patch/variáveis/allowlist/eventos/repetição/logs/
-   retorno OFF. Não remover false && ou habilitar flag nesta retomada por memória.
-5. Em incidente, FAIL/STOP e evidências sanitizadas; proprietário decide qualquer
-   intervenção administrativa. Não cancelar/promover/trocar alias/remover a trava.
+1. Descobrir worktrees/status/HEADs; preservar originais anteriores e não descartar
+   fixtures/logs locais. Não assumir SHA/path antigo como configuração permanente.
+2. Ler este HANDOFF no PR funcional da branch fix/func-01-same-day-requests; conferir seus checks/Preview.
+   Consultar #117para matriz geral e decisões; não restaurar HANDOFF antigo #111/#112.
+3. Revalidar main e os dois Drafts; sem autorização não fazer merge. Conferir que
+   o diff funcional permanece só datas/testes/migration 050/documentos relacionados.
+4. Planejar integração do prefixo 046–049 antes da aplicação 050 em HML; autorizações
+   de ambiente, catálogo/backup e decisão 048 são gates separados. Não aplicar agora.
+5. Preview com 045 não valida a regra nova. Homologar depois da implantação aprovada,
+   preservando faturas, idempotência e auditoria. Não iniciar Gates 3–5.

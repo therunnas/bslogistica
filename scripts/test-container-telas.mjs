@@ -1414,3 +1414,56 @@ test("atalho com schema anterior à 045 não preenche nem libera cadastro", asyn
     h.restaurar();
   }
 });
+
+test("formulário aceita mesmo dia e transmite a intenção sem alterar valores", async () => {
+  let enviada;
+  const h = navegador({
+    registrarContainerAction: async (entrada) => {
+      enviada = entrada;
+      return { ok: true, data: servicoId };
+    },
+  });
+  try {
+    await h.pronto();
+    await preencher(h);
+    h.change("solicitadoEm", lote.executadoEm);
+    const pedido = h.nodes().find((n) => n.type === "Input" && n.props.id === "solicitadoEm");
+    const execucao = h.nodes().find((n) => n.type === "Input" && n.props.id === "executadoEm");
+    assert.equal(pedido.props.max, lote.executadoEm);
+    assert.equal(execucao.props.min, lote.executadoEm);
+    assert.match(h.text(), /no mesmo dia/);
+    h.click("Revisar serviço");
+    assert.ok(h.find("Confirmar registro"));
+    h.click("Confirmar registro");
+    await h.pronto();
+    assert.equal(enviada.lote.solicitadoEm, enviada.lote.executadoEm);
+    assert.equal(enviada.lote.totalCobrado, lote.totalCobrado);
+    assert.deepEqual(enviada.lote.participantes, lote.participantes);
+  } finally {
+    h.restaurar();
+  }
+});
+
+for (const [nome, data] of [
+  ["posterior à execução", "2026-11-03"],
+  ["civil inválida", "2026-02-30"],
+]) {
+  test(`formulário não confirma solicitação ${nome}`, async () => {
+    let envios = 0;
+    const h = navegador({
+      registrarContainerAction: async () => {
+        envios++;
+        return { ok: true, data: servicoId };
+      },
+    });
+    try {
+      await preencher(h);
+      h.change("solicitadoEm", data);
+      h.click("Revisar serviço");
+      assert.equal(h.find("Confirmar registro"), undefined);
+      assert.equal(envios, 0);
+    } finally {
+      h.restaurar();
+    }
+  });
+}

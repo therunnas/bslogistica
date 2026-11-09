@@ -1,5 +1,6 @@
 /** FIN-PR-11B: domínio real → contrato RPC, sem rede e sem banco. */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const base = {
@@ -78,11 +79,25 @@ test("registro transmite centavos exatos, quantidade física e competência inde
   ]);
 });
 
+test("registro no mesmo dia preserva centavos e datas no payload da RPC", async () => {
+  const { registrarServicoContainer } = await backend();
+  const db = cliente();
+  assert.equal(
+    await registrarServicoContainer(db, { ...base, solicitadoEm: base.executadoEm }, key, reason),
+    id,
+  );
+  const payload = db.chamadas[0].parametros.p_dados;
+  assert.equal(payload.solicitadoEm, payload.executadoEm);
+  assert.equal(payload.receitaCentavos, 10001);
+  assert.equal(payload.custoTotalCentavos, 3003);
+  assert.equal(db.chamadas[0].parametros.p_idempotency_key, key);
+});
+
 test("domínio inválido não chama a RPC", async () => {
   const { registrarServicoContainer } = await backend();
   for (const alteracao of [
     { quantidade: 0 },
-    { solicitadoEm: base.executadoEm },
+    { solicitadoEm: "2026-11-05" },
     { totalDistribuido: "30,02" },
     { totalCobrado: "1,001" },
     { participantes: [] },
@@ -164,4 +179,37 @@ test("operação existente é enviada à RPC sem criar operação ou contrato", 
   assert.equal(db.chamadas[0].parametros.p_dados.operacaoId, operacaoId);
   assert.equal(db.chamadas[0].parametros.p_dados.clienteId, base.clienteId);
   assert.equal("contratoId" in db.chamadas[0].parametros.p_dados, false);
+});
+
+test("050 preserva normalizador financeiro/ACL e altera só a ordem das datas", () => {
+  const anterior = readFileSync(
+    new URL("../supabase/migrations/20261112120000_045_container_servico.sql", import.meta.url),
+    "utf8",
+  );
+  const migration = readFileSync(
+    new URL(
+      "../supabase/migrations/20261117120000_050_container_same_day_request.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const original = anterior.match(
+    /create function public\.normalizar_payload_container\(p_dados jsonb\)[\s\S]*?\n\$\$;/,
+  )[0];
+  const nova = migration.match(
+    /create or replace function public\.normalizar_payload_container\(p_dados jsonb\)[\s\S]*?\n\$\$;/,
+  )[0];
+  assert.equal(
+    nova,
+    original
+      .replace("create function", "create or replace function")
+      .replace("v_requested >= v_executed", "v_requested > v_executed")
+      .replace(
+        "O serviço precisa ser solicitado até o dia anterior à execução.",
+        "A solicitação não pode ser posterior à execução.",
+      ),
+  );
+  assert.match(migration, /check \(requested_on <= executed_on\)/);
+  const comandos = migration.replace(/--[^\n]*/g, "");
+  assert.doesNotMatch(comandos, /\b(?:grant|revoke|policy|truncate|delete|update)\b/i);
 });

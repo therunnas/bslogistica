@@ -146,7 +146,7 @@ Tela **Containers**: lista, detalhe e **Novo serviço**.
 
 1. Pelo menu, ou pelo atalho **Containers** da tela de Operações (que já preenche Cliente e
    Operação).
-2. Preencha **Data da solicitação** (até o dia anterior à execução), **Data da execução**,
+2. Preencha **Data da solicitação** (anterior ou no mesmo dia da execução), **Data da execução**,
    **Valor total negociado (R$)**, **Quantidade de containers** (inteira, maior que zero),
    **Produto e serviço**, Referência (opcional), **Modalidade de custo** (Por pessoa ou
    Total distribuído), **Participantes e valores devidos** (custo zero deve ser informado

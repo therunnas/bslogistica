@@ -25,33 +25,31 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**AUTO-12 — Gate 2 PASS, instalado desativado.** #115 integrado por squash na
-main `92478763af9674ecd327333020ea2a6f240ee404`; CI aprovada, main:false/Production preservados.
-Workflow_run observado com checkpoint SKIPPED/zero steps; sem dry-run ativo,
-escrita ou recibo automático. Registro factual separado desta etapa, estado de
-integração no GitHub e evidências no [HANDOFF](docs/HANDOFF.md).
+**FUNC-01 — pedido avulso no mesmo dia.** Correção implementada/testada localmente,
+publicação funcional em Draft separado da documentação #117; sem merge/aplicação
+remota. HANDOFF e checks do PR registram o estado do próprio SHA.
 
 ### Fazer agora
 
-Revisar/autorizar nominalmente a integração do checkpoint documental se pendente;
-depois aprovar separadamente o [protocolo Gate 3](docs/continuidade/CHECKPOINT_AUTOMATICO.md)
-read-only. Nenhuma mudança de ativação está autorizada nesta etapa.
+Revisar os dois Drafts e seus checks; autorizar integração/base e sequência de
+migrations antes da homologação HML. Aplicação 050 fica bloqueada até definir o
+prefixo 046–049 aprovado e autorização do ambiente. Não executar dbpush desta branch.
 
 ### Não fazer ainda
 
-Sem remover false &&, flag ON, dry-run hospedado ativo, contents: write, --write,
-recibo, gates 4–5, merge #111/#112, app, banco/migrations ou intervenção Production.
+Sem merge, migrations remotas, dados reais, Production, alteração de preço/fallback,
+ativação do controlador ou Gates 3–5. Não generalizar avulsos nesta correção.
 
 ### Critério de conclusão
 
-#115 exato integrado, CI da nova main aprovada, árvore/17 arquivos/travas/Gate 1
-preservados, Production estável e nenhuma escrita automática. Resultado comprovado
-na AUTO-12; publicação documental tem SHA/checks próprios, sem commit recursivo.
+Dois Drafts publicados, diff mínimo/checkpoint, Node/SQL/lint/TypeScript/build e
+CI/Preview próprios conferidos. Mesmo dia permitido, posterior/inválido recusados,
+idempotência/auditoria/valores/faturados preservados; HML não homologado por inferência.
 
 ### Próxima etapa
 
-Consolidar checkpoint se pendente → autorização Gate 3 para ensaio hospedado em
-leitura e retorno OFF → Gates 4 e 5 somente com autorizações independentes.
+Revisão nominal→integração autorizada com prefixo de migrations→implantação e
+homologação HML próprias. Matriz/decisões comerciais no #117. Infra auxiliar pausada.
 
 ### Fila funcional herdada da main — pausada nesta tarefa
 

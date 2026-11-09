@@ -5,6 +5,24 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## FUNC-01 — regra de pedido no mesmo dia (09/11/2026)
+
+Branch funcional própria da main75c47cd9a30e4888b197ca6ae27aa236c71ec589, sem merge. Domínio/formulário e migration
+20261117120000_050_container_same_day_request.sql aceitam solicitação<=execução. Nova 050preserva normalizador/ACL, CHECKs
+não relacionados, dados/valores, faturas e trilha; nenhuma migration histórica editada.
+Código/testes não incorporam 046–049 do #111; composição testada separadamente.
+
+TDD RED/GREEN;70 suítesNode PASS, SQL 47 suítes(045→050)/51(045→046–049→050)PASS,
+correção 049exercitada. Preservação de dois serviços prévios e uma fatura/replays,
+ACL/RLS PASS. Lint/TypeScript/buildTurbopack 66 s PASS. Revisão sem achado importante;
+CI/Preview do novo SHA a consultar separadamente no PR funcional, sem transferir PASS.
+Documental #117Draft73a3f35, CI/Preview aprovados. Gates 3–5 PAUSADOS, controlador OFF.
+
+Nenhuma migration remota, dado real, HML/Production alterados. Último registro HML 045/
+Production 034 não reconferido por SQL; Preview com 045ainda recusa mesmo dia. Ordem
+remota proposta4647484950depende de integração/decisão 048 e autorização de ambiente;
+sem db push ou --include-all improvisado. [HANDOFF](HANDOFF.md) e [sequência](financeiro/container-servico-avulso.md#func-01--mesmo-dia-versão-050-e-integração).
+
 ## AUTO-12 — Gate 2 instalado desativado, PASS (09/11/2026 UTC)
 
 #115 Ready e squash do HEAD exato fda7fcc9df7b64d0393852c9cc5256624a7b9b52 sobre

@@ -525,9 +525,17 @@ export function FormularioContainer({
                     id={campo}
                     type={tipo}
                     inputMode={campo === "totalCobrado" ? "decimal" : "text"}
+                    aria-describedby={tipo === "date" ? "container-date-order-help" : undefined}
+                    max={campo === "solicitadoEm" ? lote.executadoEm || undefined : undefined}
+                    min={campo === "executadoEm" ? lote.solicitadoEm || undefined : undefined}
                     value={lote[campo]}
                     onChange={(e) => alterar(campo, e.target.value)}
                   />
+                  {campo === "solicitadoEm" && (
+                    <p id="container-date-order-help" className="text-xs text-muted-foreground">
+                      A solicitação pode ser anterior ou no mesmo dia da execução.
+                    </p>
+                  )}
                 </Campo>
               ))}
               <Campo id="quantidade" titulo="Quantidade de containers">

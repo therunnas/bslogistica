@@ -17,8 +17,9 @@ ambientes: [Estado do projeto](../ESTADO_DO_PROJETO.md).
   execução** são conceitos separados. O preço é negociado **caso a caso**,
   sem tabela fixa; o pagamento é informado por colaborador participante,
   seja um valor em R$ por pessoa, seja um total a dividir entre eles.
-- O pedido do serviço deve ocorrer **até um dia antes** da execução, conforme
-  a regra comercial relatada. Não inventar preço, equipe ou quantidade.
+- Regra atual confirmada (FUNC-01): a solicitação pode ser **anterior ou no mesmo
+  dia** da execução. Solicitação posterior ou data civil inválida é recusada.
+  Não inventar preço, equipe ou quantidade.
 - O registro contém data, cliente, operação opcional, descrição do serviço
   (tamanho/produto), quantidade de containers e valor cobrado.
 - No fechamento e na fatura, o serviço aparece inclusive quando o cliente
@@ -68,8 +69,9 @@ aprovação do desenho, **não de repetir perguntas comerciais já respondidas**
 Estas diretrizes foram registradas na conversa do projeto em 30/10/2026,
 a partir das respostas do cliente; não são decisões técnicas novas:
 
-1. **Solicitação:** serviço solicitado até um dia antes; não impor prazos
-   horários adicionais sem evidência.
+1. **Solicitação (histórico de 30/10, superado):** até um dia antes. A confirmação
+   posterior permite mesmo dia; FUNC-01 implementa `solicitação <= execução`,
+   sem impor prazo de horário. Demais regras abaixo são preservadas.
 2. **Cobrança:** valor negociado para cada serviço, considerando produto,
    quantidade, tempo, equipe e eventual ajuda do cliente. **Sem tabela de
    preços fixa**, fórmula automática de orçamento ou tarifa por container.
@@ -220,3 +222,65 @@ novo plano de dependências; não executar esse SQL como rollback genérico.
 Resultados e limites de implantação ficam no
 [checkpoint canônico](../ESTADO_DO_PROJETO.md#fin-pr-11b--checkpoint-de-desenvolvimento-local-04112026).
 A interface e os consumidores de apresentação pertencem ao FIN-PR-11C.
+
+
+## FUNC-01 — mesmo dia, versão 050 e integração
+
+A correção muda somente a ordem admissível das datas: CHECK da tabela e
+normalizador SQL aceitam `requested_on <= executed_on`; domínio/formulário aceitam
+`solicitadoEm <= executadoEm`. O erro de data posterior é consistente. Datas civis
+inválidas continuam recusadas. Nada reescreve serviços, participantes, receitas,
+competências, custos, faturas ou trilhas existentes; normalizador mantém assinatura,
+IMMUTABLE/INVOKER, owner e ACL. Migrations históricas não foram editadas.
+
+Migration nova: `20261117120000_050_container_same_day_request.sql`. A numeração
+segue depois das candidatas 046–049 do #111, conferidas no HEAD
+`7e08270011f74ea5dfe4470097f58659eea81140`. A main base contém até a 045; esta
+branch isolada acrescenta somente a 050. Não há arquivos 046–049 por arrasto.
+O timestamp local gerado pelo CLI era anterior às migrations futuras já versionadas;
+o arquivo novo foi nomeado após a 049 antes de publicar, sem renomear histórico.
+
+### Sequências locais comprovadas e limite remoto
+
+- **045 → 050:** instalação independente da correção no baseline, 47 suítes SQL
+  locais PASS. Correção disponível nesse baseline continua cancelar + registrar.
+- **045 → 046 → 047 → 048 → 049 → 050:** composição com candidatos existentes,
+  55 versões de migration e 51 suítes SQL PASS. A 049 chama o normalizador comum;
+  troca auditada, mesmo dia, reenvio e bloqueio de faturado foram exercitados.
+- Frontend do #111 composto seletivamente com esta correção passou nos testes
+  focais e no adaptador real de correção com transporte simulado. Quatro testes
+  antigos desta main que fixavam o inventário de migrations foram atualizados para
+  51 arquivos/última 050; ao combinar o prefixo 046–049, reconciliar contagens para
+  55 e manter as exceções de versões posteriores. Não é mudança de regra financeira.
+- Probe local antes/depois preservou integralmente dois serviços anteriores à 050
+  (um livre e outro faturado), custos, participantes, adicionais, trilhas, itens de
+  fatura e snapshots, incluindo reenvio das chaves antigas. Owner/ACL/RLS intactos.
+
+**Não executar db push diretamente desta branch em HML 045.** Primeiro obter
+aprovação e reconciliar a integração dos arquivos 046–049 com a main, preservando
+esta 050 como última versão, main:false e controlador OFF. Antes da aplicação,
+confirmar catálogo real, backup/recuperação e autorização específica do ambiente.
+Na sequência recomendada para HML: aplicar o prefixo aprovado 046–049 em ordem e
+somente depois a 050; conferir cada versão e executar a homologação do candidato.
+A decisão comercial da 048 continua pendente; não ligar a resolução por arrasto.
+
+Embora a 050 funcione sozinha em 045 local, aplicá-la remotamente antes de decidir
+como incorporar 046–049 criaria versões anteriores pendentes no ledger. Essa rota
+não foi autorizada/proposta como atalho. Se o prefixo não estiver aprovado ou o
+catálogo divergir, **BLOQUEADO para aplicação**, sem `--include-all` improvisado,
+renomear migrations históricas, ignorar versão ou aplicar automaticamente no app.
+Os PRs documentais/funcionais permanecem independentes; nenhum merge é autorizado.
+
+Preview READY comprova código publicado, não backend atualizado: com HML ainda
+na 045, o banco segue recusando mesmo dia e a UI deve apresentar o erro retornado,
+sem fallback/duplicidade ou alteração automática de schema. A correção atômica
+049 não foi portada para esta branch; só é oferecida por sua capacidade no #111.
+
+### Resposta a falha
+
+A migration transaciona as mudanças e recusa estrutura inesperada do CHECK em vez
+de remover outra restrição. Não se propõe rollback que exclua/altere serviços do
+mesmo dia para recuperar `<`. Preservar histórico e avaliar correção adiante com
+autorização própria. Nada autoriza limpeza de HML, mudança de Production ou dado real.
+Resultados do SHA candidato e autorização de aplicação ficam no
+[HANDOFF](../HANDOFF.md); decisões comerciais gerais permanecem no PR documental.
