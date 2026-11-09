@@ -2,82 +2,71 @@
 
 <!-- workflow-handoff:v1 -->
 
-**TRANSFERÊNCIA ENTRE CONTAS — FUNC-03 concluída como candidato técnico, ainda sem integração funcional ou homologação.** Este é o ponto de entrada da nova conta Claude Code. Primeiro conferir GitHub, `origin/main` e os PRs; SHAs abaixo são evidências de 09/11/2026, não estados permanentes. Continuar o desenvolvimento a partir do repositório, sem depender de conversas antigas.
+**CONSOLIDAÇÃO PARA O PILOTO — #119 integrado, HML na 050, homologação funcional da camada banco/RPC concluída; interface ainda não exercitada.** SHAs e contagens abaixo são evidências de 09/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | TRANSFERÊNCIA ENTRE CONTAS — fechamento documental FUNC-03 |
-| Gate atual | Consolidação documental do #117 autorizada; #119 permanece Draft, sem merge ou HML |
-| Último gate concluído | FUNC-03: composição 046–050 publicada em #119, CI/Preview do candidato aprovados, sem homologação |
-| Worktree | Caminho histórico /private/tmp/bs-retomada-funcional-01/worktree; não acessado nesta revisão remota; descobrir worktrees no ambiente novo |
-| Branch | Origem deste documento: docs/retomada-funcional-01 (#117); verificar main remota depois da integração |
-| Base | Main conferida antes do fechamento: 75c47cd9a30e4888b197ca6ae27aa236c71ec589 |
-| HEAD validado | Main-base 75c47cd9a30e4888b197ca6ae27aa236c71ec589 e #119 candidato 48a12187ea3562775656dce1b1b767b9e893b426; consultar HEAD #117 e checks próprios |
-| Alterações não commitadas | Não inspecionadas remotamente nos worktrees locais da conta anterior; nunca presumir que inexistem. Documentação deste fechamento versionada na branch #117 |
-| PR | #117 documentação a consolidar; #119 composição técnica Draft; #118 sobreposto pela 050 do #119; #111/#112 históricos Draft |
-| Ambiente-alvo | Somente documentação GitHub/CI e Preview automático da branch; sem escrita no HML ou Production |
-| Última ação comprovada | #117 reconciliado com estado #119, sem modificação de app/SQL/configuração; conferir checks do HEAD final antes do squash |
-| Próxima ação exata | Integrar apenas #117 após CI verde e confirmar novo SHA main; nova conta revalidar #119 e preparar preflight HML com autorização separada |
+| Etapa | CONSOLIDAÇÃO PARA O PILOTO — homologação funcional (matriz curta de 9 cenários) |
+| Gate atual | Gate 5 (homologação) parcial: banco/RPC no HML PASS; interface no Preview pendente |
+| Último gate concluído | HML 045 → 050 aplicado e verificado; #119 integrado na main |
+| Worktree | /home/user/bslogistica (sessão em nuvem; descobrir de novo na retomada) |
+| Branch | claude/jolly-allen-fqechw (checkpoint; sem PR aberto) |
+| Base | main `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef` |
+| HEAD validado | 6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef (main, código até 050; CI validar/sql-local SUCCESS) |
+| Alterações não commitadas | Nenhuma além deste checkpoint |
+| PR | Nenhum aberto. #119 mergeado por squash; #63, #106–#112 e #118 fechados com motivo, branches preservadas |
+| Ambiente-alvo | HML `qbnfcmrxmssnwkhaitgd` (050). Production `ehkduqokntemtmqzdrbd` não tocada (034) |
+| Última ação comprovada | Matriz curta executada no HML por transação com reversão: 38/38 verificações PASS na camada banco/RPC; HML idêntico antes/depois |
+| Próxima ação exata | Exercitar a interface dos 9 cenários no Preview (usuário, navegador); depois preparar Production 034 → 050 com `pg_dump` novo e autorização nominal |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Projeto | Painel interno BS Soluções Logísticas, repo `therunnas/bslogistica`; site institucional é OUTRO repositório |
-| Main antes deste merge documental | `75c47cd9a30e4888b197ca6ae27aa236c71ec589` — confirmar novo HEAD após squash do #117 |
-| Documento de negócio | [NEGOCIO.md](NEGOCIO.md), portado do #112 sem alteração de regra |
-| Matriz de negócio e decisões | [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md): 17 itens, decisões C1–C6 pendentes |
-| #117 | [Documentação](https://github.com/therunnas/bslogistica/pull/117), fonte deste checkpoint; conferir no GitHub se já integrado |
-| #119 | [Composição técnica](https://github.com/therunnas/bslogistica/pull/119) **Draft NÃO mergeado** no HEAD `48a12187ea3562775656dce1b1b767b9e893b426`; 66 arquivos e migrations 046–050, consumidores, testes e [manifesto HML](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md) |
-| #118 | [Correção de pedido no mesmo dia](https://github.com/therunnas/bslogistica/pull/118) Draft, HEAD `fc51b54c978ac3042f96fb763cb21ab379231490`; 050 já incorporada seletivamente ao #119. **Não integrar duas vezes** |
-| #111 / #112 | [Release candidata](https://github.com/therunnas/bslogistica/pull/111) e [documentação anterior](https://github.com/therunnas/bslogistica/pull/112), Drafts antigos com conflitos; não copiar checkpoints históricos nem fazer merge por arrasto |
-| Testes FUNC-03 | Relatório do #119: 72 suítes Node, 51 SQL locais / 55 versões, concorrência 128+41 asserções, lint, TypeScript, build; checks GitHub `validar` e `sql-local` SUCCESS no HEAD acima. **Não equivalem a homologação HML** |
-| Migrations na main | Até 045; 046–050 existem **somente no candidato #119** até aprovação/merge |
-| Ambientes reais | Preview, HML e Production já existem: [AMBIENTES.md](AMBIENTES.md). Último registro documental de schema: HML 045, Production 034; **revalidar somente leitura antes de agir** |
-| Production | `vercel.json` mantém `git.deploymentEnabled.main:false`; relatório FUNC-03 não identificou novo deploy Production. Não presumir homologação |
-| Checkpoint automático | Controlador instalado, **OFF** (`false &&`, `--dry-run`, permissões de leitura e flag OFF); Gates 3–5 **do checkpoint automático** pausados |
-| Pendências comerciais | C1–C6 (fallback da 048, vigência/reajustes, categorias, custo do avulso, modalidades/unidades, sábado); consultar matriz; resolução comercial OFF até decisão própria |
-| Prioridade de produto | Finalizar núcleo operacional/financeiro para primeiro piloto; não reabrir automações e auditorias gerais desnecessárias |
+| Main | `6fd2632`: migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119), mergeado). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
+| Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
+| Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
+| Negócio | [NEGOCIO.md](NEGOCIO.md) e [matriz](NEGOCIO_X_SISTEMA.md); C1–C6 seguem pendentes e não bloqueiam o piloto com resolução OFF |
+| Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Aplicação autorizada de 046–050 no HML `qbnfcmrxmssnwkhaitgd` (09/11/2026), após merge do #119 e fechamento dos Drafts obsoletos |
-| Resultados e testes comprovados | Backup lógico pré-aplicação via Management API (59 tabelas, 0 falhas, SHA256) entregue ao usuário e guardado fora do Git. Cada migration aplicada em transação própria, com registro em `schema_migrations` na mesma transação e conferência de versão anterior. Após CADA uma: receita 13236.52, custo 4758.81, faturas 6692.51 = itens, 19 faturados, 51 apontamentos, 9 serviços, 15 adicionais **inalterados**; `tarifas_por_funcao=false`, `vigencia_ativa=true` inalterados. Catálogo final: CHECK `requested_on <= executed_on`; `registrar_adicional` sem EXECUTE para `authenticated`; `registrar_adicional_idempotente`/`corrigir_servico_container` com EXECUTE só `authenticated`; triggers de fatura presentes; RLS ligada em todas as tabelas de `public` |
-| Código e PR afetados | Main `6fd2632` (código até 050). Nenhum PR aberto. Checkpoint na branch `claude/jolly-allen-fqechw` |
-| Ambientes envolvidos | HML: 045 → **050**. Production **não tocada** (token usado não enxerga o projeto de Production). Preview da branch: `https://bs-logistica-sistema-o1xfg3d8m-bslogisticas.vercel.app` (backend HML pela configuração da Vercel; não verificado por cabeçalho porque o proxy desta sessão bloqueia `vercel.app`) |
-| Pendências e decisões | Homologação no navegador (matriz curta do piloto) no Preview acima; C6 do cliente-piloto; backup completo `pg_dump` e plano 034 → 050 para Production |
-| Próxima ação exata | Usuário executa a matriz curta no Preview; depois preparar Production com `pg_dump` novo e autorização nominal |
-| Autorizações e proibições | Usuário autorizou merge, fechamento dos Drafts e aplicação no HML. Production exige backup `pg_dump` novo e confirmação nominal; resolução comercial continua OFF; nunca `config push` |
+| Tarefa executada | Homologação funcional da matriz curta (9 cenários) no HML, camada banco/RPC, com dados sintéticos e reversão total |
+| Resultados e testes comprovados | 38/38 verificações PASS (uma expectativa de custo do roteiro estava errada: R$ 759,38 conferido à mão, inclui HE paga e custo proporcional). Contagens e receita do HML idênticas antes/depois (11 indicadores). Cenários: 2, 3, 4, 5, 6, 8, 9 PASS no banco; 7 PARCIAL (resumo PASS, Excel não exercitado); 1 BLOQUEADO (só interface) |
+| Código e PR afetados | Nenhum código alterado. Apenas este checkpoint |
+| Ambientes envolvidos | HML (transações revertidas; nenhuma linha persistida). Production não tocada |
+| Pendências e decisões | Interface dos 9 cenários no Preview; vínculo Preview → HML; Production 034 → 050 com `pg_dump`; três particularidades comerciais da Dynamis; achado menor: prévia em `src/lib/billing.ts` arredonda HE com `<= 15`/`<= 45` (o banco usa `< 15`/`< 45`) |
+| Próxima ação exata | Usuário executa a interface dos 9 cenários no Preview e informa o resultado; então parecer final e plano de Production |
+| Autorizações e proibições | Autorizados: testes sintéticos no HML sem persistência. Proibidos sem nova autorização: correções de código, flags/resolução ON, migrations, dados reais, deploy Production |
 
 ## Próxima ação exata, na conta nova
 
-1. Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, [NEGOCIO.md](NEGOCIO.md), [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md) e o [manifesto do #119](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md).
-2. Revalidar `main`, PRs, reviews, CI e a situação real de HML/Production **sem escrita**. Descobrir worktrees locais existentes; trabalho apenas local da conta anterior não é recuperável por clone novo.
-3. Apresentar check-up breve da composição #119 e plano de preflight HML existente: identidade/catálogo reais, backup novo com restauração comprovada, janela, Preview vinculado corretamente e testes com resolução comercial **OFF**.
-4. **Pedir autorização separada** antes de qualquer merge do #119, migration remota, alteração de dados, ativação comercial ou deploy Production. Evitar PR duplicado da 050; decidir tratamento dos Drafts históricos.
-5. A cada tarefa concluída, atualizar este HANDOFF com resultado, SHA/PR, testes, ambiente, bloqueios e próxima ação; incluir no commit/push **da tarefa autorizada**, sem criar PR apenas para checkpoint.
+1. Ler `CLAUDE.md`, `AGENTS.md`, este HANDOFF e `PROGRESS.md`; conferir main, PRs e HML (somente leitura).
+2. Obter do usuário o resultado da interface dos 9 cenários no Preview.
+3. Para Production: `pg_dump` completo novo, token com acesso ao projeto de Production, janela e autorização nominal antes de aplicar 035–050.
 
 ## Segurança e limites da transferência
 
-- **Nenhuma senha/token/`.env` real no Git.** Credenciais e permissões para GitHub, Vercel e Supabase precisam ser configuradas separadamente na outra conta; ambientes existentes não devem ser recriados.
-- CI SUCCESS, Preview READY, migration aplicada, feature flag ON, HML homologado e Production liberada são estados distintos.
-- `docs/ESTADO_DO_PROJETO.md` e as seções posteriores deste HANDOFF preservam **histórico datado**, não instruções vigentes. Esta seção de retomada prevalece sobre tarefas antigas em seus textos.
+- Nenhuma senha, token ou `.env` real no Git. O token Supabase desta sessão está salvo no ambiente Default do Claude Code e só enxerga o HML.
+- CI SUCCESS, Preview READY, migration aplicada, flag ON, HML homologado e Production liberada são estados distintos.
+- As seções históricas abaixo preservam registros datados; não são instruções vigentes.
 
 ## Autorizações
 
-A autorização desta etapa é **exclusivamente documental**: reconciliar e integrar o #117 após revisar diff e checks. Não se estende ao #119, ao #118, ao #111/#112 nem aos ambientes. A nova conta deve pedir aprovação própria para ações posteriores.
+Vigentes nesta etapa: testes funcionais sintéticos no HML, sem persistência, com resolução comercial OFF. Não se estendem a correções, Production ou ativação comercial.
 
 ## Proibições
 
-Sem merge funcional, SQL remoto, alteração em Production, segredos no Git, resolução de tarifas ON, criação de outro Supabase ou execução dos Gates 3–5 do checkpoint automático. PR Draft e Preview não equivalem a produção.
+Sem deploy ou migration em Production, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático ou correção de código antes de aprovação do relatório.
 
 ## Retomada
 
-Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, `docs/NEGOCIO.md`, `docs/NEGOCIO_X_SISTEMA.md` e o manifesto do #119; conferir refs, branches, CI, configuração dos ambientes e trabalho local não publicado. Apresentar check-up e próxima tarefa antes de executar operações remotas. As seções históricas abaixo não transferem autorização.
+Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF e `PROGRESS.md`; conferir refs, CI e HML por leitura. As seções históricas abaixo não transferem autorização.
 
 ## Evidência automática de Preview
 
@@ -529,6 +518,8 @@ inferência a partir da release #111.
 
 ## Migrations por ambiente
 
+**09/11/2026 (vigente):** main até 050; HML 050 (046–050 aplicadas uma a uma, verificadas); Production 034. Registros abaixo são históricos.
+
 FUNC-02: nenhuma migration aplicada nesta sessão. Main até 045, #111 candidatas
 046–049, #118 com 050. Registros HML045/Production034 abaixo são históricos, não
 catálogo reconferido. Antes de HML, cumprir o roteiro OFF/catálogo/backup na matriz.
@@ -594,6 +585,8 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 - sem inferir regra comercial nem usar R$ 35.118,12 como fixture de outra base.
 
 ## Bloqueios e riscos
+
+**09/11/2026 (vigente):** interface dos 9 cenários não exercitada (Preview inacessível deste container); Production 034 com frontend posterior (telas de schema novo indisponíveis até 034 → 050); backup `pg_dump` de Production pendente. Registros abaixo são históricos.
 
 **FUNC-02:** três conflitos documentais entre #117/#118; prefixo 046–049 e
 consumidores 047/049 ainda precisam de composição/CI. Main/#118 usam RPC antiga
