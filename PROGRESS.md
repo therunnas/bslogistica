@@ -43,8 +43,7 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 Sem merge funcional, migrations remotas, Production, dados reais, resolução comercial ON, novo Supabase, ativação do controlador ou Gates 3–5 automáticos. Não duplicar o trabalho do #119 nem confundir Preview com homologação.
 
-### Fila funcional herdada da main — pausada nesta tarefa
-### Fila funcional herdada da main — pausada nesta tarefa
+### Fila funcional herdada da main — histórico, não tarefa ativa
 
 Registro anterior preservado, sem atualizar status de PRs ou homologação por
 inferência. Para a release ainda não integrada, consultar o HANDOFF do #111.

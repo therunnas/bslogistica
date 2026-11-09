@@ -501,7 +501,7 @@ são o último registro herdado da main, não reconferidos nesta tarefa.
 - Production `ehkduqokntemtmqzdrbd`: 034; apenas leitura do head. Sem backup recente
   (último lógico: 23/10/2026).
 
-## Autorizações
+## Autorizações históricas — não transferem autorização
 
 FUNC-03 vigente: publicar os cinco ajustes documentais no #117 com commit/push normal; preparar/testar/publicar composição técnica em branch/PR Draft próprios. Sem merge ou migration remota.
 
@@ -526,7 +526,7 @@ Merge e mudanças de main/Production não autorizados. Os itens abaixo são hist
   com identidades e dados sintéticos, executar a matriz de 27 casos e atualizar a
   documentação. Nenhuma foi usada para alterar Production.
 
-## Proibições
+## Proibições históricas — prevalece o escopo atual acima
 
 FUNC-03 vigente: sem merge, SQL remoto, Production, dados reais, ON comercial, controlador, Gates 3–5, novas infraestruturas ou alteração do #118 original.
 
@@ -590,7 +590,7 @@ revogada pela 047. Aplicação HML bloqueada até catálogo/backup/janela e auto
   limpeza. Regra de arredondamento da HE aprovada e documentada na sessão 13.
 - Manual de utilização e preparação de Production 035–045 são gates posteriores.
 
-## Retomada
+## Retomada histórica — não usar como tarefa ativa
 
 1. Descobrir worktrees/branches/HEADs e preservar alterações de terceiros.
 2. Conferir o novo HEAD do #117, seis documentos, CI e Preview próprios, mantendo Draft.
