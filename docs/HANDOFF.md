@@ -45,13 +45,13 @@
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Fechar documentação e transferência entre contas, revisando #117 com o PR técnico #119 |
-| Resultados e testes comprovados | Diferenças documentais e referências ao #119 conferidas no GitHub; CI nova do #117 deve ser PASS no HEAD final, não transferir evidência do commit anterior |
-| Código e PR afetados | Apenas os seis documentos do #117; #119, #118 e #111/#112 não alterados |
-| Ambientes envolvidos | GitHub PR/Actions/Preview documental; nenhuma escrita no Supabase HML ou Production |
-| Pendências e decisões | #119 sem merge/homologação HML; preflight e C1–C6 pendentes, controlador OFF, Gates automáticos 3–5 pausados |
-| Próxima ação exata | Revalidar checks e integrar documental #117 autorizado; após transferência, analisar #119 e planejar HML somente leitura |
-| Autorizações e proibições | Somente revisão e squash documental #117 após aprovação da CI; vedados merges funcionais, migrations remotas, Production ou ativação automática |
+| Tarefa executada | Atualizar a branch do #119 com a main `cad9f51` (pós-squash do #117), resolvendo conflitos somente nos documentos de estado |
+| Resultados e testes comprovados | Merge sem conflito em código; PROGRESS e HANDOFF adotam a versão da main, ESTADO_DO_PROJETO mantém os dois históricos. Validações locais e CI do novo HEAD: conferir no GitHub, sem transferir a evidência do HEAD `48a1218` |
+| Código e PR afetados | Apenas documentos na branch do #119; nenhuma migration, app ou configuração alterada; #118, #111 e #112 intactos |
+| Ambientes envolvidos | Git/GitHub. Nenhuma escrita em Supabase HML ou Production; sem acesso remoto neste container |
+| Pendências e decisões | #119 segue Draft, sem merge nem homologação HML; preflight HML, backup restaurado, C6 e aplicação 046–050 (resolução OFF) pendentes |
+| Próxima ação exata | Confirmar CI/Preview do novo HEAD; preflight HML somente leitura (exige credenciais Supabase/Vercel) |
+| Autorizações e proibições | Usuário autorizou o plano geral em 09/11/2026; migration remota, Production e merge do #119 exigem confirmação nominal do ambiente-alvo e das credenciais |
 
 ## Próxima ação exata, na conta nova
 

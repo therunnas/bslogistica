@@ -296,9 +296,15 @@ select pg_temp.registrar('R7. SEM função trabalhada: recusado como pendente de
   pg_temp.r('p1') || '|' || (select count(*)::text from public.timesheet_entries where employee_id = '5c41f000-0000-4000-8000-000000000003' and work_date = date '2026-03-06'));
 select pg_temp.registrar('R8. turno SEM classificação: pendente (55000); nunca precificado como diurno', 'erro 55000|0',
   pg_temp.r('p2') || '|' || (select count(*)::text from public.timesheet_entries where employee_id = '5c41f000-0000-4000-8000-000000000001' and work_date = date '2026-03-05'));
-select pg_temp.registrar('R9. função SEM tarifa no contrato (auxiliar, administrativo): P0002, sem fallback para a diária genérica e nada gravado', 'erro P0002|erro P0002|0',
-  pg_temp.r('p3') || '|' || pg_temp.r('p4') || '|'
-  || (select count(*)::text from public.timesheet_entries where work_date = date '2026-03-04' and employee_id in ('5c41f000-0000-4000-8000-000000000004', '5c41f000-0000-4000-8000-000000000006')));
+-- 048 (FUNC-READY-01): sem diária individual e sem tarifa da função, o 3º nível é o PREÇO-BASE do contrato
+-- (antes da 048: P0002 e nada gravado). A fonte fica genérica e não há vínculo de tarifa.
+select pg_temp.registrar('R9. função SEM tarifa no contrato (auxiliar, administrativo): cobra o preço-base 100,00 (048), sem vínculo de tarifa', 'ok|ok|100.00|100.00|0',
+  (case when pg_temp.r('p3') like 'erro%' then pg_temp.r('p3') else 'ok' end) || '|'
+  || (case when pg_temp.r('p4') like 'erro%' then pg_temp.r('p4') else 'ok' end) || '|'
+  || (select billed_amount::text from public.timesheet_entries where work_date = date '2026-03-04' and employee_id = '5c41f000-0000-4000-8000-000000000004') || '|'
+  || (select billed_amount::text from public.timesheet_entries where work_date = date '2026-03-04' and employee_id = '5c41f000-0000-4000-8000-000000000006') || '|'
+  || (select count(*)::text from public.timesheet_entries where work_date = date '2026-03-04' and contract_rate_terms_id is not null
+        and employee_id in ('5c41f000-0000-4000-8000-000000000004', '5c41f000-0000-4000-8000-000000000006')));
 
 -- Operação SEM contrato: valor acordado, a regra de antes (a função do snapshot não preça nada)
 select pg_temp.salvar('o1', 'a2', 'a4', date '2026-03-02', '5', '15:00');
@@ -345,10 +351,15 @@ select pg_temp.registrar('C2. corrigir a função (antes da fatura) recalcula pe
   pg_temp.v('3', date '2026-03-09') || '|'
   || (select (te.contract_rate_terms_id = (select r.id from public.contract_rate_terms r where r.job_function_id = pg_temp.fn('operador') and r.shift_period = 'diurno' and r.active and r.valid_from = date '2026-01-01'))::text
         from public.timesheet_entries te where te.id = pg_temp.id_de('3', date '2026-03-09')::uuid));
-select pg_temp.registrar('C3. corrigir para função SEM tarifa é recusado (P0002) e o apontamento fica como estava (120,00, operador)',
-  'erro P0002|120.00|operador',
-  pg_temp.adm(format($q$select (public.corrigir_snapshots_do_apontamento(%L, %L, false, 'Tentativa sem tarifa'))::text$q$, pg_temp.id_de('3', date '2026-03-09'), pg_temp.fn('auxiliar_producao')))
-  || '|' || (select te.billed_amount::text || '|' || f.code from public.timesheet_entries te join public.job_functions f on f.id = te.job_function_id_snapshot where te.id = pg_temp.id_de('3', date '2026-03-09')::uuid));
+-- 048: corrigir para função SEM tarifa reprecifica pelo preço-base (antes: P0002 e nada mudava). A correção
+-- é aceita, o apontamento passa a auxiliar a 100,00 e perde o vínculo com a tarifa do operador.
+-- Dois comandos: a leitura precisa de um snapshot posterior à correção.
+select pg_temp.exec('c3', format($q$select (public.corrigir_snapshots_do_apontamento(%L, %L, false, 'Era auxiliar'))::text$q$,
+  pg_temp.id_de('3', date '2026-03-09'), pg_temp.fn('auxiliar_producao')));
+select pg_temp.registrar('C3. corrigir para função SEM tarifa reprecifica pelo preço-base 100,00 (048), sem vínculo de tarifa',
+  'ok|100.00|auxiliar_producao|true',
+  (case when pg_temp.r('c3') like 'erro%' then pg_temp.r('c3') else 'ok' end)
+  || '|' || (select te.billed_amount::text || '|' || f.code || '|' || (te.contract_rate_terms_id is null)::text from public.timesheet_entries te join public.job_functions f on f.id = te.job_function_id_snapshot where te.id = pg_temp.id_de('3', date '2026-03-09')::uuid));
 select pg_temp.registrar('C4. reclassificar o turno depois NÃO reprecifica o que já foi lançado (E1 03-02 continua 175,00)', '175.00',
   (select billed_amount::text from public.timesheet_entries where id = pg_temp.id_de('1', date '2026-03-02')::uuid));
 select pg_temp.exec('c5', $q$update public.shifts set shift_period = 'noturno' where name = 'S1'$q$);
@@ -389,8 +400,9 @@ select pg_temp.registrar('U4. leitura da tarifa vigente na data: 160,00 em 31/03
 
 select pg_temp.exec('f1', $q$select (public.gerar_fatura('5c41c000-0000-4000-8000-0000000000c1', date '2026-03-01', date '2026-03-15')).id::text$q$);
 select pg_temp.registrar('F1. fatura de 01–15/03 gerada pelo caminho normal', 'true', (pg_temp.r('f1') ~ '^[0-9a-f-]{36}$')::text);
-select pg_temp.registrar('F2. os itens de diárias da OP1 separam as quatro tarifas (120, 144, 160 e 200), cada uma com a quantidade × tarifa exata',
-  '120.00|144.00|160.00|200.00',
+-- 048: os lançamentos sem tarifa (R9, C3) entram pelo preço-base 100,00 como item próprio.
+select pg_temp.registrar('F2. os itens de diárias da OP1 separam o preço-base (100) e as quatro tarifas (120, 144, 160 e 200), cada um com a quantidade × preço exata',
+  '100.00|120.00|144.00|160.00|200.00',
   (select string_agg(distinct it.unit_price::text, '|' order by it.unit_price::text)
      from public.invoice_items it where it.invoice_id = pg_temp.r('f1')::uuid and it.kind = 'diarias'
       and it.operation_id = '5c41e000-0000-4000-8000-0000000000a1' and it.description not like '%proporcionais%'));

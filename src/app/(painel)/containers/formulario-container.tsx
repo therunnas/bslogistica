@@ -23,6 +23,8 @@ import {
 } from "@/lib/container-servico-intencao";
 import {
   carregarFormularioContainerAction,
+  carregarContainerAction,
+  corrigirContainerAction,
   recuperarIntencaoContainerAction,
   recuperarMarcadorContainerAction,
   registrarContainerAction,
@@ -90,10 +92,17 @@ function Selecao({
   );
 }
 
+/**
+ * Registro de serviço novo ou, com `correcao`, CORREÇÃO de um serviço disponível (049): o banco cancela o
+ * original e registra o substituto numa só transação, com a mesma proteção de intenção do registro (a chave
+ * fica na sessão e a reconciliação acha o substituto por ela). A correção não troca o cliente.
+ */
 export function FormularioContainer({
   operacaoInicialId,
+  correcao,
 }: {
   operacaoInicialId?: string | string[];
+  correcao?: { servicoId: string; lote: LoteDeContainers };
 } = {}) {
   const queryClient = useQueryClient();
   const [dados, setDados] = useState<Dados | null>(null);
@@ -126,6 +135,14 @@ export function FormularioContainer({
         if (!uuid(resultado.data.id)) {
           throw new Error("Resposta sem identificação válida. Confira a recuperação.");
         }
+        if (correcao) {
+          const original = await carregarContainerAction(correcao.servicoId);
+          if (!original.ok || original.data.substituidoPor !== resultado.data.id) {
+            throw new Error(
+              "A correção deste serviço não foi confirmada. Confira o registro anterior.",
+            );
+          }
+        }
         if (salva.estado === "confirmada" && salva.servicoId !== resultado.data.id) {
           throw new Error("A identificação confirmada diverge da recuperação.");
         }
@@ -143,7 +160,7 @@ export function FormularioContainer({
       setRecuperacaoPendente(false);
       return resultado.data.estado;
     },
-    [atualizarConsultas],
+    [atualizarConsultas, correcao],
   );
 
   useEffect(() => {
@@ -189,6 +206,10 @@ export function FormularioContainer({
           }
           return;
         }
+        if (correcao) {
+          setLote(correcao.lote);
+          return;
+        }
         if (operacaoInicialId !== undefined) {
           if (typeof operacaoInicialId !== "string") {
             setRecuperacaoPendente(true);
@@ -224,7 +245,7 @@ export function FormularioContainer({
     return () => {
       ativo = false;
     };
-  }, [atualizarConsultas, operacaoInicialId]);
+  }, [atualizarConsultas, operacaoInicialId, correcao]);
 
   function alterar<K extends keyof LoteDeContainers>(campo: K, valor: LoteDeContainers[K]) {
     setLote((anterior) => ({ ...anterior, [campo]: valor }));
@@ -245,7 +266,16 @@ export function FormularioContainer({
       if (intencao && lote.clienteId.trim().toLowerCase() !== intencao.payload.clienteId) {
         throw new Error("O cliente da intenção preservada não pode ser alterado.");
       }
-      if (!motivo.trim()) throw new Error("Informe o motivo do registro para auditoria.");
+      if (correcao && lote.clienteId !== correcao.lote.clienteId) {
+        throw new Error("A correção não troca o cliente: cancele e registre no outro cliente.");
+      }
+      if (!motivo.trim()) {
+        throw new Error(
+          correcao
+            ? "Informe o motivo da correção para auditoria."
+            : "Informe o motivo do registro para auditoria.",
+        );
+      }
       const nova =
         intencao?.estado === "recusada"
           ? corrigirIntencaoRecusada(intencao, lote, motivo)
@@ -291,11 +321,18 @@ export function FormularioContainer({
       // Persistência obrigatória antes da chamada de escrita.
       salvarIntencao(sessionStorage, enviada);
       setIntencao(enviada);
-      const resultado = await registrarContainerAction({
-        lote: intencao.lote,
-        chave: intencao.chave,
-        motivo: intencao.motivo,
-      });
+      const resultado = correcao
+        ? await corrigirContainerAction({
+            id: correcao.servicoId,
+            lote: intencao.lote,
+            chave: intencao.chave,
+            motivo: intencao.motivo,
+          })
+        : await registrarContainerAction({
+            lote: intencao.lote,
+            chave: intencao.chave,
+            motivo: intencao.motivo,
+          });
       if (!resultado.ok) {
         if (["validacao", "nao-encontrado"].includes(resultado.codigo) && !estavaIndeterminada) {
           enviada = marcarIntencao(enviada, "recusada");
@@ -415,10 +452,26 @@ export function FormularioContainer({
       ? "Há uma intenção anterior preservada. A operação de origem não foi aplicada; confira o serviço anterior antes de iniciar outro registro."
       : "";
 
+  const registroAnteriorLocalizado = Boolean(correcao && marcador && !intencao);
   if (confirmado) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Serviço registrado" description="Registro confirmado pelo servidor." />
+        <PageHeader
+          title={
+            registroAnteriorLocalizado
+              ? "Registro anterior localizado"
+              : correcao
+                ? "Serviço corrigido"
+                : "Serviço registrado"
+          }
+          description={
+            registroAnteriorLocalizado
+              ? "Confira o registro anterior antes de iniciar a correção atual."
+              : correcao
+                ? "O original foi cancelado e substituído; o histórico liga os dois."
+                : "Registro confirmado pelo servidor."
+          }
+        />
         {avisoDeOrigem && <p role="alert">{avisoDeOrigem}</p>}
         <Button asChild>
           <Link href={`/containers/${confirmado}`}>Abrir serviço</Link>
@@ -428,13 +481,21 @@ export function FormularioContainer({
           onClick={() => {
             try {
               if (dados) limparIntencao(sessionStorage, dados.userId);
-              window.location.reload();
+              if (registroAnteriorLocalizado && correcao) {
+                setMarcador(null);
+                setConfirmado(null);
+                setRecuperacaoPendente(false);
+                setLote(correcao.lote);
+                setMensagem("");
+              } else {
+                window.location.reload();
+              }
             } catch {
               setMensagem("Não foi possível limpar a intenção. Recarregue para recuperá-la.");
             }
           }}
         >
-          Novo serviço
+          {registroAnteriorLocalizado ? "Iniciar correção deste serviço" : "Novo serviço"}
         </Button>
         {mensagem && <p role="alert">{mensagem}</p>}
       </div>
@@ -457,11 +518,18 @@ export function FormularioContainer({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Novo serviço de containers"
-        description="Registre o valor total negociado e os custos individuais deste serviço avulso."
+        title={correcao ? "Corrigir serviço de containers" : "Novo serviço de containers"}
+        description={
+          correcao
+            ? "Ajuste os dados abaixo. Ao confirmar, o serviço original é cancelado e substituído por este, numa única operação; o histórico liga os dois."
+            : "Registre o valor total negociado e os custos individuais deste serviço avulso."
+        }
       />
-      <Link className="underline" href="/containers">
-        Voltar para containers
+      <Link
+        className="underline"
+        href={correcao ? `/containers/${correcao.servicoId}` : "/containers"}
+      >
+        {correcao ? "Voltar para o serviço" : "Voltar para containers"}
       </Link>
       {avisoDeOrigem && <p role="alert">{avisoDeOrigem}</p>}
       {mensagem && (
@@ -483,7 +551,7 @@ export function FormularioContainer({
                 <Selecao
                   id="cliente"
                   valor={lote.clienteId}
-                  disabled={!!intencao && !editandoPreparada}
+                  disabled={!!correcao || (!!intencao && !editandoPreparada)}
                   vazio="Selecione"
                   opcoes={dados.clientes}
                   onChange={(clienteId) => {
@@ -525,9 +593,17 @@ export function FormularioContainer({
                     id={campo}
                     type={tipo}
                     inputMode={campo === "totalCobrado" ? "decimal" : "text"}
+                    aria-describedby={tipo === "date" ? "container-date-order-help" : undefined}
+                    max={campo === "solicitadoEm" ? lote.executadoEm || undefined : undefined}
+                    min={campo === "executadoEm" ? lote.solicitadoEm || undefined : undefined}
                     value={lote[campo]}
                     onChange={(e) => alterar(campo, e.target.value)}
                   />
+                  {campo === "solicitadoEm" && (
+                    <p id="container-date-order-help" className="text-xs text-muted-foreground">
+                      A solicitação pode ser anterior ou no mesmo dia da execução.
+                    </p>
+                  )}
                 </Campo>
               ))}
               <Campo id="quantidade" titulo="Quantidade de containers">
@@ -694,7 +770,12 @@ export function FormularioContainer({
                 </div>
               )}
             </fieldset>
-            <Campo id="motivo" titulo="Motivo do registro (auditoria)">
+            <Campo
+              id="motivo"
+              titulo={
+                correcao ? "Motivo da correção (auditoria)" : "Motivo do registro (auditoria)"
+              }
+            >
               <Textarea
                 id="motivo"
                 maxLength={1000}
@@ -731,8 +812,9 @@ export function FormularioContainer({
             ))}
             <p>Motivo: {motivo}</p>
             <p className="text-sm text-muted-foreground">
-              A confirmação registra o serviço avulso. O faturamento segue o fluxo de faturamento
-              existente.
+              {correcao
+                ? "A confirmação cancela o serviço original e registra este no lugar dele. Serviço já faturado não pode ser corrigido."
+                : "A confirmação registra o serviço avulso. O faturamento segue o fluxo de faturamento existente."}
             </p>
             <Button
               variant="outline"
@@ -742,7 +824,7 @@ export function FormularioContainer({
               Voltar e corrigir
             </Button>
             <Button disabled={ocupado || recuperacaoPendente} onClick={() => void enviar()}>
-              {ocupado ? "Conferindo…" : "Confirmar registro"}
+              {ocupado ? "Conferindo…" : correcao ? "Confirmar correção" : "Confirmar registro"}
             </Button>
           </CardContent>
         </Card>

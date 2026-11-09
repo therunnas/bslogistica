@@ -328,18 +328,23 @@ select pg_temp.registrar('R7. vigência com reajuste: o dia ANTERIOR (31/03) cob
 -- Individual não depende do período do turno (noturno sem tarifa de conferente noturna)
 select pg_temp.salvar('r10', 'a1', 'a2', date '2026-03-04', '1', '07:00', '22:00');
 select pg_temp.salvar('r11', 'a1', 'a2', date '2026-03-04', '2', '07:00', '22:00');
-select pg_temp.registrar('R8. a individual vale também no turno noturno (E1 = 260,00); sem individual e sem tarifa noturna o apontamento é recusado (P0002) e nada é gravado',
-  '260.00|0|260.00|individual|0.00|0.00|erro P0002|0',
-  pg_temp.v('1', date '2026-03-04') || '|' || pg_temp.r('r11')
-  || '|' || (select count(*)::text from public.timesheet_entries where employee_id = pg_temp.emp('2') and work_date = date '2026-03-04'));
+-- 048: sem individual e sem tarifa noturna, o E2 cai no preço-base do contrato (100,00); antes: P0002.
+select pg_temp.registrar('R8. a individual vale também no turno noturno (E1 = 260,00); sem individual e sem tarifa noturna vale o preço-base 100,00 (048)',
+  '260.00|0|260.00|individual|0.00|0.00|ok|100.00|generica',
+  pg_temp.v('1', date '2026-03-04') || '|' || (case when pg_temp.r('r11') like 'erro%' then pg_temp.r('r11') else 'ok' end)
+  || '|' || (select te.billed_amount::text || '|' || coalesce(te.price_source, 'generica') from public.timesheet_entries te
+               where te.employee_id = pg_temp.emp('2') and te.work_date = date '2026-03-04'));
 
 -- Sem fonte válida e classificação obrigatória
 select pg_temp.salvar('p1', 'a1', 'a1', date '2026-03-05', '6', '15:00');
 select pg_temp.salvar('p2', 'a1', 'a1', date '2026-03-05', '7', '15:00');
-select pg_temp.registrar('R9. função sem tarifa e sem individual (E6): P0002, sem fallback para a diária genérica; sem função (E7): pendente 55000; nada gravado',
-  'erro P0002|erro 55000|0',
-  pg_temp.r('p1') || '|' || pg_temp.r('p2')
-  || '|' || (select count(*)::text from public.timesheet_entries where work_date = date '2026-03-05' and employee_id in (pg_temp.emp('6'), pg_temp.emp('7'))));
+-- 048: função sem tarifa e sem individual (E6) cobra o preço-base 100,00 (antes: P0002). Sem função (E7)
+-- continua pendente (55000): a classificação segue obrigatória.
+select pg_temp.registrar('R9. função sem tarifa e sem individual (E6): preço-base 100,00 (048); sem função (E7): pendente 55000, nada gravado',
+  'ok|erro 55000|100.00|0',
+  (case when pg_temp.r('p1') like 'erro%' then pg_temp.r('p1') else 'ok' end) || '|' || pg_temp.r('p2')
+  || '|' || (select billed_amount::text from public.timesheet_entries where work_date = date '2026-03-05' and employee_id = pg_temp.emp('6'))
+  || '|' || (select count(*)::text from public.timesheet_entries where work_date = date '2026-03-05' and employee_id = pg_temp.emp('7')));
 select pg_temp.ind('x1', '7', date '2026-01-01', 230);
 select pg_temp.salvar('p3', 'a1', 'a1', date '2026-03-06', '7', '15:00');
 select pg_temp.registrar('R10. a diária individual NÃO contorna a classificação: E7 tem individual, mas sem função trabalhada o apontamento segue pendente (55000)', 'erro 55000',
@@ -483,9 +488,9 @@ select pg_temp.registrar('F3. o total da fatura = Σ dos valores cobrados dos la
 select pg_temp.registrar('F4. o adicional aparece UMA vez, em item próprio (adicional_diario = Σ additional_amount = 30,00), fora das HE', '30.00|30.00',
   (select coalesce(sum(amount), 0)::text from public.invoice_items where invoice_id = pg_temp.r('f1')::uuid and kind = 'adicional_diario')
   || '|' || (select sum(additional_amount)::text from public.timesheet_entries where invoice_id = pg_temp.r('f1')::uuid));
-select pg_temp.registrar('F5. itens de diárias separam a individual (260, 220, 210) da padrão (240, 200, 300, 190), cada uma com seu valor unitário exato',
+select pg_temp.registrar('F5. itens de diárias separam a individual (260, 220, 210), a padrão (240, 200, 300, 190) e o preço-base (100, 048), cada uma com seu valor unitário exato',
   'true',
-  (select (array['190.00', '200.00', '210.00', '220.00', '240.00', '260.00', '300.00'] @> array_agg(distinct it.unit_price::text))::text
+  (select (array['100.00', '190.00', '200.00', '210.00', '220.00', '240.00', '260.00', '300.00'] @> array_agg(distinct it.unit_price::text))::text
      from public.invoice_items it where it.invoice_id = pg_temp.r('f1')::uuid and it.kind = 'diarias' and it.description not like '%proporcionais%'));
 select pg_temp.registrar('F6. a fatura de fevereiro, emitida antes de ligar a resolução, está IDÊNTICA (lançamentos, fatura e itens)', 'true',
   ((select e from _fev) = (select md5(string_agg(to_jsonb(te)::text, ',' order by te.id)) from public.timesheet_entries te where te.work_date < date '2026-03-01')

@@ -5,6 +5,35 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## FUNC-03 — composição técnica isolada (09/11/2026)
+
+Main 75c47cd9a30e4888b197ca6ae27aa236c71ec589 preservada. #117 documental recebeu
+6f1d960ef78254cc6b2b9cc1639c5abe202ef54d, seis documentos, CI validar/sql-local
+SUCCESS e Preview bem-sucedido. NEGOCIO.md idêntico ao #112; nenhum merge.
+
+Na branch chore/func-03-financial-composition, portabilidade seletiva do #111
+7e08270011f74ea5dfe4470097f58659eea81140 (046–049/consumidores/testes) e do #118
+fc51b54c978ac3042f96fb763cb21ab379231490 (050/domínio/formulário/testes), sem alterar
+esses PRs ou copiar checkpoints históricos sobre a main. Migrations preservadas
+byte a byte, 55 versões; sem dependências/lockfile/auth/vercel.json/controlador alterados.
+
+Testes novos locais: baseline 70/70 e composição 72/72 suítes Node; 51 suítes SQL
+com 049 PRESENTE e flags persistida/efetiva OFF; preservação por etapa de dois
+serviços/uma fatura prévios à 046, replay antigo, valores e trilhas intactos;
+concorrência adicionais 128/fatura 41 asserções PASS. Lint/TypeScript/build final Turbopack 34,8 s PASS;
+revisão independente sem Critical/Important; CI/Preview do candidato ainda requerem publicação/consulta próprias.
+Build inicial falhou por symlink de dependências externo à raiz Turbopack; npm ci
+no próprio worktree preservou lockfile e dependências; resultado final no HANDOFF.
+
+Integração corrigiu um falso sucesso no consumidor 049: recuperação genérica por
+chave/payload não validava vínculo ao original; RED/GREEN demonstrou a necessidade
+de delegar esse replay à RPC idempotente, sem alterar SQL. Manifesto e protocolo
+futuro em [composition-046-050.md](financeiro/composition-046-050.md).
+
+Nenhum SQL remoto, HML, dados reais ou Production alterados. HML045/Production034
+são últimos registros de catálogo, não nova consulta; homologação pendente de
+identidade/catálogo/backup/restauração/janela/Preview e autorização. 048 OFF instalada
+não aprova/ativa fallback; C1–C6 abertas. Controlador OFF, Gates 3–5 PAUSADOS.
 ## TRANSFERÊNCIA ENTRE CONTAS — ponto de retomada (09/11/2026)
 
 FUNC-03 completada no escopo de **preparação local e publicação em PR Draft**, sem integração funcional ou migrações remotas. O #117 traz seis documentos de negócio/continuidade; é o candidato documental autorizado para squash após reconciliação/checks. A main antes desse squash está em `75c47cd9a30e4888b197ca6ae27aa236c71ec589` (reconsultar o SHA efetivo no GitHub). O ponto operacional atual é [HANDOFF.md](HANDOFF.md), não o checkpoint AUTO-12 ainda presente na main anterior.

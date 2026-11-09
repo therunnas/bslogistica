@@ -38,6 +38,17 @@ export async function registrarContainerAction(entrada: {
 }) {
   return acoes().registrar(entrada);
 }
+export async function capacidadeCorrecaoContainerAction() {
+  return acoes().capacidadeCorrecao();
+}
+export async function corrigirContainerAction(entrada: {
+  id: string;
+  lote: LoteDeContainers;
+  chave: string;
+  motivo: string;
+}) {
+  return acoes().corrigir(entrada);
+}
 export async function cancelarContainerAction(entrada: { id: string; motivo: string }) {
   return acoes().cancelar(entrada);
 }

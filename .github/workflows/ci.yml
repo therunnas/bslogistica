@@ -255,6 +255,11 @@ jobs:
           npm run test:container-intencao
           npm run test:container-telas
 
+      - name: Testes financeiros da composição 046-050
+        run: |
+          npm run test:adicional-idempotencia
+          npm run test:func-ready
+
       - name: Teste workflow documental
         run: npm run test:workflow
 

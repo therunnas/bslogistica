@@ -24,6 +24,7 @@ function carregarModulo(file, resolver) {
 const dominio = carregarModulo(path.resolve("src/lib/container-servico.ts"), nativeRequire);
 const adicionaisDominio = carregarModulo(path.resolve("src/lib/adicionais.ts"), nativeRequire);
 const containerUi = carregarModulo(path.resolve("src/lib/container-servico-ui.ts"), nativeRequire);
+const dadosContainers = await import("../src/lib/container-servico-dados.ts");
 const formatos = carregarModulo(path.resolve("src/lib/format.ts"), nativeRequire);
 const intencoes = carregarModulo(path.resolve("src/lib/container-servico-intencao.ts"), (id) =>
   id === "./container-servico" ? dominio : nativeRequire(id),
@@ -235,6 +236,7 @@ function navegador(acoes = {}, conteudo = null, config = {}) {
           useCancelarAdicional: () => ({ isPending: false, mutateAsync: config.cancelar }),
         };
       }
+      if (id === "@/lib/container-servico-dados") return dadosContainers;
       if (id === "@/lib/container-servico") return dominio;
       if (id === "@/lib/container-servico-intencao") return intencoes;
       if (id === "@tanstack/react-query") {
@@ -247,6 +249,7 @@ function navegador(acoes = {}, conteudo = null, config = {}) {
           }),
         };
       }
+      if (id === "./formulario-container") return { FormularioContainer: "formulario" };
       if (id === "./lista-containers") return { dinheiroContainer: (valor) => `${valor} centavos` };
       if (id === "next/link") return { default: "a" };
       if (
@@ -1410,6 +1413,179 @@ test("atalho com schema anterior à 045 não preenche nem libera cadastro", asyn
     assert.match(h.text(), /Backend 045 indisponível/);
     assert.equal(h.find("Revisar serviço"), undefined);
     assert.equal(h.eventos.filter(([tipo]) => tipo === "salvar" || tipo === "registrar").length, 0);
+  } finally {
+    h.restaurar();
+  }
+});
+
+test("formulário aceita mesmo dia e transmite a intenção sem alterar valores", async () => {
+  let enviada;
+  const h = navegador({
+    registrarContainerAction: async (entrada) => {
+      enviada = entrada;
+      return { ok: true, data: servicoId };
+    },
+  });
+  try {
+    await h.pronto();
+    await preencher(h);
+    h.change("solicitadoEm", lote.executadoEm);
+    const pedido = h.nodes().find((n) => n.type === "Input" && n.props.id === "solicitadoEm");
+    const execucao = h.nodes().find((n) => n.type === "Input" && n.props.id === "executadoEm");
+    assert.equal(pedido.props.max, lote.executadoEm);
+    assert.equal(execucao.props.min, lote.executadoEm);
+    assert.match(h.text(), /no mesmo dia/);
+    h.click("Revisar serviço");
+    assert.ok(h.find("Confirmar registro"));
+    h.click("Confirmar registro");
+    await h.pronto();
+    assert.equal(enviada.lote.solicitadoEm, enviada.lote.executadoEm);
+    assert.equal(enviada.lote.totalCobrado, lote.totalCobrado);
+    assert.deepEqual(enviada.lote.participantes, lote.participantes);
+  } finally {
+    h.restaurar();
+  }
+});
+
+for (const [nome, data] of [
+  ["posterior à execução", "2026-11-03"],
+  ["civil inválida", "2026-02-30"],
+]) {
+  test(`formulário não confirma solicitação ${nome}`, async () => {
+    let envios = 0;
+    const h = navegador({
+      registrarContainerAction: async () => {
+        envios++;
+        return { ok: true, data: servicoId };
+      },
+    });
+    try {
+      await preencher(h);
+      h.change("solicitadoEm", data);
+      h.click("Revisar serviço");
+      assert.equal(h.find("Confirmar registro"), undefined);
+      assert.equal(envios, 0);
+    } finally {
+      h.restaurar();
+    }
+  });
+}
+
+for (const anterior of [servicoId, "40000000-0000-4000-8000-000000000002"]) {
+  test(`correção não confirma marcador de registro anterior ${anterior}`, async () => {
+    const chave = "50000000-0000-4000-8000-000000000001";
+    const salvo = JSON.stringify({ versao: 2, userId, chave });
+    let correcoes = 0;
+    const h = navegador(
+      {
+        recuperarMarcadorContainerAction: async () => ({
+          ok: true,
+          data: { estado: "registrado", id: anterior },
+        }),
+        corrigirContainerAction: async () => {
+          correcoes += 1;
+          return { ok: true, data: { id: "40000000-0000-4000-8000-000000000003" } };
+        },
+      },
+      salvo,
+      { props: { correcao: { servicoId, lote } } },
+    );
+    try {
+      await h.pronto();
+      assert.notEqual(
+        h.nodes().find((n) => n.type === "PageHeader")?.props.title,
+        "Serviço corrigido",
+      );
+      assert.equal(correcoes, 0);
+      assert.equal(h.storage.get(`bs:container:intencao:v1:${userId}`), salvo);
+      assert.ok(h.find("Iniciar correção deste serviço"));
+      h.click("Iniciar correção deste serviço");
+      h.change("descricao", "Descarga corrigida");
+      h.change("motivo", "Correção sintética autorizada");
+      h.click("Revisar serviço");
+      await h.click("Confirmar correção");
+      await h.pronto();
+      assert.equal(correcoes, 1);
+      assert.equal(
+        h.nodes().find((n) => n.type === "PageHeader")?.props.title,
+        "Serviço corrigido",
+      );
+    } finally {
+      h.restaurar();
+    }
+  });
+}
+
+test("correção preserva marcador anterior indeterminado e bloqueia nova intenção", async () => {
+  const salvo = JSON.stringify({
+    versao: 2,
+    userId,
+    chave: "50000000-0000-4000-8000-000000000001",
+  });
+  const h = navegador({}, salvo, { props: { correcao: { servicoId, lote } } });
+  try {
+    await h.pronto();
+    assert.equal(h.storage.get(`bs:container:intencao:v1:${userId}`), salvo);
+    assert.equal(h.find("Iniciar correção deste serviço"), undefined);
+    assert.equal(h.find("Confirmar correção"), undefined);
+  } finally {
+    h.restaurar();
+  }
+});
+
+test("recuperação em memória exige vínculo auditado com o original da correção", async () => {
+  const h = navegador(
+    {
+      recuperarIntencaoContainerAction: async () => ({
+        ok: true,
+        data: { estado: "registrado", id: servicoId },
+      }),
+      carregarContainerAction: async () => ({ ok: true, data: { substituidoPor: null } }),
+    },
+    null,
+    { props: { correcao: { servicoId, lote } } },
+  );
+  try {
+    await h.pronto();
+    h.change("descricao", "Descrição corrigida");
+    h.change("motivo", "Correção sintética");
+    h.click("Revisar serviço");
+    await h.click("Confirmar correção");
+    await h.pronto();
+    assert.notEqual(
+      h.nodes().find((n) => n.type === "PageHeader")?.props.title,
+      "Serviço corrigido",
+    );
+    assert.equal(h.storage.size, 1);
+    assert.match(h.text(), /vínculo|correção.*confirmada/);
+  } finally {
+    h.restaurar();
+  }
+});
+
+test("reload da correção já commitada oferece o substituto auditado sem nova escrita", async () => {
+  const substituto = "40000000-0000-4000-8000-000000000003";
+  const h = navegador(
+    {
+      capacidadeCorrecaoContainerAction: async () => ({ ok: true, data: true }),
+      carregarContainerAction: async () => ({
+        ok: true,
+        data: { servico: { situacao: "cancelado" }, substituidoPor: substituto },
+      }),
+    },
+    null,
+    {
+      arquivo: "correcao-container.tsx",
+      componente: "CorrecaoDoContainer",
+      props: { id: servicoId },
+    },
+  );
+  try {
+    await h.pronto();
+    assert.ok(
+      h.nodes().find((n) => n.type === "a" && n.props.href === `/containers/${substituto}`),
+    );
+    assert.match(h.text(), /corrigid/);
   } finally {
     h.restaurar();
   }

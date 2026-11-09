@@ -160,7 +160,7 @@ select pg_temp.registrar('V2. sete lançamentos gravados (seis com valor e uma f
   || '|' || pg_temp.entrada('07', '07', '1', '06:00', '15:00'));
 
 select pg_temp.registrar('V3. adicional de 100,00 registrado (ainda sem fatura)', 'true',
-  (pg_temp.adm($q$select public.registrar_adicional('5c40c000-0000-4000-8000-0000000000c1', date '2026-03-01', date '2026-03-15', 'Etiquetagem', 100.00, 'REF-1')::text$q$) ~ '^[0-9a-f-]{36}$')::text);
+  (pg_temp.adm($q$select public.registrar_adicional_idempotente(gen_random_uuid(), '5c40c000-0000-4000-8000-0000000000c1', date '2026-03-01', date '2026-03-15', 'Etiquetagem', 100.00, 'REF-1')::text$q$) ~ '^[0-9a-f-]{36}$')::text);
 
 -- O recorte do Fechamento: lançamentos do cliente cujo dia da folha cai no período.
 create temporary view _fechamento as

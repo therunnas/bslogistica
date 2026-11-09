@@ -58,7 +58,7 @@ create function pg_temp.cli(n integer) returns uuid language sql as $$
 $$;
 create function pg_temp.payload(altera jsonb default '{}') returns jsonb language sql as $$
   select jsonb_build_object('clienteId',pg_temp.cli(1),'operacaoId',null,
-    'solicitadoEm','2026-02-02','executadoEm','2026-02-03',
+    'solicitadoEm','2026-02-03','executadoEm','2026-02-03',
     'descricao','Descarga sintética FIN11B','quantidade',3,'receitaCentavos',10001,
     'custoTotalCentavos',3003,'referencia','ORDEM-SINTETICA-045','modalidadeCusto','total_distribuido',
     'competenciaCobranca',null,'participantes',jsonb_build_array(
@@ -126,6 +126,13 @@ create temporary table _off on commit drop as
 select pg_temp.assert_eq('OFF mantém receita200/custo80 da diária existente',
  (select billed_amount::text||'|'||cost_amount::text from public.timesheet_entries where id='5c45b100-0000-4000-8000-000000000001'),'200.00|80.00');
 
+-- FUNC-01: a fixture principal agora pede e executa no mesmo dia. Os testes de
+-- replay, auditoria, valores, cancelamento, fatura e permissões abaixo cobrem essa regra.
+select pg_temp.assert_eq('normalizador aceita pedido no mesmo dia',
+ public.normalizar_payload_container(pg_temp.payload())->>'solicitadoEm','2026-02-03');
+select pg_temp.assert_eq('pedido anterior à execução continua válido',
+ public.normalizar_payload_container(pg_temp.payload('{"solicitadoEm":"2026-02-02"}'))->>'solicitadoEm','2026-02-02');
+
 -- Validação de dados não depende do adaptador: chamadas diretas à RPC.
 do $$
 declare c record; antes text;
@@ -143,7 +150,7 @@ begin
   ('receita excede numeric12,2','{"receitaCentavos":1000000000000}'),
   ('custo total excede numeric12,2','{"custoTotalCentavos":1000000000000}'),
   ('soma do rateio diverge','{"custoTotalCentavos":3002}'),
-  ('solicitação no mesmo dia','{"solicitadoEm":"2026-02-03"}'),
+  ('solicitação dois dias depois','{"solicitadoEm":"2026-02-05"}'),
   ('solicitação posterior','{"solicitadoEm":"2026-02-04"}'),
   ('data civil inexistente','{"solicitadoEm":"2026-02-30"}'),
   ('sem participantes','{"participantes":[]}'),

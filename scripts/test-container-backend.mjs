@@ -1,5 +1,6 @@
 /** FIN-PR-11B: domínio real → contrato RPC, sem rede e sem banco. */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const base = {
@@ -78,11 +79,25 @@ test("registro transmite centavos exatos, quantidade física e competência inde
   ]);
 });
 
+test("registro no mesmo dia preserva centavos e datas no payload da RPC", async () => {
+  const { registrarServicoContainer } = await backend();
+  const db = cliente();
+  assert.equal(
+    await registrarServicoContainer(db, { ...base, solicitadoEm: base.executadoEm }, key, reason),
+    id,
+  );
+  const payload = db.chamadas[0].parametros.p_dados;
+  assert.equal(payload.solicitadoEm, payload.executadoEm);
+  assert.equal(payload.receitaCentavos, 10001);
+  assert.equal(payload.custoTotalCentavos, 3003);
+  assert.equal(db.chamadas[0].parametros.p_idempotency_key, key);
+});
+
 test("domínio inválido não chama a RPC", async () => {
   const { registrarServicoContainer } = await backend();
   for (const alteracao of [
     { quantidade: 0 },
-    { solicitadoEm: base.executadoEm },
+    { solicitadoEm: "2026-11-05" },
     { totalDistribuido: "30,02" },
     { totalCobrado: "1,001" },
     { participantes: [] },
@@ -164,4 +179,134 @@ test("operação existente é enviada à RPC sem criar operação ou contrato", 
   assert.equal(db.chamadas[0].parametros.p_dados.operacaoId, operacaoId);
   assert.equal(db.chamadas[0].parametros.p_dados.clienteId, base.clienteId);
   assert.equal("contratoId" in db.chamadas[0].parametros.p_dados, false);
+});
+
+test("050 preserva normalizador financeiro/ACL e altera só a ordem das datas", () => {
+  const anterior = readFileSync(
+    new URL("../supabase/migrations/20261112120000_045_container_servico.sql", import.meta.url),
+    "utf8",
+  );
+  const migration = readFileSync(
+    new URL(
+      "../supabase/migrations/20261117120000_050_container_same_day_request.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const original = anterior.match(
+    /create function public\.normalizar_payload_container\(p_dados jsonb\)[\s\S]*?\n\$\$;/,
+  )[0];
+  const nova = migration.match(
+    /create or replace function public\.normalizar_payload_container\(p_dados jsonb\)[\s\S]*?\n\$\$;/,
+  )[0];
+  assert.equal(
+    nova,
+    original
+      .replace("create function", "create or replace function")
+      .replace("v_requested >= v_executed", "v_requested > v_executed")
+      .replace(
+        "O serviço precisa ser solicitado até o dia anterior à execução.",
+        "A solicitação não pode ser posterior à execução.",
+      ),
+  );
+  assert.match(migration, /check \(requested_on <= executed_on\)/);
+  const comandos = migration.replace(/--[^\n]*/g, "");
+  assert.doesNotMatch(comandos, /\b(?:grant|revoke|policy|truncate|delete|update)\b/i);
+});
+
+test("correção valida o vínculo com o original mesmo quando a chave já existe", async () => {
+  const { criarAcoesContainer } = await import("../src/lib/container-servico-servidor.ts");
+  const { prepararLoteDeContainers } = await import("../src/lib/container-servico.ts");
+  const chamadas = [];
+  const db = {
+    from() {
+      let vazio = false;
+      const q = {
+        select() {
+          return q;
+        },
+        eq() {
+          return q;
+        },
+        order() {
+          return q;
+        },
+        limit(n) {
+          vazio = n === 0;
+          return q;
+        },
+        then(resolve, reject) {
+          return Promise.resolve({
+            data: vazio ? [] : [{ id, request_payload: prepararLoteDeContainers(base) }],
+            count: 1,
+            error: null,
+          }).then(resolve, reject);
+        },
+      };
+      return q;
+    },
+    async rpc(nome, args) {
+      chamadas.push({ nome, args });
+      // A chave existe, mas não pertence a uma correção deste original.
+      return { data: null, error: { code: "23505" } };
+    },
+  };
+  const acoes = criarAcoesContainer({
+    autorizar: async () => ({ id: "5c45b000-0000-4000-8000-000000000099" }),
+    cliente: async () => db,
+  });
+  const r = await acoes.corrigir({ id, lote: base, chave: key, motivo: reason });
+  assert.equal(r.ok, false, "payload coincidente não comprova vínculo corrected com o original");
+  assert.equal(r.codigo, "conflito");
+  assert.equal(chamadas.length, 1);
+  assert.equal(chamadas[0].nome, "corrigir_servico_container");
+  assert.equal(chamadas[0].args.p_id, id);
+});
+
+test("correção no mesmo dia transmite a mesma intenção à RPC 049 nos reenvios", async () => {
+  const { criarAcoesContainer } = await import("../src/lib/container-servico-servidor.ts");
+  const db = cliente();
+  const acoes = criarAcoesContainer({
+    autorizar: async () => ({ id }),
+    cliente: async () => db,
+  });
+  const entrada = {
+    id,
+    lote: { ...base, solicitadoEm: base.executadoEm },
+    chave: key,
+    motivo: reason,
+  };
+  for (let n = 0; n < 2; n += 1)
+    assert.deepEqual(await acoes.corrigir(entrada), { ok: true, data: { id } });
+  assert.equal(db.chamadas.length, 2);
+  assert.deepEqual(db.chamadas[0], db.chamadas[1]);
+  assert.equal(db.chamadas[0].nome, "corrigir_servico_container");
+  assert.equal(db.chamadas[0].parametros.p_dados.solicitadoEm, base.executadoEm);
+  assert.equal(db.chamadas[0].parametros.p_dados.receitaCentavos, 10001);
+  assert.equal(db.chamadas[0].parametros.p_dados.custoTotalCentavos, 3003);
+});
+
+test("correção preserva a recusa de faturados e bloqueia sessão/datas inválidas", async () => {
+  const { criarAcoesContainer } = await import("../src/lib/container-servico-servidor.ts");
+  const entrada = { id, lote: base, chave: key, motivo: reason };
+  const db = cliente({ data: null, error: { code: "55000" } });
+  const acoes = criarAcoesContainer({ autorizar: async () => ({ id }), cliente: async () => db });
+  assert.equal((await acoes.corrigir(entrada)).codigo, "estado-incompativel");
+  assert.equal(db.chamadas.length, 1);
+  const semSessao = criarAcoesContainer({
+    autorizar: async () => {
+      throw { code: "42501" };
+    },
+    cliente: async () => {
+      assert.fail("sessão recusada não cria cliente de banco");
+    },
+  });
+  assert.equal((await semSessao.corrigir(entrada)).codigo, "nao-autorizado");
+  for (const solicitadoEm of ["2026-02-30", "2026-11-05"]) {
+    assert.equal(
+      (await acoes.corrigir({ ...entrada, lote: { ...base, solicitadoEm } })).codigo,
+      "validacao",
+    );
+  }
+  assert.equal(db.chamadas.length, 1, "data inválida ou posterior não chega ao banco");
 });

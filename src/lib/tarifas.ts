@@ -49,6 +49,16 @@ export function interpretarResolucaoDeTarifas(data: unknown, erro: unknown): boo
   return (data as { resolucao_tarifas?: unknown }).resolucao_tarifas === true;
 }
 
+/**
+ * Com a resolução ligada, o preço-base do contrato vale como 3º nível (diária individual > tarifa da
+ * função > preço-base)? Anúncio `preco_base_recuo` (048). Erro ou ausência = regra antiga (sem recuo).
+ */
+export function interpretarPrecoBaseRecuo(data: unknown, erro: unknown): boolean {
+  if (erro !== null && erro !== undefined) return false;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  return (data as { preco_base_recuo?: unknown }).preco_base_recuo === true;
+}
+
 /** O banco grava os snapshots de função e período por apontamento? (`snapshots_funcao_periodo`, 040). */
 export function interpretarSnapshotsDeFuncao(data: unknown, erro: unknown): boolean {
   if (erro !== null && erro !== undefined) return false;
