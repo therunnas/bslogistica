@@ -45,13 +45,13 @@
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Atualizar a branch do #119 com a main `cad9f51` (pós-squash do #117), resolvendo conflitos somente nos documentos de estado |
-| Resultados e testes comprovados | Merge sem conflito em código; PROGRESS e HANDOFF adotam a versão da main, ESTADO_DO_PROJETO mantém os dois históricos. Validações locais e CI do novo HEAD: conferir no GitHub, sem transferir a evidência do HEAD `48a1218` |
-| Código e PR afetados | Apenas documentos na branch do #119; nenhuma migration, app ou configuração alterada; #118, #111 e #112 intactos |
-| Ambientes envolvidos | Git/GitHub. Nenhuma escrita em Supabase HML ou Production; sem acesso remoto neste container |
-| Pendências e decisões | #119 segue Draft, sem merge nem homologação HML; preflight HML, backup restaurado, C6 e aplicação 046–050 (resolução OFF) pendentes |
-| Próxima ação exata | Confirmar CI/Preview do novo HEAD; preflight HML somente leitura (exige credenciais Supabase/Vercel) |
-| Autorizações e proibições | Usuário autorizou o plano geral em 09/11/2026; migration remota, Production e merge do #119 exigem confirmação nominal do ambiente-alvo e das credenciais |
+| Tarefa executada | Consolidação para o piloto (09/11/2026): #119 atualizado com a main pós-#117, mergeado por squash; Drafts obsoletos fechados |
+| Resultados e testes comprovados | #119 HEAD `7b1deaf`: lint, TypeScript e test:workflow locais PASS; CI validar/sql-local SUCCESS. Nova main `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef`: CI validar/sql-local SUCCESS; nenhum deployment GitHub registrado para o SHA; `main:false` preservado |
+| Código e PR afetados | Main contém migrations 046–050 e consumidores. Fechados com comentário: #63, #106, #107, #108, #109, #110, #111, #112, #118 (branches preservadas). Nenhum PR aberto |
+| Ambientes envolvidos | Somente GitHub. Nenhuma escrita em Supabase HML ou Production; este container não tem credenciais Supabase/Vercel |
+| Pendências e decisões | **Main à frente dos bancos:** código até 050, HML na 045, Production na 034 (últimos registros, não revalidados). Pendentes: preflight HML, backup restaurado, aplicar 046–050 OFF, matriz curta de homologação, C6 do cliente-piloto, Production 034→050 |
+| Próxima ação exata | Preflight HML somente leitura (identidade `qbnfcmrxmssnwkhaitgd`, migration list, flags OFF), depois backup novo com restauração; exige credenciais |
+| Autorizações e proibições | Usuário autorizou merge do #119 e fechamento dos Drafts. Migration remota, Production e ativação comercial continuam exigindo confirmação nominal do ambiente-alvo; nunca `config push`, nunca Production sem backup novo |
 
 ## Próxima ação exata, na conta nova
 
