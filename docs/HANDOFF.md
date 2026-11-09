@@ -4,6 +4,23 @@
 
 **TRANSFERÊNCIA ENTRE CONTAS — FUNC-03 concluída como candidato técnico, ainda sem integração funcional ou homologação.** Este é o ponto de entrada da nova conta Claude Code. Primeiro conferir GitHub, `origin/main` e os PRs; SHAs abaixo são evidências de 09/11/2026, não estados permanentes. Continuar o desenvolvimento a partir do repositório, sem depender de conversas antigas.
 
+## Identificação
+
+| Campo | Valor |
+| --- | --- |
+| Etapa | TRANSFERÊNCIA ENTRE CONTAS — fechamento documental FUNC-03 |
+| Gate atual | Consolidação documental do #117 autorizada; #119 permanece Draft, sem merge ou HML |
+| Último gate concluído | FUNC-03: composição 046–050 publicada em #119, CI/Preview do candidato aprovados, sem homologação |
+| Worktree | Caminho histórico /private/tmp/bs-retomada-funcional-01/worktree; não acessado nesta revisão remota; descobrir worktrees no ambiente novo |
+| Branch | Origem deste documento: docs/retomada-funcional-01 (#117); verificar main remota depois da integração |
+| Base | Main conferida antes do fechamento: 75c47cd9a30e4888b197ca6ae27aa236c71ec589 |
+| HEAD validado | Main-base 75c47cd9a30e4888b197ca6ae27aa236c71ec589 e #119 candidato 48a12187ea3562775656dce1b1b767b9e893b426; consultar HEAD #117 e checks próprios |
+| Alterações não commitadas | Não inspecionadas remotamente nos worktrees locais da conta anterior; nunca presumir que inexistem. Documentação deste fechamento versionada na branch #117 |
+| PR | #117 documentação a consolidar; #119 composição técnica Draft; #118 sobreposto pela 050 do #119; #111/#112 históricos Draft |
+| Ambiente-alvo | Somente documentação GitHub/CI e Preview automático da branch; sem escrita no HML ou Production |
+| Última ação comprovada | #117 reconciliado com estado #119, sem modificação de app/SQL/configuração; conferir checks do HEAD final antes do squash |
+| Próxima ação exata | Integrar apenas #117 após CI verde e confirmar novo SHA main; nova conta revalidar #119 e preparar preflight HML com autorização separada |
+
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
@@ -24,6 +41,18 @@
 | Pendências comerciais | C1–C6 (fallback da 048, vigência/reajustes, categorias, custo do avulso, modalidades/unidades, sábado); consultar matriz; resolução comercial OFF até decisão própria |
 | Prioridade de produto | Finalizar núcleo operacional/financeiro para primeiro piloto; não reabrir automações e auditorias gerais desnecessárias |
 
+## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | Fechar documentação e transferência entre contas, revisando #117 com o PR técnico #119 |
+| Resultados e testes comprovados | Diferenças documentais e referências ao #119 conferidas no GitHub; CI nova do #117 deve ser PASS no HEAD final, não transferir evidência do commit anterior |
+| Código e PR afetados | Apenas os seis documentos do #117; #119, #118 e #111/#112 não alterados |
+| Ambientes envolvidos | GitHub PR/Actions/Preview documental; nenhuma escrita no Supabase HML ou Production |
+| Pendências e decisões | #119 sem merge/homologação HML; preflight e C1–C6 pendentes, controlador OFF, Gates automáticos 3–5 pausados |
+| Próxima ação exata | Revalidar checks e integrar documental #117 autorizado; após transferência, analisar #119 e planejar HML somente leitura |
+| Autorizações e proibições | Somente revisão e squash documental #117 após aprovação da CI; vedados merges funcionais, migrations remotas, Production ou ativação automática |
+
 ## Próxima ação exata, na conta nova
 
 1. Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, [NEGOCIO.md](NEGOCIO.md), [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md) e o [manifesto do #119](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md).
@@ -37,6 +66,18 @@
 - **Nenhuma senha/token/`.env` real no Git.** Credenciais e permissões para GitHub, Vercel e Supabase precisam ser configuradas separadamente na outra conta; ambientes existentes não devem ser recriados.
 - CI SUCCESS, Preview READY, migration aplicada, feature flag ON, HML homologado e Production liberada são estados distintos.
 - `docs/ESTADO_DO_PROJETO.md` e as seções posteriores deste HANDOFF preservam **histórico datado**, não instruções vigentes. Esta seção de retomada prevalece sobre tarefas antigas em seus textos.
+
+## Autorizações
+
+A autorização desta etapa é **exclusivamente documental**: reconciliar e integrar o #117 após revisar diff e checks. Não se estende ao #119, ao #118, ao #111/#112 nem aos ambientes. A nova conta deve pedir aprovação própria para ações posteriores.
+
+## Proibições
+
+Sem merge funcional, SQL remoto, alteração em Production, segredos no Git, resolução de tarifas ON, criação de outro Supabase ou execução dos Gates 3–5 do checkpoint automático. PR Draft e Preview não equivalem a produção.
+
+## Retomada
+
+Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, `docs/NEGOCIO.md`, `docs/NEGOCIO_X_SISTEMA.md` e o manifesto do #119; conferir refs, branches, CI, configuração dos ambientes e trabalho local não publicado. Apresentar check-up e próxima tarefa antes de executar operações remotas. As seções históricas abaixo não transferem autorização.
 
 ## Evidência automática de Preview
 
