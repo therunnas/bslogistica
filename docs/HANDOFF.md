@@ -2,40 +2,41 @@
 
 <!-- workflow-handoff:v1 -->
 
-**FUNC-03 — Documentação / Desenvolvimento isolado.** Publicação autorizada dos
-ajustes FUNC-02 exclusivamente no #117 Draft. Esta branch permanece documental;
-a composição técnica 046–050 usa branch própria criada da main reconferida.
-Nenhum merge, migration remota, homologação HML ou ativação comercial autorizado.
-Controlador OFF, main:false preservado; Gates 3–5 PAUSADOS.
+**TRANSFERÊNCIA ENTRE CONTAS — FUNC-03 concluída como candidato técnico, ainda sem integração funcional ou homologação.** Este é o ponto de entrada da nova conta Claude Code. Primeiro conferir GitHub, `origin/main` e os PRs; SHAs abaixo são evidências de 09/11/2026, não estados permanentes. Continuar o desenvolvimento a partir do repositório, sem depender de conversas antigas.
 
-## Identificação
+## Estado atual para retomada
 
-| Campo | Valor |
+| Campo | Estado comprovado / referência |
 | --- | --- |
-| Etapa | FUNC-03 — publicação documental FUNC-02 e preparação técnica separada |
-| Gate atual | Publicação documental autorizada no #117; composição 046–050 em branch/PR próprios, sem merge ou HML |
-| Último gate concluído | FUNC-02: parecer, conflitos simulados e roteiro HML OFF preparados; FUNC-01 publicou #117/#118, com CI/Preview próprios |
-| Worktree | /private/tmp/bs-retomada-funcional-01/worktree; originais FUNC-02 preservados fora do Git; demais worktrees e três docs AUTO-10 intactos |
-| Branch | docs/retomada-funcional-01, exclusivamente os seis documentos do #117 |
-| Base | Main remota 75c47cd9a30e4888b197ca6ae27aa236c71ec589 reconferida; nenhuma mudança direta na main |
-| HEAD validado | #117 anterior 73a3f35b2dca871e92b2623e84790c3b36308330; alterações documentais revisadas no working tree. Consultar HEAD/CI/Preview do commit que contém este checkpoint |
-| Alterações não commitadas | Cinco ajustes locais FUNC-02 preservados/revistos: NEGOCIO novo, matriz, HANDOFF, ESTADO e PROGRESS. Diff total contra main contém seis documentos, incluindo CHECKPOINT_AUTOMATICO já publicado; conferir status após commit/push |
-| PR | #117 Draft documental; #118 fc51b54c978ac3042f96fb763cb21ab379231490 preservado; #111 7e08270011f74ea5dfe4470097f58659eea81140 e #112 2d1c0cde7bd47154a281171d77858b530d0b6de2 Draft preservados |
-| Ambiente-alvo | Git local, GitHub/CI e Preview Git automático; nenhuma operação HML/Supabase remoto ou Production |
-| Última ação comprovada | NEGOCIO.md byte idêntico ao #112; cinco ajustes preservados, históricos e limites revistos. Validações documentais pertinentes antes do commit; CI/Preview novos exigem consulta por SHA |
-| Próxima ação exata | Conferir publicação/CI/Preview do novo HEAD #117; preparar e testar 046–050/consumidores em branch isolada da main e publicar Draft técnico próprio, sem merge |
+| Projeto | Painel interno BS Soluções Logísticas, repo `therunnas/bslogistica`; site institucional é OUTRO repositório |
+| Main antes deste merge documental | `75c47cd9a30e4888b197ca6ae27aa236c71ec589` — confirmar novo HEAD após squash do #117 |
+| Documento de negócio | [NEGOCIO.md](NEGOCIO.md), portado do #112 sem alteração de regra |
+| Matriz de negócio e decisões | [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md): 17 itens, decisões C1–C6 pendentes |
+| #117 | [Documentação](https://github.com/therunnas/bslogistica/pull/117), fonte deste checkpoint; conferir no GitHub se já integrado |
+| #119 | [Composição técnica](https://github.com/therunnas/bslogistica/pull/119) **Draft NÃO mergeado** no HEAD `48a12187ea3562775656dce1b1b767b9e893b426`; 66 arquivos e migrations 046–050, consumidores, testes e [manifesto HML](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md) |
+| #118 | [Correção de pedido no mesmo dia](https://github.com/therunnas/bslogistica/pull/118) Draft, HEAD `fc51b54c978ac3042f96fb763cb21ab379231490`; 050 já incorporada seletivamente ao #119. **Não integrar duas vezes** |
+| #111 / #112 | [Release candidata](https://github.com/therunnas/bslogistica/pull/111) e [documentação anterior](https://github.com/therunnas/bslogistica/pull/112), Drafts antigos com conflitos; não copiar checkpoints históricos nem fazer merge por arrasto |
+| Testes FUNC-03 | Relatório do #119: 72 suítes Node, 51 SQL locais / 55 versões, concorrência 128+41 asserções, lint, TypeScript, build; checks GitHub `validar` e `sql-local` SUCCESS no HEAD acima. **Não equivalem a homologação HML** |
+| Migrations na main | Até 045; 046–050 existem **somente no candidato #119** até aprovação/merge |
+| Ambientes reais | Preview, HML e Production já existem: [AMBIENTES.md](AMBIENTES.md). Último registro documental de schema: HML 045, Production 034; **revalidar somente leitura antes de agir** |
+| Production | `vercel.json` mantém `git.deploymentEnabled.main:false`; relatório FUNC-03 não identificou novo deploy Production. Não presumir homologação |
+| Checkpoint automático | Controlador instalado, **OFF** (`false &&`, `--dry-run`, permissões de leitura e flag OFF); Gates 3–5 **do checkpoint automático** pausados |
+| Pendências comerciais | C1–C6 (fallback da 048, vigência/reajustes, categorias, custo do avulso, modalidades/unidades, sábado); consultar matriz; resolução comercial OFF até decisão própria |
+| Prioridade de produto | Finalizar núcleo operacional/financeiro para primeiro piloto; não reabrir automações e auditorias gerais desnecessárias |
 
-## Última tarefa
+## Próxima ação exata, na conta nova
 
-| Campo | Valor |
-| --- | --- |
-| Tarefa executada | FUNC-03 fase documental: revisar e publicar os ajustes FUNC-02 no #117, com NEGOCIO seletivo idêntico ao #112, matriz e roteiro 046–050 sem checkpoints históricos ativos |
-| Resultados e testes comprovados | FUNC-02 já comprovou check:workflow/test:workflow 8/8, links, 17 itens, diff --check e preservação. FUNC-03 repete as verificações documentais do conjunto atualizado antes de publicar; consultar CI/Preview no novo HEAD, não herdar aprovação anterior. Nenhum teste SQL/Node funcional novo por esta publicação documental |
-| Código e PR afetados | #117: seis documentos no diff total; cinco ajustes locais. Sem app, SQL, dependências, auth, vercel.json ou workflow executável. #111/#112/#118 inalterados |
-| Ambientes envolvidos | GitHub/CI e Preview automático; fontes de negócio do #112 por SHA. Sem banco remoto ou infraestrutura nova |
-| Pendências e decisões | Composição 046–050, consumidores 047/049, inventários 55 e testes próprios ainda precisam da branch técnica. 048 instalada OFF é decisão A, ativação comercial é decisão B. C1–C6 continuam pendentes; schema HML045/Production034 são últimos registros, não reconsultados |
-| Próxima ação exata | Consultar SHA/CI/Preview #117 sem commit recursivo só de checks; seguir na branch técnica da main para testes locais completos e Draft próprio, mantendo resolução comercial OFF e checkpoint atual |
-| Autorizações e proibições | FUNC-03 autoriza commit/push normal só documental no #117 e composição/testes/publicação em Draft técnico separado. Sem merge, migration remota, dados reais, Production, ativação comercial/controlador ou Gates 3–5. Não alterar #118 original |
+1. Abrir `CLAUDE.md`, `AGENTS.md`, este HANDOFF, `PROGRESS.md`, [NEGOCIO.md](NEGOCIO.md), [NEGOCIO_X_SISTEMA.md](NEGOCIO_X_SISTEMA.md) e o [manifesto do #119](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md).
+2. Revalidar `main`, PRs, reviews, CI e a situação real de HML/Production **sem escrita**. Descobrir worktrees locais existentes; trabalho apenas local da conta anterior não é recuperável por clone novo.
+3. Apresentar check-up breve da composição #119 e plano de preflight HML existente: identidade/catálogo reais, backup novo com restauração comprovada, janela, Preview vinculado corretamente e testes com resolução comercial **OFF**.
+4. **Pedir autorização separada** antes de qualquer merge do #119, migration remota, alteração de dados, ativação comercial ou deploy Production. Evitar PR duplicado da 050; decidir tratamento dos Drafts históricos.
+5. A cada tarefa concluída, atualizar este HANDOFF com resultado, SHA/PR, testes, ambiente, bloqueios e próxima ação; incluir no commit/push **da tarefa autorizada**, sem criar PR apenas para checkpoint.
+
+## Segurança e limites da transferência
+
+- **Nenhuma senha/token/`.env` real no Git.** Credenciais e permissões para GitHub, Vercel e Supabase precisam ser configuradas separadamente na outra conta; ambientes existentes não devem ser recriados.
+- CI SUCCESS, Preview READY, migration aplicada, feature flag ON, HML homologado e Production liberada são estados distintos.
+- `docs/ESTADO_DO_PROJETO.md` e as seções posteriores deste HANDOFF preservam **histórico datado**, não instruções vigentes. Esta seção de retomada prevalece sobre tarefas antigas em seus textos.
 
 ## Evidência automática de Preview
 

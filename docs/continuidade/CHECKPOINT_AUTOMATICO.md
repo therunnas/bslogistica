@@ -11,11 +11,11 @@ BS. Gate 1/2 preservados; Gates 3, 4 e 5 PAUSADOS, não concluídos. Não execut
 protocolo futuro abaixo sem nova solicitação explícita. Manter false &&,
 contents: read, --dry-run e CHECKPOINT_AUTO_ENABLED OFF; nenhum workflow removido.
 A continuidade passa pelo HANDOFF escrito pelo agente no conjunto publicado
-com a autorização vigente. A FUNC-01 autoriza a publicação dos cinco documentos
-da retomada em PR documental Draft próprio; o merge #116 não incluiu estas novas
-alterações. A correção funcional do item7 é desenvolvida em branch/PR separados,
-sem conceder autorização de ativação ou de Gates 3–5. Consultar CI e Preview pelo
-HEAD de cada PR, sem commit recursivo somente para atualizar status.
+com a autorização vigente. O #117 contém os seis documentos da retomada e da
+transferência; conferir no GitHub o estado de integração do PR. A correção do item 7
+e as migrations 046–050 estão no #119 Draft, **não** na main até merge autorizado.
+Nenhum desses PRs autoriza ativação do controlador ou Gates 3–5.
+Consultar CI e Preview pelo HEAD de cada PR, sem commit recursivo somente para atualizar status.
 
 ## Após cada tarefa
 

@@ -5,6 +5,16 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## TRANSFERÊNCIA ENTRE CONTAS — ponto de retomada (09/11/2026)
+
+FUNC-03 completada no escopo de **preparação local e publicação em PR Draft**, sem integração funcional ou migrações remotas. O #117 traz seis documentos de negócio/continuidade; é o candidato documental autorizado para squash após reconciliação/checks. A main antes desse squash está em `75c47cd9a30e4888b197ca6ae27aa236c71ec589` (reconsultar o SHA efetivo no GitHub). O ponto operacional atual é [HANDOFF.md](HANDOFF.md), não o checkpoint AUTO-12 ainda presente na main anterior.
+
+O [#119](https://github.com/therunnas/bslogistica/pull/119) Draft, HEAD `48a12187ea3562775656dce1b1b767b9e893b426`, contém composição técnica **046–050**, interfaces financeiras compatíveis, correção auditada de serviços e pedido no mesmo dia, com [manifesto e roteiro HML](https://github.com/therunnas/bslogistica/blob/48a12187ea3562775656dce1b1b767b9e893b426/docs/financeiro/composition-046-050.md). Relatório de testes: 72 suítes Node, 51 SQL / 55 versões, 128+41 asserções de concorrência, lint/TypeScript/build PASS; CI Github `validar` e `sql-local` SUCCESS no HEAD. Sem homologação HML. Migrations 046–049 coincidem com #111, 050 coincide com #118; **não integrar 050 duas vezes** nem incluir todos os 121 arquivos do #111.
+
+#111, #112 e #118 permanecem Draft e sem integração nesta etapa. `docs/NEGOCIO.md` e `docs/NEGOCIO_X_SISTEMA.md` distinguem negócio real, implementação, testes e decisões C1–C6 pendentes. Os últimos registros documentais de schema são HML 045 e Production 034, **não revalidados** neste fechamento. Pré-flight HML exige projeto/ledger reais, backup atual com restauração comprovada, janela coordenada, Preview compatível, revisão/merge próprio e autorização para cada ação. A capacidade 048 pode ser testada com resolução comercial OFF, sem ativar fallback comercial.
+
+Production não foi modificada nesta tarefa. `main:false` no Vercel e controlador automático OFF devem permanecer; Gates 3–5 do **checkpoint automático** pausados. A nova conta deve usar `CLAUDE.md` e `AGENTS.md` para invariantes, o HANDOFF para retomada, e verificar GitHub/ambientes por leitura antes de autorizar qualquer escrita. Credenciais não são transferidas por Git.
+
 ## FUNC-03 — publicação documental autorizada (09/11/2026)
 
 Base main 75c47cd9a30e4888b197ca6ae27aa236c71ec589 reconferida. Cinco ajustes locais

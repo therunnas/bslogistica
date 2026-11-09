@@ -1,11 +1,9 @@
 # Negócio × sistema — revisão RETOMADA-FUNCIONAL-01
 
-SDLC: Requisitos / Planejamento / Revisão técnica. **FUNC-03 autoriza publicar
-os ajustes FUNC-02 no #117 Draft e preparar composição técnica em PR separado.**
+SDLC: Requisitos / Planejamento / Revisão técnica. **Referência documental de negócio para a transferência entre contas.**
 Entrada operacional única: [HANDOFF](HANDOFF.md). Os 17 itens e C1–C6 permanecem;
-item 7 corrigido/testado no #118, ainda sem integração/homologação HML.
-O plano FUNC-02 abaixo é histórico de preparação; sua publicação não autoriza
-merge, aplicação remota ou ativação comercial. Gates 3–5 PAUSADOS.
+item 7 está corrigido/testado na composição técnica [#119](https://github.com/therunnas/bslogistica/pull/119), ainda **sem merge ou homologação HML**. O #119 reúne 046–050 e consumidores compatíveis; a fonte #118 permanece Draft.
+O plano FUNC-02 abaixo é histórico de preparação e não autoriza merge, migração remota ou ativação comercial. Gates 3–5 **do checkpoint automático** PAUSADOS.
 
 [NEGOCIO.md](NEGOCIO.md) é incluído seletivamente do #112, sem alteração de texto,
 para acompanhar esta matriz na main após aprovação própria. Ele registra a prática
