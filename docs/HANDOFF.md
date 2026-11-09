@@ -23,12 +23,12 @@ Não usar este checkpoint de contenção para substituir o estado funcional do #
 | Worktree | `/private/tmp/bs-fin-20d`, worktree já isolado; descobrir novamente na retomada |
 | Branch | chore/gate1-production-deployment-guard, criada diretamente da main remota |
 | Base | 38b43490a8e0913c62a4ee6047ef48a8288ca0dc, conferida via GitHub e fetch antes de criar a branch |
-| HEAD validado | 38b43490a8e0913c62a4ee6047ef48a8288ca0dc é a base; candidato a aprovar é o HEAD publicado deste PR, a conferir na API/GitHub, sem transferir checks de outros SHAs |
-| Alterações não commitadas | Conjunto restrito: vercel.json, dois scripts Node, package.json, um step de CI e três documentos; conferir git status na retomada |
-| PR | Draft a criar contra main, exclusivamente desta branch; #111 em 7e08270011f74ea5dfe4470097f58659eea81140 e #112 em 2d1c0cde7bd47154a281171d77858b530d0b6de2 preservados |
+| HEAD validado | 75fe207b77c936123af96000471f698ec8c23ecc — código validado e publicado, CI/Preview PASS; este fechamento só documental tem HEAD/checks próprios no #113, sem transferir aprovação |
+| Alterações não commitadas | Fechamento restrito aos três documentos de continuidade, sem alteração de código após 75fe207; conferir status e remoto na retomada |
+| PR | [#113](https://github.com/therunnas/bslogistica/pull/113), aberto Draft contra main; #111 e #112 preservados nos HEADs registrados abaixo |
 | Ambiente-alvo | Local/CI e Preview automático da branch; Production somente leitura; sem HML ou Supabase |
-| Última ação comprovada | Baseline real conferida sem divergência material do AUTO-08; regra e 22 casos locais PASS; validação YAML e 69 suítes Node PASS; build PASS |
-| Próxima ação exata | Concluir publicação/checks do Draft e solicitar revisão/autorização nominal da integração do Gate 1; não fazer merge nesta sessão |
+| Última ação comprovada | Draft #113 publicado, diff remoto completo de 8 arquivos conferido; validar/sql-local PASS, Preview Git READY no código 75fe207; mesmos 43 Production/aliases/proteção; aguardando checks próprios do fechamento documental |
+| Próxima ação exata | Revisar o HEAD final do Draft #113 e obter autorização nominal da integração do Gate 1, com janela e responsável; nenhum merge autorizado |
 
 ## Última tarefa
 
@@ -38,7 +38,7 @@ Não usar este checkpoint de contenção para substituir o estado funcional do #
 | Resultados e testes comprovados | 22 casos do CLI PASS, incluindo negativos; 69 suítes Node PASS; lint PASS; tsc inicial falhou por cache do #111 e passou após preservar o cache fora do checkout; YAML válido e step novo executado, restante da CI idêntico; build PASS |
 | Código e PR afetados | Somente configuração Vercel, dois scripts de validação/teste, dois comandos npm, um step da CI e três documentos; sem src, SQL, migrations, dependências, auth ou controlador |
 | Ambientes envolvidos | Testes locais/CI sem secrets; Preview Git autorizado do Draft; Production/Vercel real somente leitura; nenhum deploy manual, banco ou homologação |
-| Pendências e decisões | Publicação/CI/Preview do candidato pendentes neste registro inicial; merge exige decisão própria. Validador não substitui proteção administrativa da branch; controlador permanece desativado no #111 e ausente da main |
+| Pendências e decisões | Código 75fe207 publicado no #113 com CI/Preview PASS; fechamento documental requer checks próprios, sem aprovação antecipada. Merge exige decisão própria. Validador não substitui proteção administrativa da branch; controlador permanece desativado no #111 e ausente da main |
 | Próxima ação exata | Revisão do HEAD final e autorização nominal da integração, com janela, checks e responsável pela resposta a falhas definidos antes de qualquer merge |
 | Autorizações e proibições | Autorizados branch da main, implementação mínima, testes, commit/push normal e PR Draft somente desta branch. Sem merge, main direta, Production, HML/Supabase, migrations, credenciais, domínios/aliases, deploy manual, bot ou gates 2–5 |
 
@@ -83,6 +83,30 @@ Não usar este checkpoint de contenção para substituir o estado funcional do #
 - Artefatos locais sanitizados/cache preservado em /private/tmp/bs-checkpoint-auto-09;
   não são checkpoint alternativo, não serão publicados nem são necessários à
   retomada. Resultados públicos finais serão registrados abaixo após criar o PR.
+
+### Publicação do Draft e fechamento do checkpoint
+
+PR [#113](https://github.com/therunnas/bslogistica/pull/113), aberto Draft contra
+main, branch chore/gate1-production-deployment-guard. Código publicado em
+`75fe207b77c936123af96000471f698ec8c23ecc`; diff remoto completo conferido: 8 caminhos e blobs idênticos
+ao conjunto local revisado, sem src/SQL/migrations/auth/lockfile/controlador.
+
+Conferência de `2026-11-09T00:36:26Z`: [CI validar e sql-local PASS](https://github.com/therunnas/bslogistica/actions/runs/42540864694),
+Vercel success. Preview `dpl_52k9hWtcAtaKdsMtjujbZ6zZQFnp`, [URL](https://bs-logistica-sistema-6avmet2mx-bslogisticas.vercel.app),
+source Git/branch/SHA corretos, target Preview/READY; recibo GitHub
+`7644201426` success. CodeRabbit não revisou por ser Draft;
+a revisão local independente não encontrou defeitos críticos/importantes.
+
+Production preservada: mesmos 43 IDs, incluindo qualquer estado retornado;
+zero novos Production, mesmo deployment servido/aliases/proteção/configuração
+e mesmos HEADs de main/#111/#112. Nenhum comando de deploy ou alteração Vercel.
+
+Este fechamento documental atende à etapa de registrar o resultado após criar o
+PR; não muda código validado. Seu próprio SHA/checks/Preview devem ser consultados
+no HEAD final do #113 e na entrega, sem emprestar PASS de 75fe207 nem fazer uma
+série recursiva de commits só para registrar checks. SHA nominal de aprovação
+será o HEAD final indicado na descrição do PR; qualquer alteração exige reaprovação.
+Gate 1 continua somente preparado, não integrado nem aplicado à main.
 
 ### Proposta de integração futura — não executar nesta sessão
 

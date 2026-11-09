@@ -27,13 +27,13 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 **CHECKPOINT-AUTO-09 — Gate 1 somente preparado em branch da main.**
 Regra main:false, validador Node e negativos em CI, sem release ou controlador.
-Publicação de Draft autorizada; merge não autorizado. Estado/checks e plano de
+[Draft #113](https://github.com/therunnas/bslogistica/pull/113) publicado; merge não autorizado. Estado/checks e plano de
 integração no [HANDOFF](docs/HANDOFF.md), único checkpoint desta linha.
 
 ### Fazer agora
 
-Concluir publicação/CI/Preview do Draft e solicitar revisão do HEAD final e
-autorização nominal de integração do Gate 1. Production preservada, contenção
+Revisar o HEAD final do Draft #113 e obter autorização nominal de integração do
+Gate 1, com janela e responsável pela resposta a falhas definidos. Production preservada, contenção
 ainda não aplicada na main. Não iniciar gates 2–5.
 
 ### Não fazer ainda
