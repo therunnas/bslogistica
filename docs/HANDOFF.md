@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**UX-AVULSA-03 — campo "Valor acordado por diária (avulsa)" desabilitado quando a operação nova tem contrato (motor ligado), em PR Draft; caminho sem contrato com valor acordado provado nas telas (localhost → HML). #120 e #121 mesclados.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
+**UX-FATURA-01 — "Gerar fatura" passa a abrir confirmação (cliente, período, apontamentos, adicionais, total e aviso de imutabilidade) antes de emitir, em PR Draft. #120, #121 e #122 mesclados.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | UX-AVULSA-03 — Gate 1/2, desenvolvimento e validação local/CI |
-| Gate atual | Gate 2: PR Draft com validação local e no navegador (localhost → HML, dados `HOMOLOG-SINT-AV2`, sem fatura); CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
-| Último gate concluído | #121 (UX-AVULSA-02 + botão escondido + HML-AVULSO-01) mesclado por squash em `0db831f58b80ed3e900ef1f855288530c9eee20a`, árvore idêntica a `477f426` |
-| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-valor` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar), `...\bslogistica-ux-avulsa` e `...\bslogistica-ux-menu` (branches mescladas). Descobrir de novo na retomada |
-| Branch | `ux/operacao-avulsa-valor-acordado`, criada de `origin/main` |
-| Base | main `0db831f58b80ed3e900ef1f855288530c9eee20a` |
-| HEAD validado | 0db831f58b80ed3e900ef1f855288530c9eee20a + o diff deste commit (formulário de operação, suíte `testar-interfaces-vigencia` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Etapa | UX-FATURA-01 — Gate 1/2, desenvolvimento e validação local/CI |
+| Gate atual | Gate 2: PR Draft com validação local e no navegador (localhost → HML, só leitura: diálogo aberto e cancelado); CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
+| Último gate concluído | #122 (UX-AVULSA-03) mesclado por squash em `7b037723173feac1f420424f599af09be5bdf918`, árvore idêntica a `fcbb775` |
+| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-fatura` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar), `...\bslogistica-ux-avulsa`, `...\bslogistica-ux-menu` e `...\bslogistica-ux-valor` (branches mescladas). Descobrir de novo na retomada |
+| Branch | `ux/faturamento-confirmar-fatura`, criada de `origin/main` |
+| Base | main `7b037723173feac1f420424f599af09be5bdf918` |
+| HEAD validado | 7b037723173feac1f420424f599af09be5bdf918 + o diff deste commit (`painel-faturamento.tsx`, suíte `testar-interface-simples` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119, #120 e #121 mesclados |
-| Ambiente-alvo | Local, CI e HML `qbnfcmrxmssnwkhaitgd` (050) com escrita sintética `HOMOLOG-SINT-AV2` pelas telas, sem fatura. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
-| Última ação comprovada | Operação nova com contrato: campo desabilitado e limpo, com ajuda; sem contrato e R$ 150,00: vigência inicial; apontamento 8h = R$ 150,00; Fechamento "Confere" |
-| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois: tipos de serviço e modalidade de cobrança dos avulsos; plano de Production 034 → 050 com `pg_dump` e autorização nominal |
+| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#122 mesclados |
+| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) só lido pelo navegador; nenhuma fatura emitida. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
+| Última ação comprovada | Diálogo de confirmação aberto com HOMOLOG-SINT-AV2 (01–15/11, 1 apontamento, 0 adicionais, R$ 150,00), foco em Cancelar, cancelado; lista com as mesmas 7 faturas após recarregar |
+| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois: UX-FATURA-02 (rótulo "Faturado" e botões do apontamento faturado); plano de Production 034 → 050 com `pg_dump` e autorização nominal |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `0db831f` (#121 sobre `f3f846e`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| Main | `7b03772` (#122 sobre `0db831f`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-FATURA-01 (10/11/2026): na tela Faturamento, "Gerar fatura" deixa de emitir na hora e abre um `AlertDialog` de confirmação com cliente, período, quantidade de apontamentos e de adicionais incluídos, total a faturar (dados que a tela já tinha, sem consulta nova) e o aviso "A fatura emitida não pode ser alterada nem apagada." Botões "Cancelar" (foco inicial) e "Emitir fatura"; só "Emitir fatura" chama `generate.mutate()` |
+| Resultados e testes comprovados | RED → GREEN em `scripts/testar-interface-simples.mjs` (C8–C15: 8 falharam antes, 40/0 depois). Em andamento, os dois botões ficam desabilitados e o diálogo não fecha (`onOpenChange` ignora com `generate.isPending`); dupla emissão bloqueada por `emitindoRef` antes do `mutate` e `event.preventDefault()` na ação; diálogo fecha em `onSettled`. Windows, Node 26.13, sobre `7b03772` + diff: `npm run lint`, `npx tsc --noEmit`, `check:workflow`, `check:vercel-deployments`, `npm run build` e `git diff --check` PASS; 69/72 `test:*`, as 3 de ambiente com contagens idênticas (`calendario-runners` 10/13, `workflow` 7/1, `vercel-deployments` 0/22). Navegador (app do worktree em `localhost:3001`, CSP → `qbnfcm…`, admin, só leitura): HOMOLOG-SINT-AV2, 01–15/11, total R$ 150,00 → "Gerar fatura" abriu "Emitir fatura?" com Cliente HOMOLOG-SINT-AV2, Período 01/11/2026 a 15/11/2026, Apontamentos 1, Adicionais 0, Total a faturar R$ 150,00, o aviso e foco em Cancelar; cancelado: diálogo fechado, 7 faturas antes e depois (também após recarregar), nenhuma do HOMOLOG-SINT-AV2, total a faturar segue R$ 150,00 |
+| Código e PR afetados | `src/app/(painel)/faturamento/painel-faturamento.tsx`, `scripts/testar-interface-simples.mjs`, `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci`, `next dev` na 3001 lendo o `.env` existente sem alterá-lo, encerrado) e CI. HML só lido: nenhuma escrita, nenhuma fatura emitida. Production, banco, RPC `gerar_fatura`, cálculo, `billing.ts`, `.env` intocados. `AGENTS.md` reescrito pelo `next dev`: restaurado, fora do commit. Prints no scratchpad da sessão (`ux-fatura/prints`) |
+| Pendências e decisões | UX-FATURA-02: apontamento faturado sem rótulo "Faturado", folha "Aberto" e "Salvar"/"Fechar dia" habilitados. Observação: em tela estreita o rodapé do diálogo empilha "Emitir fatura" acima de "Cancelar" (padrão do componente); o foco inicial continua em Cancelar. Atritos anteriores e decisões de negócio dos avulsos seguem abertos |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, `painel-faturamento.tsx` e o teste estrutural, navegador só para olhar e cancelar, commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo, faturamento (RPC e regras), `billing.ts`, auth/MFA, `vercel.json`, workflows, `.env`, chave de serviço, escrita no HML, emitir fatura, Production, rótulo "Faturado" (UX-FATURA-02), merge, Ready, force push, outro PR |
+
+### Tarefa anterior — UX-AVULSA-03 (10/11/2026, #122 mesclado)
 
 | Campo | Valor |
 | --- | --- |
@@ -107,11 +119,11 @@
 
 ## Autorizações
 
-Escritas sintéticas `HOMOLOG-SINT` e `HOMOLOG-SINT-AV` (09/11/2026, com faturas) concluídas, não vigentes. #120 e #121 mesclados pelo usuário. UX-AVULSA-03 (vigente): formulário de operação e teste estrutural, escrita `HOMOLOG-SINT-AV2` pelas telas sem fatura (concluída), commit/push na branch `ux/operacao-avulsa-valor-acordado` e um PR Draft. Não se estendem a outras escritas, Production ou ativação comercial.
+Escritas sintéticas `HOMOLOG-SINT`, `HOMOLOG-SINT-AV` e `HOMOLOG-SINT-AV2` concluídas, não vigentes. #120, #121 e #122 mesclados pelo usuário. UX-FATURA-01 (vigente): `painel-faturamento.tsx` e teste estrutural, navegador só leitura no HML, commit/push na branch `ux/faturamento-confirmar-fatura` e um PR Draft. Não se estendem a escritas, Production ou ativação comercial.
 
 ## Proibições
 
-Sem deploy ou migration em Production, nova escrita no HML, emissão de fatura, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, apagar rotas/ações/dados de containers, merge ou Ready do PR da UX-AVULSA-03 sem autorização nominal.
+Sem deploy ou migration em Production, escrita no HML, emissão de fatura, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, apagar rotas/ações/dados de containers, merge ou Ready do PR da UX-FATURA-01 sem autorização nominal.
 
 ## Retomada
 
