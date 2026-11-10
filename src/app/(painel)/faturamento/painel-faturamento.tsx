@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   Clock3,
@@ -17,6 +17,16 @@ import { PageHeader } from "../_components/app-shell";
 import { AdicionaisDoPeriodo } from "./adicionais";
 import { ArredondamentoAcumulado } from "./arredondamento";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -283,6 +293,23 @@ export function PainelFaturamento() {
     },
   });
 
+  // A fatura emitida é imutável: "Gerar fatura" só abre a confirmação. A emissão acontece em
+  // "Emitir fatura", uma vez; a trava cobre dois cliques no mesmo instante, antes de isPending.
+  const [confirmarFatura, setConfirmarFatura] = useState(false);
+  const cancelarFaturaRef = useRef<HTMLButtonElement>(null);
+  const emitindoRef = useRef(false);
+
+  function emitirFatura() {
+    if (emitindoRef.current || generate.isPending) return;
+    emitindoRef.current = true;
+    generate.mutate(undefined, {
+      onSettled: () => {
+        emitindoRef.current = false;
+        setConfirmarFatura(false);
+      },
+    });
+  }
+
   function exportCsv() {
     if (!exibicao.podeAgir) return;
 
@@ -350,7 +377,7 @@ export function PainelFaturamento() {
             <Button
               type="button"
               className="h-10 rounded-xl"
-              onClick={() => generate.mutate()}
+              onClick={() => setConfirmarFatura(true)}
               disabled={semNadaParaGerar || !exibicao.podeAgir || generate.isPending}
             >
               <FileText className="h-4 w-4" />
@@ -360,6 +387,57 @@ export function PainelFaturamento() {
           </div>
         }
       />
+
+      <AlertDialog
+        open={confirmarFatura}
+        onOpenChange={(aberto) => {
+          if (!generate.isPending) setConfirmarFatura(aberto);
+        }}
+      >
+        <AlertDialogContent
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            cancelarFaturaRef.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Emitir fatura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Confira os dados antes de emitir. A fatura emitida não pode ser alterada nem apagada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">Cliente</dt>
+            <dd className="font-medium">{clientName(selectedClient)}</dd>
+            <dt className="text-muted-foreground">Período</dt>
+            <dd className="font-medium">
+              {dateBR(start)} a {dateBR(end)}
+            </dd>
+            <dt className="text-muted-foreground">Apontamentos</dt>
+            <dd className="font-medium">{period.length}</dd>
+            <dt className="text-muted-foreground">Adicionais</dt>
+            <dd className="font-medium">{adicionaisElegiveis.length}</dd>
+            <dt className="text-muted-foreground">Total a faturar</dt>
+            <dd className="font-semibold">{brl(totalAFaturar)}</dd>
+          </dl>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel ref={cancelarFaturaRef} disabled={generate.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={generate.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                emitirFatura();
+              }}
+            >
+              {generate.isPending ? "Emitindo..." : "Emitir fatura"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardContent className="grid gap-4 p-5 md:grid-cols-3">
