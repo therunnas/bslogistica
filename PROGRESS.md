@@ -25,23 +25,70 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**TRANSFERÊNCIA DE CONTA — documentação de retomada.** A FUNC-03 terminou como **composição local/CI aprovada**, publicada no [PR #119](https://github.com/therunnas/bslogistica/pull/119) Draft (HEAD `48a12187ea3562775656dce1b1b767b9e893b426`). O PR #117 incorpora o modelo real de negócio e esta transferência documental; conferir se já foi integrado. O [HANDOFF](docs/HANDOFF.md) é o ponto de entrada da nova conta.
+**DOC-01 — alinhar este arquivo ao estado real depois de #119–#123.** Os PRs
+[#119](https://github.com/therunnas/bslogistica/pull/119) a
+[#123](https://github.com/therunnas/bslogistica/pull/123) foram mesclados por squash
+na `main` (`c6f91305c2d88048adc31387f9966b02aa48ef86`). O ponto de entrada da
+próxima sessão continua sendo o [HANDOFF](docs/HANDOFF.md).
 
 ### Situação
 
-- #119: 046–050 e consumidores compatíveis, 66 arquivos, 72 suítes Node e 51 SQL locais relatadas; CI e Preview do candidato aprovados. **NÃO mergeado nem homologado no HML.**
-- #118: correção da 050 já incorporada ao #119; evitar duplicidade. #111/#112 antigos: Draft, não integrar por arrasto.
-- `main` antes do #117: `75c47cd9a30e4888b197ca6ae27aa236c71ec589`; reconsultar GitHub após integração documental.
-- Supabase HML e Production existentes; últimos registros HML 045/Production 034, sem reconfirmação nesta transferência. Resolução comercial OFF.
-- Checkpoint automático OFF; Gates 3–5 **da automação** pausados. Production protegida com `main:false`.
+- `main` em `c6f9130`, com migrations até a **050** (`20261117120000`). Nenhum PR aberto.
+- Integrado na `main`, nesta ordem:
+  - [#119](https://github.com/therunnas/bslogistica/pull/119) (`6fd2632`): migrations
+    046–050 e consumidores compatíveis (FUNC-03);
+  - [#120](https://github.com/therunnas/bslogistica/pull/120) (`f3f846e`): rótulos da
+    operação avulsa sem "carga e descarga";
+  - [#121](https://github.com/therunnas/bslogistica/pull/121) (`0db831f`): Containers sai
+    do menu e do cartão da operação; serviço pontual vira operação avulsa;
+  - [#122](https://github.com/therunnas/bslogistica/pull/122) (`7b03772`): com contrato, o
+    valor acordado vem do contrato (campo desabilitado na operação nova);
+  - [#123](https://github.com/therunnas/bslogistica/pull/123) (`c6f9130`): confirmação
+    antes de gerar fatura.
+- **HML** (`qbnfcmrxmssnwkhaitgd`): na **050** desde 09/11/2026, com
+  `tarifas_por_funcao=false` e `vigencia_ativa=true`; resolução comercial OFF.
+- **Homologação de telas** em localhost → HML, PASS até 10/11/2026: os 9 cenários da
+  matriz curta, o fluxo avulso de ponta a ponta e a operação avulsa sem contrato com
+  valor acordado. O HML guarda dados sintéticos `HOMOLOG-SINT`, `-AV` e `-AV2` (com
+  duas faturas emitidas), a limpar em tarefa própria.
+- **Production** (`ehkduqokntemtmqzdrbd`): na **034**, não tocada; `vercel.json`
+  mantém `main:false`, sem deployment de Production a partir desses merges.
+- Checkpoint automático OFF; Gates 3–5 **da automação** pausados.
+- `npm audit` (lockfile, 10/11/2026): 12 vulnerabilidades **moderadas**, 0 altas e 0
+  críticas, todas em `glob`/`minimatch` via `typescript-eslint` (lint) e
+  `@sentry/nextjs` (plugin de build). Sem exposição a dados de usuário em runtime;
+  risco prático baixo. A correção exige trocar versões de ferramentas de build: dívida
+  técnica de baixa prioridade, em PR próprio depois do piloto. **Nunca**
+  `npm audit fix --force`.
 
 ### Próxima etapa
 
-**Após a transferência**, novo Claude Code deve fazer check-up somente leitura de `main`, #119 e ambientes, revisar preflight HML (identidade, catálogo, backup/restauração, janela, Preview compatível) e solicitar autorização específica antes de qualquer merge ou SQL remoto. Prioridade: liberar o núcleo financeiro/operacional em HML para testes reais e piloto. Decisões comerciais C1–C6 na [matriz](docs/NEGOCIO_X_SISTEMA.md).
+Fila acordada com o responsável, nesta ordem; cada item com autorização própria:
+
+1. **DOC-01** — esta tarefa: alinhar `PROGRESS.md` e `HANDOFF.md` ao estado real.
+2. **Auditoria do código e roteiro de limpeza do HML para a 050**, a partir da branch
+   `origin/docs/hml-limpeza-runbook`.
+3. **Limpar o HML** e o responsável testar manualmente do zero.
+4. **Ajustes do teste manual**, incluindo a UX-FATURA-02 (rótulo "Faturado" e botões
+   do apontamento faturado).
+5. **Production**: backup `pg_dump` novo e migrations 035–050, **só com autorização
+   nominal**.
+6. **Piloto.**
+
+Decisões de negócio em aberto, que não bloqueiam a fila com a resolução comercial OFF:
+
+- serviços avulsos: lista de tipos de serviço, modalidade de cobrança (diária, por
+  unidade ou valor fechado como adicional) e pagamento da equipe por pessoa ou rateio;
+- Dynamis: intervalo do dia útil, saída antecipada e sábados acima de 4h;
+- C1–C6 da [matriz](docs/NEGOCIO_X_SISTEMA.md).
 
 ### Não fazer ainda
 
-Sem merge funcional, migrations remotas, Production, dados reais, resolução comercial ON, novo Supabase, ativação do controlador ou Gates 3–5 automáticos. Não duplicar o trabalho do #119 nem confundir Preview com homologação.
+Sem migrations ou deploy em Production, resolução comercial ON, dados reais, novo
+Supabase, ativação do controlador ou Gates 3–5 automáticos. Sem escrita no HML fora
+da tarefa de limpeza autorizada. Sem `npm audit fix`, `npm update` ou troca de versões
+fora do PR próprio de dependências. Não confundir CI verde ou Preview com homologação,
+nem merge com autorização de Production.
 
 ### Fila funcional herdada da main — histórico, não tarefa ativa
 
@@ -112,7 +159,7 @@ de encerramento ou pausa com motivo.
 | Hardening de grants de `admin_audit_log` (`018`)   | menor privilégio na tabela de auditoria                                                              |
 | Baseline e CI                                      | Next.js atualizado, testes estruturais alinhados, CI no GitHub Actions                               |
 | Cabeçalhos e CSP                                   | CSP com nonce em enforcement, fontes auto-hospedadas, contraste do login                             |
-| Dependências                                       | `npm audit` zerado                                                                                   |
+| Dependências                                       | `npm audit` em 10/11/2026: 12 moderadas, 0 altas/críticas (glob/minimatch em ferramentas de build)   |
 
 ## Matriz E2E de acesso — pendente
 

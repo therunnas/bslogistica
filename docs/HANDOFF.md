@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**UX-FATURA-01 — "Gerar fatura" passa a abrir confirmação (cliente, período, apontamentos, adicionais, total e aviso de imutabilidade) antes de emitir, em PR Draft. #120, #121 e #122 mesclados.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
+**DOC-01 — `PROGRESS.md` alinhado ao estado real depois de #119–#123 (todos mesclados), em PR Draft. Production na 034, HML na 050, resolução comercial OFF.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | UX-FATURA-01 — Gate 1/2, desenvolvimento e validação local/CI |
-| Gate atual | Gate 2: PR Draft com validação local e no navegador (localhost → HML, só leitura: diálogo aberto e cancelado); CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
-| Último gate concluído | #122 (UX-AVULSA-03) mesclado por squash em `7b037723173feac1f420424f599af09be5bdf918`, árvore idêntica a `fcbb775` |
-| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-fatura` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar), `...\bslogistica-ux-avulsa`, `...\bslogistica-ux-menu` e `...\bslogistica-ux-valor` (branches mescladas). Descobrir de novo na retomada |
-| Branch | `ux/faturamento-confirmar-fatura`, criada de `origin/main` |
-| Base | main `7b037723173feac1f420424f599af09be5bdf918` |
-| HEAD validado | 7b037723173feac1f420424f599af09be5bdf918 + o diff deste commit (`painel-faturamento.tsx`, suíte `testar-interface-simples` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Etapa | DOC-01 — Gate 1/2, documentação |
+| Gate atual | Gate 2: PR Draft só de documentação; CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
+| Último gate concluído | #123 (UX-FATURA-01) mesclado por squash em `c6f91305c2d88048adc31387f9966b02aa48ef86`, árvore idêntica a `8676bdd` |
+| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-docs-progress` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-ux-*` (branches mescladas). Descobrir de novo na retomada |
+| Branch | `docs/progress-estado-atual`, criada de `origin/main` |
+| Base | main `c6f91305c2d88048adc31387f9966b02aa48ef86` |
+| HEAD validado | c6f91305c2d88048adc31387f9966b02aa48ef86 + o diff deste commit (`PROGRESS.md` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#122 mesclados |
-| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) só lido pelo navegador; nenhuma fatura emitida. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
-| Última ação comprovada | Diálogo de confirmação aberto com HOMOLOG-SINT-AV2 (01–15/11, 1 apontamento, 0 adicionais, R$ 150,00), foco em Cancelar, cancelado; lista com as mesmas 7 faturas após recarregar |
-| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois: UX-FATURA-02 (rótulo "Faturado" e botões do apontamento faturado); plano de Production 034 → 050 com `pg_dump` e autorização nominal |
+| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#123 mesclados; nenhum outro PR aberto |
+| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) e Production `ehkduqokntemtmqzdrbd` (034) não tocados |
+| Última ação comprovada | `PROGRESS.md` reescrito nas seções "Tarefa ativa única", "Situação", "Próxima etapa" e "Não fazer ainda", e na linha "Dependências"; fatos conferidos no Git |
+| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois, item 2 da fila: auditoria do código e roteiro de limpeza do HML para a 050 (`origin/docs/hml-limpeza-runbook`) |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `7b03772` (#122 sobre `0db831f`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| Main | `c6f9130` (#123 sobre `7b03772`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)); confirmação antes de gerar fatura ([#123](https://github.com/therunnas/bslogistica/pull/123)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | DOC-01 (10/11/2026): alinhar `PROGRESS.md` ao estado real depois de #119–#123. Reescritas as seções "Tarefa ativa única", "Situação", "Próxima etapa" e "Não fazer ainda", e a linha "Dependências" de "Marcos concluídos"; incluída a fila acordada com o responsável. Histórico preservado |
+| Resultados e testes comprovados | Fatos conferidos por leitura: `git log origin/main` (`6fd2632` #119, `f3f846e` #120, `0db831f` #121, `7b03772` #122, `c6f9130` #123; `cad9f51` é o #117, mesclado; #118 fechado sem merge); 55 migrations, a última `20261117120000_050`; API do GitHub: 0 PRs abertos; `origin/docs/hml-limpeza-runbook` existe (`169f592`). HML 050 e flags pelo registro verificado de 09/11/2026 (não reconsultado: sem consulta ao banco nesta tarefa). `npm audit --json` (somente leitura) sobre o lockfile: 12 moderadas, 0 altas, 0 críticas, em `glob`/`minimatch` via `typescript-eslint` e `@sentry/*`. Validação: `check:workflow` PASS (inclusive `--base c6f9130 --head` do commit), links locais pelo validador, Prettier de `PROGRESS.md` PASS, `git diff --check` PASS. O HANDOFF já não passava no Prettier antes desta tarefa; não foi reformatado inteiro (fora do escopo) |
+| Código e PR afetados | Apenas `PROGRESS.md` e `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci` sem alterar `package.json`/lockfile) e CI. Nenhum código, script, dependência, banco, migration, workflow, `vercel.json`, `.env`, HML ou Production tocado |
+| Pendências e decisões | Fila: (2) auditoria do código e roteiro de limpeza do HML para a 050; (3) limpar o HML e teste manual do zero; (4) ajustes do teste manual, incluindo UX-FATURA-02; (5) Production `pg_dump` + 035–050 com autorização nominal; (6) piloto. Decisões de negócio: tipos de serviço avulso, modalidade de cobrança, pagamento por pessoa ou rateio; Dynamis (intervalo do dia útil, saída antecipada, sábados acima de 4h); C1–C6. Dívida técnica: as 12 moderadas do `npm audit`, PR próprio depois do piloto, nunca `npm audit fix --force` |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, edição de `PROGRESS.md` e `docs/HANDOFF.md`, commit/push desta branch e um PR Draft. Proibidos: código, scripts, banco, migrations, dependências (`npm audit fix`, `npm update`, `package.json`/lockfile), workflows, `vercel.json`, `.env`, HML, Production, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — UX-FATURA-01 (10/11/2026, #123 mesclado)
 
 | Campo | Valor |
 | --- | --- |
@@ -119,11 +131,11 @@
 
 ## Autorizações
 
-Escritas sintéticas `HOMOLOG-SINT`, `HOMOLOG-SINT-AV` e `HOMOLOG-SINT-AV2` concluídas, não vigentes. #120, #121 e #122 mesclados pelo usuário. UX-FATURA-01 (vigente): `painel-faturamento.tsx` e teste estrutural, navegador só leitura no HML, commit/push na branch `ux/faturamento-confirmar-fatura` e um PR Draft. Não se estendem a escritas, Production ou ativação comercial.
+Escritas sintéticas `HOMOLOG-SINT`, `HOMOLOG-SINT-AV` e `HOMOLOG-SINT-AV2` concluídas, não vigentes. #119–#123 mesclados pelo usuário. DOC-01 (vigente): `PROGRESS.md` e `docs/HANDOFF.md`, commit/push na branch `docs/progress-estado-atual` e um PR Draft. Não se estendem a código, HML, Production ou ativação comercial.
 
 ## Proibições
 
-Sem deploy ou migration em Production, escrita no HML, emissão de fatura, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, apagar rotas/ações/dados de containers, merge ou Ready do PR da UX-FATURA-01 sem autorização nominal.
+Sem deploy ou migration em Production, escrita no HML, emissão de fatura, resolução de tarifas ON, dados reais, mudança de dependências, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, merge ou Ready do PR da DOC-01 sem autorização nominal.
 
 ## Retomada
 
