@@ -82,6 +82,10 @@ Nenhum procedimento deste índice presume que FIN-PR-10 esteja integrado.
 - [Reversão do motor](reversao-do-motor.md): desliga o motor pela RPC existente,
   mantendo o schema. Não equivale a remover migrations. Exige autorização,
   sessão administrativa válida, piso de MFA, motivo e controles descritos.
+- [Limpeza dos dados sintéticos do HML](limpeza-hml-sintetico.md): expurgo
+  transacional fail-closed para o HML na 050, com ensaio a seco por padrão. A
+  versão 050 ainda não foi ensaiada; execução só com backup novo restaurável,
+  ensaio local com 0 FAIL e autorização nominal.
 
 Os requisitos de backup, ensaio, catálogo e autorização são condições de uso,
 não declarações de que HML ou Production os satisfazem. Atualizações executáveis
