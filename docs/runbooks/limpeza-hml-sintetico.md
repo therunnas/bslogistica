@@ -171,6 +171,28 @@ Para desbloquear (sem autorização de escrita remota): uma máquina com Docker,
 `KEYCHAIN_ITEM=<item-do-backup-050> scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <workdir-da-stack> [porta] [impressão-do-HML]`,
 exigindo **0 FAIL** em todas as seções (A–G, inclusive C1b e C1c).
 
+**Identidade do destino antes de qualquer comando destrutivo (sessão 03).** Até o `6f4e3bb`, `reiniciar()`
+rodava `supabase db reset --local` **antes** de conferir a stack, e a conferência (só nome do container e
+porta, no `docker ps`) era um `check` que apenas somava FAIL. Agora `verificar_destino()` roda no início,
+como **primeira instrução de `reiniciar()`** (etapas A e G), de novo **depois do reset e antes da
+restauração** (o reset recria o container) e antes das seções C e D. A porta sozinha não prova nada; são
+exigidos, todos juntos:
+
+1. `<workdir>/supabase/config.toml` com **uma** linha `project_id`, igual a `bs-hml-ensaio-20b` (constante
+   do script, não argumento), e `[db] port` igual à porta informada;
+2. nenhum `SUPABASE_PROJECT_ID` no ambiente nem nos `.env`/`.env.local` do workdir (a CLI daria
+   precedência a ele sobre o `config.toml`); os comandos da CLI rodam sem `SUPABASE_ACCESS_TOKEN`,
+   `SUPABASE_PROJECT_ID` e `SUPABASE_DB_PASSWORD`;
+3. o container `supabase_db_bs-hml-ensaio-20b` existente e rodando, com o rótulo
+   `com.supabase.cli.project = bs-hml-ensaio-20b`, publicando a 5432 **só** na porta informada e sendo o
+   **único** container que publica essa porta;
+4. `supabase status --workdir <workdir> -o env` com `DB_URL` em `127.0.0.1:<porta>`;
+5. o servidor que responde em `127.0.0.1:<porta>` informa (`inet_server_addr()`) um IP desse container.
+
+Qualquer divergência, inclusive instância ausente ou parada, **encerra na hora** (código 7), sem reset,
+restauração ou escrita; não é um FAIL acumulado. O ensaio exige, portanto, que a stack `bs-hml-ensaio-20b`
+já esteja iniciada com esse `config.toml` antes de rodar.
+
 **Restauração comprovada, não só concluída.** `scripts/hml-restaurar-local.sh` não para no primeiro erro
 e termina com sucesso mesmo com erros; terminar não prova nada. O ensaio só aceita a cópia (seções A e G)
 se:
@@ -204,6 +226,20 @@ repositório) que **reprova** o HEAD `51d18f8` (20 falhas: `NOT (...)`/`NOT LIKE
 conferência, sem C1c, restauração sem comparação) e **aprova** esta versão; sem `CASCADE`; modo padrão
 `NAO`. O PostgreSQL 18 instalado aqui só tem as ferramentas de cliente (sem servidor), e não há
 `python3`: o RED/GREEN em banco, o validador da restauração e o ensaio completo **não foram executados**.
+
+Validação da guarda de destino (10/11/2026, sessão 03), **sem Docker, banco nem CLI reais**: bateria
+descartável (fora do repositório) que roda o script verdadeiro com `docker`, `supabase` e `psql`
+substituídos por stubs que só registram as chamadas (o stub de `db reset` só anota a tentativa). Na versão
+nova, **14/14**: destino correto alcança o reset só depois de todas as conferências; `project_id` errado ou
+duplicado, rótulo de outro projeto, outro container na mesma porta, banco de outro container, porta
+incompatível com o `config.toml`, porta publicada diferente, `supabase status` em outra porta, instância
+ausente, instância parada e `SUPABASE_PROJECT_ID` no ambiente ou no `.env` encerram com código 7 **sem
+alcançar o reset**; destino que muda depois do reset encerra antes da restauração. RED: o `6f4e3bb` e um
+mutante sem a guarda alcançam o reset nos 13 destinos inválidos; um mutante sem a conferência inicial
+continua protegido pela de `reiniciar()` (o caminho da etapa G). Verificação estática da ordem: um único
+`db reset`, dentro de `reiniciar()`, precedido por `verificar_destino`; restauração só depois da segunda
+conferência; chamadas `reiniciar A` e `reiniciar G`; nenhum comando remoto. Os formatos de saída reais de
+`docker` e `supabase status` **não** foram exercitados (seção 9).
 
 ## 7. Execução futura no HML (somente com a autorização da seção 8)
 
@@ -249,6 +285,10 @@ sintético e a função `e2e_s11_fn`). Autorização de leitura ou de ensaio loc
 - A versão 050 **não foi ensaiada**: sintaxe e comportamento do SQL só ficam comprovados no ensaio.
   Isso inclui a correção de `NULL` da sessão 02 e o validador da restauração (Python), escritos sem
   banco nem interpretador disponíveis.
+- A guarda de destino assume formatos reais ainda não exercitados nesta versão: rótulo
+  `com.supabase.cli.project`, saída de `docker port` (`0.0.0.0:<porta>`), `DB_URL` de `supabase status -o env`
+  e `inet_server_addr()` igual ao IP do container no Docker do Mac. Se algum divergir, o ensaio encerra com
+  código 7 sem resetar; corrigir a guarda exige revisão, nunca afrouxar para passar.
 - A lista de erros aceitos da restauração foi tirada do ensaio 045. Um stack local mais novo pode trazer
   erro diferente: o ensaio reprova, e ampliar a lista exige revisão, nunca ajuste para passar.
 - O inventário de 10/11/2026 foi lido com a RLS do admin, sem catálogo nem Auth; o preflight cobre essas

@@ -16,6 +16,16 @@
 #   - a restauração só vale se o log não tiver erro fora da lista aceita e se a impressão digital
 #     da cópia for igual à do HML tirada junto com o backup (exceto as diferenças documentadas).
 #
+# Correção de 10/11/2026 (sessão 03): IDENTIDADE DO DESTINO ANTES DE QUALQUER COMANDO DESTRUTIVO.
+#   verificar_destino() roda no início, antes de cada `supabase db reset` (dentro de reiniciar(),
+#   inclusive na etapa G), de novo depois do reset e antes da restauração, e antes das seções C e D.
+#   Exige, todos juntos (a porta sozinha não prova nada): project_id ÚNICO e igual ao do ensaio no
+#   config.toml do workdir, [db] port igual à porta, nenhum SUPABASE_PROJECT_ID no ambiente ou nos
+#   .env do workdir, o container supabase_db_<project_id> rodando com o rótulo do projeto, publicando
+#   a 5432 só nessa porta e sendo o ÚNICO que publica a porta, `supabase status` do workdir com o
+#   banco em 127.0.0.1:<porta> e o servidor que responde em 127.0.0.1:<porta> com o IP desse
+#   container. Qualquer divergência ENCERRA na hora (exit 7), sem reset, restauração ou escrita.
+#
 # Uso: KEYCHAIN_ITEM=<item-do-backup-050> \
 #      scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <diretório-do-stack-local> [porta] [impressão-do-HML]
 #   <diretório-do-stack-local>: o --workdir do `supabase start` do ensaio (project_id e portas próprios).
@@ -41,6 +51,52 @@ if [ ! -s "$ORIGEM_FP" ]; then echo "Impressão digital do HML ausente: $ORIGEM_
 cp "$ORIGEM_FP" "$OUT/origem.json"
 P=(psql -X -q -At -h 127.0.0.1 -p "$PORT" -U postgres -d postgres)
 PA=(psql -X -q -At -h 127.0.0.1 -p "$PORT" -U supabase_admin -d postgres)
+
+# Identidade do único destino aceito. Constantes de propósito: não vêm de argumento nem de ambiente.
+ENSAIO_PROJECT_ID="bs-hml-ensaio-20b"
+ENSAIO_CONTAINER="supabase_db_$ENSAIO_PROJECT_ID"
+# A CLI dá precedência a SUPABASE_PROJECT_ID sobre o config.toml: nunca herdar do ambiente.
+SB=(env -u SUPABASE_ACCESS_TOKEN -u SUPABASE_PROJECT_ID -u SUPABASE_DB_PASSWORD supabase)
+
+# Destino errado é fatal, nunca um FAIL acumulado: encerra antes de qualquer comando destrutivo.
+recusar_destino() { # motivo
+  echo "DESTINO RECUSADO ($DESTINO_MOMENTO): $1" >&2
+  echo "Nada foi resetado, restaurado ou escrito a partir deste ponto. Resumo parcial: ${PASS:-0} PASS, ${FAIL:-0} FAIL" >&2
+  exit 7
+}
+verificar_destino() { # momento
+  DESTINO_MOMENTO="$1"
+  local cfg="$WORKDIR/supabase/config.toml" n pid porta_cfg arq rodando rotulo mapa nomes status ips ipdb
+  [[ "$PORT" == 5[0-9][0-9][0-9][0-9] ]] || recusar_destino "porta fora da faixa do ensaio: $PORT"
+  [ -f "$cfg" ] || recusar_destino "workdir sem supabase/config.toml: $WORKDIR"
+  n=$(grep -cE '^[[:space:]]*project_id[[:space:]]*=' "$cfg")
+  [ "$n" = 1 ] || recusar_destino "config.toml com $n linhas project_id (esperada 1)"
+  pid=$(sed -nE 's/^[[:space:]]*project_id[[:space:]]*=[[:space:]]*"([^"]*)"[[:space:]]*(#.*)?$/\1/p' "$cfg")
+  [ "$pid" = "$ENSAIO_PROJECT_ID" ] || recusar_destino "project_id do workdir é '$pid', não '$ENSAIO_PROJECT_ID'"
+  porta_cfg=$(awk '/^[[:space:]]*\[/{s=$0; gsub(/[[:space:]]/, "", s)} s=="[db]" && /^[[:space:]]*port[[:space:]]*=/{sub(/^[^=]*=[[:space:]]*/, ""); sub(/[^0-9].*$/, ""); print; exit}' "$cfg")
+  [ "$porta_cfg" = "$PORT" ] || recusar_destino "[db] port do config.toml é '$porta_cfg', não $PORT"
+  [ -z "${SUPABASE_PROJECT_ID+x}" ] || recusar_destino "SUPABASE_PROJECT_ID definido no ambiente"
+  for arq in "$WORKDIR/.env" "$WORKDIR/supabase/.env" "$WORKDIR/.env.local" "$WORKDIR/supabase/.env.local"; do
+    if [ -e "$arq" ] && grep -qE '^[[:space:]]*(export[[:space:]]+)?SUPABASE_PROJECT_ID[[:space:]]*=' "$arq"; then
+      recusar_destino "$arq define SUPABASE_PROJECT_ID"
+    fi
+  done
+  rodando=$(docker inspect -f '{{.State.Running}}' "$ENSAIO_CONTAINER" 2>/dev/null) || recusar_destino "instância ausente: container $ENSAIO_CONTAINER não existe"
+  [ "$rodando" = true ] || recusar_destino "instância parada: $ENSAIO_CONTAINER (Running=$rodando)"
+  rotulo=$(docker inspect -f '{{index .Config.Labels "com.supabase.cli.project"}}' "$ENSAIO_CONTAINER" 2>/dev/null)
+  [ "$rotulo" = "$ENSAIO_PROJECT_ID" ] || recusar_destino "container $ENSAIO_CONTAINER com rótulo de projeto '$rotulo'"
+  mapa=$(docker port "$ENSAIO_CONTAINER" 5432/tcp 2>/dev/null)
+  [ -n "$mapa" ] || recusar_destino "container $ENSAIO_CONTAINER não publica a 5432"
+  if printf '%s\n' "$mapa" | grep -vqE ":$PORT$"; then recusar_destino "container $ENSAIO_CONTAINER publica a 5432 em outra porta: $(printf '%s' "$mapa" | tr '\n' ' ')"; fi
+  nomes=$(docker ps --filter "publish=$PORT" --format '{{.Names}}' 2>/dev/null)
+  [ "$nomes" = "$ENSAIO_CONTAINER" ] || recusar_destino "porta $PORT publicada por '$(printf '%s' "$nomes" | tr '\n' ' ')', não só por $ENSAIO_CONTAINER"
+  status=$(cd "$WORKDIR" && "${SB[@]}" status --workdir "$WORKDIR" -o env 2>/dev/null) || recusar_destino "supabase status do workdir falhou (stack não iniciada?)"
+  printf '%s\n' "$status" | grep -qE "^DB_URL=\"?postgresql://[^@]+@127\.0\.0\.1:$PORT/" || recusar_destino "supabase status do workdir não aponta o banco para 127.0.0.1:$PORT"
+  ips=" $(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' "$ENSAIO_CONTAINER" 2>/dev/null) "
+  ipdb=$("${P[@]}" -c "select host(inet_server_addr())" 2>/dev/null) || recusar_destino "nenhum banco responde em 127.0.0.1:$PORT"
+  [ -n "$ipdb" ] && [[ "$ips" == *" $ipdb "* ]] || recusar_destino "o banco em 127.0.0.1:$PORT ($ipdb) não é o container $ENSAIO_CONTAINER ($ips)"
+  echo "  destino conferido ($1): $ENSAIO_CONTAINER em 127.0.0.1:$PORT"
+}
 
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "  PASS  $1"; }
@@ -132,16 +188,21 @@ PY
   else bad "$1: cópia diverge da impressão digital do HML"; echo "Ensaio interrompido: restauração não comprovada. Resumo parcial: $PASS PASS, $FAIL FAIL"; exit 4
   fi
 }
+# Único ponto do script com `db reset`: a identidade é conferida imediatamente antes (fatal) e de
+# novo depois, antes da restauração (o reset recria o container).
 reiniciar() { # rótulo
-  (cd "$WORKDIR" && env -u SUPABASE_ACCESS_TOKEN supabase db reset --local --workdir "$WORKDIR" --yes >/dev/null 2>&1) || { echo "falha ao reiniciar o stack local"; exit 4; }
+  verificar_destino "antes do reset $1"
+  (cd "$WORKDIR" && "${SB[@]}" db reset --local --workdir "$WORKDIR" --yes >/dev/null 2>&1) || { echo "falha ao reiniciar o stack local"; exit 4; }
+  verificar_destino "depois do reset $1, antes da restauração"
   "$REPO/scripts/hml-restaurar-local.sh" "$BACKUP_DIR" "$PORT" >"$OUT/restauro.log" 2>&1 || { echo "falha na restauração"; cat "$OUT/restauro.log"; exit 4; }
   validar_restauro "$1"
 }
 LIMPAR="container_service_participants container_service_audit container_services billing_additionals invoice_items invoices timesheet_entries timesheets operation_team user_operation_access operation_location_terms operation_terms shifts operations contract_employee_rates contract_rate_terms contract_terms contracts employee_cost_terms employees clients financial_holidays financial_calendar_coverage"
 
 echo "== A. Restauração limpa e cópia isolada"
+verificar_destino "início"
 reiniciar A
-check "stack local isolado: porta $PORT, project_id do ensaio" "docker ps --format '{{.Names}} {{.Ports}}' | grep -q 'supabase_db_bs-hml-ensaio-20b.*:$PORT->'"
+ok "stack local isolado: $ENSAIO_CONTAINER, project_id e porta $PORT conferidos antes e depois do reset"
 fp base
 check "cópia restaurada: 31 tabelas, contas presentes, migrations 55 / head 050" "python3 -c \"import json;d=json.load(open('$OUT/base.json'));assert d['catalogo']['tabelas']==31 and d['auth']['users']>=1 and d['migrations']['total']==55 and d['migrations']['head']=='20261117120000'\""
 check "gatilho legado de cálculo está desabilitado na origem (1 desabilitado)" "[ \"\$(\"\${P[@]}\" -c \"select count(*) from pg_trigger where tgname='trg_timesheet_entries_calculo_financeiro' and tgenabled='D'\")\" = 1 ]"
@@ -153,6 +214,7 @@ fp seco
 check "a seco: impressão digital idêntica (inclui as contagens de todas as tabelas)" "mesmo base seco"
 
 echo "== C. Testes negativos (cada um deve ABORTAR sem alterar nada)"
+verificar_destino "antes da seção C"
 sim
 # C1 dado real misturado
 exigir "C1 preparo: marcador ainda ausente" "select count(*) from public.clients where name='Cliente Real LTDA'" 0
@@ -224,6 +286,7 @@ check "C5 rollback total: dados, gatilhos e catálogo idênticos ao início" "me
 check "C5 gatilhos voltaram ao estado original (1 desabilitado, o legado)" "[ \"\$(\"\${P[@]}\" -c \"select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid where not t.tgisinternal and c.relnamespace='public'::regnamespace and t.tgenabled<>'O'\")\" = 1 ]"
 
 echo "== D. Execução real na cópia (bs_limpeza.executar = SIM)"
+verificar_destino "antes da seção D"
 rodar "$OUT/sim.sql"; rc=$?
 check "D1 expurgo concluído (COMMIT) sem erro: $(erro1)" "[ $rc -eq 0 ] && grep -q 'EXECUTADO' '$OUT/run.out'"
 fp pos
