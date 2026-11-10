@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**HML-AVULSO-01 — cenário 10 (fluxo avulso de ponta a ponta) homologado em localhost → HML: 8 PASS, 1 PARCIAL (valor acordado na criação). UX-AVULSA-02 — item "Containers" removido do menu lateral, em PR Draft #121; o serviço de container passa a ser registrado como operação avulsa. #120 (UX-AVULSA-01) mesclado. Matriz curta de 9 cenários PASS no banco/RPC e na interface (localhost → HML).** SHAs e contagens abaixo são evidências de 09/11/2026; reconferir antes de agir.
+**UX-AVULSA-03 — campo "Valor acordado por diária (avulsa)" desabilitado quando a operação nova tem contrato (motor ligado), em PR Draft; caminho sem contrato com valor acordado provado nas telas (localhost → HML). #120 e #121 mesclados.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | HML-AVULSO-01 — Gate 5, homologação de telas (cenário 10: fluxo avulso), sobre o #121 Draft |
-| Gate atual | Gate 5 do fluxo avulso executado em localhost → HML (app do worktree em `c32a93f`); #121 segue Draft com CI validar/sql-local SUCCESS em `c32a93f`. Sem merge ou Production |
-| Último gate concluído | #120 (UX-AVULSA-01) mesclado por squash em `f3f846e23370125344e73144bf33c6c9b18c96fd` (09/11/2026 21:04 UTC); matriz curta 9/9 PASS na interface e 38/38 no banco/RPC |
-| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-menu` (git worktree). Outros: `...\bslogistica` em `claude/jolly-allen-fqechw` (HANDOFF local não commitado, conteúdo já incorporado ao #120) e `...\bslogistica-ux-avulsa` em `ux/operacoes-avulsa-rotulos` (mesclada). Descobrir de novo na retomada |
-| Branch | `ux/menu-containers-como-avulsa`, criada de `origin/main` |
-| Base | main `f3f846e23370125344e73144bf33c6c9b18c96fd` |
-| HEAD validado | c32a93ffd7d06b69b1d81972b09e7e0ab870769a (menu, CI validar/sql-local SUCCESS) + o diff deste commit (botão "Adicionar serviço de container", expectativa de teste e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
-| Alterações não commitadas | Nenhuma além deste conjunto (botão, teste e HANDOFF publicados no #121 por autorização do usuário) |
-| PR | [#121](https://github.com/therunnas/bslogistica/pull/121) Draft, HEAD `c32a93ffd7d06b69b1d81972b09e7e0ab870769a`. #120 e #119 mesclados |
-| Ambiente-alvo | HML `qbnfcmrxmssnwkhaitgd` (050) com escrita sintética `HOMOLOG-SINT-AV` pelas telas (autorizada). Production `ehkduqokntemtmqzdrbd` não tocada (034) |
-| Última ação comprovada | Fluxo avulso completo pelas telas: cliente/contrato → colaboradores → operação avulsa → equipe sem turno → apontamentos 8h/9h30 → Fechamento “Confere” → Excel do cliente → fatura R$ 456,25 imutável |
-| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD novo do #121; usuário decide sobre o campo “Valor acordado por diária (avulsa)” na criação; revisa/mescla o #121 se aprovar. Depois: plano de Production 034 → 050 com `pg_dump` e autorização nominal |
+| Etapa | UX-AVULSA-03 — Gate 1/2, desenvolvimento e validação local/CI |
+| Gate atual | Gate 2: PR Draft com validação local e no navegador (localhost → HML, dados `HOMOLOG-SINT-AV2`, sem fatura); CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
+| Último gate concluído | #121 (UX-AVULSA-02 + botão escondido + HML-AVULSO-01) mesclado por squash em `0db831f58b80ed3e900ef1f855288530c9eee20a`, árvore idêntica a `477f426` |
+| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-ux-valor` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar), `...\bslogistica-ux-avulsa` e `...\bslogistica-ux-menu` (branches mescladas). Descobrir de novo na retomada |
+| Branch | `ux/operacao-avulsa-valor-acordado`, criada de `origin/main` |
+| Base | main `0db831f58b80ed3e900ef1f855288530c9eee20a` |
+| HEAD validado | 0db831f58b80ed3e900ef1f855288530c9eee20a + o diff deste commit (formulário de operação, suíte `testar-interfaces-vigencia` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Alterações não commitadas | Nenhuma além deste conjunto |
+| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119, #120 e #121 mesclados |
+| Ambiente-alvo | Local, CI e HML `qbnfcmrxmssnwkhaitgd` (050) com escrita sintética `HOMOLOG-SINT-AV2` pelas telas, sem fatura. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
+| Última ação comprovada | Operação nova com contrato: campo desabilitado e limpo, com ajuda; sem contrato e R$ 150,00: vigência inicial; apontamento 8h = R$ 150,00; Fechamento "Confere" |
+| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois: tipos de serviço e modalidade de cobrança dos avulsos; plano de Production 034 → 050 com `pg_dump` e autorização nominal |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `f3f846e` (#120 sobre `6fd2632`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| Main | `0db831f` (#121 sobre `f3f846e`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-AVULSA-03 (10/11/2026): na tela Nova operação, com motor por vigência ligado e contrato escolhido, o campo "Valor acordado por diária (avulsa)" passa a ficar desabilitado e vazio, `agreed_amount` não vai no payload e aparece "O valor vem do contrato. Para um valor próprio deste serviço, deixe o contrato em branco." Sem contrato, segue a vigência inicial ("Cadastro inicial da operação"); edição de operação existente inalterada |
+| Resultados e testes comprovados | RED → GREEN em `scripts/testar-interfaces-vigencia.mjs` (G8b–G8g: 5 falharam antes, 157/0 depois; G8 e `testar-valores-operacao` E1 preservados, 146/0). Windows, Node 26.13, sobre `0db831f` + diff: `npm run lint`, `npx tsc --noEmit`, `check:workflow`, `check:vercel-deployments`, `npm run build` e `git diff --check` PASS; 69/72 `test:*` PASS, as 3 de ambiente com contagens idênticas (`calendario-runners` 10/13, `workflow` 7/1, `vercel-deployments` 0/22). Navegador (app do worktree em `localhost:3001`, CSP → `qbnfcm…`, admin): (a) PASS na tela — R$ 150 digitado e contrato `HOMOLOG-SINT-AV Contrato` escolhido: campo limpo e desabilitado com a ajuda; salvar NÃO executado (criaria operação além da autorizada; salvar com contrato sem valor já provado na HML-AVULSO-01), formulário cancelado. (b) PASS — `Contagem de palete - HOMOLOG-SINT-AV2`, avulsa sem contrato, R$ 150,00, 10/11/2026: cartão "Valor acordado R$ 150,00", histórico com vigência 10/11/2026 em aberto, "Informada · Cadastro inicial da operação". (c) PASS — `HOMOLOG-SINT-AV2 Colaborador 1` sem turno, 08:00–17:00/60 min = 8h00 R$ 150,00 (diária de referência R$ 150,00, "Vigência do valor acordado"), custo R$ 100,00, conferido após recarregar. (d) PASS — Fechamento 01–15/11 HOMOLOG-SINT-AV2: receita R$ 150,00, custo R$ 100,00, resultado R$ 50,00 (33,3%), conciliação "Confere" nas 6 parcelas |
+| Código e PR afetados | `src/app/(painel)/operacoes/painel-operacoes.tsx`, `scripts/testar-interfaces-vigencia.mjs`, `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci`, `next dev` na 3001 lendo o `.env` existente sem alterá-lo, encerrado) e CI. HML, escrita sintética pelas telas: cliente `HOMOLOG-SINT-AV2`, colaborador `HOMOLOG-SINT-AV2 Colaborador 1` (R$ 100 desde 01/11; criado por decisão do usuário porque os dois `HOMOLOG-SINT-AV` estavam alocados e 0 disponíveis), operação `Contagem de palete - HOMOLOG-SINT-AV2` com vigência inicial, alocação sem turno, 1 apontamento de 10/11. Nenhuma fatura; nenhum registro existente, conta, papel, Configurações, Implantação de vigências ou flag alterado. `AGENTS.md` reescrito pelo `next dev`: restaurado, fora do commit. Prints no scratchpad da sessão (`ux-avulsa-03/prints`) |
+| Pendências e decisões | Decisões de negócio dos avulsos: lista de tipos de serviço, unidade e modalidade de cobrança (diária, unidade, valor fechado como adicional), remuneração por pessoa ou rateio. Atritos já registrados (sem turno com horários vazios, "Localidade ausente" que não bloqueia, "Gerar fatura" sem confirmação, faturado sem rótulo) seguem abertos |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, formulário de operação e o teste estrutural correspondente, escrita sintética `HOMOLOG-SINT-AV2` descrita acima (sem fatura), commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo, precedência de preços, faturamento, `billing.ts`, auth/MFA, `vercel.json`, workflows, `.env`, chave de serviço, alterar registros existentes, contas, Configurações, Implantação de vigências, emitir fatura, Production, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — HML-AVULSO-01 e botão escondido (09/11/2026, #121 mesclado)
 
 | Campo | Valor |
 | --- | --- |
@@ -95,11 +107,11 @@
 
 ## Autorizações
 
-Escrita sintética `HOMOLOG-SINT` no HML pelas telas, incluindo uma fatura, autorizada e concluída em 09/11/2026, com resolução comercial OFF; não está mais vigente. UX-AVULSA-01: três textos da tela Operações, PR #120, mesclado pelo usuário em `f3f846e`. UX-AVULSA-02 (vigente): retirar o item "Containers" do menu, ajustar as expectativas de teste correspondentes, commit/push na branch `ux/menu-containers-como-avulsa` e um PR Draft. Nenhuma correção pendente de aprovação. Não se estendem a outras escritas, Production ou ativação comercial.
+Escritas sintéticas `HOMOLOG-SINT` e `HOMOLOG-SINT-AV` (09/11/2026, com faturas) concluídas, não vigentes. #120 e #121 mesclados pelo usuário. UX-AVULSA-03 (vigente): formulário de operação e teste estrutural, escrita `HOMOLOG-SINT-AV2` pelas telas sem fatura (concluída), commit/push na branch `ux/operacao-avulsa-valor-acordado` e um PR Draft. Não se estendem a outras escritas, Production ou ativação comercial.
 
 ## Proibições
 
-Sem deploy ou migration em Production, nova escrita no HML, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, apagar rotas/ações/dados de containers, merge ou Ready do PR da UX-AVULSA-02 sem autorização nominal.
+Sem deploy ou migration em Production, nova escrita no HML, emissão de fatura, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, apagar rotas/ações/dados de containers, merge ou Ready do PR da UX-AVULSA-03 sem autorização nominal.
 
 ## Retomada
 
