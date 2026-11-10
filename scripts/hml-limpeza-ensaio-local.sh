@@ -9,14 +9,25 @@
 # (raiz com prefixo sintético fora do inventário). Exige um backup NOVO do HML na 050; o backup
 # de 06/11/2026 é da 045 e o preflight 050 o recusa. Ainda NÃO executado nesta versão.
 #
-# Uso: scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <diretório-do-stack-local> [porta]
+# Correção de 10/11/2026 (sessão 02):
+#   - todo preparo de teste negativo (inserir, criar, travar) e toda limpeza dele são conferidos
+#     pela saída exata; preparo não comprovado INTERROMPE o ensaio (exit 6), nunca vira PASS;
+#   - C1c: feriado legado de nome desconhecido com legal_act NULL tem de ser recusado;
+#   - a restauração só vale se o log não tiver erro fora da lista aceita e se a impressão digital
+#     da cópia for igual à do HML tirada junto com o backup (exceto as diferenças documentadas).
+#
+# Uso: KEYCHAIN_ITEM=<item-do-backup-050> \
+#      scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <diretório-do-stack-local> [porta] [impressão-do-HML]
 #   <diretório-do-stack-local>: o --workdir do `supabase start` do ensaio (project_id e portas próprios).
+#   [impressão-do-HML]: saída de docs/runbooks/hml-impressao-digital.sql no HML, tirada junto com o
+#     dump (padrão: <pasta-do-backup>/impressao-digital-hml.json). Sem ela, o ensaio não começa.
 # Requer: psql, python3, supabase CLI, Docker, stack local já iniciado.
 set -uo pipefail
 
 BACKUP_DIR="${1:?informe a pasta do backup}"
 WORKDIR="${2:?informe o --workdir do stack local}"
 PORT="${3:-58322}"
+ORIGEM_FP="${4:-$BACKUP_DIR/impressao-digital-hml.json}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SQL="$REPO/docs/runbooks/limpeza-hml-sintetico.sql"
 FPSQL="$REPO/docs/runbooks/hml-impressao-digital.sql"
@@ -26,6 +37,8 @@ trap 'rm -rf "$OUT"' EXIT
 export PGPASSWORD=postgres
 
 if [[ "$PORT" != 5[0-9][0-9][0-9][0-9] ]]; then echo "Porta inesperada: $PORT" >&2; exit 2; fi
+if [ ! -s "$ORIGEM_FP" ]; then echo "Impressão digital do HML ausente: $ORIGEM_FP" >&2; exit 2; fi
+cp "$ORIGEM_FP" "$OUT/origem.json"
 P=(psql -X -q -At -h 127.0.0.1 -p "$PORT" -U postgres -d postgres)
 PA=(psql -X -q -At -h 127.0.0.1 -p "$PORT" -U supabase_admin -d postgres)
 
@@ -43,7 +56,16 @@ def flat(d, p=""):
     for k, v in d.items():
         o.update(flat(v, p + k + ".") if isinstance(v, dict) else {p + k: v})
     return o
-a = flat(json.load(open(sys.argv[1]))); b = flat(json.load(open(sys.argv[2])))
+def carregar(c):
+    d = json.load(open(c))
+    if isinstance(d, dict) and "rows" in d: d = d["rows"]
+    if isinstance(d, list):
+        if len(d) != 1: print("impressao digital com", len(d), "linhas:", c); sys.exit(1)
+        d = d[0]
+        if isinstance(d, dict) and len(d) == 1: d = next(iter(d.values()))
+    if isinstance(d, str): d = json.loads(d)
+    return d
+a = flat(carregar(sys.argv[1])); b = flat(carregar(sys.argv[2]))
 ign = set(filter(None, sys.argv[3].split(",")))
 dif = [k for k in sorted(set(a) | set(b)) if k not in ign and not any(k.startswith(i + ".") for i in ign) and a.get(k) != b.get(k)]
 if dif: print("diferencas:", ", ".join(dif)); sys.exit(1)
@@ -58,14 +80,67 @@ deve_abortar() { # nome  padrão-esperado-em-stderr
   if grep -q "$2" "$OUT/run.err"; then ok "$1 (aborta: $(erro1 | cut -c1-170))"; else bad "$1: abortou por outro motivo: $(erro1)"; fi
 }
 erro1() { grep -h 'ERROR:' "$OUT/run.err" | head -1 | sed -E 's/^psql:[^ ]+ //' | cut -c1-200; }
-reiniciar() {
+# Preparo/limpeza de teste: o SQL tem de terminar sem erro e imprimir EXATAMENTE o esperado.
+# Qualquer outra coisa interrompe o ensaio: um teste negativo sem o dado injetado provaria nada,
+# e um resíduo de teste anterior poderia fazer o seguinte abortar "pelo motivo certo" por acaso.
+exigir() { # nome  sql  saída-esperada
+  local saida r
+  saida="$("${P[@]}" -v ON_ERROR_STOP=1 -c "$2" 2>"$OUT/prep.err")"; r=$?
+  if [ "$r" -ne 0 ] || [ "$saida" != "$3" ]; then
+    bad "$1: preparo não comprovado (rc=$r, saída='$saida', esperada='$3') $(grep -h 'ERROR:' "$OUT/prep.err" | head -1 | cut -c1-150)"
+    echo "Ensaio interrompido: preparo de teste não comprovado. Resumo parcial: $PASS PASS, $FAIL FAIL"; exit 6
+  fi
+}
+# Terminar não basta: a restauração (que não para no primeiro erro) só vale se o log trouxer todas
+# as etapas, nenhum erro fora da lista aceita e se a cópia for igual à impressão digital do HML.
+ERROS_ACEITOS='role "supabase_realtime_admin" does not exist'
+validar_restauro() { # rótulo
+  if python3 - "$OUT/restauro.log" "$ERROS_ACEITOS" <<'PY'
+import re, sys
+log = open(sys.argv[1], encoding="utf-8", errors="replace").read().splitlines()
+aceitos = [a for a in sys.argv[2].split("|") if a]
+falhas, vistas, i = [], {}, 0
+for marca in ("cifrados OK", "texto em claro OK", "Restauração concluída"):
+    if not any(marca in l for l in log): falhas.append("marca ausente: " + marca)
+while i < len(log):
+    m = re.match(r"^    ([a-z-]+): ([0-9]+) erro\(s\)$", log[i]); i += 1
+    if m:
+        etapa, n, linhas = m.group(1), int(m.group(2)), []
+        while i < len(log) and re.match(r"^       *[0-9]+ ", log[i]):
+            c, txt = log[i].split(None, 1); linhas.append((int(c), txt)); i += 1
+        vistas[etapa] = n
+        if n and sum(c for c, _ in linhas) != n: falhas.append(f"{etapa}: {n} erro(s), nem todos listados no log")
+        for c, txt in linhas:
+            if not any(a in txt for a in aceitos): falhas.append(f"{etapa}: erro nao aceito: {txt[:100]}")
+        continue
+    m = re.match(r"^    privilégios reaplicados: [0-9]+ instruções, ([0-9]+) erro\(s\)$", log[i - 1])
+    if m:
+        vistas["privilegios"] = int(m.group(1))
+        if int(m.group(1)): falhas.append("privilegios: " + m.group(1) + " erro(s) na reaplicacao (o log nao os lista)")
+for e in ("roles", "schema-public", "migrations", "data-public", "data-auth", "privilegios"):
+    if e not in vistas: falhas.append("etapa sem resumo no log: " + e)
+if falhas: print("\n".join("     " + f for f in falhas)); sys.exit(1)
+PY
+  then ok "$1: log da restauração com todas as etapas e só erros aceitos"
+  else bad "$1: restauração com erro não aceito ou incompleta"; echo "Ensaio interrompido: restauração não comprovada. Resumo parcial: $PASS PASS, $FAIL FAIL"; exit 4
+  fi
+  fp "restauro-$1"
+  # Diferenças conhecidas e aceitas (runbook, seção 6): privilégios de função da reconciliação e o
+  # event trigger ensure_rls, que o pg_dump não traz. Qualquer outra diferença invalida a cópia.
+  if mesmo origem "restauro-$1" "catalogo.fn_privilegios_md5,catalogo.event_triggers_md5"; then
+    ok "$1: cópia igual à impressão digital do HML (exceto fn_privilegios_md5 e event_triggers_md5)"
+  else bad "$1: cópia diverge da impressão digital do HML"; echo "Ensaio interrompido: restauração não comprovada. Resumo parcial: $PASS PASS, $FAIL FAIL"; exit 4
+  fi
+}
+reiniciar() { # rótulo
   (cd "$WORKDIR" && env -u SUPABASE_ACCESS_TOKEN supabase db reset --local --workdir "$WORKDIR" --yes >/dev/null 2>&1) || { echo "falha ao reiniciar o stack local"; exit 4; }
   "$REPO/scripts/hml-restaurar-local.sh" "$BACKUP_DIR" "$PORT" >"$OUT/restauro.log" 2>&1 || { echo "falha na restauração"; cat "$OUT/restauro.log"; exit 4; }
+  validar_restauro "$1"
 }
 LIMPAR="container_service_participants container_service_audit container_services billing_additionals invoice_items invoices timesheet_entries timesheets operation_team user_operation_access operation_location_terms operation_terms shifts operations contract_employee_rates contract_rate_terms contract_terms contracts employee_cost_terms employees clients financial_holidays financial_calendar_coverage"
 
 echo "== A. Restauração limpa e cópia isolada"
-reiniciar
+reiniciar A
 check "stack local isolado: porta $PORT, project_id do ensaio" "docker ps --format '{{.Names}} {{.Ports}}' | grep -q 'supabase_db_bs-hml-ensaio-20b.*:$PORT->'"
 fp base
 check "cópia restaurada: 31 tabelas, contas presentes, migrations 55 / head 050" "python3 -c \"import json;d=json.load(open('$OUT/base.json'));assert d['catalogo']['tabelas']==31 and d['auth']['users']>=1 and d['migrations']['total']==55 and d['migrations']['head']=='20261117120000'\""
@@ -80,44 +155,70 @@ check "a seco: impressão digital idêntica (inclui as contagens de todas as tab
 echo "== C. Testes negativos (cada um deve ABORTAR sem alterar nada)"
 sim
 # C1 dado real misturado
-"${P[@]}" -c "insert into public.clients(name) values ('Cliente Real LTDA')" >/dev/null 2>&1
+exigir "C1 preparo: marcador ainda ausente" "select count(*) from public.clients where name='Cliente Real LTDA'" 0
+exigir "C1 preparo: 1 cliente inserido" "with i as (insert into public.clients(name) values ('Cliente Real LTDA') returning 1) select count(*) from i" 1
 rodar "$OUT/sim.sql"; rc=$?
 deve_abortar "C1 cliente fora dos prefixos sintéticos" 'origem sintetica: clients'
-"${P[@]}" -c "delete from public.clients where name='Cliente Real LTDA'" >/dev/null 2>&1
+exigir "C1 limpeza: exatamente 1 cliente removido" "with d as (delete from public.clients where name='Cliente Real LTDA' returning 1) select count(*) from d" 1
 fp c1; check "C1 nada foi alterado (dado injetado removido, resto igual)" "mesmo base c1"
 # C1b raiz com prefixo sintético, mas fora do inventário de 10/11/2026 (nome parecido não basta)
-"${P[@]}" -c "insert into public.clients(name) values ('HOMOLOG-SINT-NAO-INVENTARIADO')" >/dev/null 2>&1
+exigir "C1b preparo: marcador ainda ausente" "select count(*) from public.clients where name='HOMOLOG-SINT-NAO-INVENTARIADO'" 0
+exigir "C1b preparo: 1 cliente inserido" "with i as (insert into public.clients(name) values ('HOMOLOG-SINT-NAO-INVENTARIADO') returning 1) select count(*) from i" 1
 rodar "$OUT/sim.sql"; rc=$?
 deve_abortar "C1b cliente HOMOLOG-SINT fora do inventário" 'raizes: clientes'
-"${P[@]}" -c "delete from public.clients where name='HOMOLOG-SINT-NAO-INVENTARIADO'" >/dev/null 2>&1
+# O prefixo é sintético: a 3.6 aceita a raiz; só a 3.6b (inventário por ID) pode tê-la recusado.
+check "C1b recusado pelo inventário, não pela origem" "! grep -q 'origem sintetica: clients' '$OUT/run.err'"
+exigir "C1b limpeza: exatamente 1 cliente removido" "with d as (delete from public.clients where name='HOMOLOG-SINT-NAO-INVENTARIADO' returning 1) select count(*) from d" 1
 fp c1b; check "C1b nada foi alterado (dado injetado removido, resto igual)" "mesmo base c1b"
+# C1c feriado legado (anterior à 044: territory_scope 'legado', legal_act NULL) de nome desconhecido.
+#     Com NOT (legal_act LIKE ...) a linha saía da contagem por NULL e seria apagada. Tem de abortar.
+#     Feriado não se apaga (gatilho de imutabilidade), então o dado entra numa transação externa que
+#     o próprio aborto desfaz ao fechar a conexão; a impressão digital depois confirma.
+exigir "C1c preparo: data de teste sem feriado" "select count(*) from public.financial_holidays where holiday_date='2099-12-30'" 0
+{ printf '%s\n' "BEGIN;" \
+    "SELECT 'PREPARO_C1C=' || count(*) FROM (WITH i AS (INSERT INTO public.financial_holidays(holiday_date, name, reason) VALUES ('2099-12-30', 'Feriado Desconhecido Legado', 'ensaio C1c') RETURNING legal_act, territory_scope) SELECT 1 FROM i WHERE legal_act IS NULL AND territory_scope = 'legado') x;"
+  cat "$OUT/sim.sql"; } >"$OUT/c1c.sql"
+rodar "$OUT/c1c.sql"; rc=$?
+if ! grep -qx 'PREPARO_C1C=1' "$OUT/run.out"; then
+  bad "C1c preparo não comprovado: o feriado com legal_act NULL não foi inserido"; echo "Ensaio interrompido. Resumo parcial: $PASS PASS, $FAIL FAIL"; exit 6
+fi
+deve_abortar "C1c feriado legado com legal_act NULL e nome desconhecido" 'origem sintetica: financial_holidays'
+exigir "C1c limpeza: feriado de teste desfeito com a transação" "select count(*) from public.financial_holidays where holiday_date='2099-12-30'" 0
+fp c1c; check "C1c nada foi alterado (transação desfeita, resto igual)" "mesmo base c1c"
 # C2 ambiente errado (conjunto de migrations diferente)
-"${P[@]}" -c "insert into supabase_migrations.schema_migrations(version, name) values ('99999999999999','x')" >/dev/null 2>&1
+exigir "C2 preparo: 1 versão inserida" "with i as (insert into supabase_migrations.schema_migrations(version, name) values ('99999999999999','x') returning 1) select count(*) from i" 1
 rodar "$OUT/sim.sql"; rc=$?
 deve_abortar "C2 migrations diferentes do HML 050" 'ambiente: migrations'
-"${P[@]}" -c "delete from supabase_migrations.schema_migrations where version='99999999999999'" >/dev/null 2>&1
+exigir "C2 limpeza: exatamente 1 versão removida" "with d as (delete from supabase_migrations.schema_migrations where version='99999999999999' returning 1) select count(*) from d" 1
+fp c2; check "C2 nada foi alterado" "mesmo base c2"
 # C3 tabela nova não classificada
-"${P[@]}" -c "create table public.zz_nova_tabela(id int)" >/dev/null 2>&1
+exigir "C3 preparo: tabela criada" "create table public.zz_nova_tabela(id int); select count(*) from pg_tables where schemaname='public' and tablename='zz_nova_tabela'" 1
 rodar "$OUT/sim.sql"; rc=$?
 deve_abortar "C3 tabela nova não classificada" 'catalogo: 31 tabelas'
-"${P[@]}" -c "drop table public.zz_nova_tabela" >/dev/null 2>&1
+exigir "C3 limpeza: tabela removida" "drop table public.zz_nova_tabela; select count(*) from pg_tables where schemaname='public' and tablename='zz_nova_tabela'" 0
+fp c3; check "C3 nada foi alterado" "mesmo base c3"
 # C4 concorrência: outra sessão segura uma trava
-( "${P[@]}" -c "begin; lock table public.clients in access share mode; select pg_sleep(18); commit;" >/dev/null 2>&1 & )
+# A sessão da trava é identificada por application_name: a conferência não confunde com autovacuum.
+( PGAPPNAME=bs-ensaio-c4 "${P[@]}" -c "begin; lock table public.clients in access share mode; select pg_sleep(18); commit;" >/dev/null 2>&1 & )
 sleep 2
+exigir "C4 preparo: outra sessão segura a trava em clients" "select (count(*) >= 1)::int from pg_locks l join pg_class c on c.oid = l.relation join pg_stat_activity a on a.pid = l.pid where c.relname = 'clients' and c.relnamespace = 'public'::regnamespace and l.granted and a.application_name = 'bs-ensaio-c4'" 1
 rodar "$OUT/sim.sql"; rc=$?
 deve_abortar "C4 tabela em uso por outra sessão" 'lock timeout'
 sleep 18
+exigir "C4 limpeza: sessão da trava encerrada" "select count(*) from pg_stat_activity where application_name = 'bs-ensaio-c4'" 0
+fp c4; check "C4 nada foi alterado" "mesmo base c4"
 # C5 falha na validação final (alteração indevida em tabela preservada) => rollback total
-python3 - "$OUT/sim.sql" "$OUT/falha.sql" <<'PY'
+exigir "C5 preparo: existe perfil para alterar" "select (count(*) >= 1)::int from public.profiles" 1
+python3 - "$OUT/sim.sql" "$OUT/falha.sql" <<'PY' || { bad "C5 preparo: injeção no script falhou"; echo "Ensaio interrompido. Resumo parcial: $PASS PASS, $FAIL FAIL"; exit 6; }
 import sys
 t = open(sys.argv[1]).read()
 marca = "-- 5. Validação integral"
 inj = "UPDATE public.profiles SET full_name = coalesce(full_name, '') || 'x' WHERE id = (SELECT id FROM public.profiles ORDER BY id LIMIT 1);\n\n"
-assert marca in t
+assert t.count(marca) == 1
 open(sys.argv[2], "w").write(t.replace(marca, inj + marca, 1))
 PY
 rodar "$OUT/falha.sql"; rc=$?
-deve_abortar "C5 tabela preservada alterada durante a execução" 'validacao final'
+deve_abortar "C5 tabela preservada alterada durante a execução" 'validacao final:.*mudou: identidade'
 fp c5
 check "C5 rollback total: dados, gatilhos e catálogo idênticos ao início" "mesmo base c5"
 check "C5 gatilhos voltaram ao estado original (1 desabilitado, o legado)" "[ \"\$(\"\${P[@]}\" -c \"select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid where not t.tgisinternal and c.relnamespace='public'::regnamespace and t.tgenabled<>'O'\")\" = 1 ]"
@@ -152,7 +253,7 @@ deve_abortar "F1 reexecução em alvo já limpo (assinatura do HML ausente)" 'as
 fp f; check "F1 nada mudou na reexecução" "mesmo pos f"
 
 echo "== G. Mesmo script enviado como UMA ÚNICA consulta (semântica da API de gerenciamento usada por supabase db query --linked)"
-reiniciar
+reiniciar G
 fp base2
 cli() { "${P[@]}" -v ON_ERROR_STOP=1 -c "$(cat "$1")" >"$OUT/cli.out" 2>"$OUT/cli.err"; }
 cli "$SQL"; rc=$?

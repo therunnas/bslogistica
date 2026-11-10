@@ -106,6 +106,24 @@ Mudanças no script (todas fail-closed):
    devolve `NULL` com chave nula e deixaria a linha **fora** da contagem de "fora da origem". Passam a usar
    `(x IN (...)) IS NOT TRUE`: chave nula conta como fora e bloqueia.
 5. Trilha com `entity_kind` nulo bloqueia (3.10b): o `DELETE` usa `<> 'sistema'` e não a removeria.
+6. **Correção de 10/11/2026 (sessão 02): o mesmo defeito de `NULL` estava na 3.7.** Os feriados
+   legados (anteriores à 044, `territory_scope = 'legado'`) têm `legal_act` nulo. A verificação
+   `count(*) FILTER (WHERE NOT (legal_act LIKE 'E2E-%' OR name LIKE 'E2E-%' OR ...))` calculava, para um
+   legado de nome desconhecido, `NOT (NULL OR false OR false)` = `NULL`; o `FILTER` descartava a linha,
+   a contagem dava 0, a verificação aprovava e o `TRUNCATE` apagaria um feriado possivelmente real.
+   Passa a ser `(...) IS NOT TRUE`: só fica dentro a linha **comprovadamente** sintética; nula ou
+   desconhecida conta como fora e aborta. Revisadas todas as negações do script, com a mesma forma:
+   - 3.7 coberturas (`legal_act` e `official_url` são `NOT NULL` na 044; corrigido por robustez);
+   - 3.8 municípios e 3.9 funções (`name`/`code` são `NOT NULL`; `NOT LIKE`/`NOT IN` trocados);
+   - 3.3 catálogo, 3.4 dono/RLS forçada e 3.5 estados de gatilho (`NOT IN`/`<>` trocados);
+   - 3.11 admin real: `(email LIKE '%.invalid') IS FALSE`, e-mail nulo **não** conta como real (só
+     pode reprovar);
+   - impressão digital: o conjunto preservado de municípios e funções é exatamente o complemento do
+     `DELETE` parcial (`(... LIKE ...) IS NOT TRUE`).
+
+   Das negações revisadas, só a dos feriados era explorável com o esquema atual; as demais dependiam de
+   colunas `NOT NULL` e passaram a não depender. Restam `entity_kind <> 'sistema'` (o nulo é
+   bloqueado pela 3.10b) e `tgenabled <> 'O'` (coluna `NOT NULL` do catálogo).
 
 ## 4. Salvaguardas do script
 
@@ -134,6 +152,12 @@ independente decidido pela BS) e **restauração comprovada** numa stack local i
 [backup-production.md](backup-production.md). `scripts/hml-restaurar-local.sh` aceita o novo item por
 `KEYCHAIN_ITEM`.
 
+Junto com o dump, e na mesma janela sem escrita, tirar a impressão digital do HML
+(`hml-impressao-digital.sql`, somente leitura) antes e depois do dump; as duas têm de ser iguais. Guardar
+a saída na pasta do backup como `impressao-digital-hml.json` (aceita o JSON puro ou a saída de
+`supabase db query -o json`). O ensaio **não começa** sem ela: é a referência contra a qual a cópia
+restaurada é comparada.
+
 ## 6. Ensaio local da versão 050 — BLOQUEADO (10/11/2026)
 
 **Não executado.** A máquina desta sessão (Windows) não tem Docker nem Supabase CLI (o
@@ -143,13 +167,43 @@ está em outra máquina, na 045. Há um PostgreSQL 18 instalado, sem serviço at
 nem os dados do HML. Nada foi declarado PASS.
 
 Para desbloquear (sem autorização de escrita remota): uma máquina com Docker, Supabase CLI, `psql` e
-`python3`; um backup **novo** do HML na 050 com restauração local comprovada; então
-`scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <workdir-da-stack> [porta]`, exigindo **0 FAIL**
-em todas as seções (A–G, inclusive o novo C1b).
+`python3`; um backup **novo** do HML na 050 com a impressão digital do HML ao lado (seção 5); então
+`KEYCHAIN_ITEM=<item-do-backup-050> scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <workdir-da-stack> [porta] [impressão-do-HML]`,
+exigindo **0 FAIL** em todas as seções (A–G, inclusive C1b e C1c).
 
-Validação estática feita nesta versão: `bash -n` dos dois scripts; revisão do SQL contra as migrations
-046–050; conferência de que não há `CASCADE`, de que o modo padrão é `NAO` e de que as constantes de
-assinatura batem com o repositório.
+**Restauração comprovada, não só concluída.** `scripts/hml-restaurar-local.sh` não para no primeiro erro
+e termina com sucesso mesmo com erros; terminar não prova nada. O ensaio só aceita a cópia (seções A e G)
+se:
+
+1. o log tiver as marcas de integridade (hash dos cifrados e do texto em claro) e o resumo de **todas** as
+   etapas (papéis, esquema, migrations, dados de `public`, dados de `auth`, reaplicação de privilégios);
+2. cada erro listado estiver na lista aceita (hoje só `role "supabase_realtime_admin" does not exist`,
+   Realtime desligado no stack local) e a soma dos listados for igual ao total da etapa (mais de 5 tipos de
+   erro ou erro sem `psql:` reprova);
+3. a reaplicação de privilégios tiver **0** erro (o log só traz a contagem; se houver erro, investigar à
+   mão e só ampliar a lista aceita por revisão);
+4. a impressão digital da cópia for **igual** à do HML (`impressao-digital-hml.json`) em todos os campos,
+   exceto `catalogo.fn_privilegios_md5` e `catalogo.event_triggers_md5` (diferenças conhecidas, seção
+   045 — 6). Qualquer outra diferença, inclusive de contagem, invalida a cópia.
+
+Falha em qualquer item interrompe o ensaio (código 4) antes dos testes.
+
+**Testes negativos com preparo comprovado.** Cada preparo (inserir, criar tabela, segurar trava, injetar a
+alteração do C5) e cada limpeza é conferido pela saída exata (`returning`/contagem); um preparo não
+comprovado interrompe o ensaio (código 6) e **nunca vira PASS**. Antes de inserir, confere-se que o
+marcador não existe, para que um resíduo de teste anterior não faça o seguinte abortar "pelo motivo
+certo" por acaso. C1b confere também que a recusa veio do inventário (3.6b), não da origem. C1c (novo):
+feriado legado com `legal_act` nulo e nome desconhecido tem de abortar em
+`origem sintetica: financial_holidays`; como feriado não se apaga (gatilho de imutabilidade), o dado entra
+numa transação externa que o aborto desfaz, e a inserção é provada por `PREPARO_C1C=1` na saída. Depois
+de C1–C4, a impressão digital tem de voltar a ser igual à linha de base.
+
+Validação feita nesta máquina (10/11/2026, sessão 02), **sem banco**: `bash -n` dos dois scripts;
+revisão do SQL contra as migrations 030, 039, 044 e 046–050; verificador estático descartável (fora do
+repositório) que **reprova** o HEAD `51d18f8` (20 falhas: `NOT (...)`/`NOT LIKE`/`NOT IN`, preparo sem
+conferência, sem C1c, restauração sem comparação) e **aprova** esta versão; sem `CASCADE`; modo padrão
+`NAO`. O PostgreSQL 18 instalado aqui só tem as ferramentas de cliente (sem servidor), e não há
+`python3`: o RED/GREEN em banco, o validador da restauração e o ensaio completo **não foram executados**.
 
 ## 7. Execução futura no HML (somente com a autorização da seção 8)
 
@@ -193,6 +247,10 @@ sintético e a função `e2e_s11_fn`). Autorização de leitura ou de ensaio loc
 - Desabilitar gatilhos de proteção, ainda que dentro de uma transação, é o ponto sensível; mitigado pela
   guarda de origem, pelas raízes presas, pelo ensaio e pela validação antes do `COMMIT`.
 - A versão 050 **não foi ensaiada**: sintaxe e comportamento do SQL só ficam comprovados no ensaio.
+  Isso inclui a correção de `NULL` da sessão 02 e o validador da restauração (Python), escritos sem
+  banco nem interpretador disponíveis.
+- A lista de erros aceitos da restauração foi tirada do ensaio 045. Um stack local mais novo pode trazer
+  erro diferente: o ensaio reprova, e ampliar a lista exige revisão, nunca ajuste para passar.
 - O inventário de 10/11/2026 foi lido com a RLS do admin, sem catálogo nem Auth; o preflight cobre essas
   partes no alvo.
 - Sem backup gerenciado e sem PITR no HML, a recuperação depende do backup novo e da sua segunda cópia.

@@ -7,6 +7,11 @@
 -- (06/11/2026). Esta versão 050 (10/11/2026) AINDA NÃO FOI ENSAIADA: ver a seção 6
 -- do runbook. Não executar no HML antes do ensaio local com 0 FAIL.
 --
+-- NULL não é false: toda verificação de origem conta como FORA qualquer linha cuja condição
+-- de origem sintética não seja comprovadamente verdadeira, com `(condição) IS NOT TRUE`.
+-- `NOT (...)`, `NOT LIKE` e `NOT IN` devolvem NULL diante de coluna nula, e o FILTER deixaria
+-- a linha fora da contagem (fail-open). Corrigido em 10/11/2026 (feriado legado sem `legal_act`).
+--
 -- Estado esperado do banco-alvo (migration head 050, 55 migrations): é verificado
 -- pelo preflight abaixo; qualquer divergência ABORTA sem alterar nada.
 --
@@ -136,9 +141,9 @@ $f$
       'motor_md5', (SELECT md5(coalesce(string_agg(s::text, '|'), '')) FROM public.financial_engine_settings s),
       'tarifas_md5', (SELECT md5(coalesce(string_agg(s::text, '|'), '')) FROM public.pricing_settings s),
       'funcoes_padrao_md5', (SELECT md5(coalesce(string_agg(j::text, '|' ORDER BY j.code), ''))
-                             FROM public.job_functions j WHERE j.code NOT LIKE 'e2e\_%' ESCAPE '\'),
+                             FROM public.job_functions j WHERE (j.code LIKE 'e2e\_%' ESCAPE '\') IS NOT TRUE),
       'municipios_oficiais_md5', (SELECT md5(coalesce(string_agg(m::text, '|' ORDER BY m.code), ''))
-                                  FROM public.municipality_catalog m WHERE m.name NOT LIKE 'E2E-%'),
+                                  FROM public.municipality_catalog m WHERE (m.name LIKE 'E2E-%') IS NOT TRUE),
       'auditoria_admin_md5', (SELECT md5(coalesce(string_agg(a::text, '|' ORDER BY a.id), '')) FROM public.admin_audit_log a),
       'auditoria_sistema_md5', (SELECT md5(coalesce(string_agg(a::text, '|' ORDER BY a.id), ''))
                                 FROM public.financial_terms_audit a WHERE a.entity_kind = 'sistema')),
@@ -248,7 +253,7 @@ SELECT 'ambiente: assinatura sintética do HML',
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'catalogo: 31 tabelas, todas classificadas',
        (SELECT count(*) FROM pg_tables WHERE schemaname = 'public') = 31
-       AND NOT EXISTS (SELECT 1 FROM pg_tables p WHERE p.schemaname = 'public' AND p.tablename NOT IN (SELECT nome FROM bs_tabelas))
+       AND NOT EXISTS (SELECT 1 FROM pg_tables p WHERE p.schemaname = 'public' AND (p.tablename IN (SELECT nome FROM bs_tabelas)) IS NOT TRUE)
        AND NOT EXISTS (SELECT 1 FROM bs_tabelas b WHERE NOT EXISTS (SELECT 1 FROM pg_tables p WHERE p.schemaname = 'public' AND p.tablename = b.nome)),
        'tabelas_public=' || (SELECT count(*) FROM pg_tables WHERE schemaname = 'public');
 
@@ -256,14 +261,14 @@ SELECT 'catalogo: 31 tabelas, todas classificadas',
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'permissao: executor é dono das tabelas-alvo e RLS não é forçada',
        NOT EXISTS (SELECT 1 FROM pg_class c JOIN bs_tabelas b ON b.nome = c.relname
-                    WHERE c.relnamespace = 'public'::regnamespace AND b.destino <> 'PRESERVAR'
-                      AND (pg_get_userbyid(c.relowner) <> current_user OR c.relforcerowsecurity)),
+                    WHERE c.relnamespace = 'public'::regnamespace AND (b.destino = 'PRESERVAR') IS NOT TRUE
+                      AND (pg_get_userbyid(c.relowner) = current_user AND NOT c.relforcerowsecurity) IS NOT TRUE),
        'executor=' || current_user;
 
 -- 3.5 Estados de gatilho conhecidos (apenas habilitado 'O' ou desabilitado 'D').
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'gatilhos: estados apenas O ou D',
-       NOT EXISTS (SELECT 1 FROM bs_gatilhos WHERE estado NOT IN ('O', 'D')),
+       NOT EXISTS (SELECT 1 FROM bs_gatilhos WHERE (estado IN ('O', 'D')) IS NOT TRUE),
        'habilitados=' || count(*) FILTER (WHERE estado = 'O') || ' desabilitados=' || count(*) FILTER (WHERE estado = 'D')
   FROM bs_gatilhos;
 
@@ -335,29 +340,32 @@ SELECT 'raizes: colaboradores HOMOLOG-SINT = 5 IDs registrados',
        'homolog=' || (SELECT count(*) FROM public.employees WHERE name LIKE 'HOMOLOG-SINT%');
 
 -- 3.7 Calendário: só fixtures (fonte sintética). Registro com fonte oficial real impede a limpeza.
+--     Os feriados legados (anteriores à 044) têm legal_act NULL: com `NOT (legal_act LIKE ... OR ...)`
+--     um legado de nome desconhecido dava NOT (NULL OR false) = NULL e saía da contagem, e seria
+--     apagado. Com `(...) IS NOT TRUE`, só fica dentro a linha comprovadamente sintética.
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'origem sintetica: financial_holidays',
-       count(*) FILTER (WHERE NOT (legal_act LIKE 'E2E-%' OR name LIKE 'E2E-%' OR name LIKE 'AUTH01C2%')) = 0,
-       'linhas_fora_da_origem=' || count(*) FILTER (WHERE NOT (legal_act LIKE 'E2E-%' OR name LIKE 'E2E-%' OR name LIKE 'AUTH01C2%'))
+       count(*) FILTER (WHERE (legal_act LIKE 'E2E-%' OR name LIKE 'E2E-%' OR name LIKE 'AUTH01C2%') IS NOT TRUE) = 0,
+       'linhas_fora_da_origem=' || count(*) FILTER (WHERE (legal_act LIKE 'E2E-%' OR name LIKE 'E2E-%' OR name LIKE 'AUTH01C2%') IS NOT TRUE)
   FROM public.financial_holidays;
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'origem sintetica: financial_calendar_coverage',
-       count(*) FILTER (WHERE NOT (legal_act LIKE 'E2E-%' AND official_url = 'https://exemplo.gov.br/calendario')) = 0,
-       'linhas_fora_da_origem=' || count(*) FILTER (WHERE NOT (legal_act LIKE 'E2E-%' AND official_url = 'https://exemplo.gov.br/calendario'))
+       count(*) FILTER (WHERE (legal_act LIKE 'E2E-%' AND official_url = 'https://exemplo.gov.br/calendario') IS NOT TRUE) = 0,
+       'linhas_fora_da_origem=' || count(*) FILTER (WHERE (legal_act LIKE 'E2E-%' AND official_url = 'https://exemplo.gov.br/calendario') IS NOT TRUE)
   FROM public.financial_calendar_coverage;
 
 -- 3.8 Municípios: o que não for 'E2E-%' precisa ter fonte oficial do IBGE (e permanece).
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'municipios: nao sinteticos tem fonte oficial IBGE (e ficam)',
-       count(*) FILTER (WHERE name NOT LIKE 'E2E-%'
-                          AND official_url IS DISTINCT FROM 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios/' || code) = 0,
-       'sinteticos=' || count(*) FILTER (WHERE name LIKE 'E2E-%') || ' oficiais=' || count(*) FILTER (WHERE name NOT LIKE 'E2E-%')
+       count(*) FILTER (WHERE (name LIKE 'E2E-%') IS NOT TRUE
+                          AND (official_url = 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios/' || code) IS NOT TRUE) = 0,
+       'sinteticos=' || count(*) FILTER (WHERE name LIKE 'E2E-%') || ' oficiais=' || count(*) FILTER (WHERE (name LIKE 'E2E-%') IS NOT TRUE)
   FROM public.municipality_catalog;
 
 -- 3.9 Funções de trabalho: só as 4 padrão ou 'e2e_%'. Qualquer outra (possivelmente real) aborta.
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'funcoes: apenas 4 padrao + e2e_',
-       count(*) FILTER (WHERE code NOT IN ('auxiliar_producao', 'conferente', 'operador', 'administrativo') AND code NOT LIKE 'e2e\_%' ESCAPE '\') = 0
+       count(*) FILTER (WHERE (code IN ('auxiliar_producao', 'conferente', 'operador', 'administrativo') OR code LIKE 'e2e\_%' ESCAPE '\') IS NOT TRUE) = 0
        AND count(*) FILTER (WHERE code IN ('auxiliar_producao', 'conferente', 'operador', 'administrativo')) = 4,
        'padrao=' || count(*) FILTER (WHERE code IN ('auxiliar_producao', 'conferente', 'operador', 'administrativo'))
          || ' e2e=' || count(*) FILTER (WHERE code LIKE 'e2e\_%' ESCAPE '\')
@@ -393,12 +401,13 @@ SELECT 'trilha: nenhuma linha com entity_kind nulo',
   FROM public.financial_terms_audit WHERE entity_kind IS NULL;
 
 -- 3.11 Pelo menos uma conta administrativa REAL (e-mail que não termina em .invalid) permanece com papel admin.
+--      `(u.email LIKE '%.invalid') IS FALSE`: e-mail nulo não conta como admin real (só pode reprovar).
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'identidade: existe admin real preservado',
        EXISTS (SELECT 1 FROM public.user_roles r JOIN auth.users u ON u.id = r.user_id
-                WHERE r.role = 'admin' AND u.email NOT LIKE '%.invalid'),
+                WHERE r.role = 'admin' AND (u.email LIKE '%.invalid') IS FALSE),
        'admins_reais=' || (SELECT count(*) FROM public.user_roles r JOIN auth.users u ON u.id = r.user_id
-                            WHERE r.role = 'admin' AND u.email NOT LIKE '%.invalid');
+                            WHERE r.role = 'admin' AND (u.email LIKE '%.invalid') IS FALSE);
 
 -- 3.12 Veredito do preflight: qualquer reprovação aborta (mensagem só com nomes das verificações).
 DO $$

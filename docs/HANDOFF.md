@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**HML-LIMPEZA-01 — roteiro de limpeza dos dados sintéticos do HML atualizado para a 050, em PR Draft; ensaio local BLOQUEADO (sem Docker/Supabase CLI e sem backup 050 nesta máquina). Nada executado no HML. Production na 034.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
+**HML-LIMPEZA-01 — roteiro de limpeza do HML para a 050 corrigido (sessão 02: verificações com NULL fail-closed, preparo dos testes negativos conferido, restauração comprovada por log e impressão digital), no mesmo PR Draft #125; ensaio local BLOQUEADO (sem Docker/Supabase CLI/servidor PostgreSQL/`python3` e sem backup 050 nesta máquina). Nada executado no HML. Production na 034.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
 | Etapa | HML-LIMPEZA-01 — Gate 4, preparação |
-| Gate atual | Preparação documental em PR Draft; ensaio local BLOQUEADO; limpeza remota NÃO autorizada. Parecer: NO-GO para pedir a execução até o ensaio com 0 FAIL |
+| Gate atual | Preparação documental em PR Draft (#125), sessão 02 de correção; ensaio local BLOQUEADO; limpeza remota NÃO autorizada. Parecer: NO-GO para pedir a execução até o ensaio com 0 FAIL |
 | Último gate concluído | #124 (DOC-01) mesclado por squash em `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
 | Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-hml-limpeza-050` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-ux-*`/`-docs-progress` (branches mescladas). Descobrir de novo na retomada |
 | Branch | `docs/hml-limpeza-050`, criada de `origin/main`; reaproveita seletivamente 5 arquivos de `origin/docs/hml-limpeza-runbook` (`169f592`), sem mesclar a branch antiga |
 | Base | main `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
-| HEAD validado | 3cda0e55906401a635d5663b23d823d5a98b9fb6 + dois commits desta branch (importação sem alteração e adaptação 050). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| HEAD validado | 51d18f86b8a38519539d6d63adbe55f9b4ba371f (sessão 01, CI `validar` e `sql-local` SUCCESS) + o commit de correção da sessão 02. HEAD publicado e CI por SHA: consultar no PR #125, sem commit recursivo só de status |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#124 mesclados |
+| PR | [#125](https://github.com/therunnas/bslogistica/pull/125), Draft, desta branch contra main. #119–#124 mesclados |
 | Ambiente-alvo | HML `qbnfcmrxmssnwkhaitgd` (050) só lido (GET no PostgREST com a sessão admin e a RPC de leitura `estado_motor_vigencia`); nenhuma escrita. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
-| Última ação comprovada | Inventário somente leitura do HML (31 tabelas, raízes, origem por FK, trilha, motor) e roteiro adaptado para a 050; `bash -n` dos scripts, Prettier dos documentos e `check:workflow` PASS |
-| Próxima ação exata | Usuário revisa o PR Draft. Para desbloquear o ensaio: máquina com Docker, Supabase CLI, `psql` e `python3`; backup novo do HML na 050 com restauração local comprovada; `scripts/hml-limpeza-ensaio-local.sh` com 0 FAIL. Só então pedir autorização nominal da limpeza (runbook, seção 8) |
+| Última ação comprovada | Correção da sessão 02 (3.7 e demais negações com `IS NOT TRUE`; preparo/limpeza dos testes negativos conferidos; C1c; validação da restauração); `bash -n`, Prettier do runbook, verificador estático RED no `51d18f8`/GREEN na correção, `check:workflow` e `git diff --check` PASS. SQL não executado em banco |
+| Próxima ação exata | Usuário revisa o PR #125. Para desbloquear o ensaio no Mac: Docker, Supabase CLI, `psql`, `python3`; backup novo do HML na 050 com `impressao-digital-hml.json` ao lado; `KEYCHAIN_ITEM=<item> scripts/hml-limpeza-ensaio-local.sh <backup> <workdir> [porta]` com 0 FAIL. Só então pedir autorização nominal da limpeza (runbook, seção 8) |
 
 ## Estado atual para retomada
 
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | HML-LIMPEZA-01, sessão 02 (10/11/2026): corrigir as verificações de segurança e os testes do roteiro de limpeza no PR #125 (Draft), sobre `51d18f86b8a38519539d6d63adbe55f9b4ba371f`. Só `docs/runbooks/limpeza-hml-sintetico.sql`, `docs/runbooks/limpeza-hml-sintetico.md`, `scripts/hml-limpeza-ensaio-local.sh` e este HANDOFF. Limpeza remota NÃO executada nem autorizada |
+| Resultados e testes comprovados | **Causa:** na 3.7, `count(*) FILTER (WHERE NOT (legal_act LIKE 'E2E-%' OR name LIKE 'E2E-%' OR name LIKE 'AUTH01C2%'))`; feriado legado (044: `territory_scope='legado'`, `legal_act` nulo) de nome desconhecido dá `NOT (NULL OR false OR false)` = NULL, o FILTER descarta a linha, a verificação aprova e o `TRUNCATE` o apagaria (fail-open). **Correção:** `(...) IS NOT TRUE` na 3.7 (feriados e coberturas) e, por robustez, em 3.3, 3.4, 3.5, 3.8 e 3.9; 3.11 com `(email LIKE '%.invalid') IS FALSE` (e-mail nulo não conta como admin real); impressão digital de municípios/funções preservados = complemento exato do `DELETE`. Só a dos feriados era explorável (as demais colunas são `NOT NULL`). **Ensaio:** `exigir()` confere a saída exata de cada preparo e limpeza (C1, C1b, C2, C3, C4 por `application_name`, C5) e interrompe com código 6 se não comprovar, nunca PASS; marcador ausente antes de inserir; C1b confere que a recusa veio da 3.6b; C1c novo (feriado legado com `legal_act` nulo, em transação externa desfeita pelo aborto, inserção provada por `PREPARO_C1C=1`); impressão digital igual à base depois de C1–C4. **Restauração:** `hml-restaurar-local.sh` termina com sucesso mesmo com erro; o ensaio agora exige as marcas de hash, o resumo das 6 etapas, só o erro aceito (`supabase_realtime_admin`), soma dos listados igual ao total, 0 erro na reaplicação de privilégios e impressão digital da cópia igual à do HML (`impressao-digital-hml.json`, novo 4º argumento) exceto `fn_privilegios_md5`/`event_triggers_md5`; senão código 4. **Validação (sem banco):** `bash -n` PASS; Prettier do runbook PASS (HANDOFF já não passava no Prettier no `51d18f8`, formato mantido); verificador estático descartável no scratchpad: RED no `51d18f8` (20 falhas), GREEN na correção (0); `check:workflow` PASS; `git diff --check` PASS. **Não executados:** RED/GREEN em banco, o validador Python da restauração e o ensaio completo: o PostgreSQL 18 desta máquina só tem cliente (sem `share/`, `initdb` falha), não há Docker, Supabase CLI nem `python3` real |
+| Código e PR afetados | `docs/runbooks/limpeza-hml-sintetico.sql`, `docs/runbooks/limpeza-hml-sintetico.md`, `scripts/hml-limpeza-ensaio-local.sh`, `docs/HANDOFF.md`, no PR #125 (Draft). `scripts/hml-restaurar-local.sh`, `hml-impressao-digital.sql` e `docs/runbooks/README.md` inalterados. Nenhum `src/`, migration, `package.json`, lockfile ou workflow |
+| Ambientes envolvidos | Somente local (worktree e scratchpad; tentativa de `initdb` local recusada pela instalação, nada iniciado). HML, Production, Auth, usuários, flags, `.env` e credenciais não tocados; nenhuma leitura remota nesta sessão além da API pública do GitHub (PR e CI) |
+| Pendências e decisões | (1) Ensaio local da versão 050 com 0 FAIL no Mac (Docker, Supabase CLI, `psql`, `python3`; backup novo do HML na 050 e sua impressão digital); (2) se a restauração trouxer erro fora da lista aceita ou erro na reaplicação de privilégios, investigar e só ampliar a lista por revisão; (3) destino independente da segunda cópia do backup (decisão da BS); (4) se o HML receber escrita depois de 10/11/2026, refazer o inventário e a 3.6b; (5) autorização nominal da limpeza (runbook, seção 8) |
+| Próxima ação exata | Revisão do PR #125 pelo responsável; nenhuma execução remota, merge ou Ready sem autorização nominal |
+| Autorizações e proibições | Autorizados (sessão 02): os quatro arquivos acima, testes estáticos e ensaio local isolado (bloqueado), commit/push no PR #125 mantendo Draft. Proibidos: HML, Production, Auth, migrations, `src/`, workflows, dependências, flags, credenciais, outros PRs ou arquivos, limpeza remota, merge, Ready, force push |
+
+### Tarefa anterior — HML-LIMPEZA-01, sessão 01 (10/11/2026, PR #125 Draft em `51d18f86b8a38519539d6d63adbe55f9b4ba371f`)
 
 | Campo | Valor |
 | --- | --- |
@@ -143,7 +155,7 @@
 
 ## Autorizações
 
-Escritas sintéticas `HOMOLOG-SINT`, `-AV` e `-AV2` concluídas, não vigentes. #119–#124 mesclados pelo usuário. HML-LIMPEZA-01 (vigente): leitura do HML, adaptação do roteiro de limpeza para a 050, ensaio local isolado, commit/push na branch `docs/hml-limpeza-050` e um PR Draft. Não cobre a limpeza remota, que exige autorização nominal própria (runbook, seção 8).
+Escritas sintéticas `HOMOLOG-SINT`, `-AV` e `-AV2` concluídas, não vigentes. #119–#124 mesclados pelo usuário. HML-LIMPEZA-01 (vigente, sessão 02): correção de `limpeza-hml-sintetico.sql`, `limpeza-hml-sintetico.md`, `scripts/hml-limpeza-ensaio-local.sh` e deste HANDOFF, testes estáticos, ensaio local isolado, commit/push no PR #125 (branch `docs/hml-limpeza-050`), mantido Draft. A sessão 01 cobriu a leitura do HML e a adaptação para a 050. Não cobre a limpeza remota, que exige autorização nominal própria (runbook, seção 8).
 
 ## Proibições
 
