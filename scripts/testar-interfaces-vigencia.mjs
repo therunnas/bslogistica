@@ -1005,6 +1005,49 @@ verificar(
     !/payload\["contract_id"\]/.test(operacoes),
   true,
 );
+// UX-AVULSA-03: operação NOVA com motor ligado e contrato escolhido. A diária vem do contrato;
+// o valor acordado não tem efeito e o banco recusa o INSERT direto. O campo fica desabilitado
+// e vazio, e agreed_amount não vai no payload. Sem contrato, segue a vigência inicial.
+verificar(
+  "G8b. Operações: 'valor pelo contrato' = operação nova, motor ligado e contrato escolhido",
+  /const valorPeloContrato =\s+!opForm\.id && modoDeValor === "por-vigencia" && Boolean\(opForm\.contract_id\)/.test(
+    operacoes,
+  ),
+  true,
+);
+verificar(
+  "G8c. Operações: com valor pelo contrato, agreed_amount NÃO entra no payload",
+  /const enviaValor =\s+modoDeValor === "direta" \|\|\s+\(!opForm\.id && modoDeValor === "por-vigencia" && !valorPeloContrato\)/.test(
+    operacoes,
+  ),
+  true,
+);
+verificar(
+  "G8d. Operações: com valor pelo contrato, o campo fica desabilitado",
+  /const valorTravado =\s+valorPeloContrato \|\|/.test(operacoes),
+  true,
+);
+verificar(
+  "G8e. Operações: escolher contrato em operação nova com motor ligado limpa o valor acordado",
+  /agreed_amount:\s+value !== "none" && !opForm\.id && modoDeValor === "por-vigencia"\s+\? ""\s+: opForm\.agreed_amount/.test(
+    operacoes,
+  ),
+  true,
+);
+verificar(
+  "G8f. Operações: texto de ajuda do valor pelo contrato",
+  operacoes.includes(
+    "O valor vem do contrato. Para um valor próprio deste serviço, deixe o contrato em branco.",
+  ),
+  true,
+);
+verificar(
+  "G8g. Operações: sem contrato, a operação nova continua nascendo com a vigência inicial",
+  /modoDeValor === "por-vigencia" && !opForm\.contract_id && opForm\.agreed_amount !== ""/.test(
+    operacoes,
+  ) && /motivo: "Cadastro inicial da operação"/.test(operacoes),
+  true,
+);
 verificar(
   "G9. Operações: histórico do valor acordado só para operação SEM contrato",
   /opForm\.id && !opForm\.contract_id \?[\s\S]{0,200}<HistoricoDeVigencias\s+tipo="operacao"/.test(
