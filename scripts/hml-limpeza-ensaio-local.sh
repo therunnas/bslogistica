@@ -5,6 +5,10 @@
 # repovoa a partir do backup cifrado. Nunca se conecta ao HML nem a Production.
 # Resultado: lista PASS/FAIL de cada verificação; sai com código != 0 se alguma falhar.
 #
+# Versão 050 (10/11/2026): expectativas da 050 (55 migrations, head 20261117120000) e teste C1b
+# (raiz com prefixo sintético fora do inventário). Exige um backup NOVO do HML na 050; o backup
+# de 06/11/2026 é da 045 e o preflight 050 o recusa. Ainda NÃO executado nesta versão.
+#
 # Uso: scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <diretório-do-stack-local> [porta]
 #   <diretório-do-stack-local>: o --workdir do `supabase start` do ensaio (project_id e portas próprios).
 # Requer: psql, python3, supabase CLI, Docker, stack local já iniciado.
@@ -64,7 +68,7 @@ echo "== A. Restauração limpa e cópia isolada"
 reiniciar
 check "stack local isolado: porta $PORT, project_id do ensaio" "docker ps --format '{{.Names}} {{.Ports}}' | grep -q 'supabase_db_bs-hml-ensaio-20b.*:$PORT->'"
 fp base
-check "cópia restaurada: 31 tabelas, 17 contas, migrations 50 / head 045" "python3 -c \"import json;d=json.load(open('$OUT/base.json'));assert d['catalogo']['tabelas']==31 and d['auth']['users']==17 and d['migrations']['total']==50 and d['migrations']['head']=='20261112120000'\""
+check "cópia restaurada: 31 tabelas, contas presentes, migrations 55 / head 050" "python3 -c \"import json;d=json.load(open('$OUT/base.json'));assert d['catalogo']['tabelas']==31 and d['auth']['users']>=1 and d['migrations']['total']==55 and d['migrations']['head']=='20261117120000'\""
 check "gatilho legado de cálculo está desabilitado na origem (1 desabilitado)" "[ \"\$(\"\${P[@]}\" -c \"select count(*) from pg_trigger where tgname='trg_timesheet_entries_calculo_financeiro' and tgenabled='D'\")\" = 1 ]"
 
 echo "== B. Ensaio a seco (modo padrão NAO): não pode alterar nada"
@@ -81,10 +85,16 @@ rodar "$OUT/sim.sql"; rc=$?
 deve_abortar "C1 cliente fora dos prefixos sintéticos" 'origem sintetica: clients'
 "${P[@]}" -c "delete from public.clients where name='Cliente Real LTDA'" >/dev/null 2>&1
 fp c1; check "C1 nada foi alterado (dado injetado removido, resto igual)" "mesmo base c1"
+# C1b raiz com prefixo sintético, mas fora do inventário de 10/11/2026 (nome parecido não basta)
+"${P[@]}" -c "insert into public.clients(name) values ('HOMOLOG-SINT-NAO-INVENTARIADO')" >/dev/null 2>&1
+rodar "$OUT/sim.sql"; rc=$?
+deve_abortar "C1b cliente HOMOLOG-SINT fora do inventário" 'raizes: clientes'
+"${P[@]}" -c "delete from public.clients where name='HOMOLOG-SINT-NAO-INVENTARIADO'" >/dev/null 2>&1
+fp c1b; check "C1b nada foi alterado (dado injetado removido, resto igual)" "mesmo base c1b"
 # C2 ambiente errado (conjunto de migrations diferente)
 "${P[@]}" -c "insert into supabase_migrations.schema_migrations(version, name) values ('99999999999999','x')" >/dev/null 2>&1
 rodar "$OUT/sim.sql"; rc=$?
-deve_abortar "C2 migrations diferentes do HML 045" 'ambiente: migrations'
+deve_abortar "C2 migrations diferentes do HML 050" 'ambiente: migrations'
 "${P[@]}" -c "delete from supabase_migrations.schema_migrations where version='99999999999999'" >/dev/null 2>&1
 # C3 tabela nova não classificada
 "${P[@]}" -c "create table public.zz_nova_tabela(id int)" >/dev/null 2>&1
@@ -123,10 +133,10 @@ check "D2 as 23 tabelas de negócio/calendário estão com 0 linhas" "[ $ok_cont
 check "D3 financial_terms_audit ficou só com 'sistema' (7)" "[ \"\$(contagem pos financial_terms_audit)\" = 7 ]"
 check "D4 municipality_catalog ficou só com o oficial (1: Navegantes)" "[ \"\$(contagem pos municipality_catalog)\" = 1 ]"
 check "D5 job_functions ficou só com as 4 padrão" "[ \"\$(contagem pos job_functions)\" = 4 ]"
-check "D6 preservados com a MESMA contagem (profiles 15, user_roles 15, admin_audit_log 9, motor 1, tarifas 1)" "[ \"\$(contagem pos profiles)-\$(contagem pos user_roles)-\$(contagem pos admin_audit_log)-\$(contagem pos financial_engine_settings)-\$(contagem pos pricing_settings)\" = 15-15-9-1-1 ]"
+check "D6 preservados com a MESMA contagem da cópia antes do expurgo (profiles, user_roles, admin_audit_log, motor 1, tarifas 1)" "[ \"\$(contagem pos profiles)-\$(contagem pos user_roles)-\$(contagem pos admin_audit_log)-\$(contagem pos financial_engine_settings)-\$(contagem pos pricing_settings)\" = \"\$(contagem base profiles)-\$(contagem base user_roles)-\$(contagem base admin_audit_log)-1-1\" ]"
 # D7 impressão digital independente: só mudam as contagens e os hashes de catálogos parciais
 check "D7 Auth, migrations, RLS, grants, funções, gatilhos, políticas, índices e restrições idênticos (impressão digital independente)" "mesmo base pos contagem_public,configuracao.funcoes_md5,configuracao.municipios_md5"
-check "D8 Auth intacto: 17 contas, 17 identidades, 2 fatores MFA, mesmos IDs" "mesmo base pos contagem_public,configuracao,catalogo,migrations,identidade_public,extensoes"
+check "D8 Auth intacto: mesmas contas, identidades, fatores MFA e IDs da cópia antes do expurgo" "mesmo base pos contagem_public,configuracao,catalogo,migrations,identidade_public,extensoes"
 check "D9 perfis e papéis idênticos (md5)" "mesmo base pos contagem_public,configuracao,catalogo,migrations,auth,extensoes"
 check "D10 gatilho legado continua desabilitado (e só ele)" "[ \"\$(\"\${P[@]}\" -c \"select string_agg(tgname,',') from pg_trigger t join pg_class c on c.oid=t.tgrelid where not t.tgisinternal and c.relnamespace='public'::regnamespace and t.tgenabled<>'O'\")\" = trg_timesheet_entries_calculo_financeiro ]"
 

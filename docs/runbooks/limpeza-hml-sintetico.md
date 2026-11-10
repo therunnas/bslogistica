@@ -1,24 +1,210 @@
 # Limpeza dos dados sintéticos do HML — runbook e ensaio
 
-SDLC: Manutenção / Preparação de homologação. **Este documento é um plano com ensaio local.
-Nada foi executado no HML.** A execução exige autorização específica (seção 8). Estado
-factual: [HANDOFF](../HANDOFF.md). Condições comuns de runbooks: [índice](README.md).
+SDLC: Manutenção / Preparação de homologação. **Este documento é um plano. Nada foi executado no
+HML.** A versão para a **050** (10/11/2026) ainda **não foi ensaiada** (seção 6: BLOQUEADO). A
+execução exige ensaio local com 0 FAIL e autorização nominal (seção 8). Estado factual:
+[HANDOFF](../HANDOFF.md). Condições comuns de runbooks: [índice](README.md).
 
 Objetivo: deixar o HML (`qbnfcmrxmssnwkhaitgd`) sem dados de negócio sintéticos para uma
-homologação funcional do zero, **preservando** esquema, RLS, grants, funções, gatilhos,
-Auth, perfis, papéis, histórico de migrations e configurações financeiras. Não cria
-projeto Supabase nem altera Production.
+homologação funcional do zero, **preservando** esquema, RLS, grants, funções, gatilhos (e seus
+estados), Auth, perfis, papéis, histórico de migrations e configurações financeiras (motor e
+resolução de tarifas). Não cria projeto Supabase nem altera Production.
 
 Artefatos:
 
-| Arquivo                                                                                | Função                                                                                                        |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| [limpeza-hml-sintetico.sql](limpeza-hml-sintetico.sql)                                 | Expurgo em uma transação, fail-closed. **Modo padrão `NAO`: ensaio a seco que não altera dado.**              |
-| [hml-impressao-digital.sql](hml-impressao-digital.sql)                                 | Só leitura. JSON com migrations, contagens, Auth e hashes do catálogo, para comparar estados.                 |
-| [../../scripts/hml-restaurar-local.sh](../../scripts/hml-restaurar-local.sh)           | Restaura o backup cifrado num Supabase **local** isolado. Recusa destino que não esteja vazio.                |
-| [../../scripts/hml-limpeza-ensaio-local.sh](../../scripts/hml-limpeza-ensaio-local.sh) | Ensaio completo na cópia local: restauração limpa, a seco, cinco testes negativos, execução real, reexecução. |
+| Arquivo                                                                                | Função                                                                                                                 |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [limpeza-hml-sintetico.sql](limpeza-hml-sintetico.sql)                                 | Expurgo em uma transação, fail-closed. **Modo padrão `NAO`: ensaio a seco que não altera dado.** Versão 050.           |
+| [hml-impressao-digital.sql](hml-impressao-digital.sql)                                 | Só leitura. JSON com migrations, contagens, Auth e hashes do catálogo, para comparar estados. Não depende da versão.   |
+| [../../scripts/hml-restaurar-local.sh](../../scripts/hml-restaurar-local.sh)           | Restaura o backup cifrado num Supabase **local** isolado. Recusa destino que não esteja vazio. Exige macOS (Chaveiro). |
+| [../../scripts/hml-limpeza-ensaio-local.sh](../../scripts/hml-limpeza-ensaio-local.sh) | Ensaio completo na cópia local: restauração limpa, a seco, testes negativos, execução real, reexecução. Versão 050.    |
 
-## 1. Evidência do inventário (06/11/2026, leituras em transação `READ ONLY`)
+## 1. Inventário do HML na 050 (10/11/2026, somente leitura)
+
+Leitura por `GET` no PostgREST com a sessão do administrador real (RLS de admin, AAL1 sem MFA), a
+partir do app local ligado ao HML. **Não** foi lido o catálogo (`pg_*`, `supabase_migrations`) nem o
+schema `auth`: a raiz OpenAPI do PostgREST exige chave secreta e não há acesso SQL a partir desta
+máquina. Essas partes continuam garantidas pelo preflight do script, que aborta se divergirem.
+
+- **Ambiente:** emissor do token `qbnfcmrxmssnwkhaitgd`; `estado_motor_vigencia()` = motor ativo e
+  **consistente** (gatilho `trg_timesheet_entries_calculo_vigencia` ligado, legado
+  `trg_timesheet_entries_calculo_financeiro` desligado, 4 travas de taxa e jornada ligadas),
+  `resolucao_tarifas = false`, `preco_base_recuo = true` (048). Há trilha `corrected` de Containers (049)
+  e serviço com pedido no mesmo dia da execução (050): 049 e 050 aplicadas, coerente com o registro
+  de 09/11/2026 (HML 050).
+- **Assinatura de migrations esperada:** 55 versões, head `20261117120000`, md5 do conjunto
+  `01ca91361b85841984ee708716ee60ac`, calculado das versões de `supabase/migrations/` na main
+  `3cda0e5`. A mesma regra aplicada às 50 primeiras dá `688388431cd0e6bcc024814fceef8fcd`, que é
+  exatamente a assinatura que o HML 045 tinha: o ledger do HML usa as versões do repositório.
+- **Tabelas:** as 31 classificadas responderam. Nenhuma migration 046–050 cria tabela (só colunas,
+  restrições, funções e gatilhos), então o catálogo segue com 31 tabelas em `public`.
+- **Raízes:** 10 clientes e 14 colaboradores, **todos** com prefixo sintético conhecido:
+
+  | Prefixo        | Clientes | Colaboradores | Origem                                                                                   |
+  | -------------- | -------- | ------------- | ---------------------------------------------------------------------------------------- |
+  | `HML-TESTE`    | 1        | 2             | fixtures de 24/10/2026 (inventário 045)                                                  |
+  | `AUTH01C2`     | 3        | 0             | testes de autorização de 30/10/2026 (inventário 045)                                     |
+  | `E2E-S11`      | 2        | 5             | homologação FIN-PR-13, sessões 11–14 (inventário 045)                                    |
+  | `E2E-S19B`     | 1        | 2             | homologação S19 (inventário 045)                                                         |
+  | `HOMOLOG-SINT` | 3        | 5             | homologação de telas de 09–10/11/2026 (`-UI`, `-AV`, `-AV2`), IDs registrados no HANDOFF |
+
+- **Origem por chave estrangeira:** nas 21 tabelas de negócio, **0 linha** fora de uma raiz
+  sintética (mesmo rastreio do preflight). Operações avulsas: `E2E-S19B Avulsa 8b48`,
+  `Descarga de container – HOMOLOG-SINT-AV` e `Contagem de palete - HOMOLOG-SINT-AV2`.
+- **Calendário:** 10 feriados e 3 coberturas, todos fixtures (`E2E-…`, `AUTH01C2…`, `exemplo.gov.br`).
+- **Municípios:** 2. `4211306` (Navegantes) com fonte oficial do IBGE: **fica**. `4208203` com nome
+  `E2E-…` (sintético): sai.
+- **Funções:** 4 padrão (`auxiliar_producao`, `conferente`, `operador`, `administrativo`) e `e2e_s11_fn`
+  (sai).
+- **Trilha de condições:** 135 linhas = 7 de `sistema` (**ficam**) + 128 sintéticas. Das 128, 87 se
+  ligam a entidade existente, 40 têm motivo com marcador de teste e 1 (`municipio_catalogado`,
+  06/11/2026, motivo "Homologacao S19B …") se apoia no ator: **não** é a conta administrativa real e
+  já constava do inventário 045. As 18 trilhas do administrador real são de `sistema` ou ligadas às
+  entidades `HOMOLOG-SINT`.
+
+## 2. O que sai e o que fica (contagens de 10/11/2026, RLS de admin)
+
+| Destino      | Tabelas (linhas antes → depois)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Esvaziar** | `clients` 10, `contracts` 7, `contract_terms` 9, `contract_rate_terms` 4, `contract_employee_rates` 3, `operations` 9, `operation_terms` 3, `operation_location_terms` 4, `shifts` 8, `operation_team` 14, `user_operation_access` 4, `employees` 14, `employee_cost_terms` 15, `timesheets` 42, `timesheet_entries` 56, `invoices` 7, `invoice_items` 22, `billing_additionals` 18, `container_services` 11, `container_service_participants` 14, `container_service_audit` 14, `financial_holidays` 10, `financial_calendar_coverage` 3 → **0** (301 linhas) |
+| **Parcial**  | `financial_terms_audit` 135 → 7 (fica só `entity_kind = 'sistema'`); `municipality_catalog` 2 → 1; `job_functions` 5 → 4                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Intacto**  | `profiles` 15, `user_roles` (15 em 06/11/2026; a RLS do admin só mostra o próprio papel), `admin_audit_log` 9, `financial_engine_settings` 1, `pricing_settings` 1; schema `auth` inteiro; `supabase_migrations` (55)                                                                                                                                                                                                                                                                                                                                          |
+
+Também permanecem sem mudança RLS, grants, funções, gatilhos (e seus estados), políticas, índices e
+restrições. As contagens reais são revalidadas pelo próprio script (relatório `contagens_antes`) e pela
+impressão digital antes da execução.
+
+Faturas emitidas que saem (todas de clientes sintéticos): 7, entre elas `HOMOLOG-SINT-UI` R$ 965,31
+(`c40428d0…`) e `HOMOLOG-SINT-AV` R$ 456,25. O `HOMOLOG-SINT-AV2` não tem fatura.
+
+### Calendário e municípios (tratados à parte)
+
+Mesma regra da 045: feriados e coberturas sintéticos saem e o script **recusa** a limpeza se
+encontrar fonte oficial real; o município de nome sintético sai e o de fonte oficial fica. Reposição
+(fora do script, depois da limpeza, por administrador no app): Itajaí pelo nome oficial e as coberturas
+e feriados reais, a partir de [calendário: fontes oficiais](../financeiro/calendario-fontes-oficiais.md).
+
+## 3. Diferenças da 045 para a 050 que o roteiro precisou tratar
+
+| Migration | Mudança no banco                                                                                                                                                                                                                                      | Efeito no roteiro                                                                                                                                                                                      |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 046       | Fatura com lastro = apontamento **ou adicional** vinculado; guarda de `invoices` cobre também `DELETE`; `BEFORE TRUNCATE` de `timesheet_entries` e `invoice_items` recusa com adicional faturado; revoga escrita da API em `invoices`/`invoice_items` | Sem mudança de lógica: o expurgo já desliga, um a um, os gatilhos habilitados das tabelas-alvo e religa os mesmos; quem executa é o dono (`postgres`), não a API. Comentário acrescentado no passo 4.1 |
+| 047       | `billing_additionals` ganha `idempotency_key` e `request_payload` (UNIQUE parcial)                                                                                                                                                                    | Nenhum (tabela esvaziada inteira); muda o hash de colunas da impressão digital em relação à 045                                                                                                        |
+| 048       | `derivar_valores_por_vigencia`, `alterar_resolucao_tarifas` e `estado_motor_vigencia` substituídas                                                                                                                                                    | Nenhum; `pricing_settings` e `financial_engine_settings` seguem preservadas                                                                                                                            |
+| 049       | `container_service_audit.action` aceita `corrected`; RPC `corrigir_servico_container`                                                                                                                                                                 | Nenhum (tabela esvaziada inteira; há trilha `corrected` sintética)                                                                                                                                     |
+| 050       | `container_services` aceita pedido no mesmo dia da execução                                                                                                                                                                                           | Nenhum                                                                                                                                                                                                 |
+
+Mudanças no script (todas fail-closed):
+
+1. **Assinatura do ambiente** passa a ser a da 050 (55, `20261117120000`, `01ca9136…`). HML ainda na
+   045, Production (034) ou qualquer outro banco **reprova**.
+2. Prefixo `HOMOLOG-SINT` acrescentado às raízes sintéticas.
+3. **Raízes presas ao inventário de 10/11/2026** (nova verificação 3.6b): os 10 clientes por ID; os
+   colaboradores por contagem exata por prefixo e os 5 `HOMOLOG-SINT` por ID. Uma raiz nova ou faltante,
+   **mesmo com prefixo sintético**, aborta. Nome parecido não basta.
+4. **`NULL` não é `false`**: o rastreio de origem (3.6) e a trilha (3.10) usavam `x NOT IN (...)`, que
+   devolve `NULL` com chave nula e deixaria a linha **fora** da contagem de "fora da origem". Passam a usar
+   `(x IN (...)) IS NOT TRUE`: chave nula conta como fora e bloqueia.
+5. Trilha com `entity_kind` nulo bloqueia (3.10b): o `DELETE` usa `<> 'sistema'` e não a removeria.
+
+## 4. Salvaguardas do script
+
+1. **Ensaio a seco por padrão.** Sem editar a linha `bs_limpeza.executar`, nada é alterado.
+2. **Assinatura do ambiente:** migrations do HML 050 e dados-assinatura sintéticos.
+3. **Todas as 31 tabelas classificadas:** tabela nova ou ausente aborta.
+4. **Origem sintética** em cada tabela, calendário, municípios, funções e trilha; **raízes iguais ao
+   inventário**; linha fora da origem, chave nula ou registro desconhecido aborta.
+5. **Trava de execução única** (advisory lock) e `LOCK TABLE` com `lock_timeout` de 5 s.
+6. **Sem `CASCADE`:** referência de tabela fora da lista faz o `TRUNCATE` falhar e tudo ser desfeito.
+7. **Gatilhos:** só os habilitados são desligados e exatamente os mesmos são religados; o legado
+   desligado continua desligado (um `ENABLE TRIGGER USER` genérico religaria o cálculo legado).
+8. **Validação integral antes do `COMMIT`:** impressão digital do que deve permanecer igual à fotografia
+   inicial (Auth, perfis, papéis, motor, tarifas, migrations, catálogo, grants, RLS, gatilhos e estados),
+   e contagens esperadas. Divergência lança exceção e a transação inteira é desfeita.
+9. Não imprime linha de dados: o relatório só tem contagens e nomes de verificação.
+
+## 5. Backup
+
+O backup de 06/11/2026 é da **045** (cifrado, fora do Git, item do Chaveiro
+`bs-backup-hml-2026-11-06-045`) e **não serve** para a 050: o HML recebeu 046–050 e as escritas
+sintéticas de 09–10/11/2026, e o preflight 050 recusa uma cópia 045. Antes de qualquer execução é
+preciso um **backup novo** do HML na 050, com o mesmo procedimento (dump de `public`, dados de `auth` e
+`supabase_migrations`, papéis; cifragem AES-256-CBC/PBKDF2; hash conferido; segunda cópia em destino
+independente decidido pela BS) e **restauração comprovada** numa stack local isolada. Procedimento geral:
+[backup-production.md](backup-production.md). `scripts/hml-restaurar-local.sh` aceita o novo item por
+`KEYCHAIN_ITEM`.
+
+## 6. Ensaio local da versão 050 — BLOQUEADO (10/11/2026)
+
+**Não executado.** A máquina desta sessão (Windows) não tem Docker nem Supabase CLI (o
+`scripts/testar-sql-local.sh` também os exige), não tem `python3` no `PATH`, e o backup cifrado do HML
+está em outra máquina, na 045. Há um PostgreSQL 18 instalado, sem serviço ativo, mas montar nele um banco
+"parecido com Supabase" seria improvisar: ele não reproduz Auth, papéis, o `postgres` não superusuário
+nem os dados do HML. Nada foi declarado PASS.
+
+Para desbloquear (sem autorização de escrita remota): uma máquina com Docker, Supabase CLI, `psql` e
+`python3`; um backup **novo** do HML na 050 com restauração local comprovada; então
+`scripts/hml-limpeza-ensaio-local.sh <pasta-do-backup> <workdir-da-stack> [porta]`, exigindo **0 FAIL**
+em todas as seções (A–G, inclusive o novo C1b).
+
+Validação estática feita nesta versão: `bash -n` dos dois scripts; revisão do SQL contra as migrations
+046–050; conferência de que não há `CASCADE`, de que o modo padrão é `NAO` e de que as constantes de
+assinatura batem com o repositório.
+
+## 7. Execução futura no HML (somente com a autorização da seção 8)
+
+Cada passo exige o anterior concluído. Usar sempre `env -u SUPABASE_ACCESS_TOKEN`, `--project-ref
+qbnfcmrxmssnwkhaitgd` explícito e confirmar o nome do projeto (`bs-logistica-homologacao`) em
+`supabase projects list`.
+
+1. **HML parado:** ninguém usando o app ligado ao HML nem testes em andamento.
+2. **Linha de base, backup e ensaio:** `hml-impressao-digital.sql` no HML; backup novo (seção 5) com
+   restauração local; `scripts/hml-limpeza-ensaio-local.sh` sobre esse backup com **0 FAIL**. Se o HML
+   receber escrita depois do inventário de 10/11/2026, o preflight 3.6b reprova: refazer o inventário,
+   revisar o script e repetir o ensaio.
+3. **Ensaio a seco no HML** (script **sem editar**, modo `NAO`):
+   `supabase db query --linked --project-ref qbnfcmrxmssnwkhaitgd -f docs/runbooks/limpeza-hml-sintetico.sql -o json`.
+   Deve devolver `ENSAIO A SECO`, `reprovadas: 0` e contagens iguais às da seção 2.
+4. **Execução:** trocar `'NAO'` por `'SIM'` na linha marcada (a única edição; aparece no diff) e rodar o
+   mesmo comando. Espera-se `EXECUTADO` e `reprovadas: 0`. Falha em qualquer etapa desfaz tudo.
+5. **Pós-verificação:** impressão digital igual à linha de base exceto contagens e os hashes de
+   municípios e funções; head 050; motor e tarifas inalterados (`estado_motor_vigencia()` consistente,
+   resolução OFF); login do admin real; listas vazias no app; operacional sem acesso a áreas
+   administrativas.
+6. **Reposição do calendário** (seção 2) e homologação manual do zero pelo responsável.
+
+Critérios de interrupção: qualquer exceção, divergência de contagem, `reprovadas > 0` ou dúvida. **Não**
+repetir às cegas: conferir o estado com a impressão digital antes de decidir.
+
+Recuperação: antes do `COMMIT`, o próprio `ROLLBACK`. Depois do `COMMIT`, restaurar o backup novo (perde
+apenas dados sintéticos) seguindo [backup-production.md](backup-production.md), seção 3, com autorização
+própria para o destino remoto (**o script de restauração recusa destino não local**).
+
+## 8. Autorização necessária para executar no HML
+
+Para executar a seção 7, a pessoa responsável deve autorizar **por escrito**, citando: o projeto
+`qbnfcmrxmssnwkhaitgd`; o backup novo na 050 e o destino da segunda cópia; o resultado do ensaio local
+com 0 FAIL; a execução de `limpeza-hml-sintetico.sql`, primeiro a seco e depois com `'SIM'`; a janela; e
+a lista da seção 2 (301 linhas de negócio e calendário, 128 trilhas sintéticas, o município de nome
+sintético e a função `e2e_s11_fn`). Autorização de leitura ou de ensaio local **não** cobre isso.
+
+## 9. Riscos e pendências
+
+- Desabilitar gatilhos de proteção, ainda que dentro de uma transação, é o ponto sensível; mitigado pela
+  guarda de origem, pelas raízes presas, pelo ensaio e pela validação antes do `COMMIT`.
+- A versão 050 **não foi ensaiada**: sintaxe e comportamento do SQL só ficam comprovados no ensaio.
+- O inventário de 10/11/2026 foi lido com a RLS do admin, sem catálogo nem Auth; o preflight cobre essas
+  partes no alvo.
+- Sem backup gerenciado e sem PITR no HML, a recuperação depende do backup novo e da sua segunda cópia.
+- A API de gerenciamento do Supabase só é exercitada no passo 3 da seção 7.
+- A conta administrativa real não tem segundo fator; a limpeza não altera isso.
+
+## Histórico — versão 045 (06/11/2026)
+
+Registro preservado do roteiro anterior (branch `docs/hml-limpeza-runbook`, `169f592`). Não descreve o
+HML atual.
+
+### 045 — 1. Evidência do inventário (06/11/2026, leituras em transação `READ ONLY`)
 
 - HML: 50 migrations, head `20261112120000` (045), 31 tabelas em `public`, todas com RLS, todas
   de dono `postgres`; 16 MB; motor ativo; resolução de tarifas desligada. Sem backup gerenciado
@@ -35,7 +221,7 @@ Artefatos:
 - Os 120 avisos do advisor do Supabase no HML (64 `SECURITY DEFINER` executáveis por
   `authenticated`, 50 de desempenho, 5 políticas permissivas, 1 senha vazada) não mudam com a limpeza.
 
-## 2. O que sai e o que fica
+### 045 — 2. O que sai e o que fica
 
 | Destino      | Tabelas (linhas antes → depois)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -46,7 +232,7 @@ Artefatos:
 Total: **413 → 53 linhas**. Também permanecem sem mudança RLS, grants, funções, gatilhos (e seus estados),
 políticas, índices e restrições.
 
-### Calendário e municípios (tratados à parte)
+#### Calendário e municípios (tratados à parte)
 
 - **Feriados (10) e coberturas (3):** todos fixtures de teste (`ATO_SINTETICO`, `exemplo.gov.br`, nomes
   `E2E-…` ou `AUTH01C2…`). São removidos. O script **recusa** a limpeza se encontrar registro com fonte oficial real.
@@ -58,35 +244,7 @@ políticas, índices e restrições.
   [calendário: fontes oficiais](../financeiro/calendario-fontes-oficiais.md). Nada de calendário real é carregado
   por script nem por migration.
 
-## 3. Por que não é um `DELETE`
-
-O HML tem cerca de 40 gatilhos de imutabilidade que recusam `DELETE` e `TRUNCATE` por desenho (faturas,
-Containers, adicionais, tarifas, diárias individuais, calendário, catálogo de municípios, funções, trilha de
-condições). Há FKs com `CASCADE` (`clients` → contratos, faturas, operações) e `RESTRICT`. O papel `postgres`
-hospedado não é superusuário (`session_replication_role` indisponível), mas é **dono** das tabelas e pode usar
-`ALTER TABLE … DISABLE TRIGGER`, que é transacional.
-
-Decisão: **expurgo transacional controlado** — desabilitar, um a um, só os gatilhos que estavam habilitados;
-`TRUNCATE` de lista explícita **sem `CASCADE`**; religar exatamente os mesmos; validar tudo; só então `COMMIT`.
-Alternativas descartadas: `supabase db reset --linked` (recria schemas, risco sobre Auth e grants; proibido) e
-manter os dados com outro prefixo (faturas fechadas e calendário sintético continuariam poluindo Dashboard,
-Fechamento e Relatórios).
-
-## 4. Salvaguardas do script (todas exercitadas no ensaio)
-
-1. **Ensaio a seco por padrão.** Sem editar a linha `bs_limpeza.executar`, nada é alterado.
-2. **Assinatura do ambiente:** conjunto de migrations igual ao do HML 045 (50, head `20261112120000`, hash do
-   conjunto) e dados-assinatura sintéticos. Production (034) ou outro banco **reprova**.
-3. **Todas as 31 tabelas classificadas:** tabela nova ou ausente aborta.
-4. **Origem sintética em cada tabela**, calendário, municípios, funções e trilha; linha fora da origem aborta.
-5. **Trava de execução única** (advisory lock) e `LOCK TABLE` com `lock_timeout` de 5 s; tabela em uso aborta.
-6. **Sem `CASCADE`:** referência de tabela fora da lista faz o `TRUNCATE` falhar e tudo ser desfeito.
-7. **Validação integral antes do `COMMIT`:** impressão digital do que deve permanecer igual à fotografia inicial,
-   estado individual de cada gatilho igual ao original e contagens esperadas. Qualquer divergência lança exceção
-   e a transação inteira é desfeita.
-8. Não imprime linha de dados: o relatório só tem contagens e nomes de verificação.
-
-## 5. Backup (somente leitura) e segunda cópia
+### 045 — 5. Backup (somente leitura) e segunda cópia
 
 Feito em 06/11/2026 sobre o HML, sem alterá-lo (a impressão digital do HML ficou idêntica antes e depois do dump),
 com `supabase db dump --linked --project-ref qbnfcmrxmssnwkhaitgd` (esquema `public`, dados de `public`, dados
@@ -103,7 +261,7 @@ na máquina de quem executou; senha no Chaveiro (item `bs-backup-hml-2026-11-06-
 - Sem backup gerenciado no plano atual, **este dump é a única recuperação**. Refazer o dump se o HML receber
   qualquer escrita antes da janela (comparar com `hml-impressao-digital.sql`).
 
-## 6. Restauração local e ensaio (resultado de 06/11/2026)
+### 045 — 6. Restauração local e ensaio (resultado de 06/11/2026)
 
 Stack local `bs-hml-ensaio-20b` (API 58321, banco 58322; nenhuma das portas dos outros stacks), sem migrations
 no diretório (o banco vem do backup). `scripts/hml-restaurar-local.sh` restaurou sem erro real; a impressão
@@ -130,46 +288,3 @@ digital da cópia coincide com a do HML em **65 de 67 campos**. As duas diferen�
 Limites do ensaio: Postgres local é superusuário no ensaio de restauração (o expurgo roda como `postgres`, não
 superusuário); a API de gerenciamento do Supabase **não** foi exercitada (seria execução remota). O primeiro contato
 com ela é o passo 3 da seção 7.
-
-## 7. Execução futura no HML (somente com a autorização da seção 8)
-
-Cada passo exige o anterior concluído. Usar sempre `env -u SUPABASE_ACCESS_TOKEN`, `--project-ref qbnfcmrxmssnwkhaitgd`
-explícito e confirmar o nome do projeto (`bs-logistica-homologacao`) em `supabase projects list`.
-
-1. **HML parado:** ninguém usando o Preview vinculado nem testes em andamento.
-2. **Linha de base e backup novos:** `hml-impressao-digital.sql` (comparar com o desta sessão: se diferir, o HML
-   recebeu escrita; refazer dump e ensaio); novo dump cifrado conforme a seção 5; repetir
-   `scripts/hml-limpeza-ensaio-local.sh` com o dump novo (exige 0 FAIL).
-3. **Ensaio a seco no HML** (script **sem editar**, modo `NAO`):
-   `supabase db query --linked --project-ref qbnfcmrxmssnwkhaitgd -f docs/runbooks/limpeza-hml-sintetico.sql -o json`.
-   Deve devolver `ENSAIO A SECO`, `reprovadas: 0` e contagens iguais às da seção 2. Só toma travas por instantes.
-4. **Execução:** trocar `'NAO'` por `'SIM'` na linha marcada (a única edição; aparece no diff) e rodar o mesmo comando.
-   Espera-se `EXECUTADO` e `reprovadas: 0`. Falha em qualquer etapa desfaz tudo.
-5. **Pós-verificação:** `hml-impressao-digital.sql` deve diferir da linha de base **apenas** nas contagens e nos hashes
-   de municípios e funções; head 045; motor e tarifas inalterados; login do admin real; listas vazias no app;
-   operacional sem acesso a áreas administrativas.
-6. **Reposição do calendário** (seção 2) e início da homologação do zero.
-
-Critérios de interrupção: qualquer exceção, divergência de contagem, `reprovadas > 0` ou dúvida. **Não** repetir às
-cegas: conferir o estado com a impressão digital antes de decidir.
-
-Recuperação: antes do `COMMIT`, o próprio `ROLLBACK`. Depois do `COMMIT`, restaurar o dump (perde apenas dados
-sintéticos) seguindo [backup-production.md](backup-production.md), seção 3, com os ajustes registrados em
-`scripts/hml-restaurar-local.sh` (adaptar o destino com autorização própria; **o script recusa destino não local**).
-
-## 8. Autorização necessária para executar no HML
-
-Para executar a seção 7, a pessoa responsável deve autorizar **por escrito**, citando: o projeto
-`qbnfcmrxmssnwkhaitgd`; a execução de `limpeza-hml-sintetico.sql`, primeiro a seco e depois com `'SIM'`; a janela;
-a decisão sobre o destino da segunda cópia do backup; e a lista da seção 2 (inclusive a remoção do município de nome
-sintético e dos 116 registros de trilha sintética). Autorização de leitura ou de ensaio local **não** cobre isso.
-
-## 9. Riscos e pendências
-
-- Desabilitar gatilhos de proteção, ainda que dentro de uma transação, é o ponto sensível; mitigado pela guarda de
-  origem sintética, pelo ensaio e pela validação antes do `COMMIT`.
-- Sem backup gerenciado e com a segunda cópia ainda na mesma máquina, a recuperação depende de um único notebook.
-- O script fixa a assinatura do HML 045 (hash do conjunto de migrations). Uma migration futura no HML exige
-  reavaliar e atualizar o script antes de usá-lo.
-- A API de gerenciamento só foi exercitada em leitura; o passo 3 da seção 7 é a prova no alvo.
-- A conta administrativa real não tem segundo fator; a limpeza não altera isso.

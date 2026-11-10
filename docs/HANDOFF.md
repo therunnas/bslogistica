@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**DOC-01 — `PROGRESS.md` alinhado ao estado real depois de #119–#123 (todos mesclados), em PR Draft. Production na 034, HML na 050, resolução comercial OFF.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
+**HML-LIMPEZA-01 — roteiro de limpeza dos dados sintéticos do HML atualizado para a 050, em PR Draft; ensaio local BLOQUEADO (sem Docker/Supabase CLI e sem backup 050 nesta máquina). Nada executado no HML. Production na 034.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | DOC-01 — Gate 1/2, documentação |
-| Gate atual | Gate 2: PR Draft só de documentação; CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
-| Último gate concluído | #123 (UX-FATURA-01) mesclado por squash em `c6f91305c2d88048adc31387f9966b02aa48ef86`, árvore idêntica a `8676bdd` |
-| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-docs-progress` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-ux-*` (branches mescladas). Descobrir de novo na retomada |
-| Branch | `docs/progress-estado-atual`, criada de `origin/main` |
-| Base | main `c6f91305c2d88048adc31387f9966b02aa48ef86` |
-| HEAD validado | c6f91305c2d88048adc31387f9966b02aa48ef86 + o diff deste commit (`PROGRESS.md` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Etapa | HML-LIMPEZA-01 — Gate 4, preparação |
+| Gate atual | Preparação documental em PR Draft; ensaio local BLOQUEADO; limpeza remota NÃO autorizada. Parecer: NO-GO para pedir a execução até o ensaio com 0 FAIL |
+| Último gate concluído | #124 (DOC-01) mesclado por squash em `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
+| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-hml-limpeza-050` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-ux-*`/`-docs-progress` (branches mescladas). Descobrir de novo na retomada |
+| Branch | `docs/hml-limpeza-050`, criada de `origin/main`; reaproveita seletivamente 5 arquivos de `origin/docs/hml-limpeza-runbook` (`169f592`), sem mesclar a branch antiga |
+| Base | main `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
+| HEAD validado | 3cda0e55906401a635d5663b23d823d5a98b9fb6 + dois commits desta branch (importação sem alteração e adaptação 050). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#123 mesclados; nenhum outro PR aberto |
-| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) e Production `ehkduqokntemtmqzdrbd` (034) não tocados |
-| Última ação comprovada | `PROGRESS.md` reescrito nas seções "Tarefa ativa única", "Situação", "Próxima etapa" e "Não fazer ainda", e na linha "Dependências"; fatos conferidos no Git |
-| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois, item 2 da fila: auditoria do código e roteiro de limpeza do HML para a 050 (`origin/docs/hml-limpeza-runbook`) |
+| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#124 mesclados |
+| Ambiente-alvo | HML `qbnfcmrxmssnwkhaitgd` (050) só lido (GET no PostgREST com a sessão admin e a RPC de leitura `estado_motor_vigencia`); nenhuma escrita. Production `ehkduqokntemtmqzdrbd` não tocada (034) |
+| Última ação comprovada | Inventário somente leitura do HML (31 tabelas, raízes, origem por FK, trilha, motor) e roteiro adaptado para a 050; `bash -n` dos scripts, Prettier dos documentos e `check:workflow` PASS |
+| Próxima ação exata | Usuário revisa o PR Draft. Para desbloquear o ensaio: máquina com Docker, Supabase CLI, `psql` e `python3`; backup novo do HML na 050 com restauração local comprovada; `scripts/hml-limpeza-ensaio-local.sh` com 0 FAIL. Só então pedir autorização nominal da limpeza (runbook, seção 8) |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `c6f9130` (#123 sobre `7b03772`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)); confirmação antes de gerar fatura ([#123](https://github.com/therunnas/bslogistica/pull/123)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| Main | `3cda0e5` (#124 sobre `c6f9130`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)); confirmação antes de gerar fatura ([#123](https://github.com/therunnas/bslogistica/pull/123)); `PROGRESS.md` alinhado ([#124](https://github.com/therunnas/bslogistica/pull/124)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | HML-LIMPEZA-01 (10/11/2026): auditar o código e atualizar para a 050 o roteiro de limpeza dos dados sintéticos do HML preparado para a 045. Importados sem alteração (commit próprio) `docs/runbooks/limpeza-hml-sintetico.md`, `limpeza-hml-sintetico.sql`, `hml-impressao-digital.sql`, `scripts/hml-limpeza-ensaio-local.sh` e `scripts/hml-restaurar-local.sh` de `169f592`; adaptados em seguida. Limpeza remota NÃO executada nem autorizada |
+| Resultados e testes comprovados | 045 → 050: nenhuma tabela nova (046–050 só colunas, restrições, funções e gatilhos); 046 amplia a imutabilidade da fatura e o `BEFORE TRUNCATE` de `timesheet_entries`/`invoice_items` (tratado pela desabilitação individual dos gatilhos); 047 colunas de idempotência em `billing_additionals`; 049 ação `corrected`; 050 pedido no mesmo dia. Inventário do HML (somente leitura, sessão admin, RLS de admin): 31 tabelas respondem; 10 clientes e 14 colaboradores, todos de prefixo sintético (`HML-TESTE`, `AUTH01C2`, `E2E-S11`, `E2E-S19B`, `HOMOLOG-SINT`); 0 linha fora da origem nas 21 tabelas de negócio; calendário 13 fixtures; municípios 2 (1 sintético sai, Navegantes fica); funções 5 (`e2e_s11_fn` sai); trilha 135 (7 `sistema` ficam, 128 sintéticas, só 1 apoiada no ator, que não é o admin real); motor ativo e consistente, resolução OFF. Assinatura 050 calculada do repositório: 55 versões, head `20261117120000`, md5 `01ca91361b85841984ee708716ee60ac` (a mesma regra nas 50 primeiras dá `688388431cd0e6bcc024814fceef8fcd`, a assinatura do HML 045). Script: assinatura 050; prefixo `HOMOLOG-SINT`; nova 3.6b prende as raízes ao inventário (10 clientes por ID, colaboradores por prefixo e os 5 HOMOLOG-SINT por ID); 3.6 e 3.10 trocam `NOT IN` por `(... IN ...) IS NOT TRUE` (chave nula não escapa); 3.10b bloqueia trilha sem tipo. Ensaio: expectativas 050 e novo C1b. **Ensaio local BLOQUEADO:** sem Docker, Supabase CLI e `python3`, e o backup cifrado do HML é da 045 e está em outra máquina; PostgreSQL 18 local não reproduz Supabase (não usado). Validação executada: `bash -n` dos dois scripts PASS; Prettier dos dois `.md` alterados PASS; `check:workflow` PASS; `git diff --check` PASS. SQL não executado em nenhum banco |
+| Código e PR afetados | `docs/runbooks/limpeza-hml-sintetico.md`, `docs/runbooks/limpeza-hml-sintetico.sql`, `docs/runbooks/hml-impressao-digital.sql` (sem mudança), `docs/runbooks/README.md`, `scripts/hml-limpeza-ensaio-local.sh`, `scripts/hml-restaurar-local.sh` (sem mudança), `docs/HANDOFF.md`. Nenhum `src/`, migration, `package.json`, lockfile ou workflow. PR Draft desta branch contra main |
+| Ambientes envolvidos | HML só lido (GET no PostgREST com a sessão do admin real, token de `qbnfcmrxmssnwkhaitgd`, e a RPC `estado_motor_vigencia`, que só lê); nada escrito, nenhum reset, nenhuma migration. App local na 3001 só como origem da sessão, encerrado; token apagado da memória da aba; `AGENTS.md` reescrito pelo `next dev` restaurado. Production, Auth, usuários, permissões, flags, `.env` e site institucional intocados |
+| Pendências e decisões | (1) Ensaio local da versão 050 com 0 FAIL (Docker, Supabase CLI, `psql`, `python3`, backup novo do HML na 050 restaurado); (2) decisão da BS sobre o destino independente da segunda cópia do backup; (3) se o HML receber escrita depois de 10/11/2026, refazer o inventário e ajustar a 3.6b; (4) autorização nominal da limpeza (runbook, seção 8). Alternativa a avaliar em tarefa própria: ensaio na CI (`sql-local`) com dados sintéticos semeados, que exigiria um teste SQL novo |
+| Próxima ação exata | Revisão do PR pelo responsável; nenhuma execução remota, merge ou Ready sem autorização nominal |
+| Autorizações e proibições | Autorizados: leitura de código e documentação, leitura do HML, branch/worktree isolados, adaptação do runbook, ensaio local isolado (bloqueado), commit/push desta branch e um PR Draft. Proibidos: apagar ou alterar dados do HML, expurgo remoto, aplicar migrations, Production, novo Supabase, Auth/usuários/permissões, flags, regras financeiras, `src/`, `supabase/migrations/`, `package.json`, lockfile, workflows, `.env`, credenciais, force push, merge, Ready, reset remoto, site institucional |
+
+### Tarefa anterior — DOC-01 (10/11/2026, #124 mesclado)
 
 | Campo | Valor |
 | --- | --- |
@@ -131,11 +143,11 @@
 
 ## Autorizações
 
-Escritas sintéticas `HOMOLOG-SINT`, `HOMOLOG-SINT-AV` e `HOMOLOG-SINT-AV2` concluídas, não vigentes. #119–#123 mesclados pelo usuário. DOC-01 (vigente): `PROGRESS.md` e `docs/HANDOFF.md`, commit/push na branch `docs/progress-estado-atual` e um PR Draft. Não se estendem a código, HML, Production ou ativação comercial.
+Escritas sintéticas `HOMOLOG-SINT`, `-AV` e `-AV2` concluídas, não vigentes. #119–#124 mesclados pelo usuário. HML-LIMPEZA-01 (vigente): leitura do HML, adaptação do roteiro de limpeza para a 050, ensaio local isolado, commit/push na branch `docs/hml-limpeza-050` e um PR Draft. Não cobre a limpeza remota, que exige autorização nominal própria (runbook, seção 8).
 
 ## Proibições
 
-Sem deploy ou migration em Production, escrita no HML, emissão de fatura, resolução de tarifas ON, dados reais, mudança de dependências, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, merge ou Ready do PR da DOC-01 sem autorização nominal.
+Sem deploy ou migration em Production, escrita ou expurgo no HML, reset remoto, emissão de fatura, resolução de tarifas ON, dados reais, mudança de dependências, Auth/usuários/permissões, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, merge ou Ready do PR da HML-LIMPEZA-01 sem autorização nominal.
 
 ## Retomada
 

@@ -3,9 +3,11 @@
 --
 -- NÃO EXECUTAR sem autorização específica da pessoa responsável, na janela
 -- combinada, depois de backup restaurável (ver limpeza-hml-sintetico.md).
--- Este script foi ensaiado SOMENTE em cópia local restaurada do backup.
+-- A versão 045 deste script foi ensaiada SOMENTE em cópia local restaurada do backup
+-- (06/11/2026). Esta versão 050 (10/11/2026) AINDA NÃO FOI ENSAIADA: ver a seção 6
+-- do runbook. Não executar no HML antes do ensaio local com 0 FAIL.
 --
--- Estado esperado do banco-alvo (migration head 045, 50 migrations): é verificado
+-- Estado esperado do banco-alvo (migration head 050, 55 migrations): é verificado
 -- pelo preflight abaixo; qualquer divergência ABORTA sem alterar nada.
 --
 -- Como funciona (tudo em UMA transação):
@@ -226,10 +228,12 @@ CREATE TEMP TABLE bs_gatilhos ON COMMIT DROP AS
 -- ---------------------------------------------------------------------------
 CREATE TEMP TABLE bs_checks (ordem serial, nome text NOT NULL, ok boolean NOT NULL, detalhe text) ON COMMIT DROP;
 
--- 3.1 Ambiente-alvo: o conjunto de migrations é o do HML (045). Production (034) ou outro banco reprova.
+-- 3.1 Ambiente-alvo: o conjunto de migrations é o do HML (050). Production (034), o HML ainda
+--     na 045 ou outro banco reprova. O md5 é o das 55 versões de supabase/migrations/ da main
+--     (3cda0e5); o da 045 (688388431cd0e6bcc024814fceef8fcd) era o das 50 primeiras, mesma regra.
 INSERT INTO bs_checks (nome, ok, detalhe)
-SELECT 'ambiente: migrations = HML 045',
-       (count(*) = 50 AND max(version) = '20261112120000' AND md5(string_agg(version, ',' ORDER BY version)) = '688388431cd0e6bcc024814fceef8fcd'),
+SELECT 'ambiente: migrations = HML 050',
+       (count(*) = 55 AND max(version) = '20261117120000' AND md5(string_agg(version, ',' ORDER BY version)) = '01ca91361b85841984ee708716ee60ac'),
        'total=' || count(*) || ' head=' || coalesce(max(version), '-')
   FROM supabase_migrations.schema_migrations;
 
@@ -265,39 +269,70 @@ SELECT 'gatilhos: estados apenas O ou D',
 
 -- 3.6 ORIGEM SINTÉTICA: nenhuma linha das tabelas-alvo pode ser rastreada fora de uma raiz sintética.
 --     Raízes: clientes e colaboradores com prefixo sintético conhecido. Para acrescentar um
---     prefixo, é preciso editar este script (e passar pela revisão).
-WITH sc AS (SELECT id FROM public.clients WHERE name ~ '^(HML-TESTE|AUTH01C2|E2E-S11|E2E-S19B)'),
-     se AS (SELECT id FROM public.employees WHERE name ~ '^(HML-TESTE|AUTH01C2|E2E-S11|E2E-S19B)'),
+--     prefixo, é preciso editar este script (e passar pela revisão). HOMOLOG-SINT (050): raízes
+--     criadas nas homologações de 09–10/11/2026 (HOMOLOG-SINT-UI, -AV e -AV2), presas por ID em 3.6b.
+--     `(x IN (...)) IS NOT TRUE` em vez de `x NOT IN (...)`: chave nula ou subconsulta com nulo
+--     dariam NULL, e a linha escaparia da contagem (NULL não é false). Nula aqui conta como fora.
+WITH sc AS (SELECT id FROM public.clients WHERE name ~ '^(HML-TESTE|AUTH01C2|E2E-S11|E2E-S19B|HOMOLOG-SINT)'),
+     se AS (SELECT id FROM public.employees WHERE name ~ '^(HML-TESTE|AUTH01C2|E2E-S11|E2E-S19B|HOMOLOG-SINT)'),
      so AS (SELECT id FROM public.operations WHERE client_id IN (SELECT id FROM sc)),
      sk AS (SELECT id FROM public.contracts WHERE client_id IN (SELECT id FROM sc)),
      sts AS (SELECT id FROM public.timesheets WHERE operation_id IN (SELECT id FROM so)),
      sinv AS (SELECT id FROM public.invoices WHERE client_id IN (SELECT id FROM sc)),
      ssv AS (SELECT id FROM public.container_services WHERE client_id IN (SELECT id FROM sc)),
      fora AS (
-       SELECT 'clients' t, count(*) FILTER (WHERE id NOT IN (SELECT id FROM sc)) n FROM public.clients
-       UNION ALL SELECT 'employees', count(*) FILTER (WHERE id NOT IN (SELECT id FROM se)) FROM public.employees
-       UNION ALL SELECT 'contracts', count(*) FILTER (WHERE client_id NOT IN (SELECT id FROM sc)) FROM public.contracts
-       UNION ALL SELECT 'operations', count(*) FILTER (WHERE client_id NOT IN (SELECT id FROM sc)) FROM public.operations
-       UNION ALL SELECT 'shifts', count(*) FILTER (WHERE operation_id NOT IN (SELECT id FROM so)) FROM public.shifts
-       UNION ALL SELECT 'operation_team', count(*) FILTER (WHERE operation_id NOT IN (SELECT id FROM so) OR employee_id NOT IN (SELECT id FROM se)) FROM public.operation_team
-       UNION ALL SELECT 'operation_terms', count(*) FILTER (WHERE operation_id NOT IN (SELECT id FROM so)) FROM public.operation_terms
-       UNION ALL SELECT 'operation_location_terms', count(*) FILTER (WHERE operation_id NOT IN (SELECT id FROM so)) FROM public.operation_location_terms
-       UNION ALL SELECT 'user_operation_access', count(*) FILTER (WHERE operation_id NOT IN (SELECT id FROM so)) FROM public.user_operation_access
-       UNION ALL SELECT 'employee_cost_terms', count(*) FILTER (WHERE employee_id NOT IN (SELECT id FROM se)) FROM public.employee_cost_terms
-       UNION ALL SELECT 'contract_terms', count(*) FILTER (WHERE contract_id NOT IN (SELECT id FROM sk)) FROM public.contract_terms
-       UNION ALL SELECT 'contract_rate_terms', count(*) FILTER (WHERE contract_id NOT IN (SELECT id FROM sk)) FROM public.contract_rate_terms
-       UNION ALL SELECT 'contract_employee_rates', count(*) FILTER (WHERE contract_id NOT IN (SELECT id FROM sk) OR employee_id NOT IN (SELECT id FROM se)) FROM public.contract_employee_rates
-       UNION ALL SELECT 'timesheets', count(*) FILTER (WHERE operation_id NOT IN (SELECT id FROM so)) FROM public.timesheets
-       UNION ALL SELECT 'timesheet_entries', count(*) FILTER (WHERE timesheet_id NOT IN (SELECT id FROM sts) OR employee_id NOT IN (SELECT id FROM se)) FROM public.timesheet_entries
-       UNION ALL SELECT 'invoices', count(*) FILTER (WHERE client_id NOT IN (SELECT id FROM sc)) FROM public.invoices
-       UNION ALL SELECT 'invoice_items', count(*) FILTER (WHERE invoice_id NOT IN (SELECT id FROM sinv)) FROM public.invoice_items
-       UNION ALL SELECT 'billing_additionals', count(*) FILTER (WHERE client_id NOT IN (SELECT id FROM sc)) FROM public.billing_additionals
-       UNION ALL SELECT 'container_services', count(*) FILTER (WHERE client_id NOT IN (SELECT id FROM sc)) FROM public.container_services
-       UNION ALL SELECT 'container_service_participants', count(*) FILTER (WHERE service_id NOT IN (SELECT id FROM ssv) OR employee_id NOT IN (SELECT id FROM se)) FROM public.container_service_participants
-       UNION ALL SELECT 'container_service_audit', count(*) FILTER (WHERE service_id NOT IN (SELECT id FROM ssv)) FROM public.container_service_audit
+       SELECT 'clients' t, count(*) FILTER (WHERE (id IN (SELECT id FROM sc)) IS NOT TRUE) n FROM public.clients
+       UNION ALL SELECT 'employees', count(*) FILTER (WHERE (id IN (SELECT id FROM se)) IS NOT TRUE) FROM public.employees
+       UNION ALL SELECT 'contracts', count(*) FILTER (WHERE (client_id IN (SELECT id FROM sc)) IS NOT TRUE) FROM public.contracts
+       UNION ALL SELECT 'operations', count(*) FILTER (WHERE (client_id IN (SELECT id FROM sc)) IS NOT TRUE) FROM public.operations
+       UNION ALL SELECT 'shifts', count(*) FILTER (WHERE (operation_id IN (SELECT id FROM so)) IS NOT TRUE) FROM public.shifts
+       UNION ALL SELECT 'operation_team', count(*) FILTER (WHERE (operation_id IN (SELECT id FROM so) AND employee_id IN (SELECT id FROM se)) IS NOT TRUE) FROM public.operation_team
+       UNION ALL SELECT 'operation_terms', count(*) FILTER (WHERE (operation_id IN (SELECT id FROM so)) IS NOT TRUE) FROM public.operation_terms
+       UNION ALL SELECT 'operation_location_terms', count(*) FILTER (WHERE (operation_id IN (SELECT id FROM so)) IS NOT TRUE) FROM public.operation_location_terms
+       UNION ALL SELECT 'user_operation_access', count(*) FILTER (WHERE (operation_id IN (SELECT id FROM so)) IS NOT TRUE) FROM public.user_operation_access
+       UNION ALL SELECT 'employee_cost_terms', count(*) FILTER (WHERE (employee_id IN (SELECT id FROM se)) IS NOT TRUE) FROM public.employee_cost_terms
+       UNION ALL SELECT 'contract_terms', count(*) FILTER (WHERE (contract_id IN (SELECT id FROM sk)) IS NOT TRUE) FROM public.contract_terms
+       UNION ALL SELECT 'contract_rate_terms', count(*) FILTER (WHERE (contract_id IN (SELECT id FROM sk)) IS NOT TRUE) FROM public.contract_rate_terms
+       UNION ALL SELECT 'contract_employee_rates', count(*) FILTER (WHERE (contract_id IN (SELECT id FROM sk) AND employee_id IN (SELECT id FROM se)) IS NOT TRUE) FROM public.contract_employee_rates
+       UNION ALL SELECT 'timesheets', count(*) FILTER (WHERE (operation_id IN (SELECT id FROM so)) IS NOT TRUE) FROM public.timesheets
+       UNION ALL SELECT 'timesheet_entries', count(*) FILTER (WHERE (timesheet_id IN (SELECT id FROM sts) AND employee_id IN (SELECT id FROM se)) IS NOT TRUE) FROM public.timesheet_entries
+       UNION ALL SELECT 'invoices', count(*) FILTER (WHERE (client_id IN (SELECT id FROM sc)) IS NOT TRUE) FROM public.invoices
+       UNION ALL SELECT 'invoice_items', count(*) FILTER (WHERE (invoice_id IN (SELECT id FROM sinv)) IS NOT TRUE) FROM public.invoice_items
+       UNION ALL SELECT 'billing_additionals', count(*) FILTER (WHERE (client_id IN (SELECT id FROM sc)) IS NOT TRUE) FROM public.billing_additionals
+       UNION ALL SELECT 'container_services', count(*) FILTER (WHERE (client_id IN (SELECT id FROM sc)) IS NOT TRUE) FROM public.container_services
+       UNION ALL SELECT 'container_service_participants', count(*) FILTER (WHERE (service_id IN (SELECT id FROM ssv) AND employee_id IN (SELECT id FROM se)) IS NOT TRUE) FROM public.container_service_participants
+       UNION ALL SELECT 'container_service_audit', count(*) FILTER (WHERE (service_id IN (SELECT id FROM ssv)) IS NOT TRUE) FROM public.container_service_audit
      )
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'origem sintetica: ' || t, n = 0, 'linhas_fora_da_origem=' || n FROM fora;
+
+-- 3.6b Raízes iguais ao inventário somente leitura de 10/11/2026 (HML 050). Nome parecido não basta:
+--      os 10 clientes são presos por ID; os colaboradores, por contagem exata por prefixo, e os
+--      HOMOLOG-SINT (criados nas homologações registradas no HANDOFF), também por ID. Qualquer raiz
+--      nova ou faltante, mesmo com prefixo sintético, ABORTA: refazer o inventário e revisar o script.
+INSERT INTO bs_checks (nome, ok, detalhe)
+SELECT 'raizes: clientes = 10 IDs do inventario de 10/11/2026',
+       (SELECT coalesce(array_agg(id::text ORDER BY id), '{}') FROM public.clients) = ARRAY[
+         '10f8d99d-77c7-43c2-bff8-3f4a3436ba6a', '2e36c08d-e768-44cc-98b6-e1cb5f85595c',
+         '37c4b132-24ce-4431-b643-0cf74bc85e49', '3be10a1e-f1e1-4576-8734-98b1965b2e1f',
+         '54967da8-f7e9-4e75-8bf0-3c52f25a52f3', '54d7a178-0cf4-4755-aa13-5ac301d0d4d4',
+         '76313ccf-9503-42f4-8745-7b4708fee4f4', '80fb168b-1bc8-4444-9797-30d505428515',
+         'a7c38a8c-4901-4750-a0a0-68b3d3c64882', 'aa6e42f0-b2f2-45d6-b40b-cf1ddcca45e6'],
+       'clientes=' || (SELECT count(*) FROM public.clients);
+INSERT INTO bs_checks (nome, ok, detalhe)
+SELECT 'raizes: colaboradores por prefixo = inventario de 10/11/2026',
+       (SELECT jsonb_object_agg(p, n) FROM (
+          SELECT coalesce(substring(name from '^(HML-TESTE|AUTH01C2|E2E-S11|E2E-S19B|HOMOLOG-SINT)'), 'FORA') p, count(*) n
+            FROM public.employees GROUP BY 1) x)
+         = '{"E2E-S11": 5, "E2E-S19B": 2, "HML-TESTE": 2, "HOMOLOG-SINT": 5}'::jsonb,
+       'colaboradores=' || (SELECT count(*) FROM public.employees);
+INSERT INTO bs_checks (nome, ok, detalhe)
+SELECT 'raizes: colaboradores HOMOLOG-SINT = 5 IDs registrados',
+       (SELECT coalesce(array_agg(id::text ORDER BY id), '{}') FROM public.employees WHERE name LIKE 'HOMOLOG-SINT%') = ARRAY[
+         '0d65d945-3065-4436-86c7-966244bd0e0b', '215b53f5-813d-4c55-b401-c3e86f6382f7',
+         '8b93a3d0-0d2c-479c-ac9c-56f41607dbaf', 'cc8ceb99-f92a-4d0f-b995-0796f1cd8944',
+         'e7ea1aea-1824-44ab-9343-dccd67d15b84'],
+       'homolog=' || (SELECT count(*) FROM public.employees WHERE name LIKE 'HOMOLOG-SINT%');
 
 -- 3.7 Calendário: só fixtures (fonte sintética). Registro com fonte oficial real impede a limpeza.
 INSERT INTO bs_checks (nome, ok, detalhe)
@@ -339,15 +374,23 @@ WITH ids AS (
   UNION SELECT id FROM public.operation_location_terms UNION SELECT id FROM public.timesheet_entries
   UNION SELECT id FROM public.timesheets UNION SELECT id FROM public.container_services
 )
+--      `(...) IS NOT TRUE`: entity_id/term_id/reason nulos não podem tornar a linha invisível à contagem.
 INSERT INTO bs_checks (nome, ok, detalhe)
 SELECT 'origem sintetica: financial_terms_audit (exceto sistema)',
-       count(*) FILTER (WHERE NOT (a.entity_id IN (SELECT id FROM ids) OR a.term_id IN (SELECT id FROM ids)
+       count(*) FILTER (WHERE (a.entity_id IN (SELECT id FROM ids) OR a.term_id IN (SELECT id FROM ids)
                                    OR EXISTS (SELECT 1 FROM auth.users u WHERE u.id = a.actor_id AND u.email LIKE '%.invalid')
-                                   OR a.reason ~ '^(E2E|HML|AUTH01C|S19|S11)')) = 0,
-       'linhas_fora_da_origem=' || count(*) FILTER (WHERE NOT (a.entity_id IN (SELECT id FROM ids) OR a.term_id IN (SELECT id FROM ids)
+                                   OR a.reason ~ '^(E2E|HML|AUTH01C|S19|S11)') IS NOT TRUE) = 0,
+       'linhas_fora_da_origem=' || count(*) FILTER (WHERE (a.entity_id IN (SELECT id FROM ids) OR a.term_id IN (SELECT id FROM ids)
                                    OR EXISTS (SELECT 1 FROM auth.users u WHERE u.id = a.actor_id AND u.email LIKE '%.invalid')
-                                   OR a.reason ~ '^(E2E|HML|AUTH01C|S19|S11)'))
+                                   OR a.reason ~ '^(E2E|HML|AUTH01C|S19|S11)') IS NOT TRUE)
   FROM public.financial_terms_audit a WHERE a.entity_kind <> 'sistema';
+
+-- 3.10b Trilha com tipo de entidade nulo é desconhecida: nem é removida (DELETE usa <> 'sistema')
+--       nem pode ser classificada. Bloqueia.
+INSERT INTO bs_checks (nome, ok, detalhe)
+SELECT 'trilha: nenhuma linha com entity_kind nulo',
+       count(*) = 0, 'sem_tipo=' || count(*)
+  FROM public.financial_terms_audit WHERE entity_kind IS NULL;
 
 -- 3.11 Pelo menos uma conta administrativa REAL (e-mail que não termina em .invalid) permanece com papel admin.
 INSERT INTO bs_checks (nome, ok, detalhe)
@@ -384,6 +427,9 @@ BEGIN
 
   -- 4.1 Desabilita, um a um, SOMENTE os gatilhos que estavam habilitados. Os já desabilitados
   --     (ex.: trg_timesheet_entries_calculo_financeiro, desligado pelo motor ativo) não são tocados.
+  --     Na 050 isso inclui os gatilhos BEFORE TRUNCATE de timesheet_entries e invoice_items, que
+  --     desde a 046 (bloquear_truncate_lastro) recusam TRUNCATE com apontamento OU adicional
+  --     faturado, e a guarda de invoices, que desde a 046 cobre também DELETE.
   FOR r IN SELECT tabela, gatilho FROM bs_gatilhos WHERE estado = 'O' ORDER BY tabela, gatilho LOOP
     EXECUTE format('ALTER TABLE public.%I DISABLE TRIGGER %I', r.tabela, r.gatilho);
   END LOOP;
