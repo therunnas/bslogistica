@@ -13,8 +13,8 @@
 | Último gate concluído | 051 aplicada e interruptor ligado em HML e Production; site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`) |
 | Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
 | Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
-| Base | main `ecd67f2bec645bcff06fe811cb071586ff8f9780` |
-| HEAD validado | ecd67f2bec645bcff06fe811cb071586ff8f9780 + o diff deste PR (só documentação). HEAD publicado e CI por SHA: consultar no PR |
+| Base | main `20e9cfcb619933491c0bf67abc91ca659e40b422` |
+| HEAD validado | 20e9cfcb619933491c0bf67abc91ca659e40b422 + o diff deste PR (telas simplificadas, testes estruturais e HANDOFF) |
 | Alterações não commitadas | Nenhuma além deste conjunto |
 | PR | #130 (só documentação). Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
 | Ambiente-alvo | HML e Production (aplicados) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-PENTE-FINO-01 (11/11/2026, sessão em nuvem), lista de 20 itens aprovada pelo responsável ("tudo autorizado"): palavras simples no lugar de "vigência"/"HE"; aviso do motor só fora do estado normal; histórico em lista (sem rolagem lateral) com "Definir data de fim" e "Cancelar registro errado"; confirmação antes de excluir cliente, contrato, operação, turno e colaborador; componente comum `ValorAtualComAlteracao` (valor atual + "Alterar", histórico recolhido) para operação sem contrato, custo do colaborador e condições do contrato; colaborador com uma função só (catálogo, também no cadastro novo); operação Fixa sem campos de avulsa e sem campo de valor quando há contrato; função por alocação, período do turno e "função do dia" escondidos com a resolução por função desligada; contrato sem jornada, jornada de sábado e fator de feriado na tela (campos `ocultoNaTela`, valor atual segue no envio) e "Tarifas" só com a resolução ligada; textos curtos em Apontamentos e Feriados |
+| Resultados e testes comprovados | Conferido no código do motor que, com o dobro ligado, jornada, jornada de sábado e fator de feriado do contrato não entram no cálculo (núcleo V2 com divisor 8 e sábado fixo; caminho 030 não é usado). `validarNovaVigencia` aceita os valores do banco ("250.00", "1.50", "8.0"). Linux, Node 22: lint, `tsc`, 72/72 `test:*` (testes estruturais atualizados: G5, G7, G8f, G9b–G9f, funções C2) e build PASS. Sem verificação visual nesta sessão (sem login) |
+| Código e PR afetados | `src/app/(painel)/_components/vigencias.tsx`, `_components/valor-atual.tsx` (novo), `operacoes/valor-acordado.tsx`, `operacoes/painel-operacoes.tsx`, `colaboradores/painel-colaboradores.tsx`, `clientes/painel-clientes.tsx`, `clientes/feriados.tsx`, `apontamentos/painel-apontamentos.tsx`, `src/lib/vigencias-ui.ts`, `src/lib/vigencias-dados.ts` (a criação atômica devolve o id), `src/lib/apontamentos-financeiro.ts`, `src/lib/confirmar-exclusao.ts` (novo), três testes estruturais, `docs/HANDOFF.md` |
+| Ambientes envolvidos | Sessão em nuvem, CI e Preview (HML). Banco, cálculo, Production: nada |
+| Pendências e decisões | Conferência visual e teste manual do responsável no Preview. Production só com autorização. Cidade do piloto e feriados |
+| Próxima ação exata | Responsável confere as telas no Preview e refaz o teste manual |
+| Autorizações e proibições | Autorizado (11/11/2026): os 20 itens, PR e merge. Proibido sem autorização nominal: publicar em Production, banco |
+
+### Tarefa anterior — HML-LIMPEZA-02 (11/11/2026)
 
 | Campo | Valor |
 | --- | --- |

@@ -982,7 +982,8 @@ verificar(
 );
 verificar(
   "G5. Clientes: o histórico de vigências do contrato aparece no formulário do contrato existente",
-  /<HistoricoDeVigencias\s+tipo="contrato"/.test(clientes),
+  // 11/11/2026: condições atuais + "Alterar condições", com o histórico recolhido no bloco comum.
+  /<ValorAtualComAlteracao\s+tipo="contrato"/.test(clientes),
   true,
 );
 verificar(
@@ -994,7 +995,7 @@ verificar(
 );
 verificar(
   "G7. Colaboradores: histórico do custo e registro de reajuste",
-  /<HistoricoDeVigencias\s+tipo="colaborador"/.test(colaboradores) &&
+  /<ValorAtualComAlteracao\s+tipo="colaborador"/.test(colaboradores) &&
     /useCriarComVigencia\("colaborador", \["employees"\]/.test(colaboradores),
   true,
 );
@@ -1037,7 +1038,7 @@ verificar(
 verificar(
   "G8f. Operações: texto de ajuda do valor pelo contrato",
   operacoes.includes(
-    "O valor vem do contrato. Para um valor próprio deste serviço, deixe o contrato em branco.",
+    "O valor da diária vem do contrato. Para um valor próprio deste serviço, escolha",
   ),
   true,
 );
@@ -1057,36 +1058,39 @@ verificar(
 // novo valor e a data; grava pela MESMA RPC de vigência (motivo preenchido) e o histórico
 // completo continua disponível, recolhido.
 const valorAcordado = ler("src/app/(painel)/operacoes/valor-acordado.tsx");
+// 11/11/2026: o bloco virou o componente comum `ValorAtualComAlteracao` (operação, colaborador e
+// contrato), sem o segundo caminho de registro dentro do histórico.
+const valorAtual = ler("src/app/(painel)/_components/valor-atual.tsx");
 verificar(
   "G9b. Valor acordado: mostra o valor vigente hoje",
-  /situacaoDaVersao\(v, hoje\) === "vigente"/.test(valorAcordado) &&
-    /Valor atual/.test(valorAcordado),
+  /situacaoDaVersao\(v, hoje\) === "vigente"/.test(valorAtual) && /Valor atual/.test(valorAtual),
   true,
 );
 verificar(
   "G9c. Valor acordado: 'Alterar valor' grava pela mesma RPC de vigência da operação",
-  /useRegistrarVigencia\("operacao"\)/.test(valorAcordado) &&
-    /registrar\.mutate\(/.test(valorAcordado) &&
-    /valores: \{ agreed_amount: novoValor \}/.test(valorAcordado),
+  /useRegistrarVigencia\(tipo\)/.test(valorAtual) &&
+    /registrar\.mutate\(/.test(valorAtual) &&
+    /tipo="operacao"/.test(valorAcordado) &&
+    /rotuloDoBotao="Alterar valor"/.test(valorAcordado),
   true,
 );
 verificar(
   "G9d. Valor acordado: motivo preenchido automaticamente e validação da vigência preservada",
   /MOTIVO_ALTERACAO_VALOR = "Alteração do valor acordado pela tela da operação"/.test(
     valorAcordado,
-  ) && /validarNovaVigencia\("operacao"/.test(valorAcordado),
+  ) && /validarNovaVigencia\(tipo, form\)/.test(valorAtual),
   true,
 );
 verificar(
-  "G9e. Valor acordado: histórico completo recolhido em 'Ver histórico'",
-  /<details[\s\S]{0,300}Ver histórico[\s\S]{0,300}<HistoricoDeVigencias\s+tipo="operacao"/.test(
-    valorAcordado,
+  "G9e. Valor acordado: histórico recolhido em 'Ver histórico', sem segundo caminho de registro",
+  /<details[\s\S]{0,300}Ver histórico[\s\S]{0,300}<HistoricoDeVigencias[\s\S]{0,200}permitirNovo=\{false\}/.test(
+    valorAtual,
   ),
   true,
 );
 verificar(
   "G9f. Valor acordado: só altera com o motor liberado para registrar vigência",
-  /podeRegistrarVigencia\(estado\)/.test(valorAcordado),
+  /podeRegistrarVigencia\(estado\)/.test(valorAtual),
   true,
 );
 verificar(

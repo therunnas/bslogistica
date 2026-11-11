@@ -263,15 +263,15 @@ export function situacaoDaVersao(v: VersaoBase, hoje: string): SituacaoDaVersao 
 }
 
 export const ROTULO_DA_SITUACAO: Readonly<Record<SituacaoDaVersao, string>> = {
-  aposentada: "Aposentada",
-  futura: "Futura",
-  vigente: "Vigente",
-  encerrada: "Encerrada",
+  aposentada: "Cancelado",
+  futura: "Começa depois",
+  vigente: "Valendo agora",
+  encerrada: "Terminado",
 };
 
 export const ROTULO_DA_ORIGEM: Readonly<Record<string, string>> = {
-  informada: "Informada",
-  migrada_por_prova: "Migrada com prova",
+  informada: "Cadastrado",
+  migrada_por_prova: "Importado do cadastro antigo",
   correcao: "Correção",
 };
 
@@ -305,6 +305,12 @@ export interface CampoDeVigencia {
    * mantém o valor atual no envio (a RPC legada o exige). Desligada, aparece normalmente.
    */
   ocultarComTarifas?: boolean;
+  /**
+   * Não aparece na tela: o valor da versão vigente segue no envio (a RPC exige ou guarda o parâmetro).
+   * Usado para parâmetros que, com domingo/feriado em dobro (051), não mudam nenhum cálculo: jornada,
+   * jornada de sábado e fator de feriado do contrato.
+   */
+  ocultoNaTela?: boolean;
   /** Campo de escolha: valores aceitos e o padrão (enviado quando vazio; opcional vazio não vai). */
   opcoes?: readonly { valor: string; rotulo: string }[];
   padrao?: string;
@@ -343,12 +349,23 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
       tipo: "dinheiro",
       ocultarComTarifas: true,
     },
-    { chave: "shift_hours", param: "p_shift_hours", rotulo: "Jornada (horas)", tipo: "horas" },
-    { chave: "ot_factor", param: "p_ot_factor", rotulo: "Fator de hora extra", tipo: "fator" },
+    {
+      chave: "shift_hours",
+      param: "p_shift_hours",
+      rotulo: "Jornada (horas)",
+      tipo: "horas",
+      ocultoNaTela: true,
+    },
+    {
+      chave: "ot_factor",
+      param: "p_ot_factor",
+      rotulo: "Hora extra (1,5 = 50% a mais)",
+      tipo: "fator",
+    },
     {
       chave: "ot_tolerance_min",
       param: "p_ot_tolerance_min",
-      rotulo: "Tolerância (min)",
+      rotulo: "Tolerância antes da hora extra (min)",
       tipo: "minutos",
     },
     {
@@ -367,6 +384,7 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
       tipo: "horas",
       opcional: true,
       requerRegrasDefinitivas: true,
+      ocultoNaTela: true,
     },
     {
       chave: "holiday_pay_factor",
@@ -375,6 +393,7 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
       tipo: "fator",
       opcional: true,
       requerRegrasDefinitivas: true,
+      ocultoNaTela: true,
     },
     {
       chave: "closing_period",
@@ -388,11 +407,16 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
     },
   ],
   colaborador: [
-    { chave: "daily_cost", param: "p_daily_cost", rotulo: "Custo diário (R$)", tipo: "dinheiro" },
+    {
+      chave: "daily_cost",
+      param: "p_daily_cost",
+      rotulo: "Custo por diária (R$)",
+      tipo: "dinheiro",
+    },
     {
       chave: "ot_hourly_cost",
       param: "p_ot_hourly_cost",
-      rotulo: "Valor-hora da hora extra paga (R$, opcional)",
+      rotulo: "Valor da hora extra deste colaborador (R$, opcional)",
       tipo: "dinheiro",
       opcional: true,
       requerRegrasBs: true,
@@ -402,7 +426,7 @@ export const CAMPOS_DA_VIGENCIA: Readonly<Record<TipoDeVigencia, readonly CampoD
     {
       chave: "agreed_amount",
       param: "p_agreed_amount",
-      rotulo: "Valor acordado (R$)",
+      rotulo: "Valor por diária (R$)",
       tipo: "dinheiro",
     },
   ],

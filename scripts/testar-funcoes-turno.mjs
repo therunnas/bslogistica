@@ -415,7 +415,8 @@ verificar(
     /funcaoId: funcaoInicialDaAlocacao\(employee, catalogo\)/.test(operacoes),
     /montarAlocacao\(/.test(operacoes),
     /camposDePeriodoDoTurno\(periodoEscolhido, funcoesHabilitadas\)/.test(operacoes),
-    /validarPeriodoDoTurno\(periodoEscolhido, !shiftForm\.id, funcoesHabilitadas\)/.test(operacoes),
+    // 11/11/2026: o período só é pedido com o preço por função ligado (precoPorFuncao).
+    /validarPeriodoDoTurno\(periodoEscolhido, !shiftForm\.id, precoPorFuncao\)/.test(operacoes),
   ],
   [true, true, true, true],
 );

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmarExclusao } from "@/lib/confirmar-exclusao";
 import { useState } from "react";
 import {
   BadgeDollarSign,
@@ -47,7 +48,8 @@ import {
 } from "@/components/ui/table";
 
 import { brl } from "@/lib/format";
-import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
+import { AvisoDoMotor } from "../_components/vigencias";
+import { ValorAtualComAlteracao } from "../_components/valor-atual";
 import { CatalogoDeFuncoes } from "./catalogo-de-funcoes";
 import { useFuncoes } from "@/lib/funcoes-dados";
 import {
@@ -80,6 +82,9 @@ const empty = {
   daily_cost: 0,
   status: "active" as StatusColaborador,
 };
+
+/** Motivo gravado na trilha quando o custo é alterado por esta tela. */
+export const MOTIVO_ALTERACAO_CUSTO = "Alteração do custo pela tela do colaborador";
 
 const INPUT_CLASS =
   "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -139,9 +144,10 @@ export function PainelColaboradores() {
   const custoTravado =
     modoDeCusto !== "direta" && (Boolean(form.id) || modoDeCusto === "bloqueada");
 
-  // A função padrão se grava no próprio colaborador. No cadastro novo com o motor ligado o cadastro
-  // passa pela RPC atômica do custo (que não conhece a função): a função se escolhe depois de salvar.
-  const funcaoNoFormulario = funcoesHabilitadas && (Boolean(form.id) || modoDeCusto === "direta");
+  // A função (catálogo) se grava no próprio colaborador. No cadastro novo com o motor ligado o
+  // cadastro passa pela RPC atômica do custo (que não conhece a função): a função escolhida é gravada
+  // logo depois, no colaborador recém-criado.
+  const funcaoNoFormulario = funcoesHabilitadas;
 
   function submit() {
     const payload: Record<string, unknown> = {
@@ -164,10 +170,14 @@ export function PainelColaboradores() {
     }
 
     if (modoDeCusto === "por-vigencia") {
-      // Motor ligado: o custo vem da vigência; o colaborador novo já nasce com a inicial.
+      // Motor ligado: o custo vem da vigência; o colaborador novo já nasce com a inicial. A função
+      // não passa pela RPC atômica: vai numa atualização do colaborador criado.
+      const funcaoEscolhida = funcaoNoFormulario ? form.job_function_id || null : null;
+      const linha = { ...payload };
+      delete linha["job_function_id"];
       criarComVigencia.mutate(
         {
-          linha: payload,
+          linha,
           form: {
             inicio: inicioDoCusto,
             motivo: "Cadastro inicial do colaborador",
@@ -179,7 +189,14 @@ export function PainelColaboradores() {
             regrasBs,
           },
         },
-        { onSuccess: () => setOpen(false) },
+        {
+          onSuccess: (novoId) => {
+            if (funcaoEscolhida && typeof novoId === "string") {
+              save.mutate({ id: novoId, job_function_id: funcaoEscolhida });
+            }
+            setOpen(false);
+          },
+        },
       );
       return;
     }
@@ -337,7 +354,12 @@ export function PainelColaboradores() {
                       </TableCell>
 
                       <TableCell>
-                        {employee.role ? (
+                        {funcoesHabilitadas && employee.job_function_id ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0" />
+                            <span>{nomeDaFuncao(catalogo, employee.job_function_id)}</span>
+                          </div>
+                        ) : employee.role ? (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0" />
                             <span>{employee.role}</span>
@@ -345,13 +367,11 @@ export function PainelColaboradores() {
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
-                        {funcoesHabilitadas && employee.job_function_id ? (
-                          <Badge variant="secondary" className="mt-1">
-                            {nomeDaFuncao(catalogo, employee.job_function_id)}
-                          </Badge>
-                        ) : funcoesHabilitadas && pendentesDeFuncao([employee]).length > 0 ? (
+                        {funcoesHabilitadas &&
+                        !employee.job_function_id &&
+                        pendentesDeFuncao([employee]).length > 0 ? (
                           <Badge variant="outline" className="mt-1">
-                            Revisar função
+                            Escolher função
                           </Badge>
                         ) : null}
                       </TableCell>
@@ -397,7 +417,10 @@ export function PainelColaboradores() {
                             variant="ghost"
                             size="icon"
                             className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => remove.mutate(employee.id)}
+                            onClick={() =>
+                              confirmarExclusao(`o colaborador ${employee.name}`) &&
+                              remove.mutate(employee.id)
+                            }
                             aria-label={`Excluir ${employee.name}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -414,7 +437,7 @@ export function PainelColaboradores() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-border bg-card text-card-foreground sm:max-w-xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-border bg-card text-card-foreground sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl tracking-[-0.025em]">
               {form.id ? "Editar colaborador" : "Novo colaborador"}
@@ -444,26 +467,9 @@ export function PainelColaboradores() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="employee-role">Função</Label>
-
-              <Input
-                id="employee-role"
-                value={form.role}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    role: event.target.value,
-                  })
-                }
-                placeholder="Ex.: Ajudante"
-                className={INPUT_CLASS}
-              />
-            </div>
-
             {funcaoNoFormulario ? (
               <div className="space-y-2">
-                <Label htmlFor="employee-job-function">Função padrão</Label>
+                <Label htmlFor="employee-job-function">Função</Label>
 
                 <Select
                   value={form.job_function_id === "" ? SEM_FUNCAO : form.job_function_id}
@@ -487,14 +493,9 @@ export function PainelColaboradores() {
                 </Select>
 
                 <p className="text-xs text-muted-foreground">
-                  A função padrão não obriga a mesma função em todas as operações. O texto do campo
-                  acima é preservado.
+                  Falta uma função na lista? Cadastre em &ldquo;Funções&rdquo;, no topo da tela.
                 </p>
               </div>
-            ) : funcoesHabilitadas ? (
-              <p className="text-xs text-muted-foreground">
-                A função padrão se escolhe depois de salvar o colaborador.
-              </p>
             ) : null}
 
             <div className="space-y-2">
@@ -529,29 +530,31 @@ export function PainelColaboradores() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="employee-cost">Custo por diária (R$)</Label>
+            {form.id && modoDeCusto === "por-vigencia" ? null : (
+              <div className="space-y-2">
+                <Label htmlFor="employee-cost">Custo por diária (R$)</Label>
 
-              <Input
-                id="employee-cost"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.daily_cost}
-                disabled={custoTravado}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    daily_cost: Number(event.target.value),
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-            </div>
+                <Input
+                  id="employee-cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.daily_cost}
+                  disabled={custoTravado}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      daily_cost: Number(event.target.value),
+                    })
+                  }
+                  className={INPUT_CLASS}
+                />
+              </div>
+            )}
 
             {!form.id && modoDeCusto === "por-vigencia" ? (
               <div className="space-y-2">
-                <Label htmlFor="employee-cost-from">Custo vigente desde</Label>
+                <Label htmlFor="employee-cost-from">Custo vale a partir de</Label>
 
                 <Input
                   id="employee-cost-from"
@@ -562,8 +565,8 @@ export function PainelColaboradores() {
                 />
 
                 <p className="text-xs text-muted-foreground">
-                  Primeiro dia trabalhado com este custo. Dias anteriores a esta data não podem ser
-                  apontados para o colaborador.
+                  Primeiro dia de trabalho com este custo. Não é possível lançar dias antes desta
+                  data.
                 </p>
               </div>
             ) : null}
@@ -571,7 +574,7 @@ export function PainelColaboradores() {
             {!form.id && modoDeCusto === "por-vigencia" && regrasBs ? (
               <div className="space-y-2">
                 <Label htmlFor="employee-ot-hourly-cost">
-                  Valor-hora da hora extra paga (R$, opcional)
+                  Valor da hora extra deste colaborador (R$, opcional)
                 </Label>
 
                 <Input
@@ -583,8 +586,8 @@ export function PainelColaboradores() {
                 />
 
                 <p className="text-xs text-muted-foreground">
-                  Valor combinado com este colaborador. Vazio: a hora extra paga é o custo da diária
-                  dividido pela jornada, sem acréscimo.
+                  Só se houver um valor combinado. Em branco, a hora extra é paga pelo custo da
+                  diária dividido por 8.
                 </p>
               </div>
             ) : null}
@@ -614,20 +617,20 @@ export function PainelColaboradores() {
             </div>
           </div>
 
-          {custoTravado ? (
+          {custoTravado && modoDeCusto !== "por-vigencia" ? (
             <p className="text-xs text-muted-foreground">
-              {modoDeCusto === "por-vigencia"
-                ? "O custo diário segue a vigência: não é editado aqui. Registre uma nova vigência no histórico abaixo."
-                : "Regras financeiras não confirmadas: o custo diário está somente para leitura."}
+              Regras financeiras não confirmadas: o custo diário está somente para leitura.
             </p>
           ) : null}
 
-          {form.id ? (
-            <HistoricoDeVigencias
+          {form.id && modoDeCusto === "por-vigencia" ? (
+            <ValorAtualComAlteracao
               tipo="colaborador"
               entidadeId={form.id}
               estado={estadoDoMotor}
-              valoresIniciais={{ daily_cost: String(form.daily_cost) }}
+              titulo="Custo do colaborador"
+              rotuloDoBotao="Alterar custo"
+              motivo={MOTIVO_ALTERACAO_CUSTO}
             />
           ) : null}
 

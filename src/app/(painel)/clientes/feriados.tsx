@@ -40,9 +40,10 @@ const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
 
 /**
- * Calendário de feriados do motor financeiro (migration 030). O feriado só muda o PAGAMENTO dos
- * contratos que definem o fator de feriado; a cobrança no feriado não muda (regra não confirmada).
- * Apontamento já precificado mantém o tipo do dia congelado.
+ * Calendário de feriados do motor financeiro (migration 030). Com domingo/feriado em dobro (051)
+ * ligado, o feriado desta lista dobra a cobrança e o pagamento das horas efetivas; desligado, só o
+ * pagamento dos contratos com fator de feriado (030). Apontamento já precificado mantém o tipo do
+ * dia congelado.
  */
 export function FeriadosDoCalendario() {
   const capacidade = useCalendarioTerritorial();
@@ -86,8 +87,8 @@ function FeriadosLegados() {
                 Calendário de feriados
               </CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
-                Usado pelo pagamento em feriado dos contratos com fator de feriado. Registre antes
-                de apontar a data: o tipo do dia fica congelado no apontamento.
+                Domingos e os feriados desta lista são cobrados e pagos em dobro. Cadastre o feriado
+                antes de lançar os apontamentos do dia: o que já foi lançado não muda.
               </p>
             </div>
           </div>

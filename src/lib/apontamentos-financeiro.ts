@@ -307,8 +307,7 @@ export function valorDaLinha(e: EntradaDaLinha): ValorDaLinha {
       tipoDoDia === "feriado" ||
       e.gravado?.day_kind_snapshot === "domingo" ||
       e.gravado?.day_kind_snapshot === "feriado");
-  const avisoEspecial =
-    "Prévia indisponível: o banco calcula as horas especiais e o bônus ao salvar.";
+  const avisoEspecial = "Domingo ou feriado: o valor aparece depois de salvar.";
 
   // Legado (presença/reposição sem origem de preço) não vira falta: o banco recusa com 55000
   // qualquer edição motriz, inclusive esta, e perderia as outras linhas do salvamento.
