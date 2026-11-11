@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**HML-051-01 — HML na 051 com domingo e feriado em dobro LIGADO (11/11/2026). #129 mesclado em `ecd67f2`. Production segue na 050, sem o interruptor; site `8c493a5` no ar.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
+**PROD-051-01 — HML e Production na 051 com domingo e feriado em dobro LIGADO (11/11/2026). Site de Production `ecd67f2` no ar. Falta cadastrar os feriados (cidade do piloto pendente) e o teste manual.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | HML-051-01 — aplicação da 051 e interruptor ligado no HML |
-| Gate atual | HML concluído (dados fictícios). Production pendente de autorização nominal |
-| Último gate concluído | #129 mesclado em `ecd67f2` (CI validar e sql-local SUCCESS); 051 aplicada no HML e interruptor ligado |
+| Etapa | PROD-051-01 — 051 e interruptor ligado em Production, site publicado |
+| Gate atual | Production concluída para a 051. Próximo: feriados e teste manual |
+| Último gate concluído | 051 aplicada e interruptor ligado em HML e Production; site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`) |
 | Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
 | Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
 | Base | main `ecd67f2bec645bcff06fe811cb071586ff8f9780` |
-| HEAD validado | ecd67f2bec645bcff06fe811cb071586ff8f9780 + o diff deste commit (só documentação). HEAD publicado e CI por SHA: consultar no PR |
+| HEAD validado | ecd67f2bec645bcff06fe811cb071586ff8f9780 + o diff deste PR (só documentação). HEAD publicado e CI por SHA: consultar no PR |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | Desta branch contra main, só documentação. Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
-| Ambiente-alvo | HML (aplicado). Production não tocada nesta tarefa |
-| Última ação comprovada | HML: 051 PASS pelo script; 26/26 com o interruptor desligado e 7/7 com ele ligado, em transações desfeitas; `dias_especiais_em_dobro=true`, `tarifas_por_funcao=false` |
-| Próxima ação exata | Com "autorizo Production": aplicar a 051 em Production pelo [roteiro](runbooks/dias-especiais-em-dobro.md), conferir com o interruptor desligado, ligar, conferir e publicar o site com a `main` atual |
+| PR | #130 (só documentação). Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
+| Ambiente-alvo | HML e Production (aplicados) |
+| Última ação comprovada | Production: 051 PASS pelo script; 26/26 com o interruptor desligado e 7/7 com ele ligado, em transações desfeitas; `dias_especiais_em_dobro=true`, `tarifas_por_funcao=false`; 1 cliente, 3 contas, 0 apontamentos, 0 feriados; site READY e domínio no deployment novo |
+| Próxima ação exata | Cadastrar os feriados (nacionais, SC e municipais da cidade do piloto) em HML e Production antes dos apontamentos; depois o teste manual do responsável |
 
 ## Estado atual para retomada
 
@@ -27,12 +27,24 @@
 | --- | --- |
 | Main | `8c493a5` (#128): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado", tela de operação simplificada. `vercel.json` mantém `main:false` |
 | HML | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`** (050 desde 09/11/2026); `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
-| Production | **050 desde 11/11/2026** (16/16 PASS, banco idêntico ao HML). Site `8c493a5` (`dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`, 11/11/2026); reversão do site: `dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg` (`d33e8b2`). Backup `pg_dump` de 11/11 com o responsável. Sem dados de negócio; lista de feriados legada vazia |
+| Production | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`** (035–050 no mesmo dia, 16/16 PASS). Site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`); reversão do site: `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C` (`8c493a5`). Backup `pg_dump` de 11/11 (antes da 035) com o responsável. Sem dados de negócio; lista de feriados vazia |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; Preview → HML comprovado pela leitura das variáveis na Vercel (11/11/2026). Este container não abre `vercel.app` (proxy). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
 | Negócio | [NEGOCIO.md](NEGOCIO.md) e [matriz](NEGOCIO_X_SISTEMA.md); C1–C6 seguem pendentes e não bloqueiam o piloto com resolução OFF |
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | PROD-051-01 (11/11/2026, sessão em nuvem), autorizado pelo responsável ("se for exatamente como está nos planos ... sim"): o [roteiro](runbooks/dias-especiais-em-dobro.md) executado em Production — conferência, 051 pelo `aplicar-migration-api.py`, suíte 051 com o interruptor desligado, interruptor ligado por transação guardada (motivo em `pricing_settings.reason`), conferência com ele ligado — e site publicado pela API da Vercel com a `main` `ecd67f2` |
+| Resultados e testes comprovados | Script: conferência OK e aplicação PASS (56 migrations, versão `20261118120000`, nenhuma tabela com menos linhas, RLS em todas, motor e tarifas iguais). Suíte 051 em transação desfeita: 26/26. Ligado, em transação desfeita: domingo 8 h 500/300, segunda 250/150, feriado 500/300, domingo sem contrato 400/300. Depois: 1 cliente, 3 contas, 0 apontamentos, 0 feriados, 0 tabelas sem RLS. Vercel: `dpl_2zSqLHxW42m693VWr9m4QeFPQWqb` READY, `admin.bslogisticas.com.br` apontando para ele |
+| Código e PR afetados | Só documentação, no #130: `docs/HANDOFF.md`, `docs/AMBIENTES.md`, `docs/ESTADO_DO_PROJETO.md`, `PROGRESS.md` |
+| Ambientes envolvidos | Production: banco (051 + interruptor) e site. HML: já feito na tarefa anterior. Reversão do site: `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`; da regra: desligar o interruptor |
+| Pendências e decisões | Cidade do cliente-piloto. Feriados vazios em HML e Production. Teste manual do responsável (TESTE-MANUAL) depois dos feriados. Órfãos de `profiles`/`user_roles`, matriz E2E, `npm audit`, #125 |
+| Próxima ação exata | Pedir a cidade do piloto e cadastrar os feriados (HML e Production) |
+| Autorizações e proibições | Autorizado (11/11/2026): o roteiro da 051 em Production e a publicação do site. Proibido sem autorização nominal: desligar o interruptor, ligar a resolução comercial, outras escritas em Production |
+
+### Tarefa anterior — HML-051-01 (11/11/2026)
 
 | Campo | Valor |
 | --- | --- |

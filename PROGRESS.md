@@ -26,8 +26,8 @@ faturamento por período e relatórios. Duas trilhas de uso:
 ## Tarefa ativa única
 
 **FUNC-READY-02 — domingo e feriado em dobro com a resolução OFF, com interruptor (11/11/2026).**
-Migration 051 mesclada (#129) e **aplicada no HML com o interruptor ligado**; Production segue na
-050, sem o interruptor. O ponto de entrada da
+Migration 051 mesclada (#129) e **aplicada no HML e em Production, com o interruptor ligado nos
+dois**. Site de Production publicado com `ecd67f2`. O ponto de entrada da
 próxima sessão continua sendo o [HANDOFF](docs/HANDOFF.md). **O piloto ainda não começou** (ver
 "Bloqueio do piloto").
 
@@ -40,13 +40,14 @@ próxima sessão continua sendo o [HANDOFF](docs/HANDOFF.md). **O piloto ainda n
   Production), #128 (tela de operação simplificada: localidade oculta com a resolução OFF e
   "Valor atual" + "Alterar valor"), #129 (migration 051: domingo e feriado em dobro com
   interruptor).
-- **Production** (`ehkduqokntemtmqzdrbd`): **050 desde 11/11/2026**, aplicada com o
-  [plano](docs/runbooks/producao-034-050.md) (16/16 PASS, banco idêntico ao HML). Site
-  `8c493a5` em `admin.bslogisticas.com.br` (`dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`, 11/11/2026,
-  conferido antes no Preview pelo responsável); versão anterior para reversão:
-  `dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg`. Backup `pg_dump` de 11/11 com segunda cópia, guardado pelo
-  responsável. Sem dados de negócio (1 cliente de teste "te"); 7 `profiles` e 7 `user_roles`
-  órfãos.
+- **Production** (`ehkduqokntemtmqzdrbd`): **051 desde 11/11/2026**, interruptor de domingo/feriado
+  em dobro **ligado**, resolução comercial OFF (035–050 com o
+  [plano](docs/runbooks/producao-034-050.md), 051 com o
+  [roteiro](docs/runbooks/dias-especiais-em-dobro.md)). Site `ecd67f2` em `admin.bslogisticas.com.br`
+  (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`); versão anterior para reversão:
+  `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`. Backup `pg_dump` de 11/11 com segunda cópia, guardado pelo
+  responsável. Sem dados de negócio (1 cliente de teste "te"); 7 `profiles` e 7 `user_roles` órfãos;
+  nenhum feriado cadastrado.
 - **HML** (`qbnfcmrxmssnwkhaitgd`): **051**, interruptor de domingo/feriado em dobro **ligado**,
   resolução comercial OFF, só dados sintéticos.
 - **Vercel:** vínculos comprovados em 11/11/2026: Preview → HML, Production → Production.
@@ -74,13 +75,11 @@ Pendente: **cidade do cliente-piloto**, para os feriados municipais da lista ún
 
 ### Próxima etapa
 
-1. Production: aplicar a 051, ligar o interruptor e publicar o site, com autorização nominal
-   ("autorizo Production"). HML já feito.
-2. Cadastrar os feriados (nacionais, de SC e os municipais da cidade do piloto), no HML e
+1. Cadastrar os feriados (nacionais, de SC e os municipais da cidade do piloto), no HML e
    depois em Production, **antes** dos apontamentos (o tipo do dia fica congelado no
    lançamento).
-3. Teste manual do responsável e ajustes.
-4. Piloto. Contas operacionais reais só depois da matriz E2E de acesso.
+2. Teste manual do responsável e ajustes.
+3. Piloto. Contas operacionais reais só depois da matriz E2E de acesso.
 
 Depois do piloto ou em paralelo, com autorização própria: limpar os órfãos de Production,
 limpar os dados sintéticos do HML (#125, ensaio bloqueado), dependências do `npm audit`.
@@ -90,8 +89,8 @@ cobrança; três particularidades da Dynamis; C1–C6 da matriz.
 ### Não fazer ainda
 
 Sem começar o piloto, ligar a resolução comercial, dados reais, novo Supabase, `config push` ou
-Gates 3–5 automáticos. Aplicar a 051 ou ligar o interruptor só com autorização nominal por
-ambiente. Escrita em Production só com autorização nominal. Sem `npm audit fix` ou troca de
+Gates 3–5 automáticos. Desligar o interruptor ou escrever em Production só com autorização
+nominal. Sem `npm audit fix` ou troca de
 versões fora do PR próprio.
 
 ### Fila funcional herdada da main — histórico, não tarefa ativa

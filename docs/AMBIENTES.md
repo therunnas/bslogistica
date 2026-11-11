@@ -4,7 +4,7 @@ Inventário factual, sem credenciais, dos ambientes do painel. Cada afirmação 
 o limite da evidência. Mudanças de configuração exigem autorização própria e não
 são executadas por este documento.
 
-Atualização de 11/11/2026 (tarde): HML recebeu a 051 e o interruptor de domingo/feriado em dobro foi ligado no HML; site de Production publicado com `8c493a5`. Atualização de 11/11/2026: Production recebeu 035–050 e o site de `d33e8b2`; vínculos Preview → HML e Production → Production comprovados pela API da Vercel (ver [HANDOFF](HANDOFF.md)). Atualização de 09/11/2026: HML recebeu 046–050. O restante desta página é a verificação de **05/11/2026**, após a aplicação autorizada de 035–045 no HML
+Atualização de 11/11/2026 (tarde): HML e Production receberam a 051 com o interruptor de domingo/feriado em dobro ligado; site de Production publicado com `ecd67f2`. Atualização de 11/11/2026: Production recebeu 035–050 e o site de `d33e8b2`; vínculos Preview → HML e Production → Production comprovados pela API da Vercel (ver [HANDOFF](HANDOFF.md)). Atualização de 09/11/2026: HML recebeu 046–050. O restante desta página é a verificação de **05/11/2026**, após a aplicação autorizada de 035–045 no HML
 (sessão 05), por consultas somente leitura ao GitHub, à API da Vercel (nomes,
 escopos e host do Supabase, sem chaves) e à Supabase CLI. A única escrita remota
 foi o `db push` no HML.
@@ -29,12 +29,12 @@ vínculo explícito com o HML autorizado estiver comprovado.
 | CI         | GitHub Actions, jobs `validar` e `sql-local`                                                        | Supabase local efêmero no job SQL                      | Até a migration versionada no commit | Sem secrets nem vínculo remoto                                                                                                                              |
 | Preview    | Deployment automático de branch/PR; URL gerada protegida por Vercel SSO                             | HML `qbnfcmrxmssnwkhaitgd` pela configuração vigente   | 051 (o do HML)                       | Vínculo comprovado em 11/11/2026 (`NEXT_PUBLIC_SUPABASE_URL` de Preview → `qbnfcm…`); homologação das telas feita em localhost → HML (9/9 PASS, 09/11/2026) |
 | HML        | Não há domínio Vercel distinto comprovado; pode servir de backend de Preview após vínculo explícito | `bs-logistica-homologacao`, ref `qbnfcmrxmssnwkhaitgd` | 051 — `20261118120000`               | 046–050 em 09/11/2026; 051 em 11/11/2026 com `dias_especiais_em_dobro` ligado (ver HANDOFF)                                                                  |
-| Production | Vercel `bs-logistica-sistema`, domínio `admin.bslogisticas.com.br`, deploy de `main`                | `bs-logistica-sistema`, ref `ehkduqokntemtmqzdrbd`     | 050 — `20261117120000`               | 035–050 aplicadas em 11/11/2026 (16/16 PASS); site `8c493a5` (`dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`)                                                           |
+| Production | Vercel `bs-logistica-sistema`, domínio `admin.bslogisticas.com.br`, deploy de `main`                | `bs-logistica-sistema`, ref `ehkduqokntemtmqzdrbd`     | 051 — `20261118120000`               | 035–051 em 11/11/2026, `dias_especiais_em_dobro` ligado; site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`)                                                           |
 
 O repositório contém migrations até a **051**
 (`20261118120000_051_domingo_feriado_em_dobro.sql`). HML está na 051 desde 11/11/2026, com o
-interruptor de domingo/feriado em dobro ligado. Production está na 050 desde 11/11/2026
-(assinatura de versões `01ca91361b85841984ee708716ee60ac`, a mesma do HML antes da 051).
+interruptor de domingo/feriado em dobro ligado. Production também, desde 11/11/2026, com o
+interruptor ligado.
 
 ## GitHub
 
