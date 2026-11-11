@@ -419,7 +419,9 @@ verificar(
 );
 verificar(
   "D8. linha faturada tem os campos desabilitados",
-  (telaSemComentarios.match(/faturados\.has\(row\.employeeId\)/g) ?? []).length === 4,
+  // Conta só dentro de `disabled=`: o rótulo "Faturado" (UX-FATURA-02) também consulta o conjunto.
+  (telaSemComentarios.match(/disabled=\{[^}]*faturados\.has\(row\.employeeId\)/g) ?? []).length ===
+    4,
   true,
 );
 verificar(
