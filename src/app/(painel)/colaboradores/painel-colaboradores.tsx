@@ -64,6 +64,7 @@ import {
   useEstadoDoMotor,
   useFuncoesTurno,
   useRegrasDaBs,
+  useValoresDeHoje,
 } from "@/lib/vigencias-dados";
 import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
@@ -115,13 +116,22 @@ export function PainelColaboradores() {
   // Valor-hora acordado da hora extra paga (migration 029), opcional: vazio = sem valor acordado.
   const [horaExtraDoCusto, setHoraExtraDoCusto] = useState("");
 
+  // Custo que vale hoje (vigência): a coluna do cadastro não acompanha o "Alterar custo".
+  const custosDeHoje = useValoresDeHoje(
+    "colaborador",
+    data.map((employee) => employee.id),
+    modoDeCusto === "por-vigencia",
+  );
+  const custoDeHoje = (employee: Employee) =>
+    Number(custosDeHoje.get(employee.id)?.["daily_cost"] ?? employee.daily_cost);
+
   const colaboradoresAtivos = data.filter((employee) => employee.status === "active").length;
 
   const colaboradoresInativos = data.filter((employee) => employee.status !== "active").length;
 
   const custoMedio =
     data.length > 0
-      ? data.reduce((total, employee) => total + Number(employee.daily_cost), 0) / data.length
+      ? data.reduce((total, employee) => total + custoDeHoje(employee), 0) / data.length
       : 0;
 
   function edit(employee: Employee) {
@@ -392,7 +402,7 @@ export function PainelColaboradores() {
                       </TableCell>
 
                       <TableCell className="text-right text-sm font-medium text-foreground">
-                        {brl(employee.daily_cost)}
+                        {brl(custoDeHoje(employee))}
                       </TableCell>
 
                       <TableCell>

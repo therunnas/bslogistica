@@ -177,8 +177,8 @@ function tipoGravado(valor: string | null | undefined, padrao: TipoDoDia): TipoD
 }
 
 export const ROTULO_DA_ORIGEM_GRAVADA: Readonly<Record<string, string>> = {
-  versao: "Vigência do contrato",
-  valor_acordado: "Vigência do valor acordado",
+  versao: "Preço do contrato",
+  valor_acordado: "Valor próprio da operação",
   legado: "Legado",
 };
 

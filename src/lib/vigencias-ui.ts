@@ -825,8 +825,17 @@ export interface TermoDeCusto extends VersaoBase {
 
 const dataBR = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
+/** Dia anterior de um `YYYY-MM-DD` (o fim gravado é exclusivo; a tela mostra o último dia que vale). */
+const diaAnteriorISO = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+};
+
 const periodoDe = (v: VersaoBase) =>
-  `vigência ${dataBR(v.valid_from)} → ${v.valid_to ? dataBR(v.valid_to) : "em aberto"}`;
+  v.valid_to
+    ? `de ${dataBR(v.valid_from)} até ${dataBR(diaAnteriorISO(v.valid_to))}`
+    : `desde ${dataBR(v.valid_from)}`;
 
 /**
  * Espelha `motor_fonte_do_dia` + `motor_custo_do_dia` (migration 025), SÓ para a prévia da
@@ -871,7 +880,7 @@ export function resolverCondicaoDoDia(p: {
       ot_factor: Number(doContrato.ot_factor),
       ot_tolerance_min: Number(doContrato.ot_tolerance_min),
     };
-    origem = `Contrato · ${periodoDe(doContrato)}`;
+    origem = `Preço do contrato ${periodoDe(doContrato)}`;
   } else if (daOperacao) {
     regras = {
       daily_rate: Number(daOperacao.agreed_amount),
@@ -879,7 +888,7 @@ export function resolverCondicaoDoDia(p: {
       ot_factor: 1,
       ot_tolerance_min: 10,
     };
-    origem = `Valor acordado da operação · ${periodoDe(daOperacao)}`;
+    origem = `Valor próprio da operação ${periodoDe(daOperacao)}`;
   } else {
     return {
       ok: false,

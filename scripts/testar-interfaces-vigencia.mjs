@@ -514,7 +514,7 @@ verificar(
 );
 verificar(
   "D2. a origem diz o tipo e o período",
-  /^Contrato · vigência 01\/01\/2026 → 01\/07\/2026$/.test(c1.origem),
+  /^Preço do contrato de 01\/01\/2026 até 30\/06\/2026$/.test(c1.origem),
   true,
 );
 const c2 = resolverCondicaoDoDia({
@@ -525,8 +525,8 @@ const c2 = resolverCondicaoDoDia({
   termosCusto: CUSTOS,
 });
 verificar(
-  "D3. depois do reajuste: a nova taxa; a origem diz 'em aberto'",
-  [c2.regras?.daily_rate, /em aberto/.test(c2.origem)],
+  "D3. depois do reajuste: a nova taxa; a origem diz 'desde' (sem data de fim)",
+  [c2.regras?.daily_rate, /desde/.test(c2.origem)],
   [130, true],
 );
 const c3 = resolverCondicaoDoDia({
@@ -667,7 +667,7 @@ const l1 = entrada({ gravada: true, tocada: false, gravado: GRAVADO });
 verificar(
   "E2. LIGADO, linha gravada e não tocada: os valores do BANCO",
   [l1.tipo, l1.billed, l1.cost, l1.overtime, l1.origem],
-  ["banco", 137.5, 87.5, 120, "Vigência do contrato"],
+  ["banco", 137.5, 87.5, 120, "Preço do contrato"],
 );
 const l2 = entrada({ gravada: true, tocada: true, gravado: GRAVADO });
 verificar(
