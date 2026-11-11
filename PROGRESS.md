@@ -25,70 +25,70 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**DOC-01 — alinhar este arquivo ao estado real depois de #119–#123.** Os PRs
-[#119](https://github.com/therunnas/bslogistica/pull/119) a
-[#123](https://github.com/therunnas/bslogistica/pull/123) foram mesclados por squash
-na `main` (`c6f91305c2d88048adc31387f9966b02aa48ef86`). O ponto de entrada da
-próxima sessão continua sendo o [HANDOFF](docs/HANDOFF.md).
+**PROD-050-01 — Production na 050 e site novo no ar (11/11/2026).** Plano e registro no
+[PR #127](https://github.com/therunnas/bslogistica/pull/127). O ponto de entrada da próxima
+sessão continua sendo o [HANDOFF](docs/HANDOFF.md). **O piloto ainda não começou** (ver
+"Bloqueio do piloto").
 
 ### Situação
 
-- `main` em `c6f9130`, com migrations até a **050** (`20261117120000`). Nenhum PR aberto.
-- Integrado na `main`, nesta ordem:
-  - [#119](https://github.com/therunnas/bslogistica/pull/119) (`6fd2632`): migrations
-    046–050 e consumidores compatíveis (FUNC-03);
-  - [#120](https://github.com/therunnas/bslogistica/pull/120) (`f3f846e`): rótulos da
-    operação avulsa sem "carga e descarga";
-  - [#121](https://github.com/therunnas/bslogistica/pull/121) (`0db831f`): Containers sai
-    do menu e do cartão da operação; serviço pontual vira operação avulsa;
-  - [#122](https://github.com/therunnas/bslogistica/pull/122) (`7b03772`): com contrato, o
-    valor acordado vem do contrato (campo desabilitado na operação nova);
-  - [#123](https://github.com/therunnas/bslogistica/pull/123) (`c6f9130`): confirmação
-    antes de gerar fatura.
-- **HML** (`qbnfcmrxmssnwkhaitgd`): na **050** desde 09/11/2026, com
-  `tarifas_por_funcao=false` e `vigencia_ativa=true`; resolução comercial OFF.
-- **Homologação de telas** em localhost → HML, PASS até 10/11/2026: os 9 cenários da
-  matriz curta, o fluxo avulso de ponta a ponta e a operação avulsa sem contrato com
-  valor acordado. O HML guarda dados sintéticos `HOMOLOG-SINT`, `-AV` e `-AV2` (com
-  duas faturas emitidas), a limpar em tarefa própria.
-- **Production** (`ehkduqokntemtmqzdrbd`): na **034**, não tocada; `vercel.json`
-  mantém `main:false`, sem deployment de Production a partir desses merges.
-- Checkpoint automático OFF; Gates 3–5 **da automação** pausados.
-- `npm audit` (lockfile, 10/11/2026): 12 vulnerabilidades **moderadas**, 0 altas e 0
-  críticas, todas em `glob`/`minimatch` via `typescript-eslint` (lint) e
-  `@sentry/nextjs` (plugin de build). Sem exposição a dados de usuário em runtime;
-  risco prático baixo. A correção exige trocar versões de ferramentas de build: dívida
-  técnica de baixa prioridade, em PR próprio depois do piloto. **Nunca**
-  `npm audit fix --force`.
+- `main` em `d33e8b2`, com migrations até a **050**. Integrados: #119 (046–050), #120
+  (rótulos da avulsa), #121 (Containers fora do menu e do cartão; serviço pontual vira
+  operação avulsa), #122 (valor acordado pelo contrato), #123 (confirmação antes de gerar
+  fatura), #124 (este arquivo), #126 (rótulo "Faturado" no apontamento).
+- **Production** (`ehkduqokntemtmqzdrbd`): **050 desde 11/11/2026**, aplicada com o
+  [plano](docs/runbooks/producao-034-050.md) (16/16 PASS, banco idêntico ao HML). Site
+  `d33e8b2` em `admin.bslogisticas.com.br` (`dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg`); smoke do
+  responsável OK. Backup `pg_dump` de 11/11 com segunda cópia, guardado pelo responsável.
+  Sem dados de negócio (1 cliente de teste "te"); 7 `profiles` e 7 `user_roles` órfãos.
+- **HML** (`qbnfcmrxmssnwkhaitgd`): 050, resolução comercial OFF, só dados sintéticos.
+- **Vercel:** vínculos comprovados em 11/11/2026: Preview → HML, Production → Production.
+- **Homologação de telas** em localhost → HML: 9 cenários, fluxo avulso e avulsa sem contrato
+  com valor acordado, PASS.
+- `npm audit`: 12 moderadas (glob/minimatch em ferramentas de build), dívida técnica para
+  depois do piloto; nunca `npm audit fix --force`.
+
+### Bloqueio do piloto: domingo e feriado com a resolução comercial OFF
+
+Teste no HML em 11/11/2026, com reversão total: apontamento de 8 h num domingo (contrato com
+diária R$ 250 e custo R$ 150) gravou **R$ 250,00 de cobrança, R$ 150,00 de custo e tipo do dia
+"util"**. Com a resolução OFF o cálculo usa o caminho 030: domingo é dia útil; feriado só muda o
+**pagamento** quando o contrato tem fator de feriado, e a **cobrança** não muda ("regra não
+confirmada" em `src/app/(painel)/clientes/feriados.tsx`). A lista de feriados legada está
+**vazia** em HML e Production. A regra do [negócio](docs/NEGOCIO.md) (domingo e feriado: horas
+efetivas com acréscimo de 100%) só vale hoje com a resolução ON, que exige localidade e
+calendário territorial por operação e as decisões C1–C3. Registrado também no item 3 da
+[matriz](docs/NEGOCIO_X_SISTEMA.md).
+
+Decisões pedidas ao responsável em 11/11/2026, ainda sem resposta:
+
+1. confirmar a regra: domingo e feriado com acréscimo de 100% por horas efetivas **na cobrança e
+   no pagamento**;
+2. caminho: (a) ligar a resolução comercial, ou (b) migration nova (051) para que domingo e a
+   lista única de feriados usem a regra V2 também com a resolução OFF (recomendado pela sessão);
+3. cidade do cliente-piloto, para os feriados municipais da lista única.
 
 ### Próxima etapa
 
-Fila acordada com o responsável, nesta ordem; cada item com autorização própria:
+1. Decisões acima e, se (b), a migration 051 com testes, HML e depois Production.
+2. Interface: **A** esconder o calendário territorial e o aviso "Localidade ausente" com a
+   resolução OFF; **B** valor acordado da operação como "valor atual" + "Alterar valor" (a
+   partir de quando), com o histórico recolhido. Só telas, sem banco.
+3. Cadastrar os feriados (nacionais, de SC e os municipais da cidade do piloto), no HML e
+   depois em Production.
+4. Teste manual do responsável e ajustes.
+5. Piloto. Contas operacionais reais só depois da matriz E2E de acesso.
 
-1. **DOC-01** — esta tarefa: alinhar `PROGRESS.md` e `HANDOFF.md` ao estado real.
-2. **Auditoria do código e roteiro de limpeza do HML para a 050**, a partir da branch
-   `origin/docs/hml-limpeza-runbook`.
-3. **Limpar o HML** e o responsável testar manualmente do zero.
-4. **Ajustes do teste manual**, incluindo a UX-FATURA-02 (rótulo "Faturado" e botões
-   do apontamento faturado).
-5. **Production**: backup `pg_dump` novo e migrations 035–050, **só com autorização
-   nominal**.
-6. **Piloto.**
-
-Decisões de negócio em aberto, que não bloqueiam a fila com a resolução comercial OFF:
-
-- serviços avulsos: lista de tipos de serviço, modalidade de cobrança (diária, por
-  unidade ou valor fechado como adicional) e pagamento da equipe por pessoa ou rateio;
-- Dynamis: intervalo do dia útil, saída antecipada e sábados acima de 4h;
-- C1–C6 da [matriz](docs/NEGOCIO_X_SISTEMA.md).
+Depois do piloto ou em paralelo, com autorização própria: limpar os órfãos de Production,
+limpar os dados sintéticos do HML (#125, ensaio bloqueado), dependências do `npm audit`.
+Decisões de negócio em aberto que não bloqueiam: tipos de serviço avulso e modalidade de
+cobrança; três particularidades da Dynamis; C1–C6 da matriz.
 
 ### Não fazer ainda
 
-Sem migrations ou deploy em Production, resolução comercial ON, dados reais, novo
-Supabase, ativação do controlador ou Gates 3–5 automáticos. Sem escrita no HML fora
-da tarefa de limpeza autorizada. Sem `npm audit fix`, `npm update` ou troca de versões
-fora do PR próprio de dependências. Não confundir CI verde ou Preview com homologação,
-nem merge com autorização de Production.
+Sem começar o piloto, ligar a resolução comercial, alterar regra financeira sem a decisão acima,
+dados reais, novo Supabase, `config push` ou Gates 3–5 automáticos. Escrita em Production só com
+autorização nominal. Sem `npm audit fix` ou troca de versões fora do PR próprio.
 
 ### Fila funcional herdada da main — histórico, não tarefa ativa
 
