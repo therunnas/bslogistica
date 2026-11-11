@@ -35,6 +35,43 @@ são últimos registros de catálogo, não nova consulta; homologação pendente
 identidade/catálogo/backup/restauração/janela/Preview e autorização. 048 OFF instalada
 não aprova/ativa fallback; C1–C6 abertas. Controlador OFF, Gates 3–5 PAUSADOS.
 
+## HML LIMPO PARA O TESTE MANUAL (11/11/2026)
+
+A pedido do responsável ("limpe primeiro"), os dados sintéticos do HML foram removidos com o script do
+[#125](https://github.com/therunnas/bslogistica/pull/125), com uma única mudança: a assinatura de
+ambiente da verificação 3.1 passou para a 051 (56 migrations, head `20261118120000`, md5
+`2612ecd5ea3f5cf0c0000aa0d7ae8055`). Antes: backup lógico das 31 tabelas de `public` (JSON com
+SHA256SUMS, entregue ao responsável); ensaio a seco 36/36; ensaio com expurgo em transação desfeita
+36/36 e validação final aprovada. Execução: **EXECUTADO, 36/36, validação integral aprovada**. Depois:
+0 clientes, colaboradores, operações, apontamentos, faturas e feriados; 17 contas, 15 papéis, 15
+perfis, 4 funções-padrão, 7 trilhas `sistema`, motor ligado, `dias_especiais_em_dobro=true`, RLS em
+todas, só o gatilho do motor antigo desabilitado (como antes). Conferência do dobro em transação
+desfeita: 7/7.
+
+## PRODUCTION NA 051 COM DOMINGO E FERIADO EM DOBRO (11/11/2026)
+
+Autorizado pelo responsável ("exatamente como está nos planos"), seguindo
+[o roteiro](runbooks/dias-especiais-em-dobro.md): conferência OK; 051 aplicada pelo
+`aplicar-migration-api.py` (**PASS**: 56 migrations, nenhuma tabela com menos linhas, RLS em todas,
+motor e tarifas iguais); suíte 051 com o interruptor desligado em transação desfeita (26/26);
+interruptor **ligado** (resolução comercial OFF); conferência em transação desfeita: domingo 8 h
+500/300, segunda 250/150, feriado 500/300, domingo sem contrato (200) 400/300. Depois: 1 cliente de
+teste, 3 contas, 0 apontamentos, nenhum feriado cadastrado. Site publicado com a `main` `ecd67f2`:
+`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb` READY, `admin.bslogisticas.com.br` apontando para ele; versão
+anterior para reversão: `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C` (`8c493a5`). Reversão da regra: desligar o
+interruptor.
+
+## HML NA 051 COM DOMINGO E FERIADO EM DOBRO (11/11/2026)
+
+[#129](https://github.com/therunnas/bslogistica/pull/129) mesclado em `ecd67f2` (CI validar e
+sql-local SUCCESS): migration 051, interruptor `pricing_settings.dias_especiais_em_dobro`, desligado
+por padrão. No HML, com autorização do responsável (dados fictícios): 051 aplicada pelo
+`aplicar-migration-api.py` (**PASS**: 56 migrations, nenhuma tabela com menos linhas, RLS em todas,
+motor e tarifas iguais), suíte 051 com o interruptor ainda desligado em transação desfeita (26/26),
+interruptor **ligado** (resolução comercial continua OFF) e conferência em transação desfeita: domingo
+de 8 h 500/300, segunda 250/150, feriado 500/300, domingo sem contrato (200) 400/300. Nenhum dado
+fictício ficou gravado. Production recebeu o mesmo na sequência (seção acima).
+
 ## PRODUCTION NA 050 (11/11/2026)
 
 Janela autorizada pelo responsável, executada conforme [Production 034 → 050](runbooks/producao-034-050.md).
