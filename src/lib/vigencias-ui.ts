@@ -647,6 +647,59 @@ export function montarRegistro(
   return { rpc: RPC_DE_REGISTRO[tipo], params };
 }
 
+/** RPC que corrige (troca os valores de) uma versão ativa, mantendo o período (023/024/029/043). */
+export const RPC_DE_CORRECAO: Readonly<Record<TipoDeVigencia, string>> = {
+  contrato: "corrigir_condicao_contrato",
+  colaborador: "corrigir_custo_colaborador",
+  operacao: "corrigir_valor_acordado_operacao",
+};
+
+/**
+ * Correção da versão que começa NA MESMA DATA escolhida no "Alterar": o banco não aceita duas
+ * versões começando no mesmo dia, então trocar o valor de novo para a mesma data é corrigir a versão
+ * existente (mesmo período, valores novos). A frequência de fechamento (038) não é parâmetro da
+ * correção: o banco mantém a da versão corrigida.
+ */
+export function montarCorrecao(
+  tipo: TipoDeVigencia,
+  termoId: string,
+  versao: { valid_from: string; valid_to: string | null },
+  f: FormularioDeVigencia,
+): { rpc: string; params: Record<string, string | number | boolean | null> } {
+  const erros = validarNovaVigencia(tipo, {
+    ...f,
+    inicio: versao.valid_from,
+    fim: versao.valid_to ?? "",
+  });
+  if (erros.length > 0 || termoId === "") {
+    throw new Error(erros[0] ?? "Versão não informada.");
+  }
+  const params: Record<string, string | number | boolean | null> = {
+    p_term_id: termoId,
+    p_valid_from: versao.valid_from,
+    p_valid_to: versao.valid_to,
+    p_reason: f.motivo.trim(),
+  };
+  for (const campo of camposDaVigencia(
+    tipo,
+    f.regrasBs === true,
+    f.regrasDefinitivas === true,
+    f.periodoContratual === true,
+  )) {
+    if (campo.requerPeriodoContratual === true) continue;
+    const texto = f.valores[campo.chave] ?? "";
+    if (campo.tipo === "escolha") {
+      const valor = texto.trim() === "" ? (campo.padrao ?? "") : texto.trim();
+      if (campo.opcional === true && valor === "") continue;
+      params[campo.param] = valor;
+      continue;
+    }
+    if (campo.opcional === true && texto.trim() === "") continue;
+    params[campo.param] = lerNumero(texto) as number;
+  }
+  return { rpc: RPC_DE_CORRECAO[tipo], params };
+}
+
 /** RPC que cria a entidade e a vigência inicial na MESMA transação (migration 026). */
 export const RPC_DE_CADASTRO: Readonly<Record<TipoDeVigencia, string>> = {
   contrato: "criar_contrato_com_vigencia",

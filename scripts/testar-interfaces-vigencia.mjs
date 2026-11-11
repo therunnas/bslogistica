@@ -1078,7 +1078,7 @@ verificar(
   "G9d. Valor acordado: motivo preenchido automaticamente e validação da vigência preservada",
   /MOTIVO_ALTERACAO_VALOR = "Alteração do valor acordado pela tela da operação"/.test(
     valorAcordado,
-  ) && /validarNovaVigencia\(tipo, form\)/.test(valorAtual),
+  ) && /validarNovaVigencia\(tipo, \{/.test(valorAtual),
   true,
 );
 verificar(
@@ -1086,6 +1086,13 @@ verificar(
   /<details[\s\S]{0,300}Ver histórico[\s\S]{0,300}<HistoricoDeVigencias[\s\S]{0,200}permitirNovo=\{false\}/.test(
     valorAtual,
   ),
+  true,
+);
+verificar(
+  "G9g. Alterar na MESMA data de um valor existente corrige esse valor (mesmo período), sem erro de sobreposição",
+  /v\.active && v\.valid_from === inicio/.test(valorAtual) &&
+    /corrigir\.mutate\(/.test(valorAtual) &&
+    /RPC_DE_CORRECAO\[tipo\]/.test(ler("src/lib/vigencias-ui.ts")),
   true,
 );
 verificar(

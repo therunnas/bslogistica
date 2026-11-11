@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { dateBR } from "@/lib/format";
 import {
+  useCorrigirVigencia,
   usePeriodoContratual,
   useRegistrarVigencia,
   useRegrasDaBs,
@@ -69,6 +70,7 @@ export function ValorAtualComAlteracao({
 }: ValorAtualProps) {
   const versoes = useVersoes(tipo, entidadeId);
   const registrar = useRegistrarVigencia(tipo);
+  const corrigir = useCorrigirVigencia(tipo);
   const regrasBs = useRegrasDaBs();
   const regrasDefinitivas = useRegrasDefinitivas();
   const periodoContratual = usePeriodoContratual();
@@ -104,7 +106,33 @@ export function ValorAtualComAlteracao({
     regrasDefinitivas,
     periodoContratual,
   };
-  const erros = validarNovaVigencia(tipo, form);
+  // Já existe um valor começando nesta data: salvar CORRIGE esse valor (o banco não aceita dois
+  // valores começando no mesmo dia).
+  const mesmaData =
+    ((versoes.data ?? []) as VersaoComValores[]).find((v) => v.active && v.valid_from === inicio) ??
+    null;
+  const erros = validarNovaVigencia(tipo, {
+    ...form,
+    fim: mesmaData?.valid_to ?? "",
+    encerrarAnterior: mesmaData ? false : true,
+  });
+  const salvando = registrar.isPending || corrigir.isPending;
+
+  function salvar() {
+    const fechar = { onSuccess: () => setAberto(false) };
+    if (mesmaData) {
+      corrigir.mutate(
+        {
+          termoId: mesmaData.id,
+          versao: { valid_from: mesmaData.valid_from, valid_to: mesmaData.valid_to },
+          form,
+        },
+        fechar,
+      );
+      return;
+    }
+    registrar.mutate({ entidadeId, form }, fechar);
+  }
 
   function abrir() {
     // Todos os campos partem do valor de hoje; os ocultos seguem assim no envio.
@@ -203,6 +231,12 @@ export function ValorAtualComAlteracao({
                 onChange={(e) => setInicio(e.target.value)}
               />
             </div>
+            {mesmaData ? (
+              <p className="rounded-xl border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
+                Já existe um valor começando nesta data ({valoresDaVersao(tipo, mesmaData)}). Salvar
+                vai corrigir esse valor.
+              </p>
+            ) : null}
             {erros.length > 0 ? (
               <ul className="space-y-1 text-xs text-destructive">
                 {erros.map((erro) => (
@@ -223,12 +257,10 @@ export function ValorAtualComAlteracao({
             <Button
               type="button"
               className="rounded-xl"
-              disabled={erros.length > 0 || registrar.isPending || !liberado}
-              onClick={() =>
-                registrar.mutate({ entidadeId, form }, { onSuccess: () => setAberto(false) })
-              }
+              disabled={erros.length > 0 || salvando || !liberado}
+              onClick={salvar}
             >
-              {registrar.isPending ? "Salvando..." : "Salvar novo valor"}
+              {salvando ? "Salvando..." : mesmaData ? "Corrigir valor" : "Salvar novo valor"}
             </Button>
           </DialogFooter>
         </DialogContent>

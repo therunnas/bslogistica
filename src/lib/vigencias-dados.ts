@@ -25,6 +25,7 @@ import {
   interpretarPeriodoContratual,
   interpretarRegrasDefinitivas,
   montarCadastroAtomico,
+  montarCorrecao,
   montarRegistro,
   hojeEmSaoPaulo,
   versaoNaData,
@@ -430,6 +431,27 @@ export function useRegistrarVigencia(tipo: TipoDeVigencia) {
     onSuccess: () => {
       invalidarVigencias(queryClient);
       toast.success("Novo valor salvo.");
+    },
+    onError: (erro: unknown) =>
+      toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
+  });
+}
+
+/** Corrige a versão que começa na mesma data (mesmo período, valores novos). */
+export function useCorrigirVigencia(tipo: TipoDeVigencia) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: {
+      termoId: string;
+      versao: { valid_from: string; valid_to: string | null };
+      form: FormularioDeVigencia;
+    }) => {
+      const { rpc, params } = montarCorrecao(tipo, v.termoId, v.versao, v.form);
+      await chamar(rpc, params);
+    },
+    onSuccess: () => {
+      invalidarVigencias(queryClient);
+      toast.success("Valor corrigido.");
     },
     onError: (erro: unknown) =>
       toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
