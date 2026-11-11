@@ -106,25 +106,36 @@ export function ValorAtualComAlteracao({
     regrasDefinitivas,
     periodoContratual,
   };
+  const ativas = ((versoes.data ?? []) as VersaoComValores[]).filter((v) => v.active);
   // Já existe um valor começando nesta data: salvar CORRIGE esse valor (o banco não aceita dois
   // valores começando no mesmo dia).
-  const mesmaData =
-    ((versoes.data ?? []) as VersaoComValores[]).find((v) => v.active && v.valid_from === inicio) ??
-    null;
+  const mesmaData = ativas.find((v) => v.valid_from === inicio) ?? null;
+  // Data ANTES do primeiro valor (ex.: o cadastro nasceu com início hoje e é preciso lançar dias
+  // anteriores): salvar ANTECIPA o início do primeiro valor, pela mesma correção (o período só cresce,
+  // então nenhum apontamento fica sem cobertura).
+  const primeira = ativas.reduce<VersaoComValores | null>(
+    (menor, v) => (menor === null || v.valid_from < menor.valid_from ? v : menor),
+    null,
+  );
+  const antecipar =
+    !mesmaData && primeira !== null && inicio !== "" && inicio < primeira.valid_from
+      ? primeira
+      : null;
+  const alvo = mesmaData ?? antecipar;
   const erros = validarNovaVigencia(tipo, {
     ...form,
-    fim: mesmaData?.valid_to ?? "",
-    encerrarAnterior: mesmaData ? false : true,
+    fim: alvo?.valid_to ?? "",
+    encerrarAnterior: alvo ? false : true,
   });
   const salvando = registrar.isPending || corrigir.isPending;
 
   function salvar() {
     const fechar = { onSuccess: () => setAberto(false) };
-    if (mesmaData) {
+    if (alvo) {
       corrigir.mutate(
         {
-          termoId: mesmaData.id,
-          versao: { valid_from: mesmaData.valid_from, valid_to: mesmaData.valid_to },
+          termoId: alvo.id,
+          versao: { valid_from: antecipar ? inicio : alvo.valid_from, valid_to: alvo.valid_to },
           form,
         },
         fechar,
@@ -134,14 +145,26 @@ export function ValorAtualComAlteracao({
     registrar.mutate({ entidadeId, form }, fechar);
   }
 
-  function abrir() {
-    // Todos os campos partem do valor de hoje; os ocultos seguem assim no envio.
+  function valoresDe(versao: VersaoComValores | null): Record<string, string> {
     const atuais: Record<string, string> = {};
     for (const campo of campos) {
-      const atual = vigente?.[campo.chave];
+      const atual = versao?.[campo.chave];
       atuais[campo.chave] = atual === null || atual === undefined ? "" : String(atual);
     }
-    setValores(atuais);
+    return atuais;
+  }
+
+  function mudarInicio(data: string) {
+    setInicio(data);
+    // Corrigir ou antecipar parte dos valores do valor que será trocado, não dos de hoje.
+    const igual = ativas.find((v) => v.valid_from === data) ?? null;
+    const antes = !igual && primeira !== null && data !== "" && data < primeira.valid_from;
+    setValores(valoresDe(igual ?? (antes ? primeira : vigente)));
+  }
+
+  function abrir() {
+    // Todos os campos partem do valor de hoje; os ocultos seguem assim no envio.
+    setValores(valoresDe(vigente));
     setInicio(hoje);
     setAberto(true);
   }
@@ -228,13 +251,18 @@ export function ValorAtualComAlteracao({
                 type="date"
                 className={INPUT_CLASS}
                 value={inicio}
-                onChange={(e) => setInicio(e.target.value)}
+                onChange={(e) => mudarInicio(e.target.value)}
               />
             </div>
             {mesmaData ? (
               <p className="rounded-xl border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
                 Já existe um valor começando nesta data ({valoresDaVersao(tipo, mesmaData)}). Salvar
                 vai corrigir esse valor.
+              </p>
+            ) : antecipar ? (
+              <p className="rounded-xl border border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
+                O primeiro valor começa em {dateBR(antecipar.valid_from)}. Salvar vai fazer ele
+                valer desde {dateBR(inicio)}, para poder lançar os dias anteriores.
               </p>
             ) : null}
             {erros.length > 0 ? (
@@ -260,7 +288,13 @@ export function ValorAtualComAlteracao({
               disabled={erros.length > 0 || salvando || !liberado}
               onClick={salvar}
             >
-              {salvando ? "Salvando..." : mesmaData ? "Corrigir valor" : "Salvar novo valor"}
+              {salvando
+                ? "Salvando..."
+                : mesmaData
+                  ? "Corrigir valor"
+                  : antecipar
+                    ? "Antecipar início"
+                    : "Salvar novo valor"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1082,8 +1082,8 @@ export function PainelApontamentos() {
           className="mb-5 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-destructive"
         >
           <p className="text-sm font-medium">
-            Sem condição financeira válida para {linhasBloqueadas.length} linha(s). O salvamento
-            está bloqueado.
+            {linhasBloqueadas.length} linha(s) sem preço ou custo para esta data. Não é possível
+            salvar até corrigir.
           </p>
           <p className="mt-1 text-xs leading-5">{linhasBloqueadas[0]?.valor.aviso}</p>
         </div>

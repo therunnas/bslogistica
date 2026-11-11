@@ -561,12 +561,8 @@ const c5 = resolverCondicaoDoDia({
   termosCusto: CUSTOS,
 });
 verificar(
-  "D6. sem vigência: recusa e diz que a taxa atual NÃO é usada",
-  [
-    c5.ok,
-    /taxa atual do cadastro não é usada/.test(c5.motivo ?? ""),
-    /31\/12\/2025/.test(c5.motivo ?? ""),
-  ],
+  "D6. sem vigência: recusa e diz como resolver (Alterar condições com data anterior)",
+  [c5.ok, /Alterar condições/.test(c5.motivo ?? ""), /31\/12\/2025/.test(c5.motivo ?? "")],
   [false, true, true],
 );
 const c6 = resolverCondicaoDoDia({
@@ -578,7 +574,7 @@ const c6 = resolverCondicaoDoDia({
 });
 verificar(
   "D7. sem custo do colaborador na data: recusa",
-  [c6.ok, /custo vigente/.test(c6.motivo ?? "")],
+  [c6.ok, /Sem custo do colaborador/.test(c6.motivo ?? "")],
   [false, true],
 );
 const c7 = resolverCondicaoDoDia({
@@ -1090,7 +1086,7 @@ verificar(
 );
 verificar(
   "G9g. Alterar na MESMA data de um valor existente corrige esse valor (mesmo período), sem erro de sobreposição",
-  /v\.active && v\.valid_from === inicio/.test(valorAtual) &&
+  /ativas\.find\(\(v\) => v\.valid_from === inicio\)/.test(valorAtual) &&
     /corrigir\.mutate\(/.test(valorAtual) &&
     /RPC_DE_CORRECAO\[tipo\]/.test(ler("src/lib/vigencias-ui.ts")),
   true,

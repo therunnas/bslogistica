@@ -945,7 +945,9 @@ export function resolverCondicaoDoDia(p: {
   } else {
     return {
       ok: false,
-      motivo: `Sem condição financeira vigente em ${quando} para ${p.contratoId ? "o contrato da operação" : "a operação"}. Registre a vigência antes de apontar nesta data; a taxa atual do cadastro não é usada.`,
+      motivo: p.contratoId
+        ? `Sem preço do contrato para ${quando}. Em Clientes e contratos, abra o contrato e use "Alterar condições" com "A partir de" em ${quando} ou antes.`
+        : `Sem valor da operação para ${quando}. Em Operações, abra a operação e use "Alterar valor" com "A partir de" em ${quando} ou antes.`,
     };
   }
 
@@ -953,7 +955,7 @@ export function resolverCondicaoDoDia(p: {
   if (!custo || versoesAmbiguasNaData(p.termosCusto, p.data)) {
     return {
       ok: false,
-      motivo: `Sem custo vigente em ${quando} para o colaborador. Registre a vigência de custo antes de apontar nesta data.`,
+      motivo: `Sem custo do colaborador para ${quando}. Em Colaboradores, abra o colaborador e use "Alterar custo" com "A partir de" em ${quando} ou antes.`,
     };
   }
   const horaExtra = custo.ot_hourly_cost;
