@@ -35,6 +35,23 @@ são últimos registros de catálogo, não nova consulta; homologação pendente
 identidade/catálogo/backup/restauração/janela/Preview e autorização. 048 OFF instalada
 não aprova/ativa fallback; C1–C6 abertas. Controlador OFF, Gates 3–5 PAUSADOS.
 
+## PRODUCTION NA 050 (11/11/2026)
+
+Janela autorizada pelo responsável, executada conforme [Production 034 → 050](runbooks/producao-034-050.md).
+Pré-condições: backup `pg_dump -Fc` novo feito pelo responsável (1.510 itens, segunda cópia fora da
+máquina), e-mails conferidos por leitura, convite pela opção A. Production reconferida antes: 39
+migrations, md5 `5402571a…`, contagens iguais às do backup. As 16 migrations 035–050 foram aplicadas
+uma a uma pela Management API com `aplicar-migration-api.py` (14:04–14:10 UTC): **16/16 PASS**, nenhuma
+tabela com menos linhas, RLS em todas, motor e tarifas iguais. Banco final: 55 migrations, md5
+`01ca91361b85841984ee708716ee60ac` (igual ao HML), `tarifas_por_funcao=false`, motor ligado desde
+29/10, CHECK `requested_on <= executed_on`, `registrar_adicional` fechado para `authenticated`,
+gatilhos de fatura presentes, cliente de teste e contas intactos. Site publicado pela API da Vercel
+com a `main` `d33e8b2`: `dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg` READY, `admin.bslogisticas.com.br`
+apontando para ele, registro de deployment no GitHub com sucesso. Deployment anterior para reversão:
+`dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4`. Smoke pelo responsável: OK. **Não é início do piloto**: faltam a
+simplificação das telas de operação, o cadastro de feriados (a lista legada está vazia em HML e
+Production, então nenhum feriado é reconhecido com a resolução comercial OFF) e o teste manual.
+
 ## CONSOLIDAÇÃO PARA O PILOTO — HML na 050 (09/11/2026)
 
 #119 atualizado com a main pós-#117 e mergeado por squash em `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef`; CI validar/sql-local SUCCESS, sem deployment Production (`main:false`). Drafts obsoletos #63, #106–#112 e #118 fechados com motivo; branches preservadas.

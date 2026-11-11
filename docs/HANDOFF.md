@@ -2,37 +2,49 @@
 
 <!-- workflow-handoff:v1 -->
 
-**UX-FATURA-02 — apontamento faturado passa a mostrar "Faturado" (linha e cabeçalho) e "Salvar" fica indisponível quando o dia inteiro está faturado, em PR Draft feito na sessão em nuvem. Main em `3cda0e5` (#119–#124 mesclados); #125 (roteiro de limpeza do HML para a 050) aberto em Draft, ensaio BLOQUEADO.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
+**PROD-050-01 — Production na 050 e site novo no ar (11/11/2026): 16/16 migrations PASS pela Management API, banco final idêntico ao HML, site `d33e8b2` em `admin.bslogisticas.com.br`, smoke do responsável OK. Não é início do piloto: faltam simplificação das telas de operação, feriados e teste manual.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | UX-FATURA-02 — Gate 1/2, desenvolvimento e validação (CI) |
-| Gate atual | Gate 2: PR Draft com testes estruturais RED → GREEN e validação completa em Linux; CI do HEAD publicado a conferir no GitHub. Sem homologação nas telas, merge ou Production |
-| Último gate concluído | #124 (DOC-01) mesclado por squash em `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
-| Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
+| Etapa | PROD-050-01 — Gate 7 (Production), preparação documental |
+| Gate atual | Gate 7 executado em Production (migrations e site); PR #127 com plano e registro em Draft. Próximo: simplificação das telas (A/B), feriados, teste manual |
+| Último gate concluído | #126 (UX-FATURA-02) mesclado por squash em `d33e8b2d8eb52fd399abf8b6de86230fd80dca84`; CI validar/sql-local SUCCESS; nenhum deployment do SHA |
+| Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
 | Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
-| Base | main `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
-| HEAD validado | 3cda0e55906401a635d5663b23d823d5a98b9fb6 + o diff deste commit (tela de apontamentos, dois testes estruturais e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Base | main `d33e8b2d8eb52fd399abf8b6de86230fd80dca84` |
+| HEAD validado | d33e8b2d8eb52fd399abf8b6de86230fd80dca84 + o diff deste commit (plano, script, índice de runbooks e HANDOFF). HEAD publicado e CI por SHA: consultar no PR |
 | Alterações não commitadas | Nenhuma além deste conjunto |
 | PR | Draft desta branch contra main. Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
-| Ambiente-alvo | Local (nuvem) e CI. HML `qbnfcmrxmssnwkhaitgd` e Production `ehkduqokntemtmqzdrbd` não tocados |
-| Última ação comprovada | Rótulo "Faturado" na linha, contador "N de M faturados" no cabeçalho, aviso e "Salvar" indisponível com o dia inteiro faturado; 72/72 suítes, lint, TypeScript, build e `git diff --check` PASS (Linux, Node 22) |
-| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft e confere a tela no localhost → HML (só olhar) |
+| Ambiente-alvo | Production `ehkduqokntemtmqzdrbd` (050) e Vercel `bs-logistica-sistema` (`dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg`); HML `qbnfcmrxmssnwkhaitgd` (050) |
+| Última ação comprovada | Janela de 11/11/2026 14:04–14:13 UTC: reconferência; 035–050 aplicadas 16/16 PASS; banco final com 55 migrations e md5 `01ca9136…` igual ao HML; site `d33e8b2` READY com o domínio trocado; registro de deployment no GitHub com sucesso; smoke do responsável OK |
+| Próxima ação exata | PRs de interface A (esconder calendário territorial e aviso de localidade com resolução OFF) e B (valor acordado: valor atual + "Alterar valor", histórico recolhido); depois cadastro de feriados (HML, depois Production) e teste manual |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `3cda0e5` (#124 sobre `c6f9130`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)); confirmação antes de gerar fatura ([#123](https://github.com/therunnas/bslogistica/pull/123)); `PROGRESS.md` alinhado ([#124](https://github.com/therunnas/bslogistica/pull/124)). `vercel.json` mantém `main:false`; último deployment Production `38b4349` (05/11/2026), nenhum depois |
+| Main | `d33e8b2` (#126 sobre `3cda0e5`): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado" no apontamento. `vercel.json` mantém `main:false`; site de Production ainda em `38b4349` (05/11/2026) |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
-| Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
+| Production | **050 desde 11/11/2026** (16/16 PASS, banco idêntico ao HML). Site `d33e8b2` (`dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg`); reversão do site: `dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4`. Backup `pg_dump` de 11/11 com o responsável. Sem dados de negócio; lista de feriados legada vazia |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
 | Negócio | [NEGOCIO.md](NEGOCIO.md) e [matriz](NEGOCIO_X_SISTEMA.md); C1–C6 seguem pendentes e não bloqueiam o piloto com resolução OFF |
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | PROD-050-01 (11/11/2026, sessão em nuvem): plano `docs/runbooks/producao-034-050.md` e script `docs/runbooks/aplicar-migration-api.py`; **janela executada com autorização do responsável**: 035–050 aplicadas em Production e site publicado com a `main` `d33e8b2` |
+| Resultados e testes comprovados | Leituras de 11/11/2026: Production com 39 migrations (034), faltando exatamente 035–050, sem versão estranha; nenhum dado de negócio (1 cliente de teste "te"); 3 contas e 7 `profiles`/7 `user_roles` órfãos; RLS em todas as tabelas; motor ligado desde 29/10; Auth com modelo de recuperação correto e convite com `{{ .ConfirmationURL }}`; Vercel: Preview → HML e Production → Production comprovados pela primeira vez (leitura dos valores públicos de `NEXT_PUBLIC_SUPABASE_URL`); site em `dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4`/`38b4349`. HML: 55 migrations, md5 `01ca9136…` igual ao esperado pelo #125. Script, só conferência: Production 035 aceita; HML 050 recusada (já aplicada e não posterior); `--executar` sem `BS_CONFIRMO_PROJETO` recusado; o primeiro teste pegou leitura de `pricing_settings` inexistente na 034, parou com STOP e foi corrigido. Backup de Production feito pelo responsável (`pg_dump -Fc`, 1.510 itens) com segunda cópia. A senha do banco de Production apareceu no chat e foi trocada pelo responsável antes do backup |
+| Código e PR afetados | `docs/runbooks/producao-034-050.md`, `docs/runbooks/aplicar-migration-api.py`, `docs/runbooks/README.md`, `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Production: 16 migrations aplicadas (14:04–14:10 UTC), conferidas uma a uma e no fim (RLS, flags, CHECK, ACL, gatilhos, dados preservados). Vercel: deployment de Production criado pela API (`dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg`, READY, domínio trocado). HML somente leitura. Nenhuma configuração de Auth alterada. A execução rodou sem pedido de confirmação na tela (modo "Accept edits"), dentro da autorização dada no chat |
+| Pendências e decisões | Bloqueio do piloto: domingo/feriado com resolução OFF (ver `PROGRESS.md`); decisões pedidas: regra de 100% na cobrança e no pagamento, resolução ON ou migration 051, cidade do piloto. Interface A e B propostas. Depois: limpar órfãos de `profiles`/`user_roles`, matriz E2E antes de contas operacionais reais |
+| Próxima ação exata | Pedir "autorizo Production" e executar a seção 4 do plano, parando na primeira falha |
+| Autorizações e proibições | Autorizado (11/11/2026): acesso a Supabase e Vercel, preparação do plano e PR Draft. Escrita em Production só depois do "autorizo Production" explícito na janela. Proibidos: merge sem autorização, force push, `config push`, alterar configuração de Auth |
+
+### Tarefa anterior — UX-FATURA-02 (11/11/2026, #126 mesclado)
 
 | Campo | Valor |
 | --- | --- |
@@ -670,6 +682,8 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 - sem inferir regra comercial nem usar R$ 35.118,12 como fixture de outra base.
 
 ## Bloqueios e riscos
+
+**11/11/2026 (vigente):** **bloqueio do piloto** — com a resolução comercial OFF, domingo é calculado como dia útil e feriado não muda a cobrança (teste no HML, com reversão: domingo 8 h = R$ 250,00 / custo R$ 150,00 / tipo "util"); a lista de feriados legada está vazia em HML e Production. Decisões pedidas ao responsável (regra de 100% na cobrança e no pagamento; resolução ON ou migration 051; cidade do piloto): ver `PROGRESS.md`, "Bloqueio do piloto".
 
 **09/11/2026 (vigente):** interface dos 9 cenários PASS em app local ligado ao HML (Preview segue sem vínculo comprovado); Production 034 com frontend posterior (telas de schema novo indisponíveis até 034 → 050); backup `pg_dump` de Production pendente. Registros abaixo são históricos.
 
