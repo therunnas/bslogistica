@@ -1049,10 +1049,44 @@ verificar(
   true,
 );
 verificar(
-  "G9. Operações: histórico do valor acordado só para operação SEM contrato",
-  /opForm\.id && !opForm\.contract_id \?[\s\S]{0,200}<HistoricoDeVigencias\s+tipo="operacao"/.test(
-    operacoes,
+  "G9. Operações: valor acordado (com histórico) só para operação SEM contrato",
+  /opForm\.id && !opForm\.contract_id \?[\s\S]{0,200}<ValorAcordadoDaOperacao\b/.test(operacoes),
+  true,
+);
+// UX-OPERACAO-01 (B): o valor acordado mostra o valor atual e um "Alterar valor" que só pede o
+// novo valor e a data; grava pela MESMA RPC de vigência (motivo preenchido) e o histórico
+// completo continua disponível, recolhido.
+const valorAcordado = ler("src/app/(painel)/operacoes/valor-acordado.tsx");
+verificar(
+  "G9b. Valor acordado: mostra o valor vigente hoje",
+  /situacaoDaVersao\(v, hoje\) === "vigente"/.test(valorAcordado) &&
+    /Valor atual/.test(valorAcordado),
+  true,
+);
+verificar(
+  "G9c. Valor acordado: 'Alterar valor' grava pela mesma RPC de vigência da operação",
+  /useRegistrarVigencia\("operacao"\)/.test(valorAcordado) &&
+    /registrar\.mutate\(/.test(valorAcordado) &&
+    /valores: \{ agreed_amount: novoValor \}/.test(valorAcordado),
+  true,
+);
+verificar(
+  "G9d. Valor acordado: motivo preenchido automaticamente e validação da vigência preservada",
+  /MOTIVO_ALTERACAO_VALOR = "Alteração do valor acordado pela tela da operação"/.test(
+    valorAcordado,
+  ) && /validarNovaVigencia\("operacao"/.test(valorAcordado),
+  true,
+);
+verificar(
+  "G9e. Valor acordado: histórico completo recolhido em 'Ver histórico'",
+  /<details[\s\S]{0,300}Ver histórico[\s\S]{0,300}<HistoricoDeVigencias\s+tipo="operacao"/.test(
+    valorAcordado,
   ),
+  true,
+);
+verificar(
+  "G9f. Valor acordado: só altera com o motor liberado para registrar vigência",
+  /podeRegistrarVigencia\(estado\)/.test(valorAcordado),
   true,
 );
 verificar(

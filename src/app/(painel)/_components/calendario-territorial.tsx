@@ -13,7 +13,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useCalendarioTerritorial } from "@/lib/vigencias-dados";
+import { useCalendarioTerritorial, useRegimeDoCalendario } from "@/lib/vigencias-dados";
 import {
   useAlterarCalendario,
   useCoberturas,
@@ -492,6 +492,9 @@ export function CalendarioTerritorial() {
 
 export function LocalidadeDaOperacao({ id }: { id: string }) {
   const capacidade = useCalendarioTerritorial();
+  // Com a resolução comercial OFF (regime legado) o tipo do dia vem da lista única de feriados e
+  // a localidade não entra no cálculo: o bloco e o aviso "Localidade ausente" não aparecem.
+  const regime = useRegimeDoCalendario();
   const locais = useLocaisDaOperacao(id, capacidade === "disponivel");
   const catalogo = useMunicipiosCatalogados(capacidade === "disponivel");
   const alterar = useAlterarCalendario();
@@ -502,6 +505,7 @@ export function LocalidadeDaOperacao({ id }: { id: string }) {
   const [fim, setFim] = useState("");
   const [motivo, setMotivo] = useState("");
   const [encerrar, setEncerrar] = useState(false);
+  if (regime === "legado") return null;
   if (capacidade === "indisponivel") return null;
   if (capacidade === "desconhecida")
     return (

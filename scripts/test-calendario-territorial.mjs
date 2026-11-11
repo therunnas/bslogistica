@@ -337,6 +337,30 @@ const telaCalendario = readFileSync(
 assert.match(telaCalendario, /Fim exclusivo da vigência/);
 assert.match(telaCalendario, /!periodoLocalValido\(inicio, fim\)/);
 console.log("PASS edição congelada, cobertura por âmbito e fim exclusivo de vigência.");
+
+// UX-OPERACAO-01 (A): com a resolução comercial OFF o cálculo usa a lista única de feriados e
+// ignora a localidade; o bloco de localidade e o aviso "Localidade ausente" não aparecem na
+// operação. Com o regime territorial (ON) ou desconhecido, o comportamento anterior continua.
+const blocoLocalidade = telaCalendario.slice(
+  telaCalendario.indexOf("export function LocalidadeDaOperacao"),
+);
+assert.match(blocoLocalidade, /const regime = useRegimeDoCalendario\(\);/);
+assert.match(blocoLocalidade, /if \(regime === "legado"\) return null;/);
+assert.ok(
+  blocoLocalidade.indexOf('if (regime === "legado") return null;') <
+    blocoLocalidade.indexOf("<p>Localidade ausente."),
+  "a saída para o regime legado vem antes do aviso de localidade ausente",
+);
+assert.ok(
+  blocoLocalidade.indexOf("const regime = useRegimeDoCalendario();") <
+    blocoLocalidade.indexOf('if (capacidade === "indisponivel") return null;'),
+  "o hook do regime é chamado antes de qualquer retorno antecipado (regra dos hooks)",
+);
+assert.match(
+  telaCalendario,
+  /import \{[^}]*useRegimeDoCalendario[^}]*\} from "@\/lib\/vigencias-dados";/,
+);
+console.log("PASS localidade da operação oculta com o regime legado (resolução OFF).");
 assert.equal(
   valorDaLinha({ ...entrada, estado: { tag: "desconhecido", motivo: "rede" } }).bloqueiaSalvar,
   true,
