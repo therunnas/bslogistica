@@ -35,6 +35,18 @@ são últimos registros de catálogo, não nova consulta; homologação pendente
 identidade/catálogo/backup/restauração/janela/Preview e autorização. 048 OFF instalada
 não aprova/ativa fallback; C1–C6 abertas. Controlador OFF, Gates 3–5 PAUSADOS.
 
+## HML NA 051 COM DOMINGO E FERIADO EM DOBRO (11/11/2026)
+
+[#129](https://github.com/therunnas/bslogistica/pull/129) mesclado em `ecd67f2` (CI validar e
+sql-local SUCCESS): migration 051, interruptor `pricing_settings.dias_especiais_em_dobro`, desligado
+por padrão. No HML, com autorização do responsável (dados fictícios): 051 aplicada pelo
+`aplicar-migration-api.py` (**PASS**: 56 migrations, nenhuma tabela com menos linhas, RLS em todas,
+motor e tarifas iguais), suíte 051 com o interruptor ainda desligado em transação desfeita (26/26),
+interruptor **ligado** (resolução comercial continua OFF) e conferência em transação desfeita: domingo
+de 8 h 500/300, segunda 250/150, feriado 500/300, domingo sem contrato (200) 400/300. Nenhum dado
+fictício ficou gravado. **Production continua na 050, com o interruptor inexistente**; o site está em
+`8c493a5` (`dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`).
+
 ## PRODUCTION NA 050 (11/11/2026)
 
 Janela autorizada pelo responsável, executada conforme [Production 034 → 050](runbooks/producao-034-050.md).
