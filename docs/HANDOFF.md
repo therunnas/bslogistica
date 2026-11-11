@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**PROD-050-01 — Production na 050 e site novo no ar (11/11/2026): 16/16 migrations PASS pela Management API, banco final idêntico ao HML, site `d33e8b2` em `admin.bslogisticas.com.br`, smoke do responsável OK. Não é início do piloto: faltam simplificação das telas de operação, feriados e teste manual.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
+**UX-OPERACAO-01 — tela de operação mais simples, em PR Draft: (A) com a resolução comercial OFF o bloco de localidade e o aviso "Localidade ausente" não aparecem; (B) o valor acordado mostra o valor atual e um "Alterar valor" (novo valor + a partir de quando), com o histórico recolhido. Production na 050 desde 11/11/2026. Bloqueio do piloto (domingo/feriado com resolução OFF) segue aberto: próxima tarefa, com interruptor.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | PROD-050-01 — Gate 7 (Production), preparação documental |
-| Gate atual | Gate 7 executado em Production (migrations e site); PR #127 com plano e registro em Draft. Próximo: simplificação das telas (A/B), feriados, teste manual |
-| Último gate concluído | #126 (UX-FATURA-02) mesclado por squash em `d33e8b2d8eb52fd399abf8b6de86230fd80dca84`; CI validar/sql-local SUCCESS; nenhum deployment do SHA |
+| Etapa | UX-OPERACAO-01 — Gate 1/2, desenvolvimento e validação (CI) |
+| Gate atual | Gate 2: PR Draft com testes RED → GREEN e validação completa em Linux. Sem homologação nas telas, merge ou Production |
+| Último gate concluído | PROD-050-01: Production na 050 e site `d33e8b2` no ar (11/11/2026); #127 mesclado em `db84044` |
 | Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
 | Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
-| Base | main `d33e8b2d8eb52fd399abf8b6de86230fd80dca84` |
-| HEAD validado | d33e8b2d8eb52fd399abf8b6de86230fd80dca84 + o diff deste commit (plano, script, índice de runbooks e HANDOFF). HEAD publicado e CI por SHA: consultar no PR |
+| Base | main `db84044074a371b647b6f9228190c3f35093d684` |
+| HEAD validado | db84044074a371b647b6f9228190c3f35093d684 + o diff deste commit (localidade, valor acordado, dois testes estruturais e HANDOFF). HEAD publicado e CI por SHA: consultar no PR |
 | Alterações não commitadas | Nenhuma além deste conjunto |
 | PR | Draft desta branch contra main. Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
-| Ambiente-alvo | Production `ehkduqokntemtmqzdrbd` (050) e Vercel `bs-logistica-sistema` (`dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg`); HML `qbnfcmrxmssnwkhaitgd` (050) |
-| Última ação comprovada | Janela de 11/11/2026 14:04–14:13 UTC: reconferência; 035–050 aplicadas 16/16 PASS; banco final com 55 migrations e md5 `01ca9136…` igual ao HML; site `d33e8b2` READY com o domínio trocado; registro de deployment no GitHub com sucesso; smoke do responsável OK |
-| Próxima ação exata | PRs de interface A (esconder calendário territorial e aviso de localidade com resolução OFF) e B (valor acordado: valor atual + "Alterar valor", histórico recolhido); depois cadastro de feriados (HML, depois Production) e teste manual |
+| Ambiente-alvo | Local (nuvem) e CI. Production e HML não tocados nesta tarefa |
+| Última ação comprovada | A e B implementados; 72/72 suítes, lint, TypeScript, build e `git diff --check` PASS (Linux, Node 22) |
+| Próxima ação exata | Conferir CI do PR; usuário revisa e confere a tela (localhost → HML, só olhar); depois publicar o site e seguir para a correção de domingo/feriado com interruptor |
 
 ## Estado atual para retomada
 
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-OPERACAO-01 (11/11/2026, sessão em nuvem), pedido do responsável por uma tela de operação mais simples. (A) `LocalidadeDaOperacao` não aparece com o regime de calendário "legado" (resolução comercial OFF), em que o cálculo ignora a localidade; com regime territorial ou desconhecido, nada muda. (B) Novo `ValorAcordadoDaOperacao` (`src/app/(painel)/operacoes/valor-acordado.tsx`): valor vigente hoje, "Alterar valor" que pede só o novo valor e a data e grava pela mesma `useRegistrarVigencia("operacao")` (motivo "Alteração do valor acordado pela tela da operação", versão anterior encerrada no dia anterior, mesma validação `validarNovaVigencia`), e o histórico completo recolhido em "Ver histórico". Em operação existente com o motor por vigência, o campo de valor travado e vazio deixa de aparecer; em operação nova o campo continua |
+| Resultados e testes comprovados | RED → GREEN: `test:calendario-territorial` (asserções da localidade com regime legado; o primeiro GREEN falhou por um comentário com o mesmo texto do aviso e a asserção passou a procurar o elemento da tela) e `test:interfaces-vigencia` (G9 atualizado para o componente novo; G9b–G9f novos; 162/0). Linux, Node 22.23: 72/72 `test:*`, `npm run lint`, `npx tsc --noEmit`, `npm run build` e `git diff --check` PASS. Não houve verificação visual nesta sessão (sem login) |
+| Código e PR afetados | `src/app/(painel)/_components/calendario-territorial.tsx`, `src/app/(painel)/operacoes/painel-operacoes.tsx`, `src/app/(painel)/operacoes/valor-acordado.tsx` (novo), `scripts/test-calendario-territorial.mjs`, `scripts/testar-interfaces-vigencia.mjs`, `docs/HANDOFF.md`. PR Draft da branch `claude/jolly-allen-fqechw` |
+| Ambientes envolvidos | Sessão em nuvem e CI. Nenhum banco, migration, cálculo, faturamento, HML ou Production tocado |
+| Pendências e decisões | Bloqueio do piloto (domingo/feriado com resolução OFF): aprovado pelo responsável fazer com interruptor desligado por padrão (próxima tarefa). Cidade do cliente-piloto para os feriados municipais: sem resposta. Publicar o site com esta mudança depois do merge |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão e conferência visual pelo responsável; nenhuma promoção a Ready ou merge sem autorização |
+| Autorizações e proibições | Autorizado pelo responsável (11/11/2026): simplificar a tela de operação (A e B) e PR Draft. Proibidos: banco, cálculo, faturamento, Production, merge sem autorização |
+
+### Tarefa anterior — PROD-050-01 (11/11/2026, #127 mesclado)
 
 | Campo | Valor |
 | --- | --- |

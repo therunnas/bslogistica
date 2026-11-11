@@ -66,7 +66,8 @@ import {
   useTimesheets,
 } from "@/lib/queries";
 import type { Operation, Shift } from "@/lib/types";
-import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
+import { AvisoDoMotor } from "../_components/vigencias";
+import { ValorAcordadoDaOperacao } from "./valor-acordado";
 import { MENSAGEM_TURNO_PROTEGIDO } from "@/lib/erros-banco";
 import {
   camposDePeriodoDoTurno,
@@ -473,6 +474,9 @@ export function PainelOperacoes() {
   const valorTravado =
     valorPeloContrato ||
     (modoDeValor !== "direta" && (Boolean(opForm.id) || modoDeValor === "bloqueada"));
+  // Operação existente com o motor por vigência: o valor aparece e muda pelo bloco "Valor
+  // acordado por diária" (sem contrato) ou vem do contrato; o campo travado e vazio some.
+  const campoDeValorVisivel = !(opForm.id && modoDeValor === "por-vigencia");
 
   function submitOperation() {
     const payload: Record<string, unknown> = {
@@ -1019,25 +1023,27 @@ export function PainelOperacoes() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Valor acordado por diária (avulsa)</Label>
+            {campoDeValorVisivel ? (
+              <div className="space-y-2">
+                <Label>Valor acordado por diária (avulsa)</Label>
 
-              <Input
-                type="number"
-                step="0.01"
-                value={opForm.agreed_amount}
-                disabled={valorTravado}
-                onChange={(event) =>
-                  setOpForm({
-                    ...opForm,
-                    agreed_amount: event.target.value,
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-            </div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={opForm.agreed_amount}
+                  disabled={valorTravado}
+                  onChange={(event) =>
+                    setOpForm({
+                      ...opForm,
+                      agreed_amount: event.target.value,
+                    })
+                  }
+                  className={INPUT_CLASS}
+                />
+              </div>
+            ) : null}
 
-            {valorTravado ? (
+            {campoDeValorVisivel && valorTravado ? (
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 {valorPeloContrato
                   ? "O valor vem do contrato. Para um valor próprio deste serviço, deixe o contrato em branco."
@@ -1049,12 +1055,7 @@ export function PainelOperacoes() {
 
             {opForm.id && !opForm.contract_id ? (
               <div className="sm:col-span-2">
-                <HistoricoDeVigencias
-                  tipo="operacao"
-                  entidadeId={opForm.id}
-                  estado={estadoDoMotor}
-                  valoresIniciais={{ agreed_amount: opForm.agreed_amount }}
-                />
+                <ValorAcordadoDaOperacao operacaoId={opForm.id} estado={estadoDoMotor} />
               </div>
             ) : opForm.id && opForm.contract_id ? (
               <p className="text-xs text-muted-foreground sm:col-span-2">
