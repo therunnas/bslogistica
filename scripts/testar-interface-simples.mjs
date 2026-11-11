@@ -279,6 +279,55 @@ verificar(
   true,
 );
 
+console.log("\nE. Apontamento faturado (UX-FATURA-02)\n");
+// O lançamento faturado é imutável no banco. A tela já travava os campos; agora diz por quê:
+// a linha mostra "Faturado", o cabeçalho conta quantos estão faturados e "Salvar" fica
+// indisponível quando nenhuma linha do dia é editável. "Fechar dia" segue igual (é só status).
+const painelApont = semComentarios(ler(`${PAINEL}/apontamentos/painel-apontamentos.tsx`));
+verificar(
+  "E1. conta as linhas faturadas do dia a partir do conjunto que já trava os campos",
+  /const qtdFaturados = linhas\.filter\(\(linha\) => faturados\.has\(linha\.employeeId\)\)\.length;/.test(
+    painelApont,
+  ) &&
+    /const todasFaturadas = linhas\.length > 0 && qtdFaturados === linhas\.length;/.test(
+      painelApont,
+    ),
+  true,
+);
+verificar(
+  "E2. 'Salvar' indisponível quando todas as linhas do dia estão faturadas",
+  /linhasBloqueadas\.length > 0 \|\|\s*todasFaturadas\s*\}/.test(painelApont),
+  true,
+);
+verificar(
+  "E3. a linha faturada mostra o rótulo 'Faturado'",
+  /faturados\.has\(row\.employeeId\) \? \(\s*<Badge[\s\S]{0,400}?Faturado\s*<\/Badge>/.test(
+    painelApont,
+  ),
+  true,
+);
+verificar(
+  "E4. o cabeçalho informa quantos lançamentos do dia estão faturados",
+  /qtdFaturados > 0 \? \(\s*<Badge[\s\S]{0,400}?\{qtdFaturados\} de \{linhas\.length\} faturado/.test(
+    painelApont,
+  ),
+  true,
+);
+verificar(
+  "E5. aviso quando o dia inteiro está faturado",
+  painelApont.includes(
+    "Todos os lançamentos deste dia já foram faturados e não podem ser alterados.",
+  ),
+  true,
+);
+verificar(
+  "E6. 'Fechar dia' / 'Reabrir' preservado (mesma condição de antes)",
+  /onClick=\{\(\) => toggleStatus\.mutate\(isClosed \? "open" : "closed"\)\}\s*disabled=\{!timesheet \|\| leitura\.estado !== "pronto"\}/.test(
+    painelApont,
+  ),
+  true,
+);
+
 console.log("\nD. Preservado\n");
 const acoes = semComentarios(ler(`${PAINEL}/implantacao-vigencias/_acoes.ts`));
 verificar(

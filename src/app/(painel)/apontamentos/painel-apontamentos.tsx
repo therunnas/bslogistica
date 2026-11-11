@@ -779,6 +779,9 @@ export function PainelApontamentos() {
   // Só entra no salvamento a linha nova, ou a existente que o usuário tocou E que difere
   // do servidor. Linha faturada nunca entra: o banco a recusaria e levaria o lote junto.
   const faturados = useMemo(() => colaboradoresFaturados(existingEntries), [existingEntries]);
+  // Lançamento faturado é imutável no banco: a tela diz isso em vez de só travar os campos.
+  const qtdFaturados = linhas.filter((linha) => faturados.has(linha.employeeId)).length;
+  const todasFaturadas = linhas.length > 0 && qtdFaturados === linhas.length;
 
   const colaboradoresASalvar = new Set(
     linhasParaSalvar(linhas, draft?.dirty ?? new Set<string>(), existingEntries).map(
@@ -1059,7 +1062,8 @@ export function PainelApontamentos() {
                 !linhas.length ||
                 !!conflitos.length ||
                 !!horariosIguais.length ||
-                linhasBloqueadas.length > 0
+                linhasBloqueadas.length > 0 ||
+                todasFaturadas
               }
             >
               <Save className="h-4 w-4" />
@@ -1278,11 +1282,26 @@ export function PainelApontamentos() {
                   Aberto
                 </Badge>
               )}
+
+              {qtdFaturados > 0 ? (
+                <Badge
+                  variant="secondary"
+                  className="border border-border bg-secondary font-medium text-muted-foreground shadow-none"
+                >
+                  {qtdFaturados} de {linhas.length} faturado{qtdFaturados === 1 ? "" : "s"}
+                </Badge>
+              ) : null}
             </div>
 
             <p className="mt-1 text-xs text-muted-foreground">
               Presença e horários da equipe alocada no turno selecionado.
             </p>
+
+            {todasFaturadas ? (
+              <p className="mt-1 text-xs font-medium text-muted-foreground">
+                Todos os lançamentos deste dia já foram faturados e não podem ser alterados.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1378,6 +1397,16 @@ export function PainelApontamentos() {
                             <p className="truncate text-sm font-medium text-foreground">
                               {employee?.name ?? "—"}
                             </p>
+
+                            {faturados.has(row.employeeId) ? (
+                              <Badge
+                                variant="secondary"
+                                className="mt-1 border border-border bg-secondary font-medium text-muted-foreground shadow-none"
+                              >
+                                <Lock className="mr-1 h-3 w-3" />
+                                Faturado
+                              </Badge>
+                            ) : null}
 
                             <p className="mt-0.5 text-xs text-muted-foreground">
                               {employee?.role ?? "Colaborador"}

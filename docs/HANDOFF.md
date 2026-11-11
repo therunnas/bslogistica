@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**DOC-01 — `PROGRESS.md` alinhado ao estado real depois de #119–#123 (todos mesclados), em PR Draft. Production na 034, HML na 050, resolução comercial OFF.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
+**UX-FATURA-02 — apontamento faturado passa a mostrar "Faturado" (linha e cabeçalho) e "Salvar" fica indisponível quando o dia inteiro está faturado, em PR Draft feito na sessão em nuvem. Main em `3cda0e5` (#119–#124 mesclados); #125 (roteiro de limpeza do HML para a 050) aberto em Draft, ensaio BLOQUEADO.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | DOC-01 — Gate 1/2, documentação |
-| Gate atual | Gate 2: PR Draft só de documentação; CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
-| Último gate concluído | #123 (UX-FATURA-01) mesclado por squash em `c6f91305c2d88048adc31387f9966b02aa48ef86`, árvore idêntica a `8676bdd` |
-| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-docs-progress` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-ux-*` (branches mescladas). Descobrir de novo na retomada |
-| Branch | `docs/progress-estado-atual`, criada de `origin/main` |
-| Base | main `c6f91305c2d88048adc31387f9966b02aa48ef86` |
-| HEAD validado | c6f91305c2d88048adc31387f9966b02aa48ef86 + o diff deste commit (`PROGRESS.md` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Etapa | UX-FATURA-02 — Gate 1/2, desenvolvimento e validação (CI) |
+| Gate atual | Gate 2: PR Draft com testes estruturais RED → GREEN e validação completa em Linux; CI do HEAD publicado a conferir no GitHub. Sem homologação nas telas, merge ou Production |
+| Último gate concluído | #124 (DOC-01) mesclado por squash em `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
+| Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
+| Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
+| Base | main `3cda0e55906401a635d5663b23d823d5a98b9fb6` |
+| HEAD validado | 3cda0e55906401a635d5663b23d823d5a98b9fb6 + o diff deste commit (tela de apontamentos, dois testes estruturais e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#123 mesclados; nenhum outro PR aberto |
-| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) e Production `ehkduqokntemtmqzdrbd` (034) não tocados |
-| Última ação comprovada | `PROGRESS.md` reescrito nas seções "Tarefa ativa única", "Situação", "Próxima etapa" e "Não fazer ainda", e na linha "Dependências"; fatos conferidos no Git |
-| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois, item 2 da fila: auditoria do código e roteiro de limpeza do HML para a 050 (`origin/docs/hml-limpeza-runbook`) |
+| PR | Draft desta branch contra main. Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
+| Ambiente-alvo | Local (nuvem) e CI. HML `qbnfcmrxmssnwkhaitgd` e Production `ehkduqokntemtmqzdrbd` não tocados |
+| Última ação comprovada | Rótulo "Faturado" na linha, contador "N de M faturados" no cabeçalho, aviso e "Salvar" indisponível com o dia inteiro faturado; 72/72 suítes, lint, TypeScript, build e `git diff --check` PASS (Linux, Node 22) |
+| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft e confere a tela no localhost → HML (só olhar) |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `c6f9130` (#123 sobre `7b03772`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)); confirmação antes de gerar fatura ([#123](https://github.com/therunnas/bslogistica/pull/123)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| Main | `3cda0e5` (#124 sobre `c6f9130`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)); confirmação antes de gerar fatura ([#123](https://github.com/therunnas/bslogistica/pull/123)); `PROGRESS.md` alinhado ([#124](https://github.com/therunnas/bslogistica/pull/124)). `vercel.json` mantém `main:false`; último deployment Production `38b4349` (05/11/2026), nenhum depois |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-FATURA-02 (11/11/2026, sessão em nuvem): na tela Apontamentos, a linha faturada mostra o rótulo "Faturado"; o cabeçalho "Equipe do dia" mostra "N de M faturados"; com todas as linhas do dia faturadas aparece "Todos os lançamentos deste dia já foram faturados e não podem ser alterados." e "Salvar" fica indisponível. "Fechar dia"/"Reabrir" inalterado: é só status da folha e não altera lançamento faturado. Usa o conjunto `faturados` que já travava os campos; nenhuma consulta nova |
+| Resultados e testes comprovados | RED → GREEN em `scripts/testar-interface-simples.mjs` (E1–E6: 5 falharam antes; E6, que guarda "Fechar dia", já passava; 46/0 depois). `scripts/testar-apontamentos-salvar.mjs` D8 passou a contar `faturados.has(row.employeeId)` só dentro de `disabled=` (o rótulo também consulta o conjunto); continua 4 e cai para 3 se um campo perder o bloqueio (conferido com cópia mutada). Linux, Node 22.23: 72/72 `test:*` PASS, `npm run lint`, `npx tsc --noEmit`, `npm run build` (placeholders públicos) e `git diff --check` PASS |
+| Código e PR afetados | `src/app/(painel)/apontamentos/painel-apontamentos.tsx`, `scripts/testar-interface-simples.mjs`, `scripts/testar-apontamentos-salvar.mjs`, `docs/HANDOFF.md`. PR Draft da branch `claude/jolly-allen-fqechw` contra main |
+| Ambientes envolvidos | Sessão em nuvem e CI. Nenhum banco, HML, Production, cálculo, faturamento, migration, dependência, workflow, `vercel.json` ou `.env` tocado. A tela não foi aberta no navegador (sem login nesta sessão) |
+| Pendências e decisões | Conferência visual da tela pelo usuário (localhost → HML, só olhar). #125: ensaio do script de limpeza BLOQUEADO por falta de Docker/Supabase CLI/backup 050; diagnóstico do Mac pendente. Leitura do HML pela nuvem indisponível: o token do Supabase retornou "Invalid access token" em 11/11/2026. O Windows local recebeu WSL numa sessão anterior (não registrado antes). Prévia de HE em `src/lib/billing.ts` (`<= 15`/`<= 45`) não foi alterada: o banco ainda usa a regra 030 em domingo/feriado com resolução OFF, e a prévia da tela vem de `previa-v2`; tratar só em tarefa própria |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados pelo usuário (11/11/2026, "faça o que for mais correto e seguro"): código e testes desta tela, commit/push na branch da sessão e um PR Draft. Proibidos: banco, migrations, cálculo, faturamento, `billing.ts`, HML, Production, `.env`, merge, Ready, force push |
+
+### Tarefa anterior — DOC-01 (10/11/2026, #124 mesclado)
 
 | Campo | Valor |
 | --- | --- |
