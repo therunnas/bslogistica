@@ -49,7 +49,8 @@ próxima sessão continua sendo o [HANDOFF](docs/HANDOFF.md). **O piloto ainda n
   responsável. Sem dados de negócio (1 cliente de teste "te"); 7 `profiles` e 7 `user_roles` órfãos;
   nenhum feriado cadastrado.
 - **HML** (`qbnfcmrxmssnwkhaitgd`): **051**, interruptor de domingo/feriado em dobro **ligado**,
-  resolução comercial OFF, só dados sintéticos.
+  resolução comercial OFF. **Limpo em 11/11/2026** (sem clientes, colaboradores, apontamentos ou
+  faturas; contas e papéis preservados), pronto para o teste manual do responsável.
 - **Vercel:** vínculos comprovados em 11/11/2026: Preview → HML, Production → Production.
 - **Homologação de telas** em localhost → HML: 9 cenários, fluxo avulso e avulsa sem contrato
   com valor acordado, PASS.
@@ -82,7 +83,7 @@ Pendente: **cidade do cliente-piloto**, para os feriados municipais da lista ún
 3. Piloto. Contas operacionais reais só depois da matriz E2E de acesso.
 
 Depois do piloto ou em paralelo, com autorização própria: limpar os órfãos de Production,
-limpar os dados sintéticos do HML (#125, ensaio bloqueado), dependências do `npm audit`.
+dependências do `npm audit`. O HML já foi limpo (o #125 pode ser fechado ou atualizado).
 Decisões de negócio em aberto que não bloqueiam: tipos de serviço avulso e modalidade de
 cobrança; três particularidades da Dynamis; C1–C6 da matriz.
 

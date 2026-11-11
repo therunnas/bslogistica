@@ -19,20 +19,32 @@
 | PR | #130 (só documentação). Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
 | Ambiente-alvo | HML e Production (aplicados) |
 | Última ação comprovada | Production: 051 PASS pelo script; 26/26 com o interruptor desligado e 7/7 com ele ligado, em transações desfeitas; `dias_especiais_em_dobro=true`, `tarifas_por_funcao=false`; 1 cliente, 3 contas, 0 apontamentos, 0 feriados; site READY e domínio no deployment novo |
-| Próxima ação exata | Cadastrar os feriados (nacionais, SC e municipais da cidade do piloto) em HML e Production antes dos apontamentos; depois o teste manual do responsável |
+| Próxima ação exata | Teste manual do responsável no HML (limpo); depois os feriados (cidade do piloto) |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
 | Main | `8c493a5` (#128): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado", tela de operação simplificada. `vercel.json` mantém `main:false` |
-| HML | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`** (050 desde 09/11/2026); `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
+| HML | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`, limpo em 11/11/2026 (só contas e configuração)** (050 desde 09/11/2026); `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`** (035–050 no mesmo dia, 16/16 PASS). Site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`); reversão do site: `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C` (`8c493a5`). Backup `pg_dump` de 11/11 (antes da 035) com o responsável. Sem dados de negócio; lista de feriados vazia |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; Preview → HML comprovado pela leitura das variáveis na Vercel (11/11/2026). Este container não abre `vercel.app` (proxy). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
 | Negócio | [NEGOCIO.md](NEGOCIO.md) e [matriz](NEGOCIO_X_SISTEMA.md); C1–C6 seguem pendentes e não bloqueiam o piloto com resolução OFF |
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | HML-LIMPEZA-02 (11/11/2026, sessão em nuvem), pedido do responsável ("limpe primeiro") antes do teste manual: dados sintéticos do HML removidos com `docs/runbooks/limpeza-hml-sintetico.sql` do #125, mudando só a assinatura da verificação 3.1 para a 051 (56, `20261118120000`, `2612ecd5ea3f5cf0c0000aa0d7ae8055`) |
+| Resultados e testes comprovados | Backup lógico das 31 tabelas de `public` (JSON + SHA256SUMS) entregue ao responsável. Ensaio a seco 36/36; ensaio com expurgo em transação desfeita 36/36 e validação final aprovada (HML intacto depois: 10 clientes, 7 faturas, 56 apontamentos). Execução: EXECUTADO, 36/36, validação integral aprovada. Depois: 0 clientes/colaboradores/operações/apontamentos/faturas/feriados; 17 contas, 15 papéis, 4 funções-padrão, 7 trilhas `sistema`; motor ligado; `dias_especiais_em_dobro=true`; RLS em todas; 1 gatilho desabilitado (o do motor antigo, como antes). Dobro em transação desfeita: 7/7 |
+| Código e PR afetados | Só documentação, no #130 (`docs/HANDOFF.md`, `docs/ESTADO_DO_PROJETO.md`, `PROGRESS.md`). O script adaptado não foi versionado: o #125 segue com a assinatura da 050 |
+| Ambientes envolvidos | HML (limpeza). Production e Vercel: nada |
+| Pendências e decisões | Teste manual do responsável no HML (passo a passo enviado no chat). Cidade do cliente-piloto e feriados. #125: fechar ou atualizar para a 051 |
+| Próxima ação exata | Aguardar o resultado do teste manual do responsável |
+| Autorizações e proibições | Autorizado (11/11/2026): limpeza do HML. Proibido sem autorização nominal: escritas em Production |
+
+### Tarefa anterior — PROD-051-01 (11/11/2026)
 
 | Campo | Valor |
 | --- | --- |

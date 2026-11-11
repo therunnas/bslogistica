@@ -35,6 +35,19 @@ são últimos registros de catálogo, não nova consulta; homologação pendente
 identidade/catálogo/backup/restauração/janela/Preview e autorização. 048 OFF instalada
 não aprova/ativa fallback; C1–C6 abertas. Controlador OFF, Gates 3–5 PAUSADOS.
 
+## HML LIMPO PARA O TESTE MANUAL (11/11/2026)
+
+A pedido do responsável ("limpe primeiro"), os dados sintéticos do HML foram removidos com o script do
+[#125](https://github.com/therunnas/bslogistica/pull/125), com uma única mudança: a assinatura de
+ambiente da verificação 3.1 passou para a 051 (56 migrations, head `20261118120000`, md5
+`2612ecd5ea3f5cf0c0000aa0d7ae8055`). Antes: backup lógico das 31 tabelas de `public` (JSON com
+SHA256SUMS, entregue ao responsável); ensaio a seco 36/36; ensaio com expurgo em transação desfeita
+36/36 e validação final aprovada. Execução: **EXECUTADO, 36/36, validação integral aprovada**. Depois:
+0 clientes, colaboradores, operações, apontamentos, faturas e feriados; 17 contas, 15 papéis, 15
+perfis, 4 funções-padrão, 7 trilhas `sistema`, motor ligado, `dias_especiais_em_dobro=true`, RLS em
+todas, só o gatilho do motor antigo desabilitado (como antes). Conferência do dobro em transação
+desfeita: 7/7.
+
 ## PRODUCTION NA 051 COM DOMINGO E FERIADO EM DOBRO (11/11/2026)
 
 Autorizado pelo responsável ("exatamente como está nos planos"), seguindo
