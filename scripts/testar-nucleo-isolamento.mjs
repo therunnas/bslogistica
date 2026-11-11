@@ -92,6 +92,8 @@ verificar(
     // redefine só o estado do motor (a chave anunciada `nucleo_v2`).
     "20261115120000_048_preco_base_como_recuo.sql",
     "20261116120000_049_correcao_servico_container.sql",
+    // A 051 redefine o motor (domingo e feriado em dobro com a resolução OFF) e o estado do motor.
+    "20261118120000_051_domingo_feriado_em_dobro.sql",
   ],
 );
 verificar(

@@ -116,7 +116,12 @@ def main():
     novas = sorted(set(depois["contagens"]) - set(antes["contagens"]))
     motor_igual = (antes["flags"] or {}).get("motor") == (depois["flags"] or {}).get("motor")
     tarifas_antes = (antes["flags"] or {}).get("tarifas")
-    tarifas_igual = tarifas_antes is None or tarifas_antes == (depois["flags"] or {}).get("tarifas")
+    tarifas_depois = (depois["flags"] or {}).get("tarifas") or {}
+    # Chave nova (ex.: `dias_especiais_em_dobro`, 051) só é aceita se nascer desligada; as que já
+    # existiam têm de continuar iguais.
+    tarifas_igual = tarifas_antes is None or (
+        all(tarifas_depois.get(k) == v for k, v in tarifas_antes.items())
+        and all(v in (False, None) for k, v in tarifas_depois.items() if k not in tarifas_antes))
     ok = (depois["versao"] == versao and depois["migrations"] == antes["migrations"] + 1
           and not perdas and not depois["sem_rls"] and motor_igual and tarifas_igual)
     print(json.dumps({"depois": depois, "tabelas_novas": novas, "perdas": perdas,

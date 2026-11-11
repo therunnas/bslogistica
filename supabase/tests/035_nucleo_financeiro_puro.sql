@@ -1532,7 +1532,7 @@ select pg_temp.registrar('F. arredondar_minutos_extras (20261028120000_030)', '1
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'arredondar_minutos_extras'));
-select pg_temp.registrar('F. derivar_valores_por_vigencia (20261115120000_048)', '1|484a46b7b55c9692c41f10a0138c51b5',
+select pg_temp.registrar('F. derivar_valores_por_vigencia (20261118120000_051)', '1|ca82edcbbf819e026bc47a231934c9f4',
   (select count(*)::text || '|' || coalesce(max(md5(p.prosrc)), '-') from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'derivar_valores_por_vigencia'));

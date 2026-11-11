@@ -122,6 +122,20 @@ for (const [data, erro, esperado] of [
   [{ dias_especiais_v2: true, resolucao_tarifas: true }, { message: "rede" }, false],
   [null, null, false],
   [{ dias_especiais_v2: 1, resolucao_tarifas: true }, null, false],
+  // 051: o interruptor do dobro também habilita, com a resolução desligada.
+  [
+    { dias_especiais_v2: true, resolucao_tarifas: false, dias_especiais_em_dobro: true },
+    null,
+    true,
+  ],
+  [
+    { dias_especiais_v2: true, resolucao_tarifas: false, dias_especiais_em_dobro: false },
+    null,
+    false,
+  ],
+  [{ dias_especiais_v2: true, resolucao_tarifas: false, dias_especiais_em_dobro: 1 }, null, false],
+  [{ resolucao_tarifas: false, dias_especiais_em_dobro: true }, null, false],
+  [{ dias_especiais_v2: true, dias_especiais_em_dobro: true }, { message: "rede" }, false],
 ]) {
   assert.equal(interpretarDiasEspeciaisV2(data, erro), esperado);
 }

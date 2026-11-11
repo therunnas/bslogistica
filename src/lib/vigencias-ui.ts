@@ -98,12 +98,22 @@ export function interpretarNucleoV2(data: unknown, erro: unknown): boolean {
   return (data as { nucleo_v2?: unknown }).nucleo_v2 === true;
 }
 
-/** Dias especiais da 043 só são elegíveis com resolução ON comprovada. */
+/**
+ * Dias especiais da 043 só são elegíveis com resolução ON comprovada ou, desde a 051, com o
+ * interruptor de domingo e feriado em dobro ligado (`dias_especiais_em_dobro`, resolução OFF).
+ */
 export function interpretarDiasEspeciaisV2(data: unknown, erro: unknown): boolean {
   if (erro !== null && erro !== undefined) return false;
   if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
-  const r = data as { dias_especiais_v2?: unknown; resolucao_tarifas?: unknown };
-  return r.dias_especiais_v2 === true && r.resolucao_tarifas === true;
+  const r = data as {
+    dias_especiais_v2?: unknown;
+    resolucao_tarifas?: unknown;
+    dias_especiais_em_dobro?: unknown;
+  };
+  return (
+    r.dias_especiais_v2 === true &&
+    (r.resolucao_tarifas === true || r.dias_especiais_em_dobro === true)
+  );
 }
 
 /**

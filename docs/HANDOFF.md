@@ -2,37 +2,49 @@
 
 <!-- workflow-handoff:v1 -->
 
-**UX-OPERACAO-01 — tela de operação mais simples, em PR Draft: (A) com a resolução comercial OFF o bloco de localidade e o aviso "Localidade ausente" não aparecem; (B) o valor acordado mostra o valor atual e um "Alterar valor" (novo valor + a partir de quando), com o histórico recolhido. Production na 050 desde 11/11/2026. Bloqueio do piloto (domingo/feriado com resolução OFF) segue aberto: próxima tarefa, com interruptor.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
+**FUNC-READY-02 — domingo e feriado em dobro também com a resolução OFF, com interruptor desligado por padrão (migration 051), em PR Draft. Só código e testes: a 051 NÃO foi aplicada em HML nem em Production (no HML só rodou dentro de transação desfeita). Production na 050 e site `8c493a5` (#128) no ar desde 11/11/2026.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | UX-OPERACAO-01 — Gate 1/2, desenvolvimento e validação (CI) |
-| Gate atual | Gate 2: PR Draft com testes RED → GREEN e validação completa em Linux. Sem homologação nas telas, merge ou Production |
-| Último gate concluído | PROD-050-01: Production na 050 e site `d33e8b2` no ar (11/11/2026); #127 mesclado em `db84044` |
+| Etapa | FUNC-READY-02 — Gate 1/2, desenvolvimento e validação (CI) |
+| Gate atual | Gate 2: PR Draft com migration 051, teste SQL 051 e ajuste da prévia. Sem aplicação em HML/Production e sem interruptor ligado |
+| Último gate concluído | UX-OPERACAO-01: #128 mesclado em `8c493a5` e publicado em Production (`dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`, 11/11/2026), conferido pelo responsável no Preview |
 | Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
 | Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
-| Base | main `db84044074a371b647b6f9228190c3f35093d684` |
-| HEAD validado | db84044074a371b647b6f9228190c3f35093d684 + o diff deste commit (localidade, valor acordado, dois testes estruturais e HANDOFF). HEAD publicado e CI por SHA: consultar no PR |
+| Base | main `8c493a5da896d43274f3d41179a3a5df14382a30` |
+| HEAD validado | 8c493a5da896d43274f3d41179a3a5df14382a30 + o diff deste commit (051, teste SQL 051, prévia, testes de inventário, 035 regerado, docs). HEAD publicado e CI por SHA: consultar no PR |
 | Alterações não commitadas | Nenhuma além deste conjunto |
 | PR | Draft desta branch contra main. Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
-| Ambiente-alvo | Local (nuvem) e CI. Production e HML não tocados nesta tarefa |
-| Última ação comprovada | A e B implementados; 72/72 suítes, lint, TypeScript, build e `git diff --check` PASS (Linux, Node 22) |
-| Próxima ação exata | Conferir CI do PR; usuário revisa e confere a tela (localhost → HML, só olhar); depois publicar o site e seguir para a correção de domingo/feriado com interruptor |
+| Ambiente-alvo | Local (nuvem) e CI. HML: só transação desfeita (nenhuma escrita permanente). Production não tocada nesta tarefa |
+| Última ação comprovada | 051 + teste SQL 051 rodados no HML em transação desfeita: 26/26 PASS; HML conferido depois sem a coluna, sem a função e com o motor de md5 `967058d6…`. 72/72 suítes, lint, TypeScript e build PASS |
+| Próxima ação exata | Conferir CI (inclusive `sql-local`) do PR; merge pelo responsável; depois, com autorização nominal, aplicar a 051 e ligar o interruptor no HML ([roteiro](runbooks/dias-especiais-em-dobro.md)), testar, e só então Production |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `d33e8b2` (#126 sobre `3cda0e5`): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado" no apontamento. `vercel.json` mantém `main:false`; site de Production ainda em `38b4349` (05/11/2026) |
+| Main | `8c493a5` (#128): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado", tela de operação simplificada. `vercel.json` mantém `main:false` |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
-| Production | **050 desde 11/11/2026** (16/16 PASS, banco idêntico ao HML). Site `d33e8b2` (`dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg`); reversão do site: `dpl_6VwWi2m2tGfrAWcqYZdJH74Ay5E4`. Backup `pg_dump` de 11/11 com o responsável. Sem dados de negócio; lista de feriados legada vazia |
-| Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
+| Production | **050 desde 11/11/2026** (16/16 PASS, banco idêntico ao HML). Site `8c493a5` (`dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`, 11/11/2026); reversão do site: `dpl_ASYPuBYeqaaJZikv5mcdsDsToSbg` (`d33e8b2`). Backup `pg_dump` de 11/11 com o responsável. Sem dados de negócio; lista de feriados legada vazia |
+| Preview | Deployment da branch `claude/jolly-allen-fqechw`; Preview → HML comprovado pela leitura das variáveis na Vercel (11/11/2026). Este container não abre `vercel.app` (proxy). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
 | Negócio | [NEGOCIO.md](NEGOCIO.md) e [matriz](NEGOCIO_X_SISTEMA.md); C1–C6 seguem pendentes e não bloqueiam o piloto com resolução OFF |
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | FUNC-READY-02 (11/11/2026, sessão em nuvem), decisão do responsável: domingo e feriado pagam as horas efetivas em dobro (horas + 100%) na cobrança e no pagamento, com interruptor desligado por padrão. Migration `20261118120000_051_domingo_feriado_em_dobro.sql`: coluna `pricing_settings.dias_especiais_em_dobro` (false), função interna `dias_especiais_em_dobro_ativo()` (interruptor E motor ligado, sem grant), `derivar_valores_por_vigencia` passa domingo e feriado da lista legada ao ramo especial do núcleo V2 com o interruptor ligado mesmo com a resolução OFF (trava R3 só com resolução e dobro desligados), `estado_motor_vigencia` anuncia `dias_especiais_em_dobro`. Prévia: `interpretarDiasEspeciaisV2` aceita o anúncio (a tela diz que o banco calcula ao salvar). Ligar/desligar: escrita direta como `postgres` em transação autorizada, sem RPC nova |
+| Resultados e testes comprovados | HML, migration + `supabase/tests/051_domingo_feriado_em_dobro.sql` numa transação desfeita (11/11/2026): 26/26 PASS — desligado igual à 050 (domingo 250/150 `util`, feriado 250/300); `authenticated` não altera nem executa (42501); ligado: domingo 8 h 500/300, segunda e sábado sem mudança, domingo-feriado conta uma vez (500/300 `feriado`), valor acordado 200 → 400/300, 4 h 250/150, 10 h 625/375, linha gravada antes não muda sozinha, edição motriz recalcula, só notas preserva; desligado de novo: R3 recusa (55000) e domingo novo volta à 030. Depois: HML sem a coluna e sem a função, motor md5 `967058d6…` (igual a antes). Linux, Node 22: 72/72 `test:*` (inventários de migration atualizados como na 050; `035_nucleo_financeiro_puro.sql` regerado pelo gerador: só o md5 do motor), lint, `tsc` e build PASS. `sql-local` só na CI |
+| Código e PR afetados | `supabase/migrations/20261118120000_051_domingo_feriado_em_dobro.sql` e `supabase/tests/051_domingo_feriado_em_dobro.sql` (novos), `supabase/tests/035_nucleo_financeiro_puro.sql` (regerado), `src/lib/vigencias-ui.ts`, `src/integrations/supabase/types.ts`, `scripts/testar-dias-especiais.mjs`, testes de inventário (`testar-configuracoes`, `-interfaces-vigencia`, `-motor-vigencia`, `-regras-definitivas`, `-nucleo-isolamento`), `docs/runbooks/dias-especiais-em-dobro.md` (novo), `docs/runbooks/README.md`, `PROGRESS.md`, `docs/HANDOFF.md`. PR Draft da branch `claude/jolly-allen-fqechw` |
+| Ambientes envolvidos | Sessão em nuvem e CI. HML: só transação desfeita, sem escrita permanente. Production: nada nesta tarefa (antes dela, com "pode publicar" do responsável, o site foi publicado com o #128) |
+| Pendências e decisões | Cidade do cliente-piloto para os feriados municipais: sem resposta. Lista de feriados legada vazia em HML e Production: cadastrar ANTES dos apontamentos (o tipo do dia fica congelado no lançamento). Domingo/feriado com o interruptor ligado exige custo vigente do colaborador (sem ele, P0002, como com a resolução ON). `holiday_pay_factor` do contrato deixa de valer com o interruptor ligado (o dobro é fixo) |
+| Próxima ação exata | Conferir CI do PR; merge pelo responsável; aplicar a 051 no HML e ligar o interruptor só com autorização nominal, pelo roteiro |
+| Autorizações e proibições | Autorizado pelo responsável (11/11/2026): a correção com interruptor desligado por padrão, PR Draft e teste em transação desfeita no HML. Proibidos sem autorização nominal: aplicar a 051 ou ligar o interruptor em HML ou Production, merge |
+
+### Tarefa anterior — UX-OPERACAO-01 (11/11/2026, #128 mesclado e publicado)
 
 | Campo | Valor |
 | --- | --- |
