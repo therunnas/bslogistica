@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmarExclusao } from "@/lib/confirmar-exclusao";
 import { LocalidadeDaOperacao } from "../_components/calendario-territorial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -74,6 +75,7 @@ import {
   ehPeriodoDoTurno,
   funcaoInicialDaAlocacao,
   montarAlocacao,
+  nomeDaFuncao,
   opcoesDeFuncao,
   periodoDoTurno,
   PERIODOS_DO_TURNO,
@@ -83,7 +85,12 @@ import {
   validarPeriodoDoTurno,
 } from "@/lib/funcoes";
 import { useFuncoes } from "@/lib/funcoes-dados";
-import { useCriarComVigencia, useEstadoDoMotor, useFuncoesTurno } from "@/lib/vigencias-dados";
+import {
+  useCriarComVigencia,
+  useEstadoDoMotor,
+  useFuncoesTurno,
+  useResolucaoDeTarifas,
+} from "@/lib/vigencias-dados";
 import {
   hojeEmSaoPaulo,
   jornadaDoTurnoProtegida,
@@ -134,6 +141,11 @@ export function PainelOperacoes() {
   const team = useTeam();
   // Funções e período do turno (migration 039): só com o anúncio do banco.
   const funcoesHabilitadas = useFuncoesTurno();
+  // Função por alocação e período do turno só mudam o preço com a resolução por função LIGADA (041).
+  // Desligada, a tela não os pede: a alocação herda a função do colaborador e o período fica como
+  // está (pedido do responsável, 11/11/2026).
+  const resolucaoDeTarifas = useResolucaoDeTarifas();
+  const precoPorFuncao = funcoesHabilitadas && resolucaoDeTarifas === true;
   const funcoes = useFuncoes(funcoesHabilitadas);
   const catalogo = funcoes.data ?? [];
 
@@ -476,7 +488,10 @@ export function PainelOperacoes() {
     (modoDeValor !== "direta" && (Boolean(opForm.id) || modoDeValor === "bloqueada"));
   // Operação existente com o motor por vigência: o valor aparece e muda pelo bloco "Valor
   // acordado por diária" (sem contrato) ou vem do contrato; o campo travado e vazio some.
-  const campoDeValorVisivel = !(opForm.id && modoDeValor === "por-vigencia");
+  // O campo de valor só aparece quando há algo a digitar: operação sem contrato (com contrato, o
+  // valor vem do contrato e a tela diz isso em texto). Data do serviço: só na avulsa.
+  const campoDeValorVisivel = !(opForm.id && modoDeValor === "por-vigencia") && !valorPeloContrato;
+  const operacaoAvulsa = opForm.type === "spot";
 
   function submitOperation() {
     const payload: Record<string, unknown> = {
@@ -547,7 +562,7 @@ export function PainelOperacoes() {
   }
 
   const periodoEscolhido = ehPeriodoDoTurno(shiftForm.shift_period) ? shiftForm.shift_period : null;
-  const errosDoPeriodo = validarPeriodoDoTurno(periodoEscolhido, !shiftForm.id, funcoesHabilitadas);
+  const errosDoPeriodo = validarPeriodoDoTurno(periodoEscolhido, !shiftForm.id, precoPorFuncao);
 
   function submitShift() {
     const payload: Record<string, unknown> = {
@@ -751,7 +766,10 @@ export function PainelOperacoes() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => removeOperation.mutate(operation.id)}
+                      onClick={() =>
+                        confirmarExclusao(`a operação ${operation.name}`) &&
+                        removeOperation.mutate(operation.id)
+                      }
                       aria-label={`Excluir ${operation.name}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -803,7 +821,7 @@ export function PainelOperacoes() {
                                   {shift.name}
                                 </span>
 
-                                {funcoesHabilitadas ? (
+                                {precoPorFuncao ? (
                                   periodoDoTurno(shift) !== null ? (
                                     <Badge variant="secondary">
                                       {
@@ -854,7 +872,10 @@ export function PainelOperacoes() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                  onClick={() => removeShift.mutate(shift.id)}
+                                  onClick={() =>
+                                    confirmarExclusao(`o turno ${shift.name}`) &&
+                                    removeShift.mutate(shift.id)
+                                  }
                                   aria-label={`Excluir turno ${shift.name}`}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -905,7 +926,7 @@ export function PainelOperacoes() {
             </DialogTitle>
 
             <DialogDescription>
-              Operações fixas usam turnos diários; avulsas registram data e valor acordado.
+              Fixa: trabalho do dia a dia, com turnos. Avulsa: serviço de um dia só.
             </DialogDescription>
           </DialogHeader>
 
@@ -977,7 +998,7 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Local</Label>
+              <Label>Local (opcional)</Label>
 
               <Input
                 value={opForm.site}
@@ -992,7 +1013,7 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Contrato (regra de cobrança)</Label>
+              <Label>Contrato</Label>
 
               <Select
                 value={opForm.contract_id || "none"}
@@ -1012,7 +1033,7 @@ export function PainelOperacoes() {
                 </SelectTrigger>
 
                 <SelectContent>
-                  <SelectItem value="none">Sem contrato (valor acordado)</SelectItem>
+                  <SelectItem value="none">Sem contrato (valor próprio)</SelectItem>
 
                   {clientContracts.map((contract) => (
                     <SelectItem key={contract.id} value={contract.id}>
@@ -1025,7 +1046,7 @@ export function PainelOperacoes() {
 
             {campoDeValorVisivel ? (
               <div className="space-y-2">
-                <Label>Valor acordado por diária (avulsa)</Label>
+                <Label>Valor por diária (R$)</Label>
 
                 <Input
                   type="number"
@@ -1043,13 +1064,14 @@ export function PainelOperacoes() {
               </div>
             ) : null}
 
-            {campoDeValorVisivel && valorTravado ? (
+            {valorPeloContrato ? (
               <p className="text-xs text-muted-foreground sm:col-span-2">
-                {valorPeloContrato
-                  ? "O valor vem do contrato. Para um valor próprio deste serviço, deixe o contrato em branco."
-                  : modoDeValor === "por-vigencia"
-                    ? "O valor acordado segue a vigência: não é editado aqui. Registre uma nova vigência no histórico abaixo."
-                    : "Regras financeiras não confirmadas: o valor acordado está somente para leitura."}
+                O valor da diária vem do contrato. Para um valor próprio deste serviço, escolha
+                &ldquo;Sem contrato&rdquo;.
+              </p>
+            ) : campoDeValorVisivel && valorTravado ? (
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Regras financeiras não confirmadas: o valor está somente para leitura.
               </p>
             ) : null}
 
@@ -1059,26 +1081,28 @@ export function PainelOperacoes() {
               </div>
             ) : opForm.id && opForm.contract_id ? (
               <p className="text-xs text-muted-foreground sm:col-span-2">
-                Esta operação tem contrato: diária e regras vêm das vigências do contrato (tela
-                Clientes e contratos).
+                O valor da diária e as regras de hora extra vêm do contrato (tela Clientes e
+                contratos).
               </p>
             ) : null}
 
-            <div className="space-y-2">
-              <Label>Data da operação (avulsa)</Label>
+            {operacaoAvulsa ? (
+              <div className="space-y-2">
+                <Label>Data do serviço</Label>
 
-              <Input
-                type="date"
-                value={opForm.operation_date}
-                onChange={(event) =>
-                  setOpForm({
-                    ...opForm,
-                    operation_date: event.target.value,
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-            </div>
+                <Input
+                  type="date"
+                  value={opForm.operation_date}
+                  onChange={(event) =>
+                    setOpForm({
+                      ...opForm,
+                      operation_date: event.target.value,
+                    })
+                  }
+                  className={INPUT_CLASS}
+                />
+              </div>
+            ) : null}
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Observações</Label>
@@ -1203,7 +1227,7 @@ export function PainelOperacoes() {
               />
             </div>
 
-            {funcoesHabilitadas ? (
+            {precoPorFuncao ? (
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="shift-period">Período do turno</Label>
 
@@ -1420,7 +1444,10 @@ export function PainelOperacoes() {
                           </p>
 
                           <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                            {employee.role ?? "—"} · custo {brl(employee.daily_cost)}
+                            {funcoesHabilitadas && employee.job_function_id
+                              ? nomeDaFuncao(catalogo, employee.job_function_id)
+                              : (employee.role ?? "—")}{" "}
+                            · custo {brl(employee.daily_cost)}
                           </p>
                         </div>
                       </div>
@@ -1504,7 +1531,7 @@ export function PainelOperacoes() {
                         )}
                       </div>
 
-                      {funcoesHabilitadas && situacao === "aqui" && alocacao ? (
+                      {precoPorFuncao && situacao === "aqui" && alocacao ? (
                         <Select
                           value={alocacao.job_function_id ?? SEM_FUNCAO}
                           onValueChange={(value) =>

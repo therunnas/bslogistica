@@ -1215,7 +1215,7 @@ export function PainelApontamentos() {
           </div>
 
           <div className="space-y-2">
-            <Label>Regra aplicada</Label>
+            <Label>Preço</Label>
 
             <div className="flex min-h-10 items-center rounded-xl border border-border bg-secondary/35 px-3">
               <p className="text-xs leading-5 text-muted-foreground">
@@ -1229,9 +1229,13 @@ export function PainelApontamentos() {
                   </>
                 ) : estadoDoMotor.tag === "ligado" ? (
                   <>
-                    preço pela vigência da data trabalhada ·{" "}
-                    {computed.find((item) => item.valor.origem)?.valor.origem ??
-                      "veja a origem em cada linha"}
+                    {(() => {
+                      const origem = computed.find((item) => item.valor.origem)?.valor.origem;
+                      if (!origem) return "preço calculado em cada linha";
+                      return origem.startsWith("Contrato")
+                        ? "preço do contrato"
+                        : "valor próprio da operação";
+                    })()}
                   </>
                 ) : (
                   "regra financeira indisponível até a confirmação das regras"
@@ -1409,22 +1413,25 @@ export function PainelApontamentos() {
                             ) : null}
 
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                              {employee?.role ?? "Colaborador"}
-                              {funcoesHabilitadas
-                                ? (() => {
-                                    const { funcaoId } = funcaoEfetiva(
+                              {(() => {
+                                // Uma função só: a do catálogo (alocação ou colaborador); sem ela,
+                                // o texto antigo do cadastro.
+                                const { funcaoId } = funcoesHabilitadas
+                                  ? funcaoEfetiva(
                                       teamMembers.find((m) => m.employee_id === row.employeeId) ??
                                         null,
                                       employee ?? null,
-                                    );
-                                    return funcaoId === null
-                                      ? ""
-                                      : ` · ${nomeDaFuncao(funcoes.data ?? [], funcaoId)}`;
-                                  })()
-                                : ""}
+                                    )
+                                  : { funcaoId: null };
+                                return funcaoId !== null
+                                  ? nomeDaFuncao(funcoes.data ?? [], funcaoId)
+                                  : (employee?.role ?? "Colaborador");
+                              })()}
                             </p>
 
-                            {snapshotsDeFuncao ? (
+                            {/* Função do dia e correção só mudam o preço com a resolução por função
+                                LIGADA (041); desligada, a linha não pede nem mostra (11/11/2026). */}
+                            {snapshotsDeFuncao && resolucaoLigada ? (
                               gravado ? (
                                 <SnapshotDoApontamento
                                   catalogo={funcoes.data ?? []}

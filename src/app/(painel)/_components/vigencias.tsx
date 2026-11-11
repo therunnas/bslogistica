@@ -17,14 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
 import { brl, dateBR, num } from "@/lib/format";
@@ -53,11 +45,23 @@ import {
   type VersaoBase,
 } from "@/lib/vigencias-ui";
 
+/** `YYYY-MM-DD` do dia anterior (o fim gravado é exclusivo; a tela mostra o último dia que vale). */
+function diaAnterior(data: string): string {
+  const d = new Date(`${data}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 const INPUT_CLASS =
   "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
 
-/** Faixa que diz, em toda tela financeira, em que estado o motor está. */
+/**
+ * Faixa que diz, nas telas financeiras, quando as regras financeiras NÃO estão no estado normal
+ * (carregando, desligado ou não confirmado). No estado normal (motor ligado) não aparece: repetir o
+ * mesmo aviso em toda tela só poluía (pedido do responsável, 11/11/2026).
+ */
 export function AvisoDoMotor({ estado }: { estado: EstadoDoMotorUI }) {
+  if (estado.tag === "ligado") return null;
   const aviso = avisoDoMotor(estado);
   return (
     <Alert
@@ -73,41 +77,41 @@ export function AvisoDoMotor({ estado }: { estado: EstadoDoMotorUI }) {
 
 type VersaoComValores = VersaoBase & Record<string, unknown>;
 
-function valoresDaVersao(tipo: TipoDeVigencia, v: VersaoComValores): string {
+/** Os valores de uma versão em palavras simples (sem "HE", "tol." ou abreviações). */
+export function valoresDaVersao(tipo: TipoDeVigencia, v: VersaoComValores): string {
   if (tipo === "contrato") {
-    const base = `${brl(Number(v["daily_rate"]))} · ${num(Number(v["shift_hours"]), 1)} h · HE ${num(Number(v["ot_factor"]), 2)}x · tol. ${Number(v["ot_tolerance_min"])} min`;
+    const partes = [
+      `Diária ${brl(Number(v["daily_rate"]))}`,
+      `hora extra ${num(Number(v["ot_factor"]), 2)}×`,
+      `tolerância ${Number(v["ot_tolerance_min"])} min`,
+    ];
     // Parâmetros de horas só existem depois da migration 030.
-    if (!("ot_rounding_mode" in v)) return base;
-    const sabado = v["saturday_shift_hours"];
-    const feriado = v["holiday_pay_factor"];
-    return [
-      base,
-      v["ot_rounding_mode"] === "acumulado" ? "arred. acumulado" : "arred. diário",
-      sabado === null || sabado === undefined ? null : `sáb. ${num(Number(sabado), 1)} h`,
-      feriado === null || feriado === undefined ? null : `feriado ×${num(Number(feriado), 2)}`,
-      // Frequência de fechamento só existe depois da migration 038.
-      "closing_period" in v
-        ? `fechamento ${v["closing_period"] === "mensal" ? "mensal" : "quinzenal"}`
-        : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    if ("ot_rounding_mode" in v && v["ot_rounding_mode"] === "acumulado") {
+      partes.push("hora extra somada no período");
+    }
+    // Frequência de fechamento só existe depois da migration 038.
+    if ("closing_period" in v && v["closing_period"]) {
+      partes.push(`fechamento ${v["closing_period"] === "mensal" ? "mensal" : "quinzenal"}`);
+    }
+    return partes.join(" · ");
   }
   if (tipo === "colaborador") {
     // `ot_hourly_cost` só existe depois da migration 029.
-    if (!("ot_hourly_cost" in v)) return brl(Number(v["daily_cost"]));
+    if (!("ot_hourly_cost" in v)) return `${brl(Number(v["daily_cost"]))} por diária`;
     const hora = v["ot_hourly_cost"];
-    return `${brl(Number(v["daily_cost"]))} · HE paga ${
-      hora === null || hora === undefined ? "sem valor-hora acordado" : `${brl(Number(hora))}/h`
+    return `${brl(Number(v["daily_cost"]))} por diária · hora extra ${
+      hora === null || hora === undefined
+        ? "calculada pela diária"
+        : `${brl(Number(hora))} por hora`
     }`;
   }
-  return brl(Number(v["agreed_amount"]));
+  return `${brl(Number(v["agreed_amount"]))} por diária`;
 }
 
 const ROTULO_DO_TIPO: Readonly<Record<TipoDeVigencia, string>> = {
   contrato: "Condições do contrato",
-  colaborador: "Custo diário do colaborador",
-  operacao: "Valor acordado da operação",
+  colaborador: "Custo do colaborador",
+  operacao: "Valor da operação",
 };
 
 export interface HistoricoDeVigenciasProps {
@@ -116,6 +120,11 @@ export interface HistoricoDeVigenciasProps {
   estado: EstadoDoMotorUI;
   /** Valores sugeridos na nova vigência (os atuais do cadastro), por `chave` do campo. */
   valoresIniciais: Readonly<Record<string, string>>;
+  /**
+   * `false` quando a tela já oferece o "Alterar" simples (valor atual + a partir de quando): o
+   * histórico fica só para consultar, definir data de fim ou cancelar registro errado.
+   */
+  permitirNovo?: boolean;
 }
 
 export function HistoricoDeVigencias({
@@ -123,6 +132,7 @@ export function HistoricoDeVigencias({
   entidadeId,
   estado,
   valoresIniciais,
+  permitirNovo = true,
 }: HistoricoDeVigenciasProps) {
   const versoes = useVersoes(tipo, entidadeId);
   const registrar = useRegistrarVigencia(tipo);
@@ -194,101 +204,93 @@ export function HistoricoDeVigencias({
         <div>
           <p className="flex items-center gap-2 text-sm font-medium text-foreground">
             <History className="h-4 w-4" aria-hidden /> {ROTULO_DO_TIPO[tipo]} — histórico de
-            vigências
+            alterações
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Cada versão vale de uma data inicial até a final (exclusive). Todo reajuste exige motivo
-            e fica na trilha.
+            Cada linha é um valor e o período em que vale. Mudar o valor não altera apontamentos já
+            lançados.
           </p>
         </div>
-        <Button type="button" className="h-9 rounded-xl" onClick={abrirNova} disabled={!liberado}>
-          <Plus className="mr-2 h-4 w-4" aria-hidden /> Nova vigência
-        </Button>
+        {permitirNovo ? (
+          <Button type="button" className="h-9 rounded-xl" onClick={abrirNova} disabled={!liberado}>
+            <Plus className="mr-2 h-4 w-4" aria-hidden /> Novo valor
+          </Button>
+        ) : null}
       </div>
 
       {versoes.isError ? (
-        <p className="text-sm text-destructive">
-          Não foi possível carregar o histórico de vigências.
-        </p>
+        <p className="text-sm text-destructive">Não foi possível carregar o histórico.</p>
       ) : versoes.isPending ? (
         <p className="text-sm text-muted-foreground">Carregando histórico…</p>
       ) : linhas.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhuma vigência cadastrada.</p>
+        <p className="text-sm text-muted-foreground">Nenhum valor cadastrado.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead>Início</TableHead>
-                <TableHead>Fim</TableHead>
-                <TableHead>Valores</TableHead>
-                <TableHead>Situação</TableHead>
-                <TableHead>Origem · motivo</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {linhas.map((v) => {
-                const situacao = situacaoDaVersao(v, hoje);
-                const editavel = v.active && liberado;
-                return (
-                  <TableRow key={v.id} className="border-border">
-                    <TableCell className="whitespace-nowrap">{dateBR(v.valid_from)}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {v.valid_to ? dateBR(v.valid_to) : "em aberto"}
-                    </TableCell>
-                    <TableCell>{valoresDaVersao(tipo, v)}</TableCell>
-                    <TableCell>
-                      <Badge variant={situacao === "vigente" ? "default" : "secondary"}>
-                        {ROTULO_DA_SITUACAO[situacao]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[260px] text-xs text-muted-foreground">
-                      {ROTULO_DA_ORIGEM[v.origin] ?? v.origin} · {v.reason}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
+        <ul className="space-y-2">
+          {linhas.map((v) => {
+            const situacao = situacaoDaVersao(v, hoje);
+            const editavel = v.active && liberado;
+            return (
+              <li
+                key={v.id}
+                className="rounded-xl border border-border bg-background/60 p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium text-foreground">{valoresDaVersao(tipo, v)}</p>
+                  <Badge variant={situacao === "vigente" ? "default" : "secondary"}>
+                    {ROTULO_DA_SITUACAO[situacao]}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  A partir de {dateBR(v.valid_from)}
+                  {v.valid_to
+                    ? ` até ${dateBR(diaAnterior(v.valid_to))}`
+                    : ", sem data de fim"} · {ROTULO_DA_ORIGEM[v.origin] ?? v.origin}: {v.reason}
+                </p>
+                {editavel ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {v.valid_to === null ? (
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        disabled={!editavel || v.valid_to !== null}
+                        className="h-8 rounded-lg"
                         onClick={() => {
                           setEncerrando(v);
                           setFim(hoje);
                           setMotivoFim("");
                         }}
                       >
-                        Encerrar
+                        Definir data de fim
                       </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={!editavel}
-                        onClick={() => {
-                          setAposentando(v);
-                          setMotivoApos("");
-                        }}
-                      >
-                        Aposentar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 rounded-lg text-muted-foreground"
+                      onClick={() => {
+                        setAposentando(v);
+                        setMotivoApos("");
+                      }}
+                    >
+                      Cancelar registro errado
+                    </Button>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       <Dialog open={novaOpen} onOpenChange={setNovaOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nova vigência — {ROTULO_DO_TIPO[tipo].toLowerCase()}</DialogTitle>
+            <DialogTitle>Novo valor — {ROTULO_DO_TIPO[tipo].toLowerCase()}</DialogTitle>
             <DialogDescription>
               {classe === "futura"
-                ? "Vigência FUTURA: fica preparada e passa a valer na data de início. Não altera nada hoje."
-                : "Início hoje ou no passado: vale desde essa data para os apontamentos dela em diante."}
+                ? "Data no futuro: o novo valor fica guardado e só começa a valer nesse dia."
+                : "Vale a partir dessa data. Apontamentos de antes continuam com o valor que tinham."}
               {estado.tag === "desligado"
                 ? " Enquanto as vigências não estiverem ativadas, os cálculos continuam usando as taxas do cadastro."
                 : ""}
@@ -297,7 +299,7 @@ export function HistoricoDeVigencias({
 
           <div className="grid gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vigencia-inicio">Início da vigência</Label>
+              <Label htmlFor="vigencia-inicio">A partir de</Label>
               <Input
                 id="vigencia-inicio"
                 type="date"
@@ -307,15 +309,17 @@ export function HistoricoDeVigencias({
               />
               <Badge variant={classe === "futura" ? "default" : "secondary"}>
                 {classe === "futura"
-                  ? "Vigência futura"
+                  ? "Começa no futuro"
                   : classe === "hoje"
-                    ? "Alteração imediata (hoje)"
-                    : "Retroativa"}
+                    ? "Vale a partir de hoje"
+                    : "Data no passado"}
               </Badge>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="vigencia-fim-nova">Fim da vigência (opcional, exclusive)</Label>
+              <Label htmlFor="vigencia-fim-nova">
+                Termina em (opcional: vale até o dia anterior a esta data)
+              </Label>
               <Input
                 id="vigencia-fim-nova"
                 type="date"
@@ -326,7 +330,11 @@ export function HistoricoDeVigencias({
             </div>
 
             {campos
-              .filter((campo) => !(campo.ocultarComTarifas === true && resolucaoDeTarifas === true))
+              .filter(
+                (campo) =>
+                  campo.ocultoNaTela !== true &&
+                  !(campo.ocultarComTarifas === true && resolucaoDeTarifas === true),
+              )
               .map((campo) => (
                 <div key={campo.chave} className="space-y-2">
                   <Label htmlFor={`vigencia-${campo.chave}`}>{campo.rotulo}</Label>
@@ -356,7 +364,7 @@ export function HistoricoDeVigencias({
               ))}
 
             <div className="space-y-2">
-              <Label htmlFor="vigencia-motivo">Motivo do reajuste (obrigatório)</Label>
+              <Label htmlFor="vigencia-motivo">Motivo da alteração (obrigatório)</Label>
               <Textarea
                 id="vigencia-motivo"
                 value={motivo}
@@ -370,7 +378,7 @@ export function HistoricoDeVigencias({
                 checked={encerrarAnterior}
                 onCheckedChange={(c) => setEncerrarAnterior(c === true)}
               />
-              Encerrar a versão em aberto na data de início desta
+              Terminar o valor anterior (ele vale até o dia anterior a esta data)
             </label>
 
             {erros.length > 0 ? (
@@ -414,7 +422,7 @@ export function HistoricoDeVigencias({
                 )
               }
             >
-              Registrar vigência
+              Salvar novo valor
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -423,15 +431,15 @@ export function HistoricoDeVigencias({
       <Dialog open={encerrando !== null} onOpenChange={(o) => !o && setEncerrando(null)}>
         <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Encerrar vigência</DialogTitle>
+            <DialogTitle>Definir data de fim</DialogTitle>
             <DialogDescription>
-              A data final é exclusive. O banco recusa encerrar se algum apontamento ficar sem
-              cobertura.
+              O valor vale até o dia anterior a esta data. O sistema recusa se algum apontamento já
+              lançado ficar sem valor.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vigencia-fim">Data final</Label>
+              <Label htmlFor="vigencia-fim">Termina em</Label>
               <Input
                 id="vigencia-fim"
                 type="date"
@@ -471,7 +479,7 @@ export function HistoricoDeVigencias({
                 )
               }
             >
-              Encerrar
+              Definir data de fim
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -480,10 +488,10 @@ export function HistoricoDeVigencias({
       <Dialog open={aposentando !== null} onOpenChange={(o) => !o && setAposentando(null)}>
         <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Aposentar vigência</DialogTitle>
+            <DialogTitle>Cancelar registro errado</DialogTitle>
             <DialogDescription>
-              A versão deixa de valer e fica no histórico. O banco recusa aposentar uma versão já
-              usada por apontamentos.
+              Use só para um valor lançado por engano. Ele deixa de valer e continua visível no
+              histórico. O sistema recusa se ele já foi usado em algum apontamento.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -502,7 +510,7 @@ export function HistoricoDeVigencias({
               className="rounded-xl"
               onClick={() => setAposentando(null)}
             >
-              Cancelar
+              Voltar
             </Button>
             <Button
               type="button"
@@ -517,7 +525,7 @@ export function HistoricoDeVigencias({
                 )
               }
             >
-              Aposentar
+              Cancelar registro
             </Button>
           </DialogFooter>
         </DialogContent>

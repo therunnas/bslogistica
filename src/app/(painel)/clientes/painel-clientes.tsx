@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmarExclusao } from "@/lib/confirmar-exclusao";
 import { useMemo, useState } from "react";
 import {
   Building2,
@@ -47,7 +48,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 import { brl, dateBR, num, todayISO } from "@/lib/format";
-import { AvisoDoMotor, HistoricoDeVigencias } from "../_components/vigencias";
+import { AvisoDoMotor } from "../_components/vigencias";
+import { ValorAtualComAlteracao } from "../_components/valor-atual";
 import { TarifasDoContrato } from "./tarifas-do-contrato";
 import { useFuncoes } from "@/lib/funcoes-dados";
 import { FeriadosDoCalendario } from "./feriados";
@@ -95,6 +97,9 @@ const emptyContract = {
   valid_to: "",
   status: "active",
 };
+
+/** Motivo gravado na trilha quando as condições são alteradas por esta tela. */
+export const MOTIVO_ALTERACAO_CONDICOES = "Alteração das condições pela tela do contrato";
 
 const INPUT_CLASS =
   "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -165,10 +170,15 @@ export function PainelClientes() {
   // Contrato novo passa pela RPC atômica (motor por vigência): ela aceita e grava os parâmetros da
   // 030 (e a frequência da 038) na vigência inicial. Com o motor desligado ou sem a 030, os campos
   // não existem; sem a 038, a frequência não é mostrada nem enviada.
+  // Jornada de sábado e fator de feriado não mudam nenhum cálculo com domingo/feriado em dobro (051):
+  // a tela não os pede (o banco grava nulo, como "não informado").
   const camposDa030 = camposDoCadastroInicialDeContrato(
     regrasDefinitivas && modoDeTaxa === "por-vigencia" && !contractForm.id,
     periodoContratual,
-  );
+  ).filter((campo) => campo.ocultoNaTela !== true);
+  // Contrato existente com o motor por vigência: diária, hora extra e tolerância aparecem e mudam
+  // pelo bloco "Condições do contrato"; os campos travados somem.
+  const condicoesPorBloco = Boolean(contractForm.id) && modoDeTaxa === "por-vigencia";
   const errosDa030 =
     camposDa030.length > 0
       ? errosDosParametros030(
@@ -457,7 +467,10 @@ export function PainelClientes() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => removeClient.mutate(client.id)}
+                              onClick={() =>
+                                confirmarExclusao(`o cliente ${client.name}`) &&
+                                removeClient.mutate(client.id)
+                              }
                               aria-label={`Excluir ${client.name}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -528,15 +541,11 @@ export function PainelClientes() {
                       </TableHead>
 
                       <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        {tarifasPorFuncao === "disponivel" ? "Diária genérica" : "Diária"}
+                        Diária
                       </TableHead>
 
                       <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Jornada
-                      </TableHead>
-
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground">
-                        Fator HE
+                        Hora extra
                       </TableHead>
 
                       <TableHead className="text-right text-xs font-semibold text-muted-foreground">
@@ -544,7 +553,7 @@ export function PainelClientes() {
                       </TableHead>
 
                       <TableHead className="text-xs font-semibold text-muted-foreground">
-                        Vigência
+                        Período do contrato
                       </TableHead>
 
                       <TableHead className="w-24" />
@@ -590,10 +599,6 @@ export function PainelClientes() {
                         </TableCell>
 
                         <TableCell className="text-right text-sm text-muted-foreground">
-                          {num(contract.shift_hours, 1)} h
-                        </TableCell>
-
-                        <TableCell className="text-right text-sm text-muted-foreground">
                           {num(contract.ot_factor, 2)}x
                         </TableCell>
 
@@ -603,12 +608,12 @@ export function PainelClientes() {
 
                         <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                           {dateBR(contract.valid_from)}
-                          {contract.valid_to ? ` até ${dateBR(contract.valid_to)}` : ""}
+                          {contract.valid_to ? ` até ${dateBR(contract.valid_to)}` : " em diante"}
                         </TableCell>
 
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {tarifasPorFuncao === "disponivel" && funcoesHabilitadas ? (
+                            {diariaGenericaSemEfeito && funcoesHabilitadas ? (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -638,7 +643,10 @@ export function PainelClientes() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => removeContract.mutate(contract.id)}
+                              onClick={() =>
+                                confirmarExclusao(`o contrato ${contract.name}`) &&
+                                removeContract.mutate(contract.id)
+                              }
                               aria-label={`Excluir ${contract.name}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -830,7 +838,7 @@ export function PainelClientes() {
             </DialogTitle>
 
             <DialogDescription>
-              A hora extra é calculada como (diária ÷ jornada) × fator, após a tolerância.
+              Hora extra: valor da diária ÷ 8 horas × fator, depois da tolerância.
             </DialogDescription>
           </DialogHeader>
 
@@ -893,13 +901,9 @@ export function PainelClientes() {
                   cobrado.
                 </p>
               </div>
-            ) : (
+            ) : condicoesPorBloco ? null : (
               <div className="space-y-2">
-                <Label>
-                  {tarifasPorFuncao === "disponivel"
-                    ? "Diária genérica (R$)"
-                    : "Valor da diária (R$)"}
-                </Label>
+                <Label>Valor da diária (R$)</Label>
 
                 <Input
                   type="number"
@@ -914,80 +918,55 @@ export function PainelClientes() {
                   }
                   className={INPUT_CLASS}
                 />
-                {tarifasPorFuncao === "disponivel" ? (
-                  <p className="text-xs text-muted-foreground">
-                    Vale enquanto as tarifas por função e período não estiverem ligadas; depois, o
-                    preço vem da tarifa de cada função.
-                  </p>
-                ) : null}
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Jornada da diária (horas)</Label>
+            {condicoesPorBloco ? null : (
+              <>
+                <div className="space-y-2">
+                  <Label>Hora extra (fator)</Label>
 
-              <Input
-                type="number"
-                step="0.5"
-                value={contractForm.shift_hours}
-                disabled={taxaTravada}
-                onChange={(event) =>
-                  setContractForm({
-                    ...contractForm,
-                    shift_hours: Number(event.target.value),
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-              <p className="text-xs text-muted-foreground">
-                Dia útil e sábado seguem a regra fixa da BS: jornada de 8 horas (sábado com
-                referência de 4 horas). Este valor só vale para domingo e feriado, enquanto a regra
-                nova deles não chega.
-              </p>
-            </div>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    value={contractForm.ot_factor}
+                    disabled={taxaTravada}
+                    onChange={(event) =>
+                      setContractForm({
+                        ...contractForm,
+                        ot_factor: Number(event.target.value),
+                      })
+                    }
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-xs text-muted-foreground">1,5 = hora extra com 50% a mais.</p>
+                </div>
 
-            <div className="space-y-2">
-              <Label>Fator hora extra</Label>
+                <div className="space-y-2">
+                  <Label>Tolerância antes da hora extra (min)</Label>
 
-              <Input
-                type="number"
-                step="0.05"
-                value={contractForm.ot_factor}
-                disabled={taxaTravada}
-                onChange={(event) =>
-                  setContractForm({
-                    ...contractForm,
-                    ot_factor: Number(event.target.value),
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-              <p className="text-xs text-muted-foreground">1,5 = hora extra com 50% a mais.</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tolerância (min)</Label>
-
-              <Input
-                type="number"
-                value={contractForm.ot_tolerance_min}
-                disabled={taxaTravada}
-                onChange={(event) =>
-                  setContractForm({
-                    ...contractForm,
-                    ot_tolerance_min: Number(event.target.value),
-                  })
-                }
-                className={INPUT_CLASS}
-              />
-              <p className="text-xs text-muted-foreground">
-                Minutos de excesso que ainda não contam como hora extra. Passou disso, a hora extra
-                é arredondada em blocos de 15/45 minutos.
-              </p>
-            </div>
+                  <Input
+                    type="number"
+                    value={contractForm.ot_tolerance_min}
+                    disabled={taxaTravada}
+                    onChange={(event) =>
+                      setContractForm({
+                        ...contractForm,
+                        ot_tolerance_min: Number(event.target.value),
+                      })
+                    }
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Minutos a mais que ainda não contam como hora extra. Passou disso, a hora extra
+                    é arredondada em blocos de 15/45 minutos.
+                  </p>
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
-              <Label>Vigente de</Label>
+              <Label>Início do contrato</Label>
 
               <Input
                 type="date"
@@ -1003,7 +982,7 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Vigente até (opcional)</Label>
+              <Label>Fim do contrato (opcional)</Label>
 
               <Input
                 type="date"
@@ -1022,8 +1001,8 @@ export function PainelClientes() {
           {camposDa030.length > 0 ? (
             <div className="space-y-3 rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground">
-                Regras de hora extra, sábado e feriado, gravadas na vigência inicial do contrato.
-                Para mudar depois, registre uma nova vigência.
+                Outras regras do contrato. Podem ser mudadas depois em &ldquo;Alterar
+                condições&rdquo;.
               </p>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -1071,31 +1050,22 @@ export function PainelClientes() {
             </div>
           ) : null}
 
-          {taxaTravada ? (
+          {taxaTravada && modoDeTaxa !== "por-vigencia" ? (
             <p className="text-xs text-muted-foreground">
-              {modoDeTaxa === "por-vigencia"
-                ? "Diária, jornada, fator e tolerância seguem a vigência: não são editados aqui. Registre uma nova vigência no histórico abaixo."
-                : "Regras financeiras não confirmadas: as condições financeiras estão somente para leitura."}
+              Regras financeiras não confirmadas: as condições financeiras estão somente para
+              leitura.
             </p>
           ) : null}
 
-          {contractForm.id ? (
-            <HistoricoDeVigencias
+          {condicoesPorBloco ? (
+            <ValorAtualComAlteracao
               tipo="contrato"
               entidadeId={contractForm.id}
               estado={estadoDoMotor}
-              valoresIniciais={{
-                daily_rate: String(contractForm.daily_rate),
-                shift_hours: String(contractForm.shift_hours),
-                ot_factor: String(contractForm.ot_factor),
-                ot_tolerance_min: String(contractForm.ot_tolerance_min),
-              }}
+              titulo="Condições do contrato"
+              rotuloDoBotao="Alterar condições"
+              motivo={MOTIVO_ALTERACAO_CONDICOES}
             />
-          ) : modoDeTaxa === "direta" ? (
-            <p className="text-xs text-muted-foreground">
-              Depois de salvar, abra o contrato para preparar vigências futuras (reajustes com
-              data).
-            </p>
           ) : null}
 
           <DialogFooter className="mt-2 border-t border-border pt-5">

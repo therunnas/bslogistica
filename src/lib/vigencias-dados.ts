@@ -443,7 +443,8 @@ export function useCriarComVigencia(tipo: TipoDeVigencia, invalidar: string[]) {
   return useMutation({
     mutationFn: async (v: { linha: Record<string, unknown>; form: FormularioDeVigencia }) => {
       const { rpc, params } = montarCadastroAtomico(tipo, v.linha, v.form);
-      await chamar(rpc, params);
+      // As RPCs atômicas (026) devolvem o id do cadastro criado.
+      return await chamar(rpc, params);
     },
     onSuccess: () => {
       invalidar.forEach((chave) => void queryClient.invalidateQueries({ queryKey: [chave] }));
