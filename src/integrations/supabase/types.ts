@@ -886,6 +886,7 @@ export type Database = {
           ativada_em: string | null;
           changed_at: string;
           changed_by: string | null;
+          dias_especiais_em_dobro: boolean;
           id: boolean;
           reason: string | null;
           tarifas_por_funcao: boolean;
@@ -894,6 +895,7 @@ export type Database = {
           ativada_em?: string | null;
           changed_at?: string;
           changed_by?: string | null;
+          dias_especiais_em_dobro?: boolean;
           id?: boolean;
           reason?: string | null;
           tarifas_por_funcao?: boolean;
@@ -902,6 +904,7 @@ export type Database = {
           ativada_em?: string | null;
           changed_at?: string;
           changed_by?: string | null;
+          dias_especiais_em_dobro?: boolean;
           id?: boolean;
           reason?: string | null;
           tarifas_por_funcao?: boolean;

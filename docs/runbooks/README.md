@@ -86,6 +86,9 @@ Nenhum procedimento deste índice presume que FIN-PR-10 esteja integrado.
   migrations e da publicação do site, com o script
   [aplicar-migration-api.py](aplicar-migration-api.py) (uma migration por vez,
   conferência antes e depois, só conferência por padrão). Exige autorização nominal.
+- [Domingo e feriado em dobro (051)](dias-especiais-em-dobro.md): aplicar a 051 e
+  ligar o interruptor `dias_especiais_em_dobro`, primeiro no HML e depois em Production,
+  com as pré-condições (feriados e custo vigente) e a reversão. Exige autorização nominal.
 
 Os requisitos de backup, ensaio, catálogo e autorização são condições de uso,
 não declarações de que HML ou Production os satisfazem. Atualizações executáveis
