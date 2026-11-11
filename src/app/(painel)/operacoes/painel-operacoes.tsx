@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { LocalidadeDaOperacao } from "../_components/calendario-territorial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -468,8 +466,13 @@ export function PainelOperacoes() {
   // O valor acordado de operação existente só muda aqui com o motor DESLIGADO; ligado, é por nova
   // vigência; sem estado confirmado, nada financeiro é oferecido nem enviado. `contract_id` nunca é
   // alterado por esta lógica: segue exatamente o que o usuário escolheu no formulário.
+  // Operação nova, motor ligado e contrato escolhido: a diária vem do contrato e o banco recusa
+  // valor acordado por INSERT direto. O campo fica desabilitado e vazio e não vai no payload.
+  const valorPeloContrato =
+    !opForm.id && modoDeValor === "por-vigencia" && Boolean(opForm.contract_id);
   const valorTravado =
-    modoDeValor !== "direta" && (Boolean(opForm.id) || modoDeValor === "bloqueada");
+    valorPeloContrato ||
+    (modoDeValor !== "direta" && (Boolean(opForm.id) || modoDeValor === "bloqueada"));
 
   function submitOperation() {
     const payload: Record<string, unknown> = {
@@ -483,7 +486,9 @@ export function PainelOperacoes() {
       notes: opForm.notes || null,
     };
 
-    const enviaValor = modoDeValor === "direta" || (!opForm.id && modoDeValor === "por-vigencia");
+    const enviaValor =
+      modoDeValor === "direta" ||
+      (!opForm.id && modoDeValor === "por-vigencia" && !valorPeloContrato);
     if (enviaValor) {
       payload["agreed_amount"] = opForm.agreed_amount === "" ? null : Number(opForm.agreed_amount);
     }
@@ -610,7 +615,7 @@ export function PainelOperacoes() {
         <Resumo
           label="Avulsas"
           value={String(operacoesAvulsas)}
-          description="Carga e descarga"
+          description="Serviços pontuais"
           icon={CalendarDays}
         />
 
@@ -697,11 +702,6 @@ export function PainelOperacoes() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button asChild variant="outline" size="sm" className="rounded-xl">
-                      <Link href={`/containers/novo?operacao=${operation.id}`}>
-                        Adicionar serviço de container
-                      </Link>
-                    </Button>
                     <Button
                       type="button"
                       variant="outline"
@@ -952,7 +952,7 @@ export function PainelOperacoes() {
                 <SelectContent>
                   <SelectItem value="fixed">Fixa</SelectItem>
 
-                  <SelectItem value="spot">Avulsa (carga/descarga)</SelectItem>
+                  <SelectItem value="spot">Avulsa</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -996,6 +996,10 @@ export function PainelOperacoes() {
                   setOpForm({
                     ...opForm,
                     contract_id: value === "none" ? "" : value,
+                    agreed_amount:
+                      value !== "none" && !opForm.id && modoDeValor === "por-vigencia"
+                        ? ""
+                        : opForm.agreed_amount,
                   })
                 }
               >
@@ -1035,9 +1039,11 @@ export function PainelOperacoes() {
 
             {valorTravado ? (
               <p className="text-xs text-muted-foreground sm:col-span-2">
-                {modoDeValor === "por-vigencia"
-                  ? "O valor acordado segue a vigência: não é editado aqui. Registre uma nova vigência no histórico abaixo."
-                  : "Regras financeiras não confirmadas: o valor acordado está somente para leitura."}
+                {valorPeloContrato
+                  ? "O valor vem do contrato. Para um valor próprio deste serviço, deixe o contrato em branco."
+                  : modoDeValor === "por-vigencia"
+                    ? "O valor acordado segue a vigência: não é editado aqui. Registre uma nova vigência no histórico abaixo."
+                    : "Regras financeiras não confirmadas: o valor acordado está somente para leitura."}
               </p>
             ) : null}
 

@@ -244,17 +244,24 @@ verificar(
 // também a entrada do operacional, e desde o Checkout #16.1 há também a
 // entrada de conta (`ITEM_USUARIOS`), fora de `NAVEGACAO` de propósito.
 // Somar qualquer uma das duas mediria outra coisa.
-const TELAS_NAV = TELAS.filter(([rota]) => rota !== "usuarios");
+// Containers saiu do menu (UX-AVULSA-02): o serviço passa a ser registrado como
+// operação avulsa; a rota /containers continua existindo e protegida.
+const TELAS_NAV = TELAS.filter(([rota]) => rota !== "usuarios" && rota !== "containers");
 {
   const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";
   verificar(
-    "E5. admin mantém os oito links e acrescenta Containers",
+    "E5. admin mantém os oito links, sem Containers",
     (bloco.match(/\{ href: "\//g) ?? []).length,
-    9,
+    8,
   );
   verificar(
     "E5b. usuários NÃO é um item da navegação principal",
     /href: "\/usuarios"/.test(bloco),
+    false,
+  );
+  verificar(
+    "E5c. containers NÃO é um item da navegação principal",
+    /href: "\/containers"/.test(bloco),
     false,
   );
 }

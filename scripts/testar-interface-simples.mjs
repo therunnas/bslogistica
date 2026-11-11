@@ -220,6 +220,64 @@ verificar(
   /if \(!aguardando && !carregando && !erro && ajustes\.length === 0\) return null;/.test(arred),
   true,
 );
+// UX-FATURA-01: a fatura emitida é imutável; "Gerar fatura" só abre a confirmação, e a
+// emissão (generate.mutate) acontece apenas em "Emitir fatura", uma vez, sem consulta nova.
+verificar(
+  "C8. 'Gerar fatura' abre a confirmação e não emite direto",
+  /onClick=\{\(\) => setConfirmarFatura\(true\)\}/.test(painelFat) &&
+    !/onClick=\{\(\) => generate\.mutate\(\)\}/.test(painelFat),
+  true,
+);
+verificar(
+  "C9. a confirmação é um AlertDialog controlado",
+  /from "@\/components\/ui\/alert-dialog"/.test(painelFat) &&
+    /<AlertDialog\s+open=\{confirmarFatura\}/.test(painelFat),
+  true,
+);
+verificar(
+  "C10. generate.mutate só é chamado dentro de emitirFatura, uma única vez no arquivo",
+  (painelFat.match(/generate\.mutate\(/g) ?? []).length === 1 &&
+    /function emitirFatura\(\)[\s\S]{0,400}generate\.mutate\(/.test(painelFat),
+  true,
+);
+verificar(
+  "C11. a confirmação mostra cliente, período, apontamentos, adicionais e total com os dados da tela",
+  /clientName\(selectedClient\)/.test(painelFat) &&
+    /dateBR\(start\)[\s\S]{0,40}dateBR\(end\)/.test(painelFat) &&
+    /\{period\.length\}/.test(painelFat) &&
+    /\{adicionaisElegiveis\.length\}/.test(painelFat) &&
+    /\{brl\(totalAFaturar\)\}/.test(painelFat),
+  true,
+);
+verificar(
+  "C12. aviso de imutabilidade",
+  painelFat.includes("A fatura emitida não pode ser alterada nem apagada."),
+  true,
+);
+verificar(
+  "C13. botões 'Cancelar' (foco inicial) e 'Emitir fatura'",
+  /<AlertDialogCancel[^>]*ref=\{cancelarFaturaRef\}/.test(painelFat) &&
+    /onOpenAutoFocus=\{[\s\S]{0,120}cancelarFaturaRef\.current\?\.focus\(\)/.test(painelFat) &&
+    /Cancelar\s*<\/AlertDialogCancel>/.test(painelFat) &&
+    /Emitir fatura/.test(painelFat),
+  true,
+);
+verificar(
+  "C14. em andamento, os dois botões ficam desabilitados e o diálogo não fecha",
+  /<AlertDialogCancel[^>]*disabled=\{generate\.isPending\}/.test(painelFat) &&
+    /<AlertDialogAction[^>]*disabled=\{generate\.isPending\}/.test(painelFat) &&
+    /onOpenChange=\{\(aberto\) => \{\s*if \(!generate\.isPending\) setConfirmarFatura\(aberto\);/.test(
+      painelFat,
+    ),
+  true,
+);
+verificar(
+  "C15. a confirmação não dispara duas emissões (trava antes do mutate e evento padrão anulado)",
+  /if \(emitindoRef\.current \|\| generate\.isPending\) return;\s*emitindoRef\.current = true;/.test(
+    painelFat,
+  ) && /event\.preventDefault\(\);\s*emitirFatura\(\);/.test(painelFat),
+  true,
+);
 
 console.log("\nD. Preservado\n");
 const acoes = semComentarios(ler(`${PAINEL}/implantacao-vigencias/_acoes.ts`));

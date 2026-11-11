@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**CONSOLIDAÇÃO PARA O PILOTO — #119 integrado, HML na 050, homologação funcional da camada banco/RPC concluída; interface ainda não exercitada.** SHAs e contagens abaixo são evidências de 09/11/2026; reconferir antes de agir.
+**DOC-01 — `PROGRESS.md` alinhado ao estado real depois de #119–#123 (todos mesclados), em PR Draft. Production na 034, HML na 050, resolução comercial OFF.** SHAs e contagens abaixo são evidências de 10/11/2026; reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | CONSOLIDAÇÃO PARA O PILOTO — homologação funcional (matriz curta de 9 cenários) |
-| Gate atual | Gate 5 (homologação) parcial: banco/RPC no HML PASS; interface no Preview pendente |
-| Último gate concluído | HML 045 → 050 aplicado e verificado; #119 integrado na main |
-| Worktree | /home/user/bslogistica (sessão em nuvem; descobrir de novo na retomada) |
-| Branch | claude/jolly-allen-fqechw (checkpoint; sem PR aberto) |
-| Base | main `6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef` |
-| HEAD validado | 6fd26320c1d03b758fbb9bd9ce0c0907d545a0ef (main, código até 050; CI validar/sql-local SUCCESS) |
-| Alterações não commitadas | Nenhuma além deste checkpoint |
-| PR | Nenhum aberto. #119 mergeado por squash; #63, #106–#112 e #118 fechados com motivo, branches preservadas |
-| Ambiente-alvo | HML `qbnfcmrxmssnwkhaitgd` (050). Production `ehkduqokntemtmqzdrbd` não tocada (034) |
-| Última ação comprovada | Matriz curta executada no HML por transação com reversão: 38/38 verificações PASS na camada banco/RPC; HML idêntico antes/depois |
-| Próxima ação exata | Exercitar a interface dos 9 cenários no Preview (usuário, navegador); depois preparar Production 034 → 050 com `pg_dump` novo e autorização nominal |
+| Etapa | DOC-01 — Gate 1/2, documentação |
+| Gate atual | Gate 2: PR Draft só de documentação; CI do HEAD publicado a conferir no GitHub. Sem merge ou Production |
+| Último gate concluído | #123 (UX-FATURA-01) mesclado por squash em `c6f91305c2d88048adc31387f9966b02aa48ef86`, árvore idêntica a `8676bdd` |
+| Worktree | Windows local `C:\Users\PC CASA\Documents\GitHub\bslogistica-docs-progress` (git worktree). Outros: `...\bslogistica` (`claude/jolly-allen-fqechw`, HANDOFF antigo não commitado, não usar) e `...\bslogistica-ux-*` (branches mescladas). Descobrir de novo na retomada |
+| Branch | `docs/progress-estado-atual`, criada de `origin/main` |
+| Base | main `c6f91305c2d88048adc31387f9966b02aa48ef86` |
+| HEAD validado | c6f91305c2d88048adc31387f9966b02aa48ef86 + o diff deste commit (`PROGRESS.md` e HANDOFF). HEAD publicado e CI por SHA: consultar no PR, sem commit recursivo só de status |
+| Alterações não commitadas | Nenhuma além deste conjunto |
+| PR | Draft desta branch contra main (link no relatório da sessão/GitHub). #119–#123 mesclados; nenhum outro PR aberto |
+| Ambiente-alvo | Local e CI. HML `qbnfcmrxmssnwkhaitgd` (050) e Production `ehkduqokntemtmqzdrbd` (034) não tocados |
+| Última ação comprovada | `PROGRESS.md` reescrito nas seções "Tarefa ativa única", "Situação", "Próxima etapa" e "Não fazer ainda", e na linha "Dependências"; fatos conferidos no Git |
+| Próxima ação exata | Conferir CI `validar`/`sql-local` no HEAD do PR; usuário revisa o Draft. Depois, item 2 da fila: auditoria do código e roteiro de limpeza do HML para a 050 (`origin/docs/hml-limpeza-runbook`) |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `6fd2632`: migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119), mergeado). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
+| Main | `c6f9130` (#123 sobre `7b03772`): migrations até 050 e consumidores 047/049 ([#119](https://github.com/therunnas/bslogistica/pull/119)); rótulos da avulsa ([#120](https://github.com/therunnas/bslogistica/pull/120)); menu e botão de Containers retirados, fluxo avulso homologado ([#121](https://github.com/therunnas/bslogistica/pull/121)); valor acordado pelo contrato ([#122](https://github.com/therunnas/bslogistica/pull/122)); confirmação antes de gerar fatura ([#123](https://github.com/therunnas/bslogistica/pull/123)). `vercel.json` mantém `main:false`; nenhum deployment Production do SHA |
 | HML | 050 desde 09/11/2026; `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | 034, não tocada. O frontend publicado é anterior e espera schema 045: risco conhecido, resolvido apenas pela implantação 034 → 050 |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; vínculo com HML **não comprovado deste container** (proxy bloqueia `vercel.app`, sem credencial Vercel). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -36,18 +36,91 @@
 
 | Campo | Valor |
 | --- | --- |
-| Tarefa executada | Homologação funcional da matriz curta (9 cenários) no HML, camada banco/RPC, com dados sintéticos e reversão total |
-| Resultados e testes comprovados | 38/38 verificações PASS (uma expectativa de custo do roteiro estava errada: R$ 759,38 conferido à mão, inclui HE paga e custo proporcional). Contagens e receita do HML idênticas antes/depois (11 indicadores). Cenários: 2, 3, 4, 5, 6, 8, 9 PASS no banco; 7 PARCIAL (resumo PASS, Excel não exercitado); 1 BLOQUEADO (só interface) |
-| Código e PR afetados | Nenhum código alterado. Apenas este checkpoint |
-| Ambientes envolvidos | HML (transações revertidas; nenhuma linha persistida). Production não tocada |
-| Pendências e decisões | Interface dos 9 cenários no Preview; vínculo Preview → HML; Production 034 → 050 com `pg_dump`; três particularidades comerciais da Dynamis; achado menor: prévia em `src/lib/billing.ts` arredonda HE com `<= 15`/`<= 45` (o banco usa `< 15`/`< 45`) |
-| Próxima ação exata | Usuário executa a interface dos 9 cenários no Preview e informa o resultado; então parecer final e plano de Production |
-| Autorizações e proibições | Autorizados: testes sintéticos no HML sem persistência. Proibidos sem nova autorização: correções de código, flags/resolução ON, migrations, dados reais, deploy Production |
+| Tarefa executada | DOC-01 (10/11/2026): alinhar `PROGRESS.md` ao estado real depois de #119–#123. Reescritas as seções "Tarefa ativa única", "Situação", "Próxima etapa" e "Não fazer ainda", e a linha "Dependências" de "Marcos concluídos"; incluída a fila acordada com o responsável. Histórico preservado |
+| Resultados e testes comprovados | Fatos conferidos por leitura: `git log origin/main` (`6fd2632` #119, `f3f846e` #120, `0db831f` #121, `7b03772` #122, `c6f9130` #123; `cad9f51` é o #117, mesclado; #118 fechado sem merge); 55 migrations, a última `20261117120000_050`; API do GitHub: 0 PRs abertos; `origin/docs/hml-limpeza-runbook` existe (`169f592`). HML 050 e flags pelo registro verificado de 09/11/2026 (não reconsultado: sem consulta ao banco nesta tarefa). `npm audit --json` (somente leitura) sobre o lockfile: 12 moderadas, 0 altas, 0 críticas, em `glob`/`minimatch` via `typescript-eslint` e `@sentry/*`. Validação: `check:workflow` PASS (inclusive `--base c6f9130 --head` do commit), links locais pelo validador, Prettier de `PROGRESS.md` PASS, `git diff --check` PASS. O HANDOFF já não passava no Prettier antes desta tarefa; não foi reformatado inteiro (fora do escopo) |
+| Código e PR afetados | Apenas `PROGRESS.md` e `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci` sem alterar `package.json`/lockfile) e CI. Nenhum código, script, dependência, banco, migration, workflow, `vercel.json`, `.env`, HML ou Production tocado |
+| Pendências e decisões | Fila: (2) auditoria do código e roteiro de limpeza do HML para a 050; (3) limpar o HML e teste manual do zero; (4) ajustes do teste manual, incluindo UX-FATURA-02; (5) Production `pg_dump` + 035–050 com autorização nominal; (6) piloto. Decisões de negócio: tipos de serviço avulso, modalidade de cobrança, pagamento por pessoa ou rateio; Dynamis (intervalo do dia útil, saída antecipada, sábados acima de 4h); C1–C6. Dívida técnica: as 12 moderadas do `npm audit`, PR próprio depois do piloto, nunca `npm audit fix --force` |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, edição de `PROGRESS.md` e `docs/HANDOFF.md`, commit/push desta branch e um PR Draft. Proibidos: código, scripts, banco, migrations, dependências (`npm audit fix`, `npm update`, `package.json`/lockfile), workflows, `vercel.json`, `.env`, HML, Production, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — UX-FATURA-01 (10/11/2026, #123 mesclado)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-FATURA-01 (10/11/2026): na tela Faturamento, "Gerar fatura" deixa de emitir na hora e abre um `AlertDialog` de confirmação com cliente, período, quantidade de apontamentos e de adicionais incluídos, total a faturar (dados que a tela já tinha, sem consulta nova) e o aviso "A fatura emitida não pode ser alterada nem apagada." Botões "Cancelar" (foco inicial) e "Emitir fatura"; só "Emitir fatura" chama `generate.mutate()` |
+| Resultados e testes comprovados | RED → GREEN em `scripts/testar-interface-simples.mjs` (C8–C15: 8 falharam antes, 40/0 depois). Em andamento, os dois botões ficam desabilitados e o diálogo não fecha (`onOpenChange` ignora com `generate.isPending`); dupla emissão bloqueada por `emitindoRef` antes do `mutate` e `event.preventDefault()` na ação; diálogo fecha em `onSettled`. Windows, Node 26.13, sobre `7b03772` + diff: `npm run lint`, `npx tsc --noEmit`, `check:workflow`, `check:vercel-deployments`, `npm run build` e `git diff --check` PASS; 69/72 `test:*`, as 3 de ambiente com contagens idênticas (`calendario-runners` 10/13, `workflow` 7/1, `vercel-deployments` 0/22). Navegador (app do worktree em `localhost:3001`, CSP → `qbnfcm…`, admin, só leitura): HOMOLOG-SINT-AV2, 01–15/11, total R$ 150,00 → "Gerar fatura" abriu "Emitir fatura?" com Cliente HOMOLOG-SINT-AV2, Período 01/11/2026 a 15/11/2026, Apontamentos 1, Adicionais 0, Total a faturar R$ 150,00, o aviso e foco em Cancelar; cancelado: diálogo fechado, 7 faturas antes e depois (também após recarregar), nenhuma do HOMOLOG-SINT-AV2, total a faturar segue R$ 150,00 |
+| Código e PR afetados | `src/app/(painel)/faturamento/painel-faturamento.tsx`, `scripts/testar-interface-simples.mjs`, `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci`, `next dev` na 3001 lendo o `.env` existente sem alterá-lo, encerrado) e CI. HML só lido: nenhuma escrita, nenhuma fatura emitida. Production, banco, RPC `gerar_fatura`, cálculo, `billing.ts`, `.env` intocados. `AGENTS.md` reescrito pelo `next dev`: restaurado, fora do commit. Prints no scratchpad da sessão (`ux-fatura/prints`) |
+| Pendências e decisões | UX-FATURA-02: apontamento faturado sem rótulo "Faturado", folha "Aberto" e "Salvar"/"Fechar dia" habilitados. Observação: em tela estreita o rodapé do diálogo empilha "Emitir fatura" acima de "Cancelar" (padrão do componente); o foco inicial continua em Cancelar. Atritos anteriores e decisões de negócio dos avulsos seguem abertos |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, `painel-faturamento.tsx` e o teste estrutural, navegador só para olhar e cancelar, commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo, faturamento (RPC e regras), `billing.ts`, auth/MFA, `vercel.json`, workflows, `.env`, chave de serviço, escrita no HML, emitir fatura, Production, rótulo "Faturado" (UX-FATURA-02), merge, Ready, force push, outro PR |
+
+### Tarefa anterior — UX-AVULSA-03 (10/11/2026, #122 mesclado)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-AVULSA-03 (10/11/2026): na tela Nova operação, com motor por vigência ligado e contrato escolhido, o campo "Valor acordado por diária (avulsa)" passa a ficar desabilitado e vazio, `agreed_amount` não vai no payload e aparece "O valor vem do contrato. Para um valor próprio deste serviço, deixe o contrato em branco." Sem contrato, segue a vigência inicial ("Cadastro inicial da operação"); edição de operação existente inalterada |
+| Resultados e testes comprovados | RED → GREEN em `scripts/testar-interfaces-vigencia.mjs` (G8b–G8g: 5 falharam antes, 157/0 depois; G8 e `testar-valores-operacao` E1 preservados, 146/0). Windows, Node 26.13, sobre `0db831f` + diff: `npm run lint`, `npx tsc --noEmit`, `check:workflow`, `check:vercel-deployments`, `npm run build` e `git diff --check` PASS; 69/72 `test:*` PASS, as 3 de ambiente com contagens idênticas (`calendario-runners` 10/13, `workflow` 7/1, `vercel-deployments` 0/22). Navegador (app do worktree em `localhost:3001`, CSP → `qbnfcm…`, admin): (a) PASS na tela — R$ 150 digitado e contrato `HOMOLOG-SINT-AV Contrato` escolhido: campo limpo e desabilitado com a ajuda; salvar NÃO executado (criaria operação além da autorizada; salvar com contrato sem valor já provado na HML-AVULSO-01), formulário cancelado. (b) PASS — `Contagem de palete - HOMOLOG-SINT-AV2`, avulsa sem contrato, R$ 150,00, 10/11/2026: cartão "Valor acordado R$ 150,00", histórico com vigência 10/11/2026 em aberto, "Informada · Cadastro inicial da operação". (c) PASS — `HOMOLOG-SINT-AV2 Colaborador 1` sem turno, 08:00–17:00/60 min = 8h00 R$ 150,00 (diária de referência R$ 150,00, "Vigência do valor acordado"), custo R$ 100,00, conferido após recarregar. (d) PASS — Fechamento 01–15/11 HOMOLOG-SINT-AV2: receita R$ 150,00, custo R$ 100,00, resultado R$ 50,00 (33,3%), conciliação "Confere" nas 6 parcelas |
+| Código e PR afetados | `src/app/(painel)/operacoes/painel-operacoes.tsx`, `scripts/testar-interfaces-vigencia.mjs`, `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci`, `next dev` na 3001 lendo o `.env` existente sem alterá-lo, encerrado) e CI. HML, escrita sintética pelas telas: cliente `HOMOLOG-SINT-AV2`, colaborador `HOMOLOG-SINT-AV2 Colaborador 1` (R$ 100 desde 01/11; criado por decisão do usuário porque os dois `HOMOLOG-SINT-AV` estavam alocados e 0 disponíveis), operação `Contagem de palete - HOMOLOG-SINT-AV2` com vigência inicial, alocação sem turno, 1 apontamento de 10/11. Nenhuma fatura; nenhum registro existente, conta, papel, Configurações, Implantação de vigências ou flag alterado. `AGENTS.md` reescrito pelo `next dev`: restaurado, fora do commit. Prints no scratchpad da sessão (`ux-avulsa-03/prints`) |
+| Pendências e decisões | Decisões de negócio dos avulsos: lista de tipos de serviço, unidade e modalidade de cobrança (diária, unidade, valor fechado como adicional), remuneração por pessoa ou rateio. Atritos já registrados (sem turno com horários vazios, "Localidade ausente" que não bloqueia, "Gerar fatura" sem confirmação, faturado sem rótulo) seguem abertos |
+| Próxima ação exata | Conferir CI do HEAD do PR; revisão do usuário; nenhuma promoção a Ready ou merge sem autorização nominal |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, formulário de operação e o teste estrutural correspondente, escrita sintética `HOMOLOG-SINT-AV2` descrita acima (sem fatura), commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo, precedência de preços, faturamento, `billing.ts`, auth/MFA, `vercel.json`, workflows, `.env`, chave de serviço, alterar registros existentes, contas, Configurações, Implantação de vigências, emitir fatura, Production, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — HML-AVULSO-01 e botão escondido (09/11/2026, #121 mesclado)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | HML-AVULSO-01 (09/11/2026): homologação de telas do cenário 10, fluxo avulso de ponta a ponta, app do worktree `bslogistica-ux-menu` em `c32a93f` (#121) em `localhost:3001` (CSP → `qbnfcm…`), admin `bcviniciuslc@gmail.com` sem MFA, resolução comercial OFF |
+| Resultados e testes comprovados | **8 PASS, 1 PARCIAL.** a PASS: cliente `HOMOLOG-SINT-AV` e contrato `HOMOLOG-SINT-AV Contrato` (R$ 200,00, 8h, 1,5x, tolerância 10 min, vigência 01/11/2026). b PASS: `HOMOLOG-SINT-AV Colaborador 1/2`, custo R$ 100/110 desde 01/11. c **PARCIAL**: operação avulsa `Descarga de container – HOMOLOG-SINT-AV` (`622cbc76…`), data 09/11/2026, contrato selecionado; com "Valor acordado por diária (avulsa)" = 200 o salvamento foi recusado ("Com o motor por vigência ligado, taxa, custo ou valor acordado só entram por registro de vigência (data de início e motivo), não por INSERT direto."), nada gravado; salva sem o valor, a diária R$ 200 veio do contrato. d PASS: 2 colaboradores alocados "Sem turno". e PASS: sem turno, 08:00–17:00/60 min = 8h00 R$ 200,00; 08:00–18:30/60 min = 9h30, HE 1h30 R$ 56,25 (200 ÷ 8 = 25,00 × fator 1,5 = 37,50 × 1,5 h = 56,25), total R$ 256,25; custo R$ 100,00 + R$ 130,63; conferido após recarregar. f PASS: Fechamento 01–15/11 receita R$ 456,25, custo R$ 230,63, resultado R$ 225,62 (49,5%), conciliação "Confere" nas 6 parcelas. g PASS: Excel do cliente (2 abas) sem custo/margem/resultado, total R$ 456,25. h PASS: fatura única HOMOLOG-SINT-AV R$ 456,25 / custo R$ 230,63 "Fechada", sem ação de edição; apontamentos faturados com 6 campos desabilitados, "Corrigir" ausente, Salvar → "Nenhuma alteração para salvar". i PASS (observação): botão "Adicionar serviço de container" no cartão da avulsa leva a `/containers/novo?operacao=622cbc76…`, formulário "Novo serviço de containers" com cliente e operação pré-preenchidos (não salvo) |
+| Código e PR afetados | Nenhum código alterado. Apenas este HANDOFF, local, na branch do #121 (sem commit) |
+| Ambientes envolvidos | HML, escrita sintética autorizada só pelas telas: cliente, contrato, 2 colaboradores, operação avulsa `622cbc76…`, alocação sem turno, 2 apontamentos de 09/11, 1 fatura (imutável). Nenhum registro existente, conta, papel, Configurações, Implantação de vigências ou flag alterado; operação não atribuída a conta operacional. Production, código, `.env` e `vercel.json` intocados. `next dev` reescreveu `AGENTS.md`: restaurado. Prints e o Excel fora do repositório (scratchpad da sessão, `hml-avulso-01`) |
+| Pendências e decisões | (1) Campo "Valor acordado por diária (avulsa)" aparece na criação mas é recusado com o motor por vigência ligado: esconder/desabilitar ou levar ao registro de vigência com motivo. (2) Botão "Adicionar serviço de container" em toda operação abre o módulo Containers (valor negociado + custo por participante): risco de cobrar o mesmo serviço duas vezes (diárias + container); recomendação: esconder no cartão (ou redirecionar para adicional no Faturamento) enquanto o módulo fica só por URL; o formulário ainda mostra "Voltar para containers", tela que saiu do menu. (3) Atritos: colaborador nasce com "Revisar função"; sem turno, horários vêm vazios e intervalo 0 (preencher à mão em cada linha); operação mostra "Localidade ausente. Defina a vigência antes de apontar com o motor ligado." mas o apontamento foi aceito; apontamento faturado sem rótulo "Faturado", folha "Aberto", Salvar/Fechar dia habilitados; "Gerar fatura" sem confirmação; nome com "–" (travessão) difícil de digitar. Decisões de negócio abertas: tipos de serviço, unidade/modalidade, remuneração |
+| Próxima ação exata | Ponto (2) decidido pelo usuário: esconder o botão, feito localmente (ver abaixo). Falta decidir o ponto (1). #121 segue Draft até autorização nominal de merge |
+| Complemento — botão escondido (09/11/2026) | Decisão do usuário: esconder "Adicionar serviço de container". Removidos o `Button`/`Link` do cartão da operação e o import `Link` (sem outro uso) em `painel-operacoes.tsx`; `scripts/test-container-telas.mjs` passa a exigir a ausência do atalho. Rota `/containers/novo?operacao=` e links do Faturamento mantidos. Windows sobre `c32a93f` + diff local: lint, tsc, check:workflow, check:vercel-deployments, build e diff --check PASS; `test:container-telas` 65/0; 69/72 `test:*` (as 3 de ambiente de sempre). Navegador localhost:3001 → HML, admin, sem salvar: 8 cartões de operação sem o botão e sem link para `/containers`; `/containers` abre por URL com 11 serviços. Publicado no #121 por autorização do usuário |
+| Autorizações e proibições | Autorizada e concluída: escrita sintética `HOMOLOG-SINT-AV` no HML pelas telas, incluindo uma fatura. Proibidos: alterar registros existentes, contas, papéis, Configurações, Implantação de vigências, flags, código, banco, migrations, `.env`, `vercel.json`, commit/push/merge/PR, Production, atribuição a conta operacional |
+
+### Tarefa anterior — UX-AVULSA-02 (09/11/2026, PR #121 Draft)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-AVULSA-02 (09/11/2026): retirar o item "Containers" da navegação lateral do admin. Decisão do responsável: serviço de container passa a ser registrado como operação avulsa em Operações (nome do serviço, equipe e diária). Nada apagado: rotas, ações, componentes, migrations 045–050 e dados de containers permanecem |
+| Resultados e testes comprovados | `src/app/(painel)/_components/app-shell.tsx`: removido `{ href: "/containers", label: "Containers", icon: Package }` e o import `Package`, sem outro uso (o lint reprovaria). Expectativas que conferiam o item: `scripts/testar-papel.mjs` E5 9 → 8 links, `TELAS_NAV` exclui `containers` como já excluía `usuarios` (a rota segue em `TELAS`, com guard e rota conferidos) e nova E5c "containers NÃO é item da navegação principal"; `scripts/testar-tela-operacional.mjs` B15 9 → 8. Windows, Node 26.13: `npm run lint` PASS, `npx tsc --noEmit` PASS, `check:workflow` PASS, `check:vercel-deployments` PASS, `test:papel` 111/0, `test:tela-operacional` 170/0, 69/72 `test:*` PASS, `npm run build` PASS, `git diff --check` PASS. Falham por ambiente Windows, iguais às da UX-AVULSA-01: `test:calendario-runners` 10/13, `test:workflow` 7/1, `test:vercel-deployments` 0/22. Navegador (app do worktree em `localhost:3001`, CSP → `qbnfcm…`, admin): menu com Dashboard, Apontamentos, Operações, Clientes e contratos, Colaboradores, Faturamento, Fechamento, Relatórios; `/containers` abre por URL direta com 11 serviços; Nova operação → tipo "Avulsa" mostra valor acordado por diária e data; cancelado, cartão Avulsas segue em 1 |
+| Código e PR afetados | `src/app/(painel)/_components/app-shell.tsx`, `scripts/testar-papel.mjs`, `scripts/testar-tela-operacional.mjs`, `docs/HANDOFF.md`. PR Draft desta branch contra main |
+| Ambientes envolvidos | Local (worktree, `npm ci`, `next dev` na porta 3001 lendo o `.env` existente sem alterá-lo, encerrado ao fim) e CI. HML só lido. Nenhum banco, Production, `.env`, chave de serviço, flag, migration, cálculo, faturamento, auth, `vercel.json` ou workflow tocado. O `next dev` reescreve `AGENTS.md` com bloco "nextjs-agent-rules": restaurado, fora do commit |
+| Pendências e decisões | Links restantes para `/containers`, mantidos de propósito: `faturamento/adicionais.tsx` (import de `../containers/_acoes`, `router.push` linha ~144 e `href` linha ~336) e `operacoes/painel-operacoes.tsx` linha ~701 (botão "Adicionar serviço de container" → `/containers/novo?operacao=…`). Testes que referenciam rotas `/containers` seguem válidos (`test-container-telas`, `test-container-dados`, `testar-func-ready`, `testar-compatibilidade-deploy`). Decisões abertas: lista de tipos de serviço, unidade e modalidade de cobrança dos avulsos (diária, unidade, valor fechado como adicional), remuneração por pessoa ou rateio, destino final do módulo Containers. Pendentes anteriores abaixo seguem válidos |
+| Próxima ação exata | Concluída: PR #121 Draft, CI validar/sql-local SUCCESS em `c32a93f` |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, remoção do item de menu e das expectativas que o conferiam, commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo/faturamento, auth/MFA, `vercel.json`, workflows, apagar/alterar rotas, ações, componentes ou dados de containers, remover os links listados, escrita no HML, Production, `.env`, chave de serviço, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — UX-AVULSA-01 (09/11/2026, #120 mesclado)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-AVULSA-01 (09/11/2026): trocar três textos da tela Operações que prendiam a avulsa a "carga e descarga". O tipo do serviço avulso passa a ser dito pelo nome da operação (decisão do responsável). Menu e módulo "Containers" inalterados |
+| Resultados e testes comprovados | Trocas: (1) `painel-operacoes.tsx`, opção do tipo "Avulsa (carga/descarga)" → "Avulsa"; (2) `painel-operacoes.tsx`, cartão "Avulsas" description "Carga e descarga" → "Serviços pontuais"; (3) `operacoes/page.tsx`, metadata description → "Operações fixas e avulsas, com turnos, intervalos e equipe alocada." (uma linha, exigência do Prettier corrigida à mão). Nenhuma suíte conferia os textos antigos. Windows, Node 26.13: `npm run lint` PASS, `npx tsc --noEmit` PASS, `check:workflow` PASS, `check:vercel-deployments` PASS, 69/72 `test:*` PASS, `npm run build` PASS (66 s, 24 páginas), `git diff --check` PASS. Falham `test:calendario-runners` (Python ausente), `test:workflow` (separador `\`) e `test:vercel-deployments` (caminho `C:\C:\…PC%20CASA`) com contagens idênticas no checkout original em `d0e7143` sem a mudança: ambiente Windows, a confirmar na CI Linux |
+| Código e PR afetados | `src/app/(painel)/operacoes/painel-operacoes.tsx`, `src/app/(painel)/operacoes/page.tsx`, `docs/HANDOFF.md`. PR Draft desta branch contra main, incluindo os 3 commits de documentação herdados |
+| Ambientes envolvidos | Local (worktree, `npm ci`) e CI. Nenhum banco, HML, Production, `.env`, chave de serviço, flag, migration, cálculo, faturamento, auth, `vercel.json` ou workflow tocado |
+| Pendências e decisões | Evolução dos serviços avulsos: lista de tipos reais, unidade/modalidade de cobrança (diária, unidade, valor fechado), se toda avulsa é por diária, remuneração por pessoa ou rateio, futuro do menu "Containers". Outras ocorrências não alteradas (fora do escopo): `painel-operacoes.tsx` "Operações fixas usam turnos diários; avulsas registram data e valor acordado." e "Valor acordado por diária (avulsa)"; `operacoes/page.tsx` openGraph "Operações fixas e avulsas com turnos e equipe alocada."; dashboard "Distribuição entre operações fixas e avulsas."; `/containers` "Serviços avulsos, valores negociados e custos por participante." Nenhuma outra menção de interface a carga/descarga em `src/` ou `scripts/`. Pendentes anteriores abaixo seguem válidos |
+| Próxima ação exata | Concluída: CI validar/sql-local SUCCESS em `5cec5cf` e `9eb628f`; #120 mesclado pelo usuário em `f3f846e` |
+| Autorizações e proibições | Autorizados: worktree/branch, `npm ci`, os três textos, commit/push desta branch e um PR Draft; Preview automático (não é homologação). Proibidos: banco, migrations, RLS, grants, flags, cálculo/faturamento, `billing.ts`, auth/MFA, `vercel.json`, workflows, HML, Production, `.env`, chave de serviço, módulo/menu "Containers", tipo/unidade/quantidade de serviço, merge, Ready, force push, outro PR |
+
+### Tarefa anterior — homologação da interface (09/11/2026)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | Homologação funcional da interface dos 9 cenários (09/11/2026), app Next local (`localhost:3000`, `.env` → HML `qbnfcmrxmssnwkhaitgd`), navegador do app; admin `bcviniciuslc@gmail.com` (sem MFA) nos cenários 1–8 e `s11-op@e2e-sintetico.invalid` no 9. Preview não usado (exige login Vercel; vínculo não comprovado) |
+| Resultados e testes comprovados | **9/9 PASS** (prints na sessão). 1 Dashboard abre com R$. 2 container pedido = execução (09/11) salvo. 3 pedido 10/11 > execução 09/11 recusado na tela ("A solicitação não pode ser posterior à execução."), lista continua com 10 serviços. 4 correção 300 → 320: novo `6872ba95…` disponível, original `a3cf5ae1…` Cancelado/substituído com vínculo e auditoria. 5 adicional R$ 75 com duplo clique: um só. 6 8h = R$ 250,00; 9h30 = R$ 320,31 (HE R$ 70,31), custo R$ 120,00 e R$ 154,38, conferido após recarregar. 7 Fechamento 01–15/11 R$ 965,31, conciliação com banco "Confere" em todas as parcelas; Excel do cliente (2 abas) sem custo/margem/resultado, total R$ 965,31. 8 fatura `c40428d0…` R$ 965,31/custo R$ 324,38 Fechada; sem ação de edição; container faturado sem Corrigir/Cancelar e `/corrigir` recusado; apontamento faturado com campos desabilitados ("Nenhuma alteração para salvar"). 9 operacional entra em `/operacional`, vê só "E2E-S11 Operação A1", nenhum `R$`/termo financeiro na página, menu só `/operacional`; `/dashboard` redireciona para `/operacional`; `/faturamento` e `/fechamento` mostram "Área administrativa restrita". Somado à camada banco/RPC anterior (38/38 PASS) |
+| Código e PR afetados | Nenhum código alterado. Apenas este checkpoint, local |
+| Ambientes envolvidos | HML com escrita sintética autorizada e persistida: cliente `HOMOLOG-SINT-UI` (`a7c38a8c…`), contrato `HOMOLOG-SINT Contrato UI` (R$ 250, 8h, 1,5, vigência 01/11/2026), colaboradores `HOMOLOG-SINT Colaborador 1/2` (custo R$ 120/130 desde 01/11), operação `HOMOLOG-SINT Operacao UI` (`4a5a47dc…`) e turno, 2 containers, 1 adicional, 2 apontamentos de 09/11, fatura `c40428d0…` (imutável). Nenhum registro existente alterado; contas de usuário, Configurações e Implantação de vigências intocadas; resolução comercial OFF. Production não tocada |
+| Pendências e decisões | Observações de UX (não reprovam cenário): "Gerar fatura" emite sem confirmação; apontamento faturado não exibe "Faturado", folha segue "Aberto" e "Salvar"/"Fechar dia" ficam habilitados; cenário 3 recusado no cliente antes do servidor (recusa do banco provada na rodada banco/RPC); aviso "Localidade ausente" na operação não bloqueou apontamento. Download do Excel no navegador do app ficou como `.tmp` em Downloads. Pendentes anteriores: Production 034 → 050 com `pg_dump`; três particularidades da Dynamis; prévia `src/lib/billing.ts` `<= 15`/`<= 45` × banco `< 15`/`< 45`; dados `HOMOLOG-SINT` no HML exigem tarefa própria se for limpar |
+| Próxima ação exata | Superada pela UX-AVULSA-01 acima (checkpoint publicado nesta branch por autorização do usuário) |
+| Autorizações e proibições | Autorizada naquela tarefa: escrita sintética `HOMOLOG-SINT` no HML pelas telas, incluindo uma fatura. Não se estende a outras escritas |
 
 ## Próxima ação exata, na conta nova
 
 1. Ler `CLAUDE.md`, `AGENTS.md`, este HANDOFF e `PROGRESS.md`; conferir main, PRs e HML (somente leitura).
-2. Obter do usuário o resultado da interface dos 9 cenários no Preview.
+2. Interface dos 9 cenários concluída em localhost → HML (9/9 PASS).
 3. Para Production: `pg_dump` completo novo, token com acesso ao projeto de Production, janela e autorização nominal antes de aplicar 035–050.
 
 ## Segurança e limites da transferência
@@ -58,11 +131,11 @@
 
 ## Autorizações
 
-Vigentes nesta etapa: testes funcionais sintéticos no HML, sem persistência, com resolução comercial OFF. Não se estendem a correções, Production ou ativação comercial.
+Escritas sintéticas `HOMOLOG-SINT`, `HOMOLOG-SINT-AV` e `HOMOLOG-SINT-AV2` concluídas, não vigentes. #119–#123 mesclados pelo usuário. DOC-01 (vigente): `PROGRESS.md` e `docs/HANDOFF.md`, commit/push na branch `docs/progress-estado-atual` e um PR Draft. Não se estendem a código, HML, Production ou ativação comercial.
 
 ## Proibições
 
-Sem deploy ou migration em Production, resolução de tarifas ON, dados reais, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático ou correção de código antes de aprovação do relatório.
+Sem deploy ou migration em Production, escrita no HML, emissão de fatura, resolução de tarifas ON, dados reais, mudança de dependências, criação de ambiente/Supabase, reaplicação de migrations, Gates 3–5 do checkpoint automático, merge ou Ready do PR da DOC-01 sem autorização nominal.
 
 ## Retomada
 
@@ -586,7 +659,7 @@ migrations, credenciais, dados, domínios/aliases, deploy manual, bot ou gates 2
 
 ## Bloqueios e riscos
 
-**09/11/2026 (vigente):** interface dos 9 cenários não exercitada (Preview inacessível deste container); Production 034 com frontend posterior (telas de schema novo indisponíveis até 034 → 050); backup `pg_dump` de Production pendente. Registros abaixo são históricos.
+**09/11/2026 (vigente):** interface dos 9 cenários PASS em app local ligado ao HML (Preview segue sem vínculo comprovado); Production 034 com frontend posterior (telas de schema novo indisponíveis até 034 → 050); backup `pg_dump` de Production pendente. Registros abaixo são históricos.
 
 **FUNC-02:** três conflitos documentais entre #117/#118; prefixo 046–049 e
 consumidores 047/049 ainda precisam de composição/CI. Main/#118 usam RPC antiga

@@ -214,10 +214,10 @@ verificar(
   2,
 );
 verificar(
-  "B15. admin mantém os oito links e acrescenta Containers, sem ampliar menu operacional",
+  "B15. admin mantém os oito links, sem Containers, e sem ampliar menu operacional",
   (/admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1]?.match(/href: "\//g) ?? [])
     .length,
-  9,
+  8,
 );
 verificar(
   "B16. e o operacional tem exatamente um",
