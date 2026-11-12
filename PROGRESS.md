@@ -45,7 +45,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-02  | Clientes e contratos                                                               | PASS (local) |
 | CP-03  | Colaboradores e valores                                                            | PASS (local) |
 | CP-04  | Operações, turnos e equipes                                                        | PASS (local) |
-| CP-05  | Apontamentos e regras financeiras (maior risco)                                    | não iniciado |
+| CP-05  | Apontamentos e regras financeiras (maior risco)                                    | PASS (local) |
 | CP-06  | Serviços avulsos, adicionais e containers                                          | não iniciado |
 | CP-07  | Fechamento e faturamento                                                           | não iniciado |
 | CP-08  | Dashboard, relatórios e exportações                                                | não iniciado |
@@ -58,12 +58,12 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 
 | ID  | Defeito                                                                                                   | Prioridade | Evidência                    | CP       |
 | --- | --------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------- | -------- |
-| D1  | Saída antes da entrada (08:00 → 07:50) salva sem aviso como 22h50 (R$ 953,13)                             | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
+| D1  | Saída antes da entrada (08:00 → 07:50) salvava sem aviso como 22h50. **Corrigido no CP-05** (telas)      | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
 | D2  | "Alterar custo": trocar a data substituía o valor digitado pelo antigo. **Corrigido no CP-03**            | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
 | D3  | Duplo clique duplicava cliente e turno. **Corrigido**: cliente no CP-02, turno no CP-04 (envio único)     | P2         | E2E #133 + leitura do código | CP-02/04 |
 | D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
-| D6  | `billing.ts` usa `<= 15`/`<= 45` (030) e o núcleo V2 `< 15`/`< 45`; só alimenta horas exibidas, não valor | P3         | leitura do código            | CP-05    |
+| D6  | `<= 15`/`<= 45` (030) × `< 15`/`< 45` (V2). **Sem defeito no CP-05**: a 030 só roda com o dobro desligado | P3         | leitura do código            | CP-05    |
 | D7  | Containers fora do menu, mas acessíveis por URL e links do Faturamento (risco de cobrança dupla)          | P2         | HANDOFF                      | CP-06    |
 | D8  | Exclusões usam `window.confirm` nativo                                                                    | P3         | leitura do código            | CP-09    |
 | I1  | `scripts/e2e-local.sh` usava `setsid`, ausente no macOS. **Corrigido** (`set -m`; G22–G25); macOS nativo não comprovado | infra | execução local 12/11 | CP-00B |
@@ -87,6 +87,22 @@ PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 73/73 `test:*`; `sql-local` 52; sem 
 financeira alterada e com MFA opcional mantido. Pendente de decisão: o Auth responde `user_banned`
 antes de conferir a senha (revela conta revogada pela API do Auth, não pela tela). Não testados:
 expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo.
+
+Defeitos do CP-05 (12/11/2026, sessão em nuvem), reproduzidos no E2E (RED) e corrigidos (GREEN);
+inventário, matrizes de jornada, sábado/domingo/feriado, custo × receita, D6 e decisões em
+[docs/qa/CP-05-apontamentos-e-regras-financeiras.md](docs/qa/CP-05-apontamentos-e-regras-financeiras.md):
+
+| ID        | Defeito                                                                                              | Prioridade | Estado                        |
+| --------- | ---------------------------------------------------------------------------------------------------- | ---------- | ----------------------------- |
+| D1        | Saída antes da entrada em turno diurno gravada sem aviso (22h50); agora bloqueia até corrigir/confirmar | P1         | corrigido nas telas; banco: AUT-CP05-01 |
+| D-CP05-01 | "Salvar o dia" gravava as linhas novas da equipe sem a tela distinguir linha gravada de sugerida     | P2         | corrigido (aviso)             |
+| D-CP05-02 | Duas abas: a segunda sobrescrevia sem aviso o que a primeira gravou                                  | P2         | corrigido (tela do admin)     |
+
+Decisões do CP-05 (nenhuma implementada): DEC-CP05-01 (limite de jornada em turno noturno e
+registro da confirmação), DEC-CP05-02 (substituto fora da equipe), DEC-CP05-03 (linha nova nasce
+presente), DEC-CP05-04 (jornada que cruza tipos de dia), DEC-CP05-05 (presença sem horário = diária
+inteira). Autorização pendente: **AUT-CP05-01** (trava do D1 e da concorrência no banco, migration
+com plano de compatibilidade no documento do CP-05).
 
 Defeitos do CP-04 (12/11/2026, sessão em nuvem), todos corrigidos e revalidados; inventário,
 matrizes de turnos e equipes e conciliação em

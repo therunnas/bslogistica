@@ -53,24 +53,30 @@ test("preparação: cliente, contrato 250, colaborador, operação e turno", asy
   await alocar(page, { operacao: OP, colaborador: HUGO, turno: TURNO });
 });
 
-test(
-  "B3 [DEFEITO]: saída antes da entrada (08:00 → 07:50) salva sem aviso como jornada de 22h50",
-  CONHECIDA,
-  async ({ page }) => {
-    await abrirDia(page, { operacao: OP, turno: TURNO, data: DATA_B3 });
-    const tr = linhaDo(page, HUGO);
-    await tr.locator("input[type=time]").nth(0).fill("08:00");
-    await tr.locator("input[type=time]").nth(1).fill("07:50");
-    await page.getByRole("button", { name: "Salvar", exact: true }).click();
-    // Correto seria um aviso de jornada atípica com confirmação. Hoje salva direto:
-    await esperarAviso(page, "Apontamento salvo.");
-    await expect(page.getByRole("alertdialog")).toHaveCount(0);
-    const l = lancamento(OP, HUGO, DATA_B3);
-    // Calculado à mão pela regra atual (fator 1,5, tolerância 10 min, blocos de 15/45 min).
-    expect(l?.receita).toBe("953.13");
-    expect(l?.custo).toBe("428.13");
-  },
-);
+// D1/B3: CORRIGIDO no CP-05. Saída antes da entrada num turno que não vira o dia não é mais
+// gravada em silêncio: a tela bloqueia até corrigir o horário ou confirmar a linha. Deixou de ser
+// falha conhecida: o teste confere o comportamento correto, sem a etiqueta. O cálculo não mudou.
+test("[CORRIGIDO D1] saída antes da entrada (08:00 → 07:50): aviso e bloqueio até confirmar", async ({
+  page,
+}) => {
+  await abrirDia(page, { operacao: OP, turno: TURNO, data: DATA_B3 });
+  const tr = linhaDo(page, HUGO);
+  await tr.locator("input[type=time]").nth(0).fill("08:00");
+  await tr.locator("input[type=time]").nth(1).fill("07:50");
+  const salvar = page.getByRole("button", { name: "Salvar", exact: true });
+  await expect(page.getByRole("alert").filter({ hasText: "saída antes da entrada" })).toBeVisible();
+  await expect(salvar).toBeDisabled();
+  expect(lancamento(OP, HUGO, DATA_B3), "nada gravado sem confirmação").toBeUndefined();
+  // Confirmada expressamente, grava pelo cálculo de sempre (fator 1,5, tolerância 10, blocos 15/45).
+  await tr
+    .getByRole("checkbox", { name: /Confirmo que a jornada atravessou a meia-noite/ })
+    .check();
+  await salvar.click();
+  await esperarAviso(page, "Apontamento salvo.");
+  const l = lancamento(OP, HUGO, DATA_B3);
+  expect(l?.receita).toBe("953.13");
+  expect(l?.custo).toBe("428.13");
+});
 
 // D3 em cliente: CORRIGIDO no CP-02 (trava de envio único). Deixou de ser falha conhecida: o
 // teste agora confere o comportamento correto, sem a etiqueta. (D3 em turno segue abaixo, CP-04.)

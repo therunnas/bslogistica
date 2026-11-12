@@ -78,7 +78,7 @@ export async function criarContrato(
 
 export async function criarColaborador(
   page: Page,
-  o: { nome: string; custo: number; desde: string; funcao?: string },
+  o: { nome: string; custo: number; desde: string; funcao?: string; horaExtra?: number },
 ) {
   await page.goto("/colaboradores");
   await page.getByRole("button", { name: "Novo colaborador" }).click();
@@ -87,6 +87,10 @@ export async function criarColaborador(
   if (o.funcao) await escolher(page, d.locator("#employee-job-function"), o.funcao);
   await d.locator("#employee-cost").fill(String(o.custo));
   await d.locator("#employee-cost-from").fill(o.desde);
+  // Valor-hora acordado da hora extra PAGA (opcional; em branco = custo ÷ 8).
+  if (o.horaExtra !== undefined) {
+    await d.locator("#employee-ot-hourly-cost").fill(String(o.horaExtra));
+  }
   await d.getByRole("button", { name: "Salvar colaborador" }).click();
   await esperarFechar(page);
 }

@@ -875,7 +875,8 @@ verificar(
 verificar(
   "H6. Operacional: a recusa bloqueia o botão e é repetida no envio, sem mexer no contrato da RPC",
   /entradaIgualSaida\(linha\.status, linha\.check_in, linha\.check_out\)/.test(telaOperacional) &&
-    /\}\) \|\| horariosIguais\.length > 0/.test(telaOperacional) &&
+    // CP-05: a mesma expressão do botão passou a incluir a recusa do D1 (saída antes da entrada).
+    /\}\) \|\|\s*horariosIguais\.length > 0/.test(telaOperacional) &&
     /if \(horariosIguais\.length > 0\) \{\s*toast\.error\(MENSAGEM_ENTRADA_IGUAL_SAIDA\);/.test(
       telaOperacional,
     ),

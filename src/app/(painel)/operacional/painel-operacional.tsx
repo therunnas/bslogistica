@@ -37,7 +37,13 @@ import {
 
 import { todayISO } from "@/lib/format";
 import { toast } from "@/lib/notificacoes";
-import { MENSAGEM_ENTRADA_IGUAL_SAIDA, entradaIgualSaida } from "@/lib/horarios";
+import {
+  MENSAGEM_ENTRADA_IGUAL_SAIDA,
+  MENSAGEM_SAIDA_ANTES_DA_ENTRADA,
+  chaveDaConfirmacaoDeVirada,
+  entradaIgualSaida,
+  saidaAntesDaEntradaForaDoTurno,
+} from "@/lib/horarios";
 import { useSalvarApontamentoOperacional } from "@/lib/operacional/mutations";
 import {
   useApontamentosDoOperador,
@@ -160,6 +166,10 @@ export function PainelOperacional() {
   const [operationId, setOperationId] = useState<string | null>(null);
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [workDate, setWorkDate] = useState(todayISO());
+  // D1: confirmações expressas de jornada que atravessou a meia-noite fora de turno noturno.
+  const [viradasConfirmadas, setViradasConfirmadas] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   const [rascunho, setRascunho] = useState<{
     escopo: string;
@@ -254,6 +264,29 @@ export function PainelOperacional() {
     entradaIgualSaida(linha.status, linha.check_in, linha.check_out),
   );
 
+  // D1/B3: saída antes da entrada num turno que não vira o dia exige corrigir ou confirmar a linha.
+  const chaveDaVirada = (linha: {
+    employee_id: string;
+    check_in?: string | null;
+    check_out?: string | null;
+  }) =>
+    `${escopo}|${chaveDaConfirmacaoDeVirada(linha.employee_id, linha.check_in, linha.check_out)}`;
+  const viradasForaDoTurno = pendentes.filter((linha) =>
+    saidaAntesDaEntradaForaDoTurno(linha.status, linha.check_in, linha.check_out, turno),
+  );
+  const viradasPendentes = viradasForaDoTurno.filter(
+    (linha) => !viradasConfirmadas.has(chaveDaVirada(linha)),
+  );
+  const linhaComVirada = new Set(viradasForaDoTurno.map((linha) => linha.employee_id));
+
+  // D-CP05-01: linhas ainda sem apontamento entram no salvamento como estão — presença, mesmo sem
+  // horário (diária inteira no dia útil e no sábado). A tela diz isso antes de salvar.
+  const gravadosDoDia = new Set((apontamentos.data ?? []).map((a) => a.employee_id));
+  const novasPresencas = pendentes.filter(
+    (linha) => linha.status !== "absent" && !gravadosDoDia.has(linha.employee_id),
+  );
+  const novasSemHorario = novasPresencas.filter((linha) => !linha.check_in || !linha.check_out);
+
   function enviar() {
     if (!operationId || !shiftId || !pronto) return;
 
@@ -265,6 +298,12 @@ export function PainelOperacional() {
 
     if (horariosIguais.length > 0) {
       toast.error(MENSAGEM_ENTRADA_IGUAL_SAIDA);
+
+      return;
+    }
+
+    if (viradasPendentes.length > 0) {
+      toast.error(MENSAGEM_SAIDA_ANTES_DA_ENTRADA);
 
       return;
     }
@@ -622,6 +661,26 @@ export function PainelOperacional() {
                                 })
                               }
                             />
+
+                            {linhaComVirada.has(linha.employee_id) ? (
+                              <label className="mt-1.5 flex w-44 items-start gap-1.5 text-[11px] leading-4 text-destructive">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
+                                  checked={viradasConfirmadas.has(chaveDaVirada(linha))}
+                                  onChange={(event) => {
+                                    const chave = chaveDaVirada(linha);
+                                    setViradasConfirmadas((atuais) => {
+                                      const novas = new Set(atuais);
+                                      if (event.target.checked) novas.add(chave);
+                                      else novas.delete(chave);
+                                      return novas;
+                                    });
+                                  }}
+                                />
+                                Confirmo que a jornada atravessou a meia-noite
+                              </label>
+                            ) : null}
                           </TableCell>
 
                           <TableCell>
@@ -682,6 +741,22 @@ export function PainelOperacional() {
                   {MENSAGEM_ENTRADA_IGUAL_SAIDA}
                 </p>
               ) : null}
+
+              {novasSemHorario.length > 0 ? (
+                <p className="mt-1 text-xs font-medium text-foreground">
+                  {novasSemHorario.length === 1
+                    ? "1 colaborador ainda sem apontamento será gravado como presente sem horário."
+                    : `${novasSemHorario.length} colaboradores ainda sem apontamento serão gravados como presentes sem horário.`}{" "}
+                  Marque Falta para quem não trabalhou, ou informe os horários.
+                </p>
+              ) : null}
+
+              {viradasPendentes.length > 0 ? (
+                <p role="alert" className="mt-1 text-xs text-destructive">
+                  {viradasPendentes.length} linha(s) com saída antes da entrada num turno que não
+                  atravessa a meia-noite. {MENSAGEM_SAIDA_ANTES_DA_ENTRADA}
+                </p>
+              ) : null}
             </div>
 
             <Button
@@ -694,7 +769,9 @@ export function PainelOperacional() {
                   fechada,
                   pendentes: pendentes.length,
                   salvando: salvar.isPending,
-                }) || horariosIguais.length > 0
+                }) ||
+                horariosIguais.length > 0 ||
+                viradasPendentes.length > 0
               }
             >
               <Save className="h-4 w-4" />

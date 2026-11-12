@@ -4,7 +4,11 @@ Evidência da auditoria do CP-04 (sessão 07, 12/11/2026, sessão em nuvem, Linu
 `/operacoes` (operação fixa e avulsa, turnos, equipe), os valores comerciais exibidos nela e a
 passagem para apontamento, fechamento e relatório. Supabase **local descartável**, dados
 sintéticos (`TESTE-AUD-132 CP04 …`), motor por vigência LIGADO, resolução comercial DESLIGADA,
-domingo/feriado em dobro LIGADO, como na Production. Nenhum acesso a HML, Preview ou Production.
+domingo/feriado em dobro LIGADO, como na Production. Nenhum acesso a Preview ou Production.
+**Correção (registrada no CP-05):** durante este checkpoint houve 2 chamadas vazias, por engano, à
+API de gerenciamento do HML (`{"query": "\n"}`, sem SQL executado, nada lido nem gravado); ver
+"Incidente de ambiente" em
+[CP-05-apontamentos-e-regras-financeiras.md](CP-05-apontamentos-e-regras-financeiras.md).
 
 Testes: `e2e/specs/70-operacoes-turnos-equipes.spec.ts`, `scripts/testar-operacoes-turnos.mjs`
 (`npm run test:operacoes-turnos`) e a conversão do D3 em turno em

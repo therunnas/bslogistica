@@ -92,6 +92,9 @@ jobs:
       - name: Teste operacoes-turnos
         run: npm run test:operacoes-turnos
 
+      - name: Testes de apontamentos e regras financeiras (CP-05)
+        run: npm run test:apontamentos-cp05
+
       - name: Teste troca
         run: npm run test:troca
 
