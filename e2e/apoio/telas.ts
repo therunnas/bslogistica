@@ -216,7 +216,128 @@ export async function lancarDia(
   const salvar = page.getByRole("button", { name: "Salvar", exact: true });
   await expect(salvar).toBeEnabled();
   await salvar.click();
-  await expect(page.getByRole("button", { name: "Salvando..." })).toHaveCount(0, {
-    timeout: 30_000,
-  });
+  await expect(page.getByText("Apontamento salvo.").first()).toBeVisible({ timeout: 30_000 });
+}
+
+// ---------------------------------------------------------------------------
+// Cartões de resumo (Fechamento, Dashboard, Relatórios, Faturamento)
+// ---------------------------------------------------------------------------
+
+/** Valor de um cartão de resumo: o parágrafo logo depois do rótulo. */
+export function valorDoCartao(page: Page, rotulo: string): Locator {
+  return page
+    .locator(`xpath=//p[normalize-space(.)=${JSON.stringify(rotulo)}]/following-sibling::p[1]`)
+    .first();
+}
+
+/** Descrição de um cartão de resumo: o segundo parágrafo depois do rótulo. */
+export function descricaoDoCartao(page: Page, rotulo: string): Locator {
+  return page
+    .locator(`xpath=//p[normalize-space(.)=${JSON.stringify(rotulo)}]/following-sibling::p[2]`)
+    .first();
+}
+
+// ---------------------------------------------------------------------------
+// Vigência do custo do colaborador ("Alterar custo")
+// ---------------------------------------------------------------------------
+
+/** Abre o cadastro do colaborador (lápis da lista). */
+export async function abrirColaborador(page: Page, nome: string) {
+  await page.goto("/colaboradores");
+  await page.getByRole("button", { name: `Editar ${nome}`, exact: true }).click();
+  await expect(dialogo(page).getByText("Custo do colaborador")).toBeVisible();
+}
+
+/**
+ * "Alterar custo": escolhe a data PRIMEIRO (trocar a data recarrega o valor da versão) e só então
+ * digita o valor. Devolve o rótulo do botão que a tela ofereceu.
+ */
+export async function alterarCusto(
+  page: Page,
+  o: { colaborador: string; inicio: string; custo?: number; botaoEsperado: string },
+) {
+  await abrirColaborador(page, o.colaborador);
+  await dialogo(page).getByRole("button", { name: "Alterar custo" }).click();
+  const d = dialogo(page);
+  await expect(d.getByRole("heading", { name: "Alterar custo" })).toBeVisible();
+  await d.locator("#valor-atual-inicio").fill(o.inicio);
+  if (o.custo !== undefined) await d.locator("#valor-atual-daily_cost").fill(String(o.custo));
+  const botao = d.getByRole("button", { name: o.botaoEsperado, exact: true });
+  await expect(botao).toBeEnabled();
+  return { dialogo: d, botao };
+}
+
+// ---------------------------------------------------------------------------
+// Fechamento e Faturamento
+// ---------------------------------------------------------------------------
+
+const MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+/** Gera o fechamento da 1ª quinzena do mês para o cliente. */
+export async function gerarFechamento(
+  page: Page,
+  o: { cliente: string; mes: number; ano: number },
+) {
+  await page.goto("/fechamento");
+  await escolher(page, page.locator("#fechamento-cliente"), o.cliente);
+  await escolher(page, page.locator("#fechamento-mes"), MESES[o.mes - 1] ?? "");
+  await escolher(page, page.locator("#fechamento-ano"), String(o.ano));
+  await page.getByRole("button", { name: "1ª quinzena" }).click();
+  await page.getByRole("button", { name: "Gerar fechamento" }).click();
+  await expect(valorDoCartao(page, "Receita total")).toBeVisible({ timeout: 30_000 });
+}
+
+/** Abre o Faturamento no cliente e período. */
+export async function abrirFaturamento(
+  page: Page,
+  o: { cliente: string; inicio: string; fim: string },
+) {
+  await page.goto("/faturamento");
+  await escolher(page, campo(page, "Cliente"), o.cliente);
+  await campo(page, "De").fill(o.inicio);
+  await campo(page, "Até").fill(o.fim);
+  await expect(valorDoCartao(page, "Total a faturar")).toBeVisible({ timeout: 30_000 });
+}
+
+/** "Gerar fatura" → confere a confirmação → "Emitir fatura". */
+export async function emitirFatura(page: Page, totalEsperado: RegExp) {
+  await page.getByRole("button", { name: "Gerar fatura" }).click();
+  const confirmacao = page.getByRole("alertdialog");
+  await expect(confirmacao.getByRole("heading", { name: "Emitir fatura?" })).toBeVisible();
+  await expect(confirmacao).toContainText(totalEsperado);
+  await confirmacao.getByRole("button", { name: "Emitir fatura" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0, { timeout: 30_000 });
+}
+
+/** Registra um adicional para o cliente já escolhido no Faturamento. */
+export async function registrarAdicional(
+  page: Page,
+  o: { inicio: string; fim: string; mesCompetencia: string; motivo: string; valor: number },
+) {
+  await page.getByRole("button", { name: "Novo adicional" }).click();
+  const d = dialogo(page);
+  await d.locator("#adicional-inicio").fill(o.inicio);
+  await d.locator("#adicional-fim").fill(o.fim);
+  const mes = d.locator("#adicional-competencia-mes");
+  if (await mes.count()) {
+    await mes.fill(o.mesCompetencia);
+    await d.locator("#adicional-competencia").selectOption({ index: 0 });
+  }
+  await d.locator("#adicional-motivo").fill(o.motivo);
+  await d.locator("#adicional-valor").fill(String(o.valor));
+  await d.getByRole("button", { name: "Registrar adicional" }).click();
+  await esperarFechar(page);
 }
