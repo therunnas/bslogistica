@@ -12,20 +12,20 @@
 | Gate atual | Production concluída para a 051. Próximo: feriados e teste manual |
 | Último gate concluído | 051 aplicada e interruptor ligado em HML e Production; site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`) |
 | Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
-| Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
-| Base | main `1d60ca0215bf36fe5c6af340789380d0198f6d68` |
-| HEAD validado | 74209affdb14f773543f04e26b99aef74ce4eab9 (E2E, `validar` e `sql-local` SUCCESS); este checkpoint muda só documentação e é revalidado no HEAD do PR Draft do E2E |
+| Branch | `test/e2e-playwright-local` (#133; recebeu a main por merge, sem force push). `claude/jolly-allen-fqechw` (#132) integrada e preservada |
+| Base | main `1c6042e424e1030a0d4280e73e339730ebc87a65` (squash do #132) |
+| HEAD validado | 5b4f44ab607f0a6b01cf16a705d16374fb5f22b4 (#133: `validar`, `sql-local` e `e2e-local` SUCCESS, 58 PASS, 5 FALHA CONHECIDA, 21 travas). O merge da main nesta branch muda só este checkpoint e é revalidado no novo HEAD do #133 antes da integração |
 | Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | #130 (só documentação). Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
+| PR | #132 integrado (`1c6042e`); #133 em integração. Abertos e não tocados: #134 (Draft, base `test/e2e-playwright-local`) e #125 (Draft, não mesclar) |
 | Ambiente-alvo | HML e Production (aplicados) |
 | Última ação comprovada | Production: 051 PASS pelo script; 26/26 com o interruptor desligado e 7/7 com ele ligado, em transações desfeitas; `dias_especiais_em_dobro=true`, `tarifas_por_funcao=false`; 1 cliente, 3 contas, 0 apontamentos, 0 feriados; site READY e domínio no deployment novo |
-| Próxima ação exata | Teste manual do responsável no HML (limpo); depois os feriados (cidade do piloto) |
+| Próxima ação exata | Integrar #133 com CI verde no HEAD final; depois reconciliar a base do #134 com a nova main (ver "Última tarefa") |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `8c493a5` (#128): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado", tela de operação simplificada. `vercel.json` mantém `main:false` |
+| Main | `1c6042e` (#132: valores de hoje nas listas, correção e antecipação pelo "Alterar"), sobre `1d60ca0` (#131) e `8c493a5` (#128): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado", tela de operação simplificada. `vercel.json` mantém `main:false` |
 | HML | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`, limpo em 11/11/2026 (só contas e configuração)** (050 desde 09/11/2026); `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`** (035–050 no mesmo dia, 16/16 PASS). Site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`); reversão do site: `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C` (`8c493a5`). Backup `pg_dump` de 11/11 (antes da 035) com o responsável. Sem dados de negócio; lista de feriados vazia |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; Preview → HML comprovado pela leitura das variáveis na Vercel (11/11/2026). Este container não abre `vercel.app` (proxy). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | INTEGRACAO-132-133 (12/11/2026, sessão em nuvem), autorizada pelo responsável: homologação funcional do #132 aceita no escopo testado (V1 no HML; V2–V5 pelo Codex no Preview `afc2219` → HML, lote `TESTE-AUD-132-FINAL-R2`, com ressalvas). #132 tirado do Draft e integrado por squash: **SHA integrado `1c6042e424e1030a0d4280e73e339730ebc87a65`** (árvore idêntica à do `afc2219` validado). #133: base trocada para `main` e `main` incorporada por merge, sem force push; único conflito em `docs/HANDOFF.md`, resolvido mantendo os registros das duas tarefas |
+| Resultados e testes comprovados | #132: `validar` e `sql-local` SUCCESS no `afc2219` (HEAD validado) e CI da `main` no `1c6042e`. #133: SHA validado antes da atualização `5b4f44a` (`validar`, `sql-local`, `e2e-local` SUCCESS; 58 PASS, 5 FALHA CONHECIDA, 0 FAIL, 0 PULADO; 21 travas). O HEAD final do #133 e o SHA do squash do #133 ficam no PR #133 e no relatório da tarefa (o checkpoint não pode citar o próprio commit de integração) |
+| Código e PR afetados | #132 (`src/`, teste estrutural, HANDOFF) na `main`. #133: só E2E, Playwright, comandos `e2e:*`, `.gitignore` e documentação; nenhum `src/`, migration ou `ci.yml` |
+| Ambientes envolvidos | GitHub (PRs, CI). Sem deploy: `vercel.json` mantém `main: false`. HML e Production: nenhum acesso nesta tarefa; nenhuma alteração de banco |
+| Pendências e decisões | Cinco defeitos conhecidos (B3 horário de saída antes da entrada; duplo clique em cliente e turno; valor digitado perdido ao trocar a data no "Alterar custo"; confirmação da fatura sem aviso de dias abertos). `useValoresDeHoje`: recuo silencioso para a coluna do cadastro em erro/carregamento e `.in(...)` com todos os IDs (`src/lib/vigencias-dados.ts:104`, `:372-405`). Fim de contrato `01/01/0001` num registro antigo do HML (não vem do #132). SQL independente e demais gates de Production. **#134** (`fix/qa-bs-01-estabilizacao`, base `test/e2e-playwright-local`, HEAD `76fec3a`): reconciliar a base com a nova `main` depois do squash do #133, sem rebase nem force push |
+| Próxima ação exata | Responsável decide a reconciliação do #134: trocar a base para `main` e incorporar a `main` por merge na `fix/qa-bs-01-estabilizacao` (conflitos esperados só onde o squash duplicou histórico: HANDOFF e arquivos do E2E idênticos), revalidar a CI e só então continuar a auditoria CP-00B a CP-12. Próxima tarefa recomendada: corrigir o risco de horários (B3) preservando jornadas noturnas legítimas |
+| Autorizações e proibições | Autorizado e usado: tirar Draft e integrar #132 e #133 por squash, trocar a base do #133, merge da `main` na branch do #133, resolver o HANDOFF, atualizar descrições. Não autorizado e não feito: Production, deploy, migrations, configuração, flags, bancos remotos, alterar ou integrar o #134, tocar o #125, excluir branches |
+
+### Tarefa anterior — E2E-REVISAO-02 (12/11/2026, PR #133)
 
 | Campo | Valor |
 | --- | --- |
@@ -56,7 +68,7 @@
 | Próxima ação exata | Responsável revisa o PR Draft do E2E (base: branch do #132). Sem merge, Ready for review ou deploy até a revisão |
 | Autorizações e proibições | Autorizado e usado: infraestrutura E2E local, branch `test/e2e-playwright-local` e PR Draft próprio. Proibidos e não feitos: acesso ao HML ou à Production, `src/`, migrations, `ci.yml`, merge, Ready for review, deploy, force push, alterar os PRs #125 e #132 |
 
-### Tarefa anterior — UX-PENTE-FINO-02 (11/11/2026, PR #132 em Draft)
+### Tarefa anterior — UX-PENTE-FINO-02 (11/11/2026, #132 integrado em `1c6042e` em 12/11/2026)
 
 | Campo | Valor |
 | --- | --- |
