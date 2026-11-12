@@ -40,7 +40,7 @@ começou** (ver "Bloqueio do piloto").
 | CP     | Escopo                                                                             | Estado       |
 | ------ | ---------------------------------------------------------------------------------- | ------------ |
 | CP-00  | Baseline e inventário (Git, PRs, ambientes, docs, 16 telas + 7 de acesso + 5 APIs) | PASS         |
-| CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | pendente     |
+| CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | PASS (Linux) |
 | CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | não iniciado |
 | CP-02  | Clientes e contratos                                                               | não iniciado |
 | CP-03  | Colaboradores e valores                                                            | não iniciado |
@@ -54,7 +54,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-11  | Regressão integrada final                                                          | não iniciado |
 | CP-12  | Roteiro de homologação com o responsável (HML só com autorização)                  | não iniciado |
 
-Defeitos registrados no CP-00 (nenhum corrigido ainda):
+Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 
 | ID  | Defeito                                                                                                   | Prioridade | Evidência                    | CP       |
 | --- | --------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------- | -------- |
@@ -66,7 +66,13 @@ Defeitos registrados no CP-00 (nenhum corrigido ainda):
 | D6  | `billing.ts` usa `<= 15`/`<= 45` (030) e o núcleo V2 `< 15`/`< 45`; só alimenta horas exibidas, não valor | P3         | leitura do código            | CP-05    |
 | D7  | Containers fora do menu, mas acessíveis por URL e links do Faturamento (risco de cobrança dupla)          | P2         | HANDOFF                      | CP-06    |
 | D8  | Exclusões usam `window.confirm` nativo                                                                    | P3         | leitura do código            | CP-09    |
-| I1  | `scripts/e2e-local.sh` usa `setsid`, ausente no macOS: o app não sobe e o E2E local para (saída 7)        | infra      | execução local 12/11         | CP-00B   |
+| I1  | `scripts/e2e-local.sh` usava `setsid`, ausente no macOS. **Corrigido** (`set -m`; G22–G25); macOS nativo não comprovado | infra | execução local 12/11 | CP-00B |
+
+CP-00B (12/11/2026, sessão em nuvem, Linux): baseline executável completa — lint, `tsc`, 72/72
+`test:*`, build, `sql-local` 52 suítes, E2E local 63 testes (58 PASS, 0 FAIL, 5 FALHA CONHECIDA,
+0 PULADO, 47/47 conferências financeiras) e 25/25 travas; I1 corrigido de forma portável (sem
+`setsid`). **Execução nativa no macOS não comprovada**: o Mac deixa de ser requisito para avançar;
+o ambiente principal passa a ser a sessão em nuvem e a CI.
 
 ### Situação
 

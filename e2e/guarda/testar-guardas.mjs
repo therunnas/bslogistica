@@ -171,8 +171,23 @@ case "$*" in
     echo 'ANON_KEY="anon-sintetica"'
     echo 'SERVICE_ROLE_KEY="service-sintetica"' ;;
   *"supabase@"*" start"*) exit "\${STUB_START_SAIDA:-0}" ;;
+  *"next start"*)
+    # App falso: registra o próprio PID e grupo, sobe um filho (como o next-server) e espera.
+    d="$(dirname "$STUB_LOG")"
+    echo "$$ $(ps -o pgid= -p $$ | tr -d ' ')" >"$d/app.pid"
+    sleep 300 &
+    echo "$!" >"$d/filho.pid"
+    wait
+    exit 0 ;;
+  *"playwright test"*) exit "\${STUB_PLAYWRIGHT_SAIDA:-1}" ;;
 esac
 exit 0
+`,
+  // Simula o macOS: \`setsid\` não existe. Se o script o chamar, fica registrado e falha.
+  setsid: `#!/usr/bin/env bash
+echo "setsid $*" >>"$STUB_LOG"
+echo "setsid: command not found" >&2
+exit 127
 `,
   npm: `#!/usr/bin/env bash
 echo "npm $*" >>"$STUB_LOG"
@@ -262,6 +277,43 @@ const rIdentidade = await rodarSandbox(montarSandbox(), {
 });
 const rRotulo = await rodarSandbox(montarSandbox(), { STUB_ROTULO: "bs-e2e-outro" });
 
+// I1 (portabilidade): o app sobe sem `setsid`, num grupo de processos próprio, e um erro no ensaio
+// (Playwright falha) encerra o líder e o filho. Build verdadeiro no stub para chegar até o app.
+const raizApp = montarSandbox();
+const rApp = await rodarSandbox(raizApp, { STUB_BUILD_SAIDA: "0" });
+const lerPid = (arquivo) => {
+  try {
+    return readFileSync(join(raizApp, arquivo), "utf8").trim().split(/\s+/);
+  } catch {
+    return [];
+  }
+};
+const [appPid, appGrupo] = lerPid("app.pid");
+const [filhoPid] = lerPid("filho.pid");
+/** Encerrado = não existe mais ou é zumbi (o PID 1 de alguns contêineres não recolhe zumbis). */
+function encerrado(pid) {
+  try {
+    const estado = execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" });
+    return estado.trim() === "" || estado.trim().startsWith("Z");
+  } catch {
+    return true;
+  }
+}
+async function esperarEncerrar(pids) {
+  for (let i = 0; i < 50 && !pids.every(encerrado); i++)
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  return pids.every(encerrado);
+}
+const appEncerrado = appPid && filhoPid ? await esperarEncerrar([appPid, filhoPid]) : false;
+// Nunca deixar processo de teste para trás, mesmo se a verificação falhar.
+if (!appEncerrado && appGrupo) {
+  try {
+    process.kill(-Number(appGrupo), "SIGKILL");
+  } catch {
+    // grupo já encerrado
+  }
+}
+
 caso("G14. destino inválido (project_id da Production): sai sem start, reset nem stop", () => {
   assert.notEqual(rDestino.codigo, 0);
   assert.deepEqual(destrutivas(rDestino), []);
@@ -312,12 +364,52 @@ caso("G20. identidade divergente depois do start: sem reset; stop só do projeto
   assert.match(rRotulo.saida, /pertence a "bs-e2e-outro"/);
 });
 caso("G21. nenhum cenário usa stop sem --project-id nem --all", () => {
-  const todas = [rDestino, rUrl, rVinculo, rExistente, rPorta, rProprioErro, rIdentidade, rRotulo];
+  const todas = [
+    rDestino,
+    rUrl,
+    rVinculo,
+    rExistente,
+    rPorta,
+    rProprioErro,
+    rIdentidade,
+    rRotulo,
+    rApp,
+  ];
   for (const r of todas)
     for (const c of supabase(r, " stop")) {
       assert.match(c, /stop --project-id bs-e2e-[a-z0-9-]+ --no-backup$/);
       assert.doesNotMatch(c, /--all/);
     }
+});
+
+caso("G22. o script não chama `setsid` (ausente no macOS; I1)", () => {
+  const codigo = readFileSync("scripts/e2e-local.sh", "utf8")
+    .split("\n")
+    .filter((linha) => !linha.trim().startsWith("#"));
+  assert.deepEqual(
+    codigo.filter((linha) => /\bsetsid\b/.test(linha)),
+    [],
+  );
+});
+caso("G23. com `setsid` indisponível, o app sobe e nada chama `setsid`", () => {
+  assert.ok(appPid, `o app falso não subiu; saída: ${rApp.saida.slice(-400)}`);
+  assert.deepEqual(
+    rApp.chamadas.filter((c) => c.startsWith("setsid")),
+    [],
+  );
+  assert.ok(rApp.chamadas.some((c) => c.includes("next start -H 127.0.0.1 -p 3000")));
+});
+caso("G24. o app fica num grupo de processos próprio (líder do grupo)", () => {
+  assert.equal(appGrupo, appPid);
+});
+caso("G25. erro no ensaio: encerra o app inteiro (líder e filho) e só o Supabase próprio", () => {
+  assert.notEqual(rApp.codigo, 0);
+  assert.ok(appEncerrado, `processos do app ainda vivos: ${appPid} ${filhoPid}`);
+  assert.deepEqual(
+    supabase(rApp, " stop").map((c) => c.replace(/^npx --yes supabase@[\d.]+ /, "")),
+    [`stop --project-id ${PROJETO_STUB} --no-backup`],
+  );
+  assert.ok(rApp.chamadas.some((c) => c.includes("playwright test")));
 });
 
 console.log(`\n${total} verificações das travas: todas PASS.`);

@@ -39,7 +39,9 @@ Sequência do script:
 5. semente: papéis `admin` e `operacional`, motor por vigência ligado pela RPC (sessão sintética
    temporária), domingo/feriado em dobro ligado, resolução por função desligada;
 6. `npm run build` e `next start` em `127.0.0.1:3000`, com `e2e/guarda/rede.cjs` bloqueando
-   qualquer conexão do servidor para fora do loopback;
+   qualquer conexão do servidor para fora do loopback. O app sobe num **grupo de processos
+   próprio** pelo controle de tarefas do bash (`set -m`), sem `setsid` (ausente no macOS); o script
+   confere que o app é líder do próprio grupo e para se não for;
 7. Playwright (1 worker, sem retry); o login é feito pela tela uma vez por papel;
 8. falha se o servidor tentou rede externa; resumo; contexto de cada falha inesperada no log;
 9. encerramento no `trap EXIT`, passe ou falhe, **só do que esta execução criou**: o app que ela
@@ -48,7 +50,14 @@ Sequência do script:
    `--all`). Se a execução parou nas validações do passo 1, nada é parado.
 
 Localmente (com Docker): `npm ci`, trocar o `project_id` do `supabase/config.toml` por
-`bs-e2e-<algo>` **sem commitar** e rodar `npm run e2e:local`. Sem a troca, as travas recusam.
+`bs-e2e-<algo>` **sem commitar** e rodar `npm run e2e:local`. Sem a troca, as travas recusam. As
+travas também recusam qualquer variável de ambiente que contenha um domínio proibido — por exemplo
+um e-mail `@bslogisticas.com.br` exportado pela própria ferramenta de desenvolvimento. Nesse caso,
+rode sem essa variável (`env -u NOME npm run e2e:local`); não afrouxe a trava.
+
+Portabilidade: o script não usa `setsid` (I1 da QA-BS-01). A subida e o encerramento do app foram
+comprovados no Linux (CI e sessão em nuvem) e pelos casos G22–G25 com `setsid` indisponível; a
+execução nativa no macOS ainda não foi comprovada.
 
 ## Isolamento comprovado (e2e/guarda)
 
@@ -69,13 +78,15 @@ Localmente (com Docker): `npm ci`, trocar o `project_id` do `supabase/config.tom
   reset nem stop.
 
 Os casos G1–G13 de `testar-guardas.mjs` provam cada trava com entradas que **devem** ser
-recusadas. Os casos G14–G21 rodam uma **cópia** do `scripts/e2e-local.sh` num diretório
+recusadas. Os casos G14–G25 rodam uma **cópia** do `scripts/e2e-local.sh` num diretório
 temporário com `docker`, `npx`, `npm` e `curl` falsos (que só registram as chamadas) e provam: destino
 inválido, URL externa e vínculo remoto saem sem `start`, reset nem stop; instância preexistente e
 porta ocupada são recusadas sem operação destrutiva; com instância própria validada e erro no
 ensaio, o reset acontece depois da conferência de identidade e o único stop é
 `stop --project-id <projeto da execução> --no-backup`; identidade divergente depois do `start`
-não dispara reset; nenhum cenário usa stop sem `--project-id` nem `--all`.
+não dispara reset; nenhum cenário usa stop sem `--project-id` nem `--all`; o script não chama
+`setsid` e, com um `setsid` falso que falha (como no macOS), o app sobe como líder do próprio grupo
+e um erro no ensaio encerra o líder e o filho (G22–G25).
 
 ## Cenários
 

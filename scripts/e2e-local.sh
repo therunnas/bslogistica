@@ -40,8 +40,12 @@ interromper() {
 encerrar() {
   local codigo=$?
   trap - EXIT
-  # O app roda num grupo de processos próprio (setsid): encerra o npx e o next-server juntos.
-  if [ -n "$APP_PID" ]; then kill -- "-$APP_PID" 2>/dev/null || true; fi
+  # O app roda num grupo de processos próprio (controle de tarefas do bash, `set -m`): encerra o
+  # npx e o next-server juntos. O segundo `kill` cobre o líder caso o grupo já não exista.
+  if [ -n "$APP_PID" ]; then
+    kill -- "-$APP_PID" 2>/dev/null || true
+    kill "$APP_PID" 2>/dev/null || true
+  fi
   if [ -n "$ESTADO_DIR" ]; then rm -rf "$ESTADO_DIR"; fi
   # Stop só do Supabase que esta execução subiu, pelo project_id dela (nunca o padrão do config,
   # nunca --all), e de novo conferido o prefixo local.
@@ -147,9 +151,17 @@ npm run build >"$RESULTADOS/build.log" 2>&1 || {
   exit 1
 }
 
+# Grupo de processos próprio para o app SEM `setsid` (ausente no macOS): com o controle de tarefas
+# do bash ligado só aqui (`set -m`), o processo em segundo plano vira líder do próprio grupo — no
+# bash do Linux e no bash 3.2 do macOS. O encerramento derruba o grupo inteiro (npx + next-server).
+set -m
 E2E_REDE_LOG="$REDE_LOG" NODE_OPTIONS="--require ./e2e/guarda/rede.cjs" \
-  setsid npx next start -H 127.0.0.1 -p 3000 >"$RESULTADOS/app.log" 2>&1 &
+  npx next start -H 127.0.0.1 -p 3000 >"$RESULTADOS/app.log" 2>&1 &
 APP_PID=$!
+set +m
+GRUPO_DO_APP=$(ps -o pgid= -p "$APP_PID" | tr -d ' ')
+[ "$GRUPO_DO_APP" = "$APP_PID" ] ||
+  interromper "o app não ficou num grupo de processos próprio (pgid ${GRUPO_DO_APP:-?}); sem isso o encerramento não alcança o next-server."
 for _ in $(seq 1 60); do
   if curl -s -o /dev/null http://127.0.0.1:3000/login; then break; fi
   sleep 1

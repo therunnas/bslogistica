@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**QA-BS-01 — auditoria, correção e estabilização integral. CP-00 PASS; #134 reconciliado com a `main` `f6df1fb` (#132 e #133 integrados); CP-00B pendente (E2E local bloqueado no macOS por `setsid`). Nenhum defeito corrigido ainda.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
+**QA-BS-01 — auditoria, correção e estabilização integral. CP-00 PASS; CP-00B PASS no Linux (sessão em nuvem e CI), com I1 corrigido de forma portável; execução nativa no macOS não comprovada. Próximo: CP-01. Nenhum defeito D1–D8 corrigido ainda.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
 | Etapa | QA-BS-01 — auditoria, correção e estabilização integral, por checkpoints CP-00 a CP-12 (plano e defeitos em [PROGRESS](../PROGRESS.md#qa-bs-01--checkpoints)) |
-| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-00B pendente |
-| Último gate concluído | CP-00 — baseline e inventário (12/11/2026); depois, RECONCILIACAO-134 (só Git e documentação): `main` incorporada por merge e base do #134 trocada para `main` |
-| Worktree | Sessão em nuvem: worktree isolado `/home/user/bslogistica-qa134` (efêmero). Sessão anterior no Mac: worktree na pasta temporária do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
+| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-01 a iniciar |
+| Último gate concluído | CP-00B — baseline executável (12/11/2026, Linux: sessão em nuvem e CI); antes, CP-00 e a RECONCILIACAO-134 |
+| Worktree | Sessão em nuvem (ambiente principal a partir da sessão 03): worktree isolado `/home/user/bslogistica-qa134` (efêmero), com Docker local da sessão. Sessão anterior no Mac: worktree na pasta temporária do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
 | Branch | `fix/qa-bs-01-estabilizacao`, criada de `origin/test/e2e-playwright-local` (#133, que inclui o #132) por decisão do responsável e reconciliada com a `main` por merge (sem rebase nem force push) |
 | Base | main `f6df1fbf58e8eb34648e2328b926ef99c7ad7164` (squash do #133, sobre `1c6042e`, squash do #132) |
-| HEAD validado | f6df1fbf58e8eb34648e2328b926ef99c7ad7164 (`main`: `validar` e `sql-local` SUCCESS; o conteúdo E2E dele foi validado no `bded9e1`: 58 PASS, 5 FALHA CONHECIDA, 21 travas). O merge nesta branch muda só HANDOFF e PROGRESS e é revalidado (`validar`, `sql-local`, `e2e-local`) no novo HEAD do #134 |
-| Alterações não commitadas | Nenhuma na sessão em nuvem. No Mac (sessão anterior): `supabase/config.toml` com `project_id = "bs-e2e-qa01"` (exigido pelo E2E local — **nunca commitar**) e `supabase/.branches/` (gerado pelo CLI) |
+| HEAD validado | fdda696e783d3776dc20c68dfc3a5361641f1552 (CI: `validar`, `sql-local`, `e2e-local` SUCCESS) + o diff do CP-00B (I1 em `scripts/e2e-local.sh`, guardas G22–G25, docs), validado na sessão em nuvem: lint, `tsc`, 72/72 `test:*`, build, `sql-local` 52 suítes, E2E 58 PASS / 5 FALHA CONHECIDA, 25/25 travas; revalidado na CI no novo HEAD do #134 |
+| Alterações não commitadas | Nenhuma na sessão em nuvem (o `project_id` local trocado só para os testes foi restaurado). No Mac (sessão anterior): `supabase/config.toml` com `project_id = "bs-e2e-qa01"` (**nunca commitar**) e `supabase/.branches/` |
 | PR | #134 (Draft), base `main` desde a RECONCILIACAO-134. Integrados: #132 (`1c6042e`) e #133 (`f6df1fb`). Aberto e não tocado: #125 |
 | Ambiente-alvo | Local (Supabase local descartável) e CI. HML, Preview e Production: nenhum acesso |
-| Última ação comprovada | RECONCILIACAO-134: merge da `main` `f6df1fb` em `76fec3a`; conflito só em `docs/HANDOFF.md`; diff do #134 contra a `main` só com `PROGRESS.md` e `docs/HANDOFF.md`. CP-00 PASS; E2E local no Mac ainda bloqueado por `setsid` (I1) |
-| Próxima ação exata | CP-00B: fechar o baseline executável local — rodar o E2E local com um substituto de `setsid` só no PATH local (ou corrigir o script de forma portável, como I1) e conferir 58 PASS / 5 FALHA CONHECIDA; depois CP-01 |
+| Última ação comprovada | CP-00B na sessão em nuvem (Docker local): baseline estática e executável completa; E2E local 63 testes (58 PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO) com o app subindo sem `setsid`; `sql-local` 52 suítes; encerramento sem sobras (0 containers, 0 volumes, nenhum processo do app) |
+| Próxima ação exata | CP-01 — autenticação e permissões (inclui TOTP real no Supabase local), sem corrigir D1–D8 antes do checkpoint correspondente |
 
 ## Estado atual para retomada
 
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | QA-BS-01 CP-00B (12/11/2026, sessão em nuvem, sessão 03), autorizado pelo responsável: consolidar a baseline executável no HEAD `fdda696` e investigar I1. I1 corrigido de forma portável em `scripts/e2e-local.sh`: o app sobe num grupo de processos próprio pelo controle de tarefas do bash (`set -m`, existente no bash do Linux e no bash 3.2 do macOS), sem `setsid`; o script confere que o app é líder do próprio grupo e interrompe se não for; o encerramento derruba o grupo (e o líder, como recuo). Regressão em `e2e/guarda/testar-guardas.mjs` (G22–G25, com `setsid` falso que falha como no macOS). `docs/TESTES_E2E.md` atualizado (25 travas, portabilidade, variável de ambiente com domínio proibido) |
+| Resultados e testes comprovados | **A. CI (Linux) no `fdda696`:** `validar`, `sql-local` e `e2e-local` SUCCESS; 63 testes, 58 PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO; 21 travas. **B. Sessão em nuvem (Linux, Node 22.23, Docker local), com o diff do CP-00B:** `npm ci`; lint PASS; `tsc` PASS; `check:workflow` PASS; 72/72 `test:*` PASS (83 s + `test:func-ready`); build PASS (placeholders da CI); travas 25/25 PASS; prova de mutação (script com `setsid` falha no G22); `e2e:local` completo: 63 testes, 58 PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO, 284 s, 47/47 conferências financeiras sem divergência, nenhuma rede externa, encerramento sem sobras; `sql-local` (`scripts/testar-sql-local.sh`): 52 suítes PASS, 84 s. A trava recusou corretamente a variável `CLAUDE_CODE_USER_EMAIL` (domínio proibido) desta sessão: o E2E rodou sem ela, sem afrouxar a trava. **C. macOS:** não executado; a correção é portável por desenho e pelos G22–G25, mas não há execução nativa comprovada |
+| Código e PR afetados | `scripts/e2e-local.sh`, `e2e/guarda/testar-guardas.mjs`, `docs/TESTES_E2E.md`, `PROGRESS.md`, `docs/HANDOFF.md`. Nenhum `src/`, regra financeira, RLS, migration ou workflow. PR #134 (Draft) |
+| Ambientes envolvidos | Sessão em nuvem: Docker local iniciado nesta sessão (vazio no início; Supabase `bs-e2e-sessao03-1` e `bs-fin11-sessao03-1` criados e encerrados pelo próprio `project_id`; 0 containers e 0 volumes no fim). GitHub (CI). HML, Preview e Production: nenhum acesso |
+| Pendências e decisões | I1 sem comprovação nativa no macOS (rodar `npm run e2e:local` no Mac quando houver oportunidade; não bloqueia). D1–D8 abertos, nos CPs previstos. Da integração: `useValoresDeHoje` (recuo silencioso e `.in(...)`), fim de contrato `01/01/0001` no HML, SQL independente e gates de Production. Checkout `fix/auditoria-bs-202610` do Mac: preservar |
+| Próxima ação exata | CP-01 — autenticação e permissões, com TOTP real no Supabase local; não iniciar correções de D1–D8 antes do checkpoint correspondente |
+| Autorizações e proibições | Autorizado e usado: testes locais isolados na sessão, correção de I1 em `scripts/e2e-local.sh` e nas guardas, docs do checkpoint, commit e push só no #134, descrição do PR. Proibidos e não feitos: merge, Ready for review, `main` e outros PRs, deploy, HML, Production, migrations remotas, flags, secrets, outro Supabase remoto, excluir containers ou volumes preexistentes (não havia), `src/`, regras financeiras, RLS, desligar travas, CP-01 |
+
+### Tarefa anterior — RECONCILIACAO-134 (12/11/2026, #134 com base `main`)
 
 | Campo | Valor |
 | --- | --- |
