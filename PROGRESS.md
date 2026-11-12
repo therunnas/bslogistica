@@ -103,14 +103,15 @@ matrizes de turnos e equipes e conciliação em
 | D-CP04-06 | 12 rótulos soltos nos formulários de operação e turno                                                 | P3         | corrigido |
 | D-CP04-07 | Excluir turno/operação não dizia que a equipe e os turnos saem junto                                  | P3         | corrigido |
 | D-CP04-08 | Alocar/desalocar mostravam a mensagem crua do erro                                                    | P3         | corrigido |
+| D-CP04-09 | Clique/Enter durante o fechamento do diálogo gravava de novo (cliente, colaborador, operação, turno)  | P2         | corrigido |
 
 Decisões do CP-04: **DEC-CP04-01** (turno com início igual ao fim é aceito como 24 h, com aviso) e
 alternativas registradas para a DEC-CP02-01 (contrato encerrado continua selecionável e cobrando;
 a tela agora identifica e avisa, sem bloquear).
 
-CP-04 (12/11/2026, sessão em nuvem, Linux): 16 casos E2E novos (`70-operacoes-turnos-equipes`);
+CP-04 (12/11/2026, sessão em nuvem, Linux): 17 casos E2E novos (`70-operacoes-turnos-equipes`, com o D3b);
 fechamento R$ 2.450,00 de receita e R$ 1.490,00 de custo e relatório (Rui 620, Sol 720, Tito 150)
-sem divergência ao centavo; E2E completo 148 testes (145 PASS, 0 FAIL, 3 FALHA CONHECIDA, 0
+sem divergência ao centavo; E2E completo 149 testes (146 PASS, 0 FAIL, 3 FALHA CONHECIDA, 0
 PULADO); 76/76 `test:*`; `sql-local` 52; sem SQL, RLS ou cálculo alterado.
 
 Defeitos do CP-03 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e

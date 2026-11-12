@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Trava SÍNCRONA contra clique duplo (e Enter repetido) em ações que gravam.
@@ -34,5 +34,22 @@ export function criarTrava(): Trava {
 
 export function useTrava(): Trava {
   const [trava] = useState(criarTrava);
+  return trava;
+}
+
+/**
+ * Trava de formulário que FECHA o diálogo ao gravar. Depois do sucesso o diálogo continua montado
+ * durante a animação de saída, com o botão focado e o formulário preenchido: liberar a trava no
+ * `onSettled` deixava um clique ou Enter nesse intervalo gravar de novo (CI do acd1747: o CL3 criou
+ * dois clientes; reproduzido no E2E D3b para cliente, colaborador, operação e turno).
+ *
+ * Regra de uso: libere só no `onError` (para tentar de novo); no sucesso a trava fica ocupada e só
+ * se solta quando o diálogo abre outra vez.
+ */
+export function useTravaDoDialogo(aberto: boolean): Trava {
+  const trava = useTrava();
+  useEffect(() => {
+    if (aberto) trava.liberar();
+  }, [aberto, trava]);
   return trava;
 }

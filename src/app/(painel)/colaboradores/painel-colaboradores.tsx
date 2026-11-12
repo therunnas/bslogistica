@@ -68,7 +68,7 @@ import {
 } from "@/lib/vigencias-dados";
 import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
-import { useTrava } from "@/lib/trava";
+import { useTravaDoDialogo } from "@/lib/trava";
 import { useEmployees } from "@/lib/queries";
 import type { Employee } from "@/lib/types";
 
@@ -131,8 +131,9 @@ export function PainelColaboradores() {
     modoDeCusto === "por-vigencia" && (custosDeHoje.carregando || custosDeHoje.erro);
   const custoDeHoje = (employee: Employee) =>
     Number(custosDeHoje.valores.get(employee.id)?.["daily_cost"] ?? employee.daily_cost);
-  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique.
-  const trava = useTrava();
+  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique; e
+  // depois de gravar a trava só se solta quando o diálogo abre de novo (ver useTravaDoDialogo).
+  const trava = useTravaDoDialogo(open);
 
   const colaboradoresAtivos = data.filter((employee) => employee.status === "active").length;
 
@@ -192,7 +193,7 @@ export function PainelColaboradores() {
 
     if (form.id) {
       payload["id"] = form.id;
-      save.mutate(payload, { onSettled: trava.liberar, onSuccess: () => setOpen(false) });
+      save.mutate(payload, { onError: trava.liberar, onSuccess: () => setOpen(false) });
       return;
     }
 
@@ -217,7 +218,7 @@ export function PainelColaboradores() {
           },
         },
         {
-          onSettled: trava.liberar,
+          onError: trava.liberar,
           onSuccess: (novoId) => {
             if (funcaoEscolhida && typeof novoId === "string") {
               save.mutate({ id: novoId, job_function_id: funcaoEscolhida });
@@ -231,7 +232,7 @@ export function PainelColaboradores() {
 
     if (modoDeCusto === "direta") {
       enviado = true;
-      save.mutate(payload, { onSettled: trava.liberar, onSuccess: () => setOpen(false) });
+      save.mutate(payload, { onError: trava.liberar, onSuccess: () => setOpen(false) });
     }
     if (!enviado) trava.liberar();
   }

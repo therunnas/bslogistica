@@ -696,3 +696,87 @@ test("OP5 excluir operação: com apontamento é recusado; sem dependência remo
   ).toBeVisible({ timeout: 20_000 });
   expect(contar("operations", livre)).toBe(0);
 });
+
+// =============================================================================================
+// D3 TARDIO: o diálogo que fecha depois de gravar ainda aceita o clique
+// =============================================================================================
+
+/**
+ * Clica e continua clicando a cada quadro enquanto o botão existir e estiver habilitado — como o
+ * Enter repetido do teclado. Depois de gravar, o diálogo fica montado durante a animação de
+ * saída, com o botão focado e o formulário preenchido: foi nesse intervalo que a CI do acd1747
+ * criou dois clientes no CL3 (a trava era liberada no `onSettled`, antes de o diálogo sumir).
+ */
+async function insistirAteFechar(botao: ReturnType<typeof dialogo>) {
+  await botao.evaluate(async (b: HTMLElement) => {
+    const alvo = b as HTMLButtonElement;
+    alvo.click();
+    const fim = performance.now() + 2500;
+    while (performance.now() < fim && alvo.isConnected) {
+      await new Promise((r) => requestAnimationFrame(r));
+      if (alvo.isConnected && !alvo.disabled) alvo.click();
+    }
+  });
+}
+
+test("D3b clique que chega com o diálogo fechando (depois de gravar) não grava de novo: cliente, colaborador, operação e turno", async ({
+  page,
+}) => {
+  const cliente = `${C} Fecho Cliente`;
+  await page.goto("/clientes");
+  await page.getByRole("button", { name: "Novo cliente" }).click();
+  let d = dialogo(page);
+  await campo(d, "Nome").fill(cliente);
+  await insistirAteFechar(d.getByRole("button", { name: "Salvar cliente" }));
+  await esperarFechar(page);
+  await page.waitForTimeout(1500);
+  const clientes = Number(
+    valor(`select count(*) from public.clients where name = ${lit(cliente)}`),
+  );
+
+  const colaborador = `${C} Fecho Colaborador`;
+  await page.goto("/colaboradores");
+  await page.getByRole("button", { name: "Novo colaborador" }).click();
+  d = dialogo(page);
+  await d.locator("#employee-name").fill(colaborador);
+  await d.locator("#employee-cost").fill("150");
+  await d.locator("#employee-cost-from").fill("2026-10-01");
+  await insistirAteFechar(d.getByRole("button", { name: "Salvar colaborador" }));
+  await esperarFechar(page);
+  await page.waitForTimeout(1500);
+  const colaboradores = Number(
+    valor(`select count(*) from public.employees where name = ${lit(colaborador)}`),
+  );
+
+  const operacao = `${C} Fecho Op`;
+  await abrirOperacoes(page);
+  await page.getByRole("button", { name: "Nova operação" }).click();
+  d = dialogo(page);
+  await escolher(page, campo(d, "Cliente"), CLI);
+  await campo(d, "Nome da operação").fill(operacao);
+  await escolher(page, campo(d, "Contrato"), new RegExp(`^${literal(CTR)} — `));
+  await insistirAteFechar(d.getByRole("button", { name: "Salvar operação" }));
+  await esperarFechar(page);
+  await page.waitForTimeout(1500);
+  const operacoes = contar("operations", operacao);
+
+  d = await abrirNovoTurno(page, operacao);
+  await preencherTurno(d, { nome: "Fecho CP04", inicio: "06:00", fim: "15:00", intervalo: 60 });
+  await insistirAteFechar(d.getByRole("button", { name: "Salvar turno" }));
+  await esperarFechar(page);
+  await page.waitForTimeout(1500);
+  // `in`, não `=`: se a operação tiver duplicado, a contagem do turno não pode quebrar.
+  const turnos = Number(
+    valor(
+      `select count(*) from public.shifts where name = 'Fecho CP04' and operation_id in
+         (select id from public.operations where name = ${lit(operacao)})`,
+    ),
+  );
+
+  expect({ clientes, colaboradores, operacoes, turnos }).toEqual({
+    clientes: 1,
+    colaboradores: 1,
+    operacoes: 1,
+    turnos: 1,
+  });
+});

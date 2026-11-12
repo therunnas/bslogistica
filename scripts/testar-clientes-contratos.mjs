@@ -119,15 +119,18 @@ verificar(
 // ---------------------------------------------------------------------------------------------
 
 verificar(
-  "C1. salvar cliente passa pela trava e a libera no onSettled",
-  /travaCliente\.tentar\(\)[\s\S]{0,700}saveClient\.mutate\(payload, \{\s*onSettled: travaCliente\.liberar,/.test(
+  "C1. salvar cliente passa pela trava; só o erro a libera (sucesso espera o diálogo reabrir)",
+  /travaCliente\.tentar\(\)[\s\S]{0,700}saveClient\.mutate\(payload, \{\s*onError: travaCliente\.liberar,/.test(
     tela,
-  ),
+  ) &&
+    /const travaCliente = useTravaDoDialogo\(clientOpen\);/.test(tela) &&
+    /const travaContrato = useTravaDoDialogo\(contractOpen\);/.test(tela) &&
+    !/onSettled: trava(Cliente|Contrato)\.liberar/.test(tela),
   true,
 );
 const mutacoesDoContrato = [...tela.matchAll(/(saveContract|criarContratoComVigencia)\.mutate\(/g)]
   .length;
-const liberadasDoContrato = [...tela.matchAll(/onSettled: travaContrato\.liberar/g)].length;
+const liberadasDoContrato = [...tela.matchAll(/onError: travaContrato\.liberar/g)].length;
 verificar(
   "C2. salvar contrato passa pela trava e todo caminho que envia a libera",
   `${/if \(!travaContrato\.tentar\(\)\) return;/.test(tela)}:${mutacoesDoContrato}:${liberadasDoContrato}`,

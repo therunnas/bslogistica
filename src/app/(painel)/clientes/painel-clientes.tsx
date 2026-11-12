@@ -71,7 +71,7 @@ import {
   PARAMETROS_030_INICIAIS,
 } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
-import { useTrava } from "@/lib/trava";
+import { useTravaDoDialogo } from "@/lib/trava";
 import { useClients, useContracts, useEmployees, useOperations } from "@/lib/queries";
 import type { Client, Contract } from "@/lib/types";
 
@@ -164,12 +164,12 @@ export function PainelClientes() {
   const condicao = (contract: { id: string }, chave: string, coluna: number) =>
     Number(condicoesDeHoje.valores.get(contract.id)?.[chave] ?? coluna);
   const removeContract = useDeleteRow("contracts");
-  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique.
-  const travaCliente = useTrava();
-  const travaContrato = useTrava();
-
   const [clientOpen, setClientOpen] = useState(false);
   const [contractOpen, setContractOpen] = useState(false);
+  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique; e
+  // depois de gravar a trava só se solta quando o diálogo abre de novo (ver useTravaDoDialogo).
+  const travaCliente = useTravaDoDialogo(clientOpen);
+  const travaContrato = useTravaDoDialogo(contractOpen);
 
   const [clientForm, setClientForm] = useState(emptyClient);
   const [contractForm, setContractForm] = useState(emptyContract);
@@ -269,7 +269,7 @@ export function PainelClientes() {
     }
 
     saveClient.mutate(payload, {
-      onSettled: travaCliente.liberar,
+      onError: travaCliente.liberar,
       onSuccess: () => setClientOpen(false),
     });
   }
@@ -317,7 +317,7 @@ export function PainelClientes() {
     if (contractForm.id) {
       payload["id"] = contractForm.id;
       saveContract.mutate(payload, {
-        onSettled: travaContrato.liberar,
+        onError: travaContrato.liberar,
         onSuccess: () => setContractOpen(false),
       });
       return;
@@ -343,7 +343,7 @@ export function PainelClientes() {
             periodoContratual: camposDa030.length > 0 && periodoContratual,
           },
         },
-        { onSettled: travaContrato.liberar, onSuccess: () => setContractOpen(false) },
+        { onError: travaContrato.liberar, onSuccess: () => setContractOpen(false) },
       );
       return;
     }
@@ -351,7 +351,7 @@ export function PainelClientes() {
     if (modoDeTaxa === "direta") {
       enviado = true;
       saveContract.mutate(payload, {
-        onSettled: travaContrato.liberar,
+        onError: travaContrato.liberar,
         onSuccess: () => setContractOpen(false),
       });
     }

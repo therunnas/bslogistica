@@ -56,7 +56,7 @@ import { shiftPlannedMinutes } from "@/lib/billing";
 import { brl, dateBR, minutesToLabel } from "@/lib/format";
 import { exigirLinhaAfetada, useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { toast } from "@/lib/notificacoes";
-import { useTrava } from "@/lib/trava";
+import { useTravaDoDialogo } from "@/lib/trava";
 import {
   useClients,
   useContracts,
@@ -190,9 +190,6 @@ export function PainelOperacoes() {
     porVigencia && (v.carregando || v.erro);
   const textoDesconhecido = (v: { erro: boolean }) => (v.erro ? "Indisponível" : "Carregando…");
   const hoje = hojeEmSaoPaulo();
-  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique.
-  const travaOperacao = useTrava();
-  const travaTurno = useTrava();
   const timesheets = useTimesheets();
   const entries = useEntries();
   const removeOperation = useDeleteRow("operations");
@@ -202,6 +199,10 @@ export function PainelOperacoes() {
 
   const [opOpen, setOpOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
+  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique; e
+  // depois de gravar a trava só se solta quando o diálogo abre de novo (ver useTravaDoDialogo).
+  const travaOperacao = useTravaDoDialogo(opOpen);
+  const travaTurno = useTravaDoDialogo(shiftOpen);
   const [teamOpen, setTeamOpen] = useState<Operation | null>(null);
 
   const [equipeBusca, setEquipeBusca] = useState("");
@@ -554,7 +555,7 @@ export function PainelOperacoes() {
     if (opForm.id) {
       payload["id"] = opForm.id;
       saveOperation.mutate(payload, {
-        onSettled: travaOperacao.liberar,
+        onError: travaOperacao.liberar,
         onSuccess: () => setOpOpen(false),
       });
       return;
@@ -572,13 +573,13 @@ export function PainelOperacoes() {
             encerrarAnterior: false,
           },
         },
-        { onSettled: travaOperacao.liberar, onSuccess: () => setOpOpen(false) },
+        { onError: travaOperacao.liberar, onSuccess: () => setOpOpen(false) },
       );
       return;
     }
 
     saveOperation.mutate(payload, {
-      onSettled: travaOperacao.liberar,
+      onError: travaOperacao.liberar,
       onSuccess: () => setOpOpen(false),
     });
   }
@@ -648,7 +649,7 @@ export function PainelOperacoes() {
     }
 
     saveShift.mutate(payload, {
-      onSettled: travaTurno.liberar,
+      onError: travaTurno.liberar,
       onSuccess: () => setShiftOpen(false),
     });
   }

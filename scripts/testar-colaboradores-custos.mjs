@@ -86,9 +86,9 @@ verificar(
 
 verificar(
   "A6. salvar do 'Alterar' tem envio único (duplo clique não chama mutate duas vezes)",
-  /function salvar\(\) \{\s*if \(!trava\.tentar\(\)\) return;\s*const fechar = \{ onSettled: trava\.liberar, onSuccess: \(\) => setAberto\(false\) \};/.test(
+  /function salvar\(\) \{\s*if \(!trava\.tentar\(\)\) return;\s*const fechar = \{ onError: trava\.liberar, onSuccess: \(\) => setAberto\(false\) \};/.test(
     alterar,
-  ),
+  ) && /const trava = useTravaDoDialogo\(aberto\);/.test(alterar),
   true,
 );
 
@@ -108,7 +108,10 @@ verificar(
   true,
 );
 const envios = [...tela.matchAll(/(save|criarComVigencia)\.mutate\(/g)].length;
-const liberadas = [...tela.matchAll(/onSettled: trava\.liberar/g)].length;
+const liberadas = [...tela.matchAll(/onError: trava\.liberar/g)].length;
+// Depois do sucesso o diálogo ainda fecha (animação): só o erro libera; reabrir também.
+const travaDoDialogo =
+  /const trava = useTravaDoDialogo\(open\);/.test(tela) && !/onSettled: trava\.liberar/.test(tela);
 verificar(
   "B7. envio único: trava no submit, liberada em todo caminho que envia e no que não envia",
   [
@@ -118,10 +121,11 @@ verificar(
     envios,
     liberadas,
     /if \(!enviado\) trava\.liberar\(\);/.test(tela),
+    travaDoDialogo,
   ],
   // 4 mutates: edição, cadastro com vigência, gravação da função depois do cadastro (dentro do
   // onSuccess, já protegida) e motor desligado; 3 deles enviam pelo submit e liberam a trava.
-  [true, 4, 3, true],
+  [true, 4, 3, true, true],
 );
 verificar(
   "B8. o rótulo Status nomeia o seletor",

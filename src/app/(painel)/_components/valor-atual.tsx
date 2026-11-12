@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { dateBR } from "@/lib/format";
-import { useTrava } from "@/lib/trava";
+import { useTravaDoDialogo } from "@/lib/trava";
 import {
   useCorrigirVigencia,
   usePeriodoContratual,
@@ -137,12 +137,13 @@ export function ValorAtualComAlteracao({
   // Envio único. Sem a trava, um duplo clique chamava `mutate` duas vezes: o TanStack Query só
   // executa o `onSuccess` da ÚLTIMA chamada, então o sucesso da primeira (que fecha o diálogo) era
   // descartado e a segunda falhava por sobreposição — valor gravado, diálogo aberto e aviso de erro
-  // (E2E do CP-03, intermitente).
-  const trava = useTrava();
+  // (E2E do CP-03, intermitente). Depois de gravar, a trava só se solta quando o diálogo abre de
+  // novo: um clique durante a animação de saída gravaria outra vez (ver useTravaDoDialogo).
+  const trava = useTravaDoDialogo(aberto);
 
   function salvar() {
     if (!trava.tentar()) return;
-    const fechar = { onSettled: trava.liberar, onSuccess: () => setAberto(false) };
+    const fechar = { onError: trava.liberar, onSuccess: () => setAberto(false) };
     if (alvo) {
       corrigir.mutate(
         {

@@ -165,7 +165,7 @@ verificar(
 // D. D3 em turno e operação: envio único; nomes limpos; carregamento
 // ---------------------------------------------------------------------------------------------
 
-const liberadasOperacao = [...tela.matchAll(/onSettled: travaOperacao\.liberar/g)].length;
+const liberadasOperacao = [...tela.matchAll(/onError: travaOperacao\.liberar/g)].length;
 const enviosOperacao = [...tela.matchAll(/(saveOperation|criarOperacaoComVigencia)\.mutate\(/g)]
   .length;
 verificar(
@@ -177,7 +177,7 @@ verificar(
   "D2. salvar turno (D3): trava, liberação e botão desabilitado durante o envio",
   [
     /!travaTurno\.tentar\(\)\s*\)\s*return;/.test(tela),
-    /saveShift\.mutate\(payload, \{\s*onSettled: travaTurno\.liberar,/.test(tela),
+    /saveShift\.mutate\(payload, \{\s*onError: travaTurno\.liberar,/.test(tela),
     /saveShift\.isPending\s*\}/.test(tela),
     /\{saveShift\.isPending \? "Salvando\.\.\." : "Salvar turno"\}/.test(tela),
   ],
@@ -241,6 +241,54 @@ verificar(
         !new RegExp(`id="${id}"`).test(tela),
     )
     .map(([id]) => id)
+    .join(","),
+  "",
+);
+
+// ---------------------------------------------------------------------------------------------
+// F. D3 tardio: depois de gravar, o diálogo que fecha não aceita outro envio
+// ---------------------------------------------------------------------------------------------
+
+const fonteDaTrava = semComentarios(ler("src/lib/trava.ts"));
+verificar(
+  "F1. a trava do diálogo só se solta quando o diálogo abre",
+  /export function useTravaDoDialogo\(aberto: boolean\): Trava \{\s*const trava = useTrava\(\);\s*useEffect\(\(\) => \{\s*if \(aberto\) trava\.liberar\(\);\s*\}, \[aberto, trava\]\);/.test(
+    fonteDaTrava,
+  ),
+  true,
+);
+{
+  const { criarTrava } = await import("../src/lib/trava.ts");
+  const trava = criarTrava();
+  const primeiro = trava.tentar(); // 1º clique: grava
+  // sucesso: nada libera (é o onError que libera); o diálogo está na animação de saída
+  const duranteOFechamento = trava.tentar();
+  trava.liberar(); // o diálogo abriu de novo
+  const aoReabrir = trava.tentar();
+  verificar(
+    "F2. sequência do E2E D3b: grava, clique no fechamento ignorado, reabrir aceita",
+    [primeiro, duranteOFechamento, aoReabrir],
+    [true, false, true],
+  );
+}
+const telasComDialogo = [
+  ["clientes", "src/app/(painel)/clientes/painel-clientes.tsx"],
+  ["colaboradores", "src/app/(painel)/colaboradores/painel-colaboradores.tsx"],
+  ["operações", "src/app/(painel)/operacoes/painel-operacoes.tsx"],
+  ["alterar valor", "src/app/(painel)/_components/valor-atual.tsx"],
+];
+verificar(
+  "F3. nenhuma tela de diálogo libera a trava no onSettled; todas usam useTravaDoDialogo",
+  telasComDialogo
+    .filter(([, caminho]) => {
+      const fonte = semComentarios(ler(caminho));
+      return (
+        /onSettled: trava\w*\.liberar/.test(fonte) ||
+        !/useTravaDoDialogo\(/.test(fonte) ||
+        /useTrava\(\)/.test(fonte)
+      );
+    })
+    .map(([nome]) => nome)
     .join(","),
   "",
 );
