@@ -26,8 +26,9 @@ faturamento por período e relatórios. Duas trilhas de uso:
 ## Tarefa ativa única
 
 **QA-BS-01 — auditoria, correção e estabilização integral (iniciada em 12/11/2026).** Branch
-`fix/qa-bs-01-estabilizacao`, empilhada sobre o #133 (que inclui o #132), por decisão do
-responsável. Execução por checkpoints (CP-00 a CP-12): auditar, reproduzir, corrigir, testar,
+`fix/qa-bs-01-estabilizacao`, criada sobre o #133 (que inclui o #132) por decisão do
+responsável e, depois dos squashes do #132 (`1c6042e`) e do #133 (`f6df1fb`), reconciliada com a
+`main` por merge (RECONCILIACAO-134; PR #134 com base `main`). Execução por checkpoints (CP-00 a CP-12): auditar, reproduzir, corrigir, testar,
 validar e só então avançar. Estado e próxima ação exata no [HANDOFF](docs/HANDOFF.md).
 
 Tarefa anterior, ainda vigente em HML e Production: **FUNC-READY-02** — domingo e feriado em
@@ -39,7 +40,7 @@ começou** (ver "Bloqueio do piloto").
 | CP     | Escopo                                                                             | Estado       |
 | ------ | ---------------------------------------------------------------------------------- | ------------ |
 | CP-00  | Baseline e inventário (Git, PRs, ambientes, docs, 16 telas + 7 de acesso + 5 APIs) | PASS         |
-| CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | em andamento |
+| CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | pendente     |
 | CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | não iniciado |
 | CP-02  | Clientes e contratos                                                               | não iniciado |
 | CP-03  | Colaboradores e valores                                                            | não iniciado |
@@ -69,13 +70,14 @@ Defeitos registrados no CP-00 (nenhum corrigido ainda):
 
 ### Situação
 
-- `main` em `1d60ca0` (#131; antes registrado como `ecd67f2`), com migrations até a **051**. Integrados: #119 (046–050), #120
+- `main` em `f6df1fb` (#133, E2E local), sobre `1c6042e` (#132, valores de hoje nas listas) e
+  `1d60ca0` (#131), com migrations até a **051**. Integrados: #119 (046–050), #120
   (rótulos da avulsa), #121 (Containers fora do menu e do cartão; serviço pontual vira
   operação avulsa), #122 (valor acordado pelo contrato), #123 (confirmação antes de gerar
   fatura), #124 (este arquivo), #126 (rótulo "Faturado" no apontamento), #127 (plano de
   Production), #128 (tela de operação simplificada: localidade oculta com a resolução OFF e
   "Valor atual" + "Alterar valor"), #129 (migration 051: domingo e feriado em dobro com
-  interruptor).
+  interruptor), #131 (pente fino das telas), #132 e #133 (12/11/2026, squash).
 - **Production** (`ehkduqokntemtmqzdrbd`): **051 desde 11/11/2026**, interruptor de domingo/feriado
   em dobro **ligado**, resolução comercial OFF (035–050 com o
   [plano](docs/runbooks/producao-034-050.md), 051 com o
@@ -123,7 +125,7 @@ dependências do `npm audit`. O HML já foi limpo (o #125 pode ser fechado ou at
 Decisões de negócio em aberto que não bloqueiam: tipos de serviço avulso e modalidade de
 cobrança; três particularidades da Dynamis; C1–C6 da matriz.
 
-### Testes E2E com Supabase local (E2E-IMPLEMENTACAO-01, PR Draft sobre o #132)
+### Testes E2E com Supabase local (#133, integrado em `f6df1fb`)
 
 Infraestrutura Playwright contra o app em loopback e um Supabase **local descartável** no
 GitHub Actions (job `e2e-local`, workflow próprio), sem secrets e sem caminho para HML ou

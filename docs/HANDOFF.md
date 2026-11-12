@@ -2,30 +2,30 @@
 
 <!-- workflow-handoff:v1 -->
 
-**QA-BS-01 — auditoria, correção e estabilização integral. CP-00 PASS; CP-00B em andamento (E2E local bloqueado no macOS por `setsid`). Nenhum defeito corrigido ainda.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
+**QA-BS-01 — auditoria, correção e estabilização integral. CP-00 PASS; #134 reconciliado com a `main` `f6df1fb` (#132 e #133 integrados); CP-00B pendente (E2E local bloqueado no macOS por `setsid`). Nenhum defeito corrigido ainda.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
 | Etapa | QA-BS-01 — auditoria, correção e estabilização integral, por checkpoints CP-00 a CP-12 (plano e defeitos em [PROGRESS](../PROGRESS.md#qa-bs-01--checkpoints)) |
-| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-00B |
-| Último gate concluído | CP-00 — baseline e inventário (12/11/2026) |
-| Worktree | Mac local, worktree efêmero na pasta temporária da sessão do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
-| Branch | `fix/qa-bs-01-estabilizacao`, criada de `origin/test/e2e-playwright-local` (#133, que inclui o #132) por decisão do responsável; desvio registrado da regra "partir da main" |
-| Base | `5b4f44ab607f0a6b01cf16a705d16374fb5f22b4` (#133); main `1d60ca0215bf36fe5c6af340789380d0198f6d68` |
-| HEAD validado | `5b4f44ab607f0a6b01cf16a705d16374fb5f22b4` (lint, `tsc`, 74/74 `test:*`, build no Mac); commits posteriores só de documentação (HANDOFF e PROGRESS) |
-| Alterações não commitadas | `supabase/config.toml` (`project_id = "bs-e2e-qa01"`, exigido pelo E2E local — **nunca commitar**); `supabase/.branches/` (gerado pelo CLI) |
-| PR | PR Draft desta branch com base `test/e2e-playwright-local`. Abertos: #133, #132, #125 |
+| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-00B pendente |
+| Último gate concluído | CP-00 — baseline e inventário (12/11/2026); depois, RECONCILIACAO-134 (só Git e documentação): `main` incorporada por merge e base do #134 trocada para `main` |
+| Worktree | Sessão em nuvem: worktree isolado `/home/user/bslogistica-qa134` (efêmero). Sessão anterior no Mac: worktree na pasta temporária do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
+| Branch | `fix/qa-bs-01-estabilizacao`, criada de `origin/test/e2e-playwright-local` (#133, que inclui o #132) por decisão do responsável e reconciliada com a `main` por merge (sem rebase nem force push) |
+| Base | main `f6df1fbf58e8eb34648e2328b926ef99c7ad7164` (squash do #133, sobre `1c6042e`, squash do #132) |
+| HEAD validado | f6df1fbf58e8eb34648e2328b926ef99c7ad7164 (`main`: `validar` e `sql-local` SUCCESS; o conteúdo E2E dele foi validado no `bded9e1`: 58 PASS, 5 FALHA CONHECIDA, 21 travas). O merge nesta branch muda só HANDOFF e PROGRESS e é revalidado (`validar`, `sql-local`, `e2e-local`) no novo HEAD do #134 |
+| Alterações não commitadas | Nenhuma na sessão em nuvem. No Mac (sessão anterior): `supabase/config.toml` com `project_id = "bs-e2e-qa01"` (exigido pelo E2E local — **nunca commitar**) e `supabase/.branches/` (gerado pelo CLI) |
+| PR | #134 (Draft), base `main` desde a RECONCILIACAO-134. Integrados: #132 (`1c6042e`) e #133 (`f6df1fb`). Aberto e não tocado: #125 |
 | Ambiente-alvo | Local (Supabase local descartável) e CI. HML, Preview e Production: nenhum acesso |
-| Última ação comprovada | CP-00 PASS; baseline estática PASS no Mac; E2E local parou na subida do app (`setsid: command not found`, saída 7) |
-| Próxima ação exata | Fechar o CP-00B: rodar o E2E local com um substituto de `setsid` só no PATH local (ou corrigir o script de forma portável) e conferir 58 PASS / 5 FALHA CONHECIDA; depois CP-01 |
+| Última ação comprovada | RECONCILIACAO-134: merge da `main` `f6df1fb` em `76fec3a`; conflito só em `docs/HANDOFF.md`; diff do #134 contra a `main` só com `PROGRESS.md` e `docs/HANDOFF.md`. CP-00 PASS; E2E local no Mac ainda bloqueado por `setsid` (I1) |
+| Próxima ação exata | CP-00B: fechar o baseline executável local — rodar o E2E local com um substituto de `setsid` só no PATH local (ou corrigir o script de forma portável, como I1) e conferir 58 PASS / 5 FALHA CONHECIDA; depois CP-01 |
 
 ## Estado atual para retomada
 
 | Campo | Estado comprovado / referência |
 | --- | --- |
-| Main | `8c493a5` (#128): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado", tela de operação simplificada. `vercel.json` mantém `main:false` |
+| Main | `f6df1fb` (#133: E2E com Supabase local isolado), sobre `1c6042e` (#132: valores de hoje nas listas, correção e antecipação pelo "Alterar"), `1d60ca0` (#131) e `8c493a5` (#128): código até 050, rótulos da avulsa, Containers fora do menu, valor acordado pelo contrato, confirmação antes de gerar fatura, rótulo "Faturado", tela de operação simplificada. `vercel.json` mantém `main:false` |
 | HML | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`, limpo em 11/11/2026 (só contas e configuração)** (050 desde 09/11/2026); `tarifas_por_funcao=false`; `vigencia_ativa=true`. Backup lógico pré-aplicação (59 tabelas) entregue ao usuário, fora do Git |
 | Production | **051 desde 11/11/2026, `dias_especiais_em_dobro=true`** (035–050 no mesmo dia, 16/16 PASS). Site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`); reversão do site: `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C` (`8c493a5`). Backup `pg_dump` de 11/11 (antes da 035) com o responsável. Sem dados de negócio; lista de feriados vazia |
 | Preview | Deployment da branch `claude/jolly-allen-fqechw`; Preview → HML comprovado pela leitura das variáveis na Vercel (11/11/2026). Este container não abre `vercel.app` (proxy). Configuração registrada em [AMBIENTES.md](AMBIENTES.md) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | RECONCILIACAO-134 (12/11/2026, sessão em nuvem, QA-BS-01 sessão 02), autorizada pelo responsável: reconciliar o #134 com a `main` depois dos squashes do #132 e do #133, só Git e documentação. HEAD anterior do #134 `76fec3a7a098af08519c0aa12729147bb04589fa`; `main` `f6df1fbf58e8eb34648e2328b926ef99c7ad7164` incorporada por merge (sem rebase nem force push); base do PR trocada de `test/e2e-playwright-local` para `main`. Único conflito: `docs/HANDOFF.md` (Identificação, Última tarefa e título da UX-PENTE-FINO-02), resolvido preservando o checkpoint QA-BS-01 (CP-00, CP-00B, D1–D8, I1, limitações do E2E no macOS) e o registro da INTEGRACAO-132-133. `PROGRESS.md` mesclado sem conflito (QA-BS-01 + seção do E2E da `main`) |
+| Resultados e testes comprovados | SHAs de integração conferidos no GitHub: #132 validado `afc2219`, integrado `1c6042e424e1030a0d4280e73e339730ebc87a65`; #133 validado `bded9e1b2605313e6f96b9261bc1b45896037a90` (`validar`, `sql-local`, `e2e-local` SUCCESS; 63 testes: 58 PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO; 21 travas), integrado `f6df1fbf58e8eb34648e2328b926ef99c7ad7164` (árvore idêntica à do `bded9e1`; CI da `main` SUCCESS). Diff do #134 contra a `main` depois do merge: só `PROGRESS.md` e `docs/HANDOFF.md`. Local: `git diff --check` e `npm run check:workflow` PASS. CI no novo HEAD do #134: ver PR #134 |
+| Código e PR afetados | Só `docs/HANDOFF.md` e `PROGRESS.md` (e o commit de merge). Nenhum `src/`, teste, script, migration ou workflow alterado. PR #134: base `main`, descrição atualizada, continua Draft |
+| Ambientes envolvidos | GitHub (branch e PR #134, CI). HML, Preview e Production: nenhum acesso; nenhum deploy, banco, flag ou secret |
+| Pendências e decisões | Todas as do QA-BS-01 abaixo seguem abertas: D1–D8 e I1 (nenhum corrigido), CP-00B. Da integração: `useValoresDeHoje` (recuo silencioso e `.in(...)` com todos os IDs), fim de contrato `01/01/0001` num registro antigo do HML, SQL independente e demais gates de Production. Checkout `fix/auditoria-bs-202610` do Mac: preservar, não integrar sem decisão |
+| Próxima ação exata | CP-00B — finalizar o baseline executável local (E2E local no Mac sem `setsid`, SQL local, 58 PASS / 5 FALHA CONHECIDA); depois CP-01. Não corrigir defeitos antes disso |
+| Autorizações e proibições | Autorizado e usado: inspecionar Git e GitHub, merge da `main` na branch do #134, resolver o HANDOFF, atualizar PROGRESS, HANDOFF e a descrição do #134, trocar a base para `main`, commit e push só nesta branch. Proibidos e não feitos: merge do #134, Ready for review, rebase, force push, outras branches ou PRs (#125), deploy, HML, Preview remoto, Production, banco, migrations, flags, secrets, `src/`, correção de D1–D8, CP-00B |
+
+### Tarefa anterior — QA-BS-01, CP-00 e início do CP-00B (12/11/2026, Mac)
 
 | Campo | Valor |
 | --- | --- |
@@ -44,7 +56,19 @@
 | Próxima ação exata | Fechar o CP-00B (E2E local: 58 PASS / 5 FALHA CONHECIDA esperados) e iniciar o CP-01; correções na ordem D1/D2 → D3 → demais, cada uma com teste RED → GREEN, `test:*`, E2E e registro aqui |
 | Autorizações e proibições | Autorizado pelo responsável (prompt QA-BS-01, 12/11/2026): inspecionar o repositório, testes locais seguros, criar testes, corrigir código nesta branch, commits nela e PR Draft. Proibidos: merge, Ready for review, Production, HML, Preview remoto com banco, migrations remotas, flags, secrets, exclusão de dados, outro projeto Supabase, alterar outras branches ou PRs (#125, #132, #133), commitar `supabase/config.toml` |
 
-### Tarefa anterior — E2E-REVISAO-02 (12/11/2026, PR #133 em Draft)
+### Tarefa anterior — INTEGRACAO-132-133 (12/11/2026, #132 em `1c6042e`, #133 em `f6df1fb`)
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | INTEGRACAO-132-133 (12/11/2026, sessão em nuvem), autorizada pelo responsável: homologação funcional do #132 aceita no escopo testado (V1 no HML; V2–V5 pelo Codex no Preview `afc2219` → HML, lote `TESTE-AUD-132-FINAL-R2`, com ressalvas). #132 tirado do Draft e integrado por squash: **SHA integrado `1c6042e424e1030a0d4280e73e339730ebc87a65`** (árvore idêntica à do `afc2219` validado). #133: base trocada para `main` e `main` incorporada por merge, sem force push; único conflito em `docs/HANDOFF.md`, resolvido mantendo os registros das duas tarefas |
+| Resultados e testes comprovados | #132: `validar` e `sql-local` SUCCESS no `afc2219` (HEAD validado) e CI da `main` no `1c6042e`. #133: SHA validado antes da atualização `5b4f44a` (`validar`, `sql-local`, `e2e-local` SUCCESS; 58 PASS, 5 FALHA CONHECIDA, 0 FAIL, 0 PULADO; 21 travas). O HEAD final do #133 e o SHA do squash do #133 ficam no PR #133 e no relatório da tarefa (o checkpoint não pode citar o próprio commit de integração) |
+| Código e PR afetados | #132 (`src/`, teste estrutural, HANDOFF) na `main`. #133: só E2E, Playwright, comandos `e2e:*`, `.gitignore` e documentação; nenhum `src/`, migration ou `ci.yml` |
+| Ambientes envolvidos | GitHub (PRs, CI). Sem deploy: `vercel.json` mantém `main: false`. HML e Production: nenhum acesso nesta tarefa; nenhuma alteração de banco |
+| Pendências e decisões | Cinco defeitos conhecidos (B3 horário de saída antes da entrada; duplo clique em cliente e turno; valor digitado perdido ao trocar a data no "Alterar custo"; confirmação da fatura sem aviso de dias abertos). `useValoresDeHoje`: recuo silencioso para a coluna do cadastro em erro/carregamento e `.in(...)` com todos os IDs (`src/lib/vigencias-dados.ts:104`, `:372-405`). Fim de contrato `01/01/0001` num registro antigo do HML (não vem do #132). SQL independente e demais gates de Production. **#134** (`fix/qa-bs-01-estabilizacao`, base `test/e2e-playwright-local`, HEAD `76fec3a`): reconciliar a base com a nova `main` depois do squash do #133, sem rebase nem force push |
+| Próxima ação exata | Responsável decide a reconciliação do #134: trocar a base para `main` e incorporar a `main` por merge na `fix/qa-bs-01-estabilizacao` (conflitos esperados só onde o squash duplicou histórico: HANDOFF e arquivos do E2E idênticos), revalidar a CI e só então continuar a auditoria CP-00B a CP-12. Próxima tarefa recomendada: corrigir o risco de horários (B3) preservando jornadas noturnas legítimas |
+| Autorizações e proibições | Autorizado e usado: tirar Draft e integrar #132 e #133 por squash, trocar a base do #133, merge da `main` na branch do #133, resolver o HANDOFF, atualizar descrições. Não autorizado e não feito: Production, deploy, migrations, configuração, flags, bancos remotos, alterar ou integrar o #134, tocar o #125, excluir branches |
+
+### Tarefa anterior — E2E-REVISAO-02 (12/11/2026, PR #133, integrado em `f6df1fb`)
 
 | Campo | Valor |
 | --- | --- |
@@ -68,7 +92,7 @@
 | Próxima ação exata | Responsável revisa o PR Draft do E2E (base: branch do #132). Sem merge, Ready for review ou deploy até a revisão |
 | Autorizações e proibições | Autorizado e usado: infraestrutura E2E local, branch `test/e2e-playwright-local` e PR Draft próprio. Proibidos e não feitos: acesso ao HML ou à Production, `src/`, migrations, `ci.yml`, merge, Ready for review, deploy, force push, alterar os PRs #125 e #132 |
 
-### Tarefa anterior — UX-PENTE-FINO-02 (11/11/2026, PR #132 em Draft)
+### Tarefa anterior — UX-PENTE-FINO-02 (11/11/2026, #132 integrado em `1c6042e` em 12/11/2026)
 
 | Campo | Valor |
 | --- | --- |
