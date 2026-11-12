@@ -76,10 +76,14 @@ test.describe("administrador", () => {
 test.describe("operacional", () => {
   test.use({ storageState: estadoDe("operacional") });
 
-  test("é levado à tela do operador", async ({ page }) => {
+  test("é levado à tela do operador (ainda sem operação atribuída)", async ({ page }) => {
     await page.goto("/dashboard");
     await page.waitForURL(/\/operacional/);
-    await expect(page.getByRole("heading", { level: 1, name: /^Apontamento$/ })).toBeVisible();
+    // Sem linha em user_operation_access a própria RPC devolve lista vazia e a tela avisa.
+    await expect(
+      page.getByText("Nenhuma operação atribuída a você. Procure o administrador."),
+    ).toBeVisible();
+    await semErroDeAplicacao(page);
   });
 
   for (const caminho of ["/clientes", "/faturamento", "/fechamento", "/colaboradores"]) {

@@ -23,7 +23,8 @@ APP_PID=""
 
 encerrar() {
   local codigo=$?
-  if [ -n "$APP_PID" ] && kill -0 "$APP_PID" 2>/dev/null; then kill "$APP_PID" || true; fi
+  # O app roda num grupo de processos próprio (setsid): encerra o npx e o next-server juntos.
+  if [ -n "$APP_PID" ]; then kill -- "-$APP_PID" 2>/dev/null || true; fi
   rm -rf "$ESTADO_DIR"
   echo "Encerrando o Supabase local (sem backup)..."
   "${CLI[@]}" stop --no-backup >/dev/null 2>&1 || true
@@ -99,7 +100,7 @@ npm run build >"$RESULTADOS/build.log" 2>&1 || {
 }
 
 E2E_REDE_LOG="$REDE_LOG" NODE_OPTIONS="--require ./e2e/guarda/rede.cjs" \
-  npx next start -H 127.0.0.1 -p 3000 >"$RESULTADOS/app.log" 2>&1 &
+  setsid npx next start -H 127.0.0.1 -p 3000 >"$RESULTADOS/app.log" 2>&1 &
 APP_PID=$!
 for _ in $(seq 1 60); do
   if curl -s -o /dev/null http://127.0.0.1:3000/login; then break; fi
@@ -126,4 +127,12 @@ else
 fi
 
 node e2e/relatorio.mjs || true
+
+# Contexto de cada falha (árvore de acessibilidade da página, sem cookies nem tokens) no próprio log,
+# para diagnosticar sem baixar o artefato.
+for contexto in "$RESULTADOS"/artefatos-*/*/error-context.md; do
+  [ -f "$contexto" ] || continue
+  echo "----- $contexto"
+  sed -n '1,120p' "$contexto"
+done
 exit "$RESULTADO"
