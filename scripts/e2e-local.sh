@@ -113,7 +113,7 @@ set +e
 E2E_ADMIN_EMAIL="$ADMIN_EMAIL" E2E_ADMIN_SENHA="$ADMIN_SENHA" \
   E2E_OPER_EMAIL="$OPER_EMAIL" E2E_OPER_SENHA="$OPER_SENHA" \
   E2E_DB_CONTAINER="$CONTAINER" E2E_ESTADO_DIR="$ESTADO_DIR" \
-  npx playwright test
+  env -u SUPABASE_SERVICE_ROLE_KEY -u PASSWORD_RECOVERY_PROOF_SECRET npx playwright test
 RESULTADO=$?
 set -e
 
@@ -133,6 +133,7 @@ node e2e/relatorio.mjs || true
 for contexto in "$RESULTADOS"/artefatos-*/*/error-context.md; do
   [ -f "$contexto" ] || continue
   echo "----- $contexto"
-  sed -n '1,120p' "$contexto"
+  # Erro e árvore da página; o código-fonte do teste fica de fora (já está no repositório).
+  awk '/^# Test source/{f=1} /^# Page snapshot/{f=0} !f' "$contexto" | sed -n '1,200p'
 done
 exit "$RESULTADO"

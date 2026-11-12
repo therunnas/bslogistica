@@ -29,7 +29,11 @@ export function campo(escopo: Locator | Page, rotulo: string): Locator {
 /** Escolhe uma opção num select do Radix (abre o gatilho e clica na opção pelo texto). */
 export async function escolher(page: Page, gatilho: Locator, opcao: string | RegExp) {
   await gatilho.click();
-  await page.getByRole("option", { name: opcao }).first().click();
+  // Texto exato quando é string (evita casar "Fixo" com "Fixo B"); expressão regular quando precisa.
+  await page
+    .getByRole("option", typeof opcao === "string" ? { name: opcao, exact: true } : { name: opcao })
+    .first()
+    .click();
 }
 
 /** Diálogo aberto (o último, quando há um sobre outro). */
@@ -53,7 +57,7 @@ export async function criarCliente(page: Page, nome: string) {
   await campo(d, "Nome").fill(nome);
   await d.getByRole("button", { name: "Salvar cliente" }).click();
   await esperarFechar(page);
-  await expect(page.getByRole("cell", { name: nome })).toBeVisible();
+  await expect(page.getByText(nome, { exact: true }).first()).toBeVisible();
 }
 
 export async function criarContrato(

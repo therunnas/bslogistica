@@ -611,7 +611,7 @@ test.describe("PR #132 — faturado congelado e valor de hoje", () => {
     const hoje = versoesDeCusto(VERA).filter((v) => v.ativa && v.fim === null)[0];
     expect(hoje).toBeDefined();
     await page.goto("/colaboradores");
-    await expect(page.locator("tr").filter({ hasText: VERA })).toContainText(
+    await expect(page.locator("tr").filter({ hasText: VERA }).first()).toContainText(
       reais(Number(hoje?.custo)),
     );
 
