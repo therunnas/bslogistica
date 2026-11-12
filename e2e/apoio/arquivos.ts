@@ -18,10 +18,19 @@ function desescapar(xml: string): string {
     .replace(/&(?:lt|gt|quot|apos|amp);/g, (e) => ENTIDADES[e] ?? e);
 }
 
-/** Todo o XML de um .xlsx baixado, desescapado, num texto só (para procurar rótulos e valores). */
-export function textoDoXlsx(caminho: string): string {
+/**
+ * Só o que aparece nas células de um .xlsx: textos (`<t>`) e valores (`<v>`), um por linha. Sem
+ * nomes de elementos e atributos do XML (ex.: `customWidth` não é a palavra "custo").
+ */
+export function celulasDoXlsx(caminho: string): string {
   const arquivos = lerZip(readFileSync(caminho)) as Map<string, string>;
-  return desescapar([...arquivos.values()].join("\n"));
+  const textos: string[] = [];
+  for (const [nome, xml] of arquivos) {
+    if (!nome.startsWith("xl/")) continue;
+    for (const m of xml.matchAll(/<(t|v)(?:\s[^>]*)?>([^<]*)<\/\1>/g))
+      textos.push(desescapar(m[2] ?? ""));
+  }
+  return textos.join("\n");
 }
 
 /** Linhas de um CSV com separador `;` (aspas duplas como no gerador), sem o BOM inicial. */

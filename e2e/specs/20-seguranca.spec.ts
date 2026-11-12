@@ -200,7 +200,9 @@ test("operacional pela API: tabela direta devolve zero linha; RPC sem valor fina
   const chaves = chavesDe(ops);
   for (const chave of CHAVES_PROIBIDAS) expect(chaves.has(chave), `chave ${chave}`).toBe(false);
   expect(chaves.has("cliente_nome")).toBe(true);
-  await api.auth.signOut();
+  // "local": encerra só esta sessão da API. O padrão (global) derrubaria também a sessão do
+  // navegador desta conta, usada pelos outros testes.
+  await api.auth.signOut({ scope: "local" });
 });
 
 test("operacional pela API: chave extra na escrita recusa a chamada inteira (22023)", async () => {
@@ -235,14 +237,18 @@ test("operacional pela API: chave extra na escrita recusa a chamada inteira (220
   });
   expect(error?.code).toBe("22023");
   expect(lancamento(OP, GIL, "2026-10-14")).toBeUndefined();
-  await api.auth.signOut();
+  // "local": encerra só esta sessão da API. O padrão (global) derrubaria também a sessão do
+  // navegador desta conta, usada pelos outros testes.
+  await api.auth.signOut({ scope: "local" });
 });
 
 test("admin não usa a porta do operador (a RPC exige o papel operacional)", async () => {
   const api = await sessaoApi("admin");
   const { data, error } = await api.rpc("listar_operacoes_do_operador");
   expect(error !== null || (Array.isArray(data) && data.length === 0)).toBe(true);
-  await api.auth.signOut();
+  // "local": encerra só esta sessão da API. O padrão (global) derrubaria também a sessão do
+  // navegador desta conta, usada pelos outros testes.
+  await api.auth.signOut({ scope: "local" });
 });
 
 test("depois da fatura, o operador vê a linha travada como faturada", async ({ browser }) => {

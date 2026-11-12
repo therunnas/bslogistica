@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 
-import { linhasDoCsv, textoDoXlsx } from "../apoio/arquivos";
+import { celulasDoXlsx, linhasDoCsv } from "../apoio/arquivos";
 
 import {
   contarPorNome,
@@ -502,14 +502,14 @@ test.describe("fechamento, exportações e fatura do cliente fixo", () => {
         page.waitForEvent("download"),
         page.getByRole("button", { name: botao }).click(),
       ]);
-      return textoDoXlsx(await download.path());
+      return celulasDoXlsx(await download.path());
     };
 
     const interno = await baixar("Baixar Excel (.xlsx)");
-    expect(interno).toMatch(/custo/i);
+    expect(interno).toMatch(/\bcusto\b/i);
 
     const cliente = await baixar("Excel do cliente (.xlsx)");
-    expect(cliente).not.toMatch(/custo|margem|resultado/i);
+    expect(cliente).not.toMatch(/\b(custo|margem|resultado)\b/i);
     expect(cliente).not.toMatch(/2006[.,]25|1706[.,]25/);
     expect(cliente).toContain(ANA);
 
