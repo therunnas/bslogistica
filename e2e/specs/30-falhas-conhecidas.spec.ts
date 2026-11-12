@@ -90,22 +90,22 @@ test("[CORRIGIDO D3] duplo clique em “Salvar cliente” cria um único cliente
   expect(contarPorNome("clients", nome)).toBe(1);
 });
 
-test(
-  "[DEFEITO] duplo clique em “Salvar turno” cria dois turnos iguais",
-  CONHECIDA,
-  async ({ page }) => {
-    const nome = "Turno Duplo";
-    await page.goto("/operacoes");
-    await cartaoDaOperacao(page, OP).getByRole("button", { name: "Turno", exact: true }).click();
-    const d = dialogo(page);
-    await campo(d, "Nome do turno").fill(nome);
-    await d.getByRole("button", { name: "Salvar turno" }).evaluate((botao: HTMLElement) => {
-      botao.click();
-      botao.click();
-    });
-    await expect.poll(() => contarPorNome("shifts", nome), { timeout: 20_000 }).toBe(2);
-  },
-);
+// D3 em turno: CORRIGIDO no CP-04 (trava de envio único). Deixou de ser falha conhecida: o teste
+// agora confere o comportamento correto, sem a etiqueta.
+test("[CORRIGIDO D3] duplo clique em “Salvar turno” cria um único turno", async ({ page }) => {
+  const nome = "Turno Duplo";
+  await page.goto("/operacoes");
+  await cartaoDaOperacao(page, OP).getByRole("button", { name: "Turno", exact: true }).click();
+  const d = dialogo(page);
+  await campo(d, "Nome do turno").fill(nome);
+  await d.getByRole("button", { name: "Salvar turno" }).evaluate((botao: HTMLElement) => {
+    botao.click();
+    botao.click();
+  });
+  await expect.poll(() => contarPorNome("shifts", nome), { timeout: 20_000 }).toBe(1);
+  await page.waitForTimeout(1500);
+  expect(contarPorNome("shifts", nome)).toBe(1);
+});
 
 // D2: CORRIGIDO no CP-03 (o formulário guarda o que foi digitado ao trocar a data). Deixou de ser
 // falha conhecida: o teste confere o comportamento correto, sem a etiqueta.

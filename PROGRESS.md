@@ -44,7 +44,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | PASS (local) |
 | CP-02  | Clientes e contratos                                                               | PASS (local) |
 | CP-03  | Colaboradores e valores                                                            | PASS (local) |
-| CP-04  | Operações, turnos e equipes                                                        | não iniciado |
+| CP-04  | Operações, turnos e equipes                                                        | PASS (local) |
 | CP-05  | Apontamentos e regras financeiras (maior risco)                                    | não iniciado |
 | CP-06  | Serviços avulsos, adicionais e containers                                          | não iniciado |
 | CP-07  | Fechamento e faturamento                                                           | não iniciado |
@@ -60,7 +60,7 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | --- | --------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------- | -------- |
 | D1  | Saída antes da entrada (08:00 → 07:50) salva sem aviso como 22h50 (R$ 953,13)                             | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
 | D2  | "Alterar custo": trocar a data substituía o valor digitado pelo antigo. **Corrigido no CP-03**            | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
-| D3  | Duplo clique duplica cliente e turno. **Cliente corrigido no CP-02** (envio único); turno segue no CP-04  | P2         | E2E #133 + leitura do código | CP-02/04 |
+| D3  | Duplo clique duplicava cliente e turno. **Corrigido**: cliente no CP-02, turno no CP-04 (envio único)     | P2         | E2E #133 + leitura do código | CP-02/04 |
 | D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
 | D6  | `billing.ts` usa `<= 15`/`<= 45` (030) e o núcleo V2 `< 15`/`< 45`; só alimenta horas exibidas, não valor | P3         | leitura do código            | CP-05    |
@@ -87,6 +87,31 @@ PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 73/73 `test:*`; `sql-local` 52; sem 
 financeira alterada e com MFA opcional mantido. Pendente de decisão: o Auth responde `user_banned`
 antes de conferir a senha (revela conta revogada pela API do Auth, não pela tela). Não testados:
 expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo.
+
+Defeitos do CP-04 (12/11/2026, sessão em nuvem), todos corrigidos e revalidados; inventário,
+matrizes de turnos e equipes e conciliação em
+[docs/qa/CP-04-operacoes-turnos-equipes.md](docs/qa/CP-04-operacoes-turnos-equipes.md):
+
+| ID        | Defeito                                                                                               | Prioridade | Estado    |
+| --------- | ----------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D3        | Duplo clique em "Salvar turno" criava 2 turnos (sem carregamento no botão)                            | P2         | corrigido |
+| D-CP04-01 | Duplo clique em "Salvar operação" criava 2 operações                                                  | P2         | corrigido |
+| D-CP04-02 | Cartão da avulsa, seletor de contrato e custo na equipe mostravam o valor do cadastro como "hoje"     | P2         | corrigido |
+| D-CP04-03 | Turno "vira a meia-noite" com fim depois do início (32 h) e intervalo maior que o turno eram aceitos  | P2         | corrigido |
+| D-CP04-04 | Cliente inativo e contrato encerrado/inativo sem identificação no formulário (agora identificados)    | P3         | corrigido |
+| D-CP04-05 | Nome de operação/turno só com espaços aceito; espaços das pontas gravados                             | P3         | corrigido |
+| D-CP04-06 | 12 rótulos soltos nos formulários de operação e turno                                                 | P3         | corrigido |
+| D-CP04-07 | Excluir turno/operação não dizia que a equipe e os turnos saem junto                                  | P3         | corrigido |
+| D-CP04-08 | Alocar/desalocar mostravam a mensagem crua do erro                                                    | P3         | corrigido |
+
+Decisões do CP-04: **DEC-CP04-01** (turno com início igual ao fim é aceito como 24 h, com aviso) e
+alternativas registradas para a DEC-CP02-01 (contrato encerrado continua selecionável e cobrando;
+a tela agora identifica e avisa, sem bloquear).
+
+CP-04 (12/11/2026, sessão em nuvem, Linux): 16 casos E2E novos (`70-operacoes-turnos-equipes`);
+fechamento R$ 2.450,00 de receita e R$ 1.490,00 de custo e relatório (Rui 620, Sol 720, Tito 150)
+sem divergência ao centavo; E2E completo 148 testes (145 PASS, 0 FAIL, 3 FALHA CONHECIDA, 0
+PULADO); 76/76 `test:*`; `sql-local` 52; sem SQL, RLS ou cálculo alterado.
 
 Defeitos do CP-03 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
 revalidados (GREEN); inventário, cenários de vigência e reconciliação de custos em

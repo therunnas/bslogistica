@@ -89,6 +89,9 @@ jobs:
       - name: Teste colaboradores-custos
         run: npm run test:colaboradores-custos
 
+      - name: Teste operacoes-turnos
+        run: npm run test:operacoes-turnos
+
       - name: Teste troca
         run: npm run test:troca
 

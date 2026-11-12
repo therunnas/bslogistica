@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**QA-BS-01 — auditoria, correção e estabilização integral. CP-00, CP-00B, CP-01, CP-02 e CP-03 PASS (local e CI). CP-03 (colaboradores e valores) corrigiu D2 e mais 7 defeitos (D-CP03-01 a 07). Próximo: CP-04. D1, D3 em turno, D4–D8 e as decisões DEC-CP02-01 a 03 seguem abertos.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
+**QA-BS-01 — auditoria, correção e estabilização integral. CP-00, CP-00B, CP-01, CP-02, CP-03 e CP-04 PASS (local e CI). CP-04 (operações, turnos e equipes) corrigiu D3 em turno e mais 8 defeitos (D-CP04-01 a 08). Próximo: CP-05. D1, D4–D8 e as decisões DEC-CP02-01 a 03 e DEC-CP04-01 seguem abertos.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
 | Etapa | QA-BS-01 — auditoria, correção e estabilização integral, por checkpoints CP-00 a CP-12 (plano e defeitos em [PROGRESS](../PROGRESS.md#qa-bs-01--checkpoints)) |
-| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-03 concluído; CP-04 a iniciar (não iniciado nesta sessão) |
-| Último gate concluído | CP-03 — colaboradores e valores (12/11/2026, sessão em nuvem, sessão 06); antes, CP-02, CP-01, CP-00B, CP-00 e a RECONCILIACAO-134 |
+| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-04 concluído; CP-05 a iniciar (não iniciado nesta sessão) |
+| Último gate concluído | CP-04 — operações, turnos e equipes (12/11/2026, sessão em nuvem, sessão 07); antes, CP-03, CP-02, CP-01, CP-00B, CP-00 e a RECONCILIACAO-134 |
 | Worktree | Sessão em nuvem (ambiente principal a partir da sessão 03): worktree isolado `/home/user/bslogistica-qa134` (efêmero), com Docker local da sessão. Sessão anterior no Mac: worktree na pasta temporária do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
 | Branch | `fix/qa-bs-01-estabilizacao`, criada de `origin/test/e2e-playwright-local` (#133, que inclui o #132) por decisão do responsável e reconciliada com a `main` por merge (sem rebase nem force push) |
 | Base | main `f6df1fbf58e8eb34648e2328b926ef99c7ad7164` (squash do #133, sobre `1c6042e`, squash do #132) |
-| HEAD validado | b8f08f7ad7db0e5032250338dad789549abbd3db (CP-02; CI `validar`, `sql-local`, `e2e-local` SUCCESS) + o diff do CP-03, validado na sessão em nuvem: lint, `tsc`, `check:workflow`, 75/75 `test:*`, build, `sql-local` 52 suítes, E2E 132 testes (128 PASS, 4 FALHA CONHECIDA, 0 FAIL, 0 PULADO), 25/25 travas; revalidado na CI no novo HEAD do #134 |
+| HEAD validado | 1f94d03115ab0fec153f2f3e54b686bef9f39f8b (CP-03; CI `validar`, `sql-local`, `e2e-local` SUCCESS) + o diff do CP-04, validado na sessão em nuvem: lint, `tsc`, `check:workflow`, 76/76 `test:*`, build, `sql-local` 52 suítes, E2E 148 testes (145 PASS, 3 FALHA CONHECIDA, 0 FAIL, 0 PULADO), 25/25 travas; revalidado na CI no novo HEAD do #134 |
 | Alterações não commitadas | Nenhuma na sessão em nuvem (`project_id` trocado só para os testes e restaurado; `supabase/.branches/` não versionado). No Mac (sessão anterior): `supabase/config.toml` com `project_id = "bs-e2e-qa01"` (**nunca commitar**) e `supabase/.branches/` |
 | PR | #134 (Draft), base `main` desde a RECONCILIACAO-134. Integrados: #132 (`1c6042e`) e #133 (`f6df1fb`). Aberto e não tocado: #125 |
 | Ambiente-alvo | Local (Supabase local descartável) e CI. HML, Preview e Production: nenhum acesso |
-| Última ação comprovada | CP-03 na sessão em nuvem (Docker local, reiniciado nesta sessão): 16 casos E2E novos de colaboradores, funções, "Alterar custo", valores de hoje (com 300 colaboradores) e integração com equipe, apontamento, fechamento e relatório; 8 defeitos reproduzidos (RED), corrigidos e revalidados (GREEN); encerramento sem sobras (0 containers, 0 volumes) |
-| Próxima ação exata | CP-04 — operações, turnos e equipes (inclui D3 em turno; adotar o valor de hoje com estado na tela de Operações), só com nova autorização; não iniciado |
+| Última ação comprovada | CP-04 na sessão em nuvem (Docker reiniciado nesta sessão, depois de remover o `containerd.pid` velho da sessão anterior): 16 casos E2E novos de operações, turnos, equipes e integração com apontamento, fechamento e relatório; 9 defeitos corrigidos e revalidados; encerramento sem sobras (0 containers, 0 volumes) |
+| Próxima ação exata | CP-05 — apontamentos e regras financeiras (inclui D1/B3; salvar o dia grava a equipe inteira), só com nova autorização; não iniciado |
 
 ## Estado atual para retomada
 
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | QA-BS-01 CP-04 — operações, turnos e equipes (12/11/2026, sessão em nuvem, sessão 07), autorizado pelo responsável. Auditoria da tela `/operacoes` (operação fixa e avulsa, turnos, equipe), dos valores exibidos e da passagem para apontamento, fechamento e relatório. D3 em turno corrigido. Inventário, matrizes de turnos e equipes, conciliação e decisões em [docs/qa/CP-04-operacoes-turnos-equipes.md](qa/CP-04-operacoes-turnos-equipes.md) |
+| Resultados e testes comprovados | **RED no `1f94d03`:** 2 operações e (no `30-falhas-conhecidas`) 2 turnos no duplo clique; nome gravado com espaços; rótulos soltos; cartão da avulsa com o valor do cadastro com erro de leitura; "Salvar turno" sem carregamento. **GREEN, sessão em nuvem:** lint, `tsc`, `check:workflow`, `git diff --check` PASS; 76/76 `test:*` (nova `test:operacoes-turnos` 23/23); build PASS; travas 25/25; `npm run e2e:local`: **148 testes, 145 PASS, 0 FAIL, 3 FALHA CONHECIDA, 0 PULADO**, 990 s (D3 em turno saiu das falhas conhecidas); `sql-local` 52 suítes. Conciliação: contrato 250 → 300 e custo 150 → 170 pela data, dois profissionais, turno noturno com data da entrada, fechamento R$ 2.450,00 × R$ 1.490,00, relatório Rui 620 / Sol 720 / Tito 150 |
+| Código e PR afetados | Correções: `src/app/(painel)/operacoes/painel-operacoes.tsx` e `operacoes/_dominio.ts` (novo). Testes: `e2e/specs/70-operacoes-turnos-equipes.spec.ts`, D3 em turno em `30-falhas-conhecidas` convertido em PASS, `scripts/testar-operacoes-turnos.mjs` (+ `package.json` e `ci.yml`). Docs: `docs/TESTES_E2E.md`, `docs/qa/CP-04-…`, `PROGRESS.md`, este arquivo. **Nenhum SQL, migration, RLS, policy, grant, trigger ou cálculo.** PR #134 (Draft) |
+| Ambientes envolvidos | Sessão em nuvem: Docker iniciado nesta sessão (vazio no início; o `dockerd` só subiu depois de apagar o `/var/run/docker/containerd/containerd.pid` deixado pela sessão anterior, arquivo de execução do próprio daemon); Supabase `bs-e2e-cp04` (iteração e execuções oficiais) e `bs-fin11-cp04` (SQL) criados e encerrados pelo próprio `project_id`; 0 containers e 0 volumes no fim. GitHub (CI). HML, Preview e Production: nenhum acesso |
+| Pendências e decisões | DEC-CP02-01 (contrato encerrado continua cobrando; alternativas a–d no documento do CP-04; reforçado por evidência nova), DEC-CP02-02, DEC-CP02-03, **DEC-CP04-01** (turno de 24 h com início = fim: aceito com aviso). Dependências: CP-05 (salvar o dia grava a equipe inteira; D1), CP-06 (avulsa sem data nasce com vigência de hoje; modalidades), CP-09 (`window.confirm`). Operação não tem status editável (inativar operação não existe). D1, D4–D8 abertos |
+| Próxima ação exata | CP-05 — apontamentos e regras financeiras, com nova autorização; não iniciado |
+| Autorizações e proibições | Autorizado e usado: inspeção, testes em Supabase local, cenários E2E, correção de defeitos do CP-04 (validação, usabilidade, persistência, duplo clique em turnos e operações, carregamento e erro dos valores exibidos), integração com colaboradores, clientes, contratos e apontamentos, documentação, commit e push só no #134, descrição do PR. Proibidos e não feitos: merge, Ready for review, `main` e outros PRs, deploy, HML, Production, migrations remotas, flags e secrets remotos, outro Supabase remoto, excluir dados reais, motor financeiro, decisões de negócio, D1, D4, afrouxar RLS, enfraquecer testes, remover recursos Docker preexistentes (não havia), CP-05 |
+
+### Tarefa anterior — QA-BS-01 CP-03 (12/11/2026, sessão em nuvem, sessão 06)
 
 | Campo | Valor |
 | --- | --- |
