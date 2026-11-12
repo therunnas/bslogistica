@@ -145,3 +145,8 @@ cobrados normalmente pelo valor dele (R$ 200,00). O fim do contrato não limita 
   (DEC-CP02-01).
 - **CP-01, CP-02 e CP-03 íntegros:** specs 40, 41, 50 e 60 PASS na mesma execução; suítes
   `mensagens-auth`, `clientes-contratos` e `colaboradores-custos` PASS.
+- **CI no `e57f379` (primeiro push do CP-04):** `validar` e `sql-local` SUCCESS; `e2e-local` FAIL em
+  1 teste (OP5: 148 testes, 144 PASS, 1 FAIL, 3 FALHA CONHECIDA). Causa no próprio teste: depois da
+  exclusão recusada, o aviso "Exclusão recusada…" ainda era o primeiro da pilha quando o teste leu o
+  aviso da exclusão seguinte (na CI, mais rápida que a sessão local). A conferência no banco não chegou a rodar nessa execução; na execução local completa a operação livre foi excluída e conferida no banco. Correção: esperar o aviso específico "Registro removido." (OP5 e o mesmo
+  padrão no CB6 do CP-03). Revalidado no HEAD seguinte.

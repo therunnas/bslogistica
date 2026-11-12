@@ -1,5 +1,5 @@
 # Projeto BSLOG atual (sa-east-1), reconfirmado na reconstrução de 10/09/2026.
-project_id = "ehkduqokntemtmqzdrbd"
+project_id = "bs-e2e-cp04"
 
 # Sem seção [auth] de propósito. "supabase config push" envia este arquivo
 # inteiro: com a seção ausente, o CLI aplicaria seus padrões a toda a

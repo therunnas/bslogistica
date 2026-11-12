@@ -663,6 +663,9 @@ test("CB6 excluir: com apontamento é recusado em português; sem dependência r
   resposta = responderConfirmacao(page, true);
   await page.getByRole("button", { name: `Excluir ${C} Enter`, exact: true }).click();
   await resposta;
-  await esperarAviso(page, "Registro removido.");
+  // O aviso anterior (recusa) pode continuar na tela: espera o aviso desta exclusão.
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: "Registro removido." }),
+  ).toBeVisible({ timeout: 20_000 });
   expect(contarColaboradores(`${C} Enter`)).toBe(0);
 });

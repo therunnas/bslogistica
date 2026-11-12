@@ -690,6 +690,9 @@ test("OP5 excluir operação: com apontamento é recusado; sem dependência remo
   resposta = responderConfirmacao(page, true);
   await page.getByRole("button", { name: `Excluir ${livre}`, exact: true }).click();
   await resposta;
-  await esperarAviso(page, "Registro removido.");
+  // O aviso anterior (recusa) pode continuar na tela: espera o aviso desta exclusão.
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: "Registro removido." }),
+  ).toBeVisible({ timeout: 20_000 });
   expect(contar("operations", livre)).toBe(0);
 });
