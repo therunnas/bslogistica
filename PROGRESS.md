@@ -93,7 +93,7 @@ Infraestrutura Playwright contra o app em loopback e um Supabase **local descart
 GitHub Actions (job `e2e-local`, workflow próprio), sem secrets e sem caminho para HML ou
 Production ([TESTES_E2E.md](docs/TESTES_E2E.md)). Cobre o ciclo pela tela (V1–V5 do #132, fixa ao
 centavo, avulsa genérica, fechamento, exportações, fatura, Dashboard e Relatórios), a segurança do
-operador e os defeitos conhecidos como `test.fail` (B3 jornada atípica, duplo clique em cliente e
+operador e os defeitos conhecidos reproduzidos como FALHA CONHECIDA (B3 jornada atípica, duplo clique em cliente e
 turno, valor digitado perdido ao trocar a data, confirmação da fatura sem aviso de dias abertos).
 **CI verde nesse job não é homologação nem autoriza Production**; o teste no Preview segue
 necessário para Auth real, borda da Vercel e dados do ambiente de homologação.

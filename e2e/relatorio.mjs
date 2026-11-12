@@ -1,7 +1,8 @@
 /**
  * Resumo do E2E a partir de e2e-results/resultado.json (reporter JSON do Playwright).
  * Escreve e2e-results/resumo.md e, na CI, o resumo do job ($GITHUB_STEP_SUMMARY).
- * Status: PASS, FAIL, FALHA CONHECIDA (test.fail esperado), PULADO.
+ * Status: PASS, FAIL, FALHA CONHECIDA (defeito conhecido reproduzido, etiqueta @falha-conhecida,
+ * ou test.fail esperado), PULADO.
  */
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -14,6 +15,8 @@ const dados = JSON.parse(readFileSync(ARQUIVO, "utf8"));
 const sha = process.env.E2E_SHA ?? "local";
 
 const linhas = [];
+/** Contexto (árvore da página) só das falhas inesperadas, para o log da CI. */
+const contextos = [];
 function percorrer(suite, caminho) {
   const nome = [...caminho, suite.title].filter(Boolean);
   for (const spec of suite.specs ?? []) {
@@ -23,8 +26,17 @@ function percorrer(suite, caminho) {
       if (teste.status === "skipped") status = "PULADO";
       else if (teste.expectedStatus === "failed" && teste.status === "expected")
         status = "FALHA CONHECIDA";
+      // Teste que REPRODUZ um defeito conhecido e confere que ele continua lá (e2e/specs/30-…).
+      else if (
+        (spec.tags ?? []).some((tag) => tag.replace(/^@/, "") === "falha-conhecida") &&
+        teste.status === "expected"
+      )
+        status = "FALHA CONHECIDA";
       else if (teste.status === "expected") status = "PASS";
       else status = "FAIL";
+      if (status === "FAIL")
+        for (const anexo of r?.attachments ?? [])
+          if (anexo.name === "error-context" && anexo.path) contextos.push(anexo.path);
       linhas.push({
         arquivo: spec.file,
         titulo: [...nome.slice(1), spec.title].join(" › "),
@@ -61,5 +73,6 @@ const md = [
 ].join("\n");
 
 writeFileSync("e2e-results/resumo.md", md);
+writeFileSync("e2e-results/contextos-das-falhas.txt", contextos.map((c) => `${c}\n`).join(""));
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
 console.log(md.split("\n").slice(0, 3).join("\n"));

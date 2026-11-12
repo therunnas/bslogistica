@@ -65,7 +65,7 @@ recusadas.
 | `00-fumaca.spec.ts` | estado do banco (56 migrations, motor ON, resolução OFF, dobro ON, RLS em tudo), leitura somente leitura, admin abre as 10 telas, operacional restrito |
 | `10-ciclo-completo.spec.ts` | cadastros pela tela; V1–V5 do PR #132; operação fixa ao centavo (normal, incompleta, horas extras, limites 15/45, sábado, domingo, feriado, noturno, falta, substituição); avulsa genérica com 2 participantes; fechamento; Excel interno × Excel do cliente (sem custo/margem); CSV; adicional e fatura; sem cobrança dupla; faturado travado; Dashboard e Relatórios |
 | `20-seguranca.spec.ts` | operador só por RPC e sem chave financeira; tabela direta devolve zero linha; chave extra recusada com `22023`; admin não usa a RPC do operador; faturado travado para o operador; sem sessão não há dado |
-| `30-falhas-conhecidas.spec.ts` | defeitos e riscos conhecidos escritos como o comportamento correto, com `test.fail` |
+| `30-falhas-conhecidas.spec.ts` | defeitos e riscos conhecidos: cada teste reproduz o defeito e confere que ele continua lá (etiqueta `@falha-conhecida`) |
 
 Esperado × obtido: os valores esperados estão escritos à mão nos cenários (diária 250, custo 150,
 hora extra 1,5, tolerância 10 min, domingo/feriado em dobro) e são comparados com o que o banco
@@ -76,11 +76,12 @@ gravou (derivação por trigger) e com o que a tela mostra. A tabela completa da
 
 - **PASS** — comportamento conferido;
 - **FAIL** — regressão ou problema novo (a CI fica vermelha);
-- **FALHA CONHECIDA** — teste marcado com `test.fail` falhou como esperado: o defeito continua lá;
+- **FALHA CONHECIDA** — teste com a etiqueta `@falha-conhecida` reproduziu o defeito: ele continua lá;
 - **PULADO** — não rodou (num arquivo serial, um passo anterior falhou).
 
-Quando um defeito conhecido for corrigido, o teste dele passa a "passar inesperadamente" e a CI
-acusa: tirar o `test.fail` no mesmo PR da correção.
+Quando um defeito conhecido for corrigido, a conferência do defeito falha e a CI acusa: no mesmo PR
+da correção, trocar o teste pelo comportamento correto e tirar a etiqueta. Um passo anterior que
+quebre (seletor, preparação) também dá FAIL — nunca vira falha conhecida por engano.
 
 ## Evidências
 

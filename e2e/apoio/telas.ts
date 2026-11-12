@@ -249,7 +249,7 @@ export function descricaoDoCartao(page: Page, rotulo: string): Locator {
 export async function abrirColaborador(page: Page, nome: string) {
   await page.goto("/colaboradores");
   await page.getByRole("button", { name: `Editar ${nome}`, exact: true }).click();
-  await expect(dialogo(page).getByText("Custo do colaborador")).toBeVisible();
+  await expect(dialogo(page).getByText("Custo do colaborador", { exact: true })).toBeVisible();
 }
 
 /**

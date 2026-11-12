@@ -128,12 +128,13 @@ fi
 
 node e2e/relatorio.mjs || true
 
-# Contexto de cada falha (árvore de acessibilidade da página, sem cookies nem tokens) no próprio log,
-# para diagnosticar sem baixar o artefato.
-for contexto in "$RESULTADOS"/artefatos-*/*/error-context.md; do
-  [ -f "$contexto" ] || continue
-  echo "----- $contexto"
-  # Erro e árvore da página; o código-fonte do teste fica de fora (já está no repositório).
-  awk '/^# Test source/{f=1} /^# Page snapshot/{f=0} !f' "$contexto" | sed -n '1,200p'
-done
+# Contexto das falhas INESPERADAS (árvore de acessibilidade da página, sem cookies nem tokens) no
+# próprio log, para diagnosticar sem baixar o artefato. Falha conhecida (test.fail) fica de fora.
+if [ -s "$RESULTADOS/contextos-das-falhas.txt" ]; then
+  while IFS= read -r contexto; do
+    [ -f "$contexto" ] || continue
+    echo "----- $contexto"
+    awk '/^# Test source/{f=1} /^# Page snapshot/{f=0} !f' "$contexto" | sed -n '1,200p'
+  done <"$RESULTADOS/contextos-das-falhas.txt"
+fi
 exit "$RESULTADO"

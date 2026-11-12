@@ -141,7 +141,11 @@ test("operacional: a tela usa só as RPCs e nenhuma resposta traz valor financei
   await escolher(page, campo(page, "Operação"), new RegExp(`^${literal(OP)} — ${literal(CLI)}$`));
   await escolher(page, campo(page, "Turno"), new RegExp(`^${literal(TURNO)} — 08:00 às 17:00`));
   await campo(page, "Data").fill(DATA);
-  await expect(page.locator("tr").filter({ hasText: GIL })).toBeVisible();
+  const linhaDoGil = page.locator("tr").filter({ hasText: GIL }).first();
+  await expect(linhaDoGil).toBeVisible();
+  // Na tela do operador os horários começam vazios: ele informa entrada e saída.
+  await linhaDoGil.locator("input[type=time]").nth(0).fill("08:00");
+  await linhaDoGil.locator("input[type=time]").nth(1).fill("17:00");
   await page.getByRole("button", { name: "Salvar apontamento" }).click();
   await expect(page.getByText("Apontamento salvo.").first()).toBeVisible({ timeout: 30_000 });
   await Promise.all(pendentes);
