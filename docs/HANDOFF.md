@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**PROD-051-01 — HML e Production na 051 com domingo e feriado em dobro LIGADO (11/11/2026). Site de Production `ecd67f2` no ar. Falta cadastrar os feriados (cidade do piloto pendente) e o teste manual.** SHAs e contagens abaixo são evidências de 11/11/2026; reconferir antes de agir.
+**QA-BS-01 — auditoria, correção e estabilização integral. CP-00 PASS; CP-00B em andamento (E2E local bloqueado no macOS por `setsid`). Nenhum defeito corrigido ainda.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
-| Etapa | PROD-051-01 — 051 e interruptor ligado em Production, site publicado |
-| Gate atual | Production concluída para a 051. Próximo: feriados e teste manual |
-| Último gate concluído | 051 aplicada e interruptor ligado em HML e Production; site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`) |
-| Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
-| Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
-| Base | main `1d60ca0215bf36fe5c6af340789380d0198f6d68` |
-| HEAD validado | 74209affdb14f773543f04e26b99aef74ce4eab9 (E2E, `validar` e `sql-local` SUCCESS); este checkpoint muda só documentação e é revalidado no HEAD do PR Draft do E2E |
-| Alterações não commitadas | Nenhuma além deste conjunto |
-| PR | #130 (só documentação). Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
-| Ambiente-alvo | HML e Production (aplicados) |
-| Última ação comprovada | Production: 051 PASS pelo script; 26/26 com o interruptor desligado e 7/7 com ele ligado, em transações desfeitas; `dias_especiais_em_dobro=true`, `tarifas_por_funcao=false`; 1 cliente, 3 contas, 0 apontamentos, 0 feriados; site READY e domínio no deployment novo |
-| Próxima ação exata | Teste manual do responsável no HML (limpo); depois os feriados (cidade do piloto) |
+| Etapa | QA-BS-01 — auditoria, correção e estabilização integral, por checkpoints CP-00 a CP-12 (plano e defeitos em [PROGRESS](../PROGRESS.md#qa-bs-01--checkpoints)) |
+| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-00B |
+| Último gate concluído | CP-00 — baseline e inventário (12/11/2026) |
+| Worktree | Mac local, worktree efêmero na pasta temporária da sessão do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
+| Branch | `fix/qa-bs-01-estabilizacao`, criada de `origin/test/e2e-playwright-local` (#133, que inclui o #132) por decisão do responsável; desvio registrado da regra "partir da main" |
+| Base | `5b4f44ab607f0a6b01cf16a705d16374fb5f22b4` (#133); main `1d60ca0215bf36fe5c6af340789380d0198f6d68` |
+| HEAD validado | `5b4f44ab607f0a6b01cf16a705d16374fb5f22b4` (lint, `tsc`, 74/74 `test:*`, build no Mac); commits posteriores só de documentação (HANDOFF e PROGRESS) |
+| Alterações não commitadas | `supabase/config.toml` (`project_id = "bs-e2e-qa01"`, exigido pelo E2E local — **nunca commitar**); `supabase/.branches/` (gerado pelo CLI) |
+| PR | PR Draft desta branch com base `test/e2e-playwright-local`. Abertos: #133, #132, #125 |
+| Ambiente-alvo | Local (Supabase local descartável) e CI. HML, Preview e Production: nenhum acesso |
+| Última ação comprovada | CP-00 PASS; baseline estática PASS no Mac; E2E local parou na subida do app (`setsid: command not found`, saída 7) |
+| Próxima ação exata | Fechar o CP-00B: rodar o E2E local com um substituto de `setsid` só no PATH local (ou corrigir o script de forma portável) e conferir 58 PASS / 5 FALHA CONHECIDA; depois CP-01 |
 
 ## Estado atual para retomada
 
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | QA-BS-01, CP-00 e início do CP-00B (12/11/2026, Claude Code no Mac). CP-00: leitura de CLAUDE/AGENTS/PROGRESS/HANDOFF/ESTADO/WORKFLOW/AMBIENTES/NEGOCIO/NEGOCIO_X_SISTEMA da main; conferência de Git, PRs e CI; inventário de 16 telas do painel, 7 de acesso e 5 rotas de API; leitura da autorização das APIs `/api/fechamento*` e `/api/calendario/municipios` e das Server Actions de usuários, containers e vigências (todas conferem sessão e `admin` no servidor antes do banco); plano CP-00 a CP-12 e defeitos D1–D8 e I1 no [PROGRESS](../PROGRESS.md#qa-bs-01--checkpoints). CP-00B: baseline executável no Mac |
+| Resultados e testes comprovados | Mac, Node 24.15, em `5b4f44a`: `npm ci`, `npm run lint` PASS, `npx tsc --noEmit` PASS, 74/74 `test:*`/`check:*` PASS (`test:calendario-runners` falhou só por `docker` fora do PATH e passou 23/23 depois), `npm run build` PASS com os placeholders da CI. `npm run e2e:local`: travas 21/21 PASS, Supabase local `bs-e2e-qa01`, 56 migrations, semente e build OK; **BLOQUEADO** na subida do app (`setsid` não existe no macOS, saída 7); Playwright não rodou. Nenhum teste SQL local rodou nesta sessão. Divergências documentais: PROGRESS dizia main `ecd67f2` e HANDOFF `8c493a5`; o real é `1d60ca0` (corrigido no PROGRESS) |
+| Código e PR afetados | Só `PROGRESS.md` e `docs/HANDOFF.md`. Nenhum código, teste, migration ou workflow alterado |
+| Ambientes envolvidos | Mac local: Docker Desktop ligado; 36 containers `supabase_*` antigos de 9 instâncias locais removidos com autorização do responsável, **14 volumes preservados** (os 24 containers sem esse prefixo intocados); Supabase local `bs-e2e-qa01` criado e encerrado pelo script. HML, Preview e Production: nenhum acesso |
+| Pendências e decisões | I1 (`setsid`) bloqueia o E2E local no Mac. Checkout original `fix/auditoria-bs-202610`: 9 commits de 17/10 nunca publicados, com a migration `019_historico_operacional_desalocado`, `src/lib/apontamentos/rascunho.ts` e `scripts/testar-apontamentos.mjs` ausentes da main — preservar, não integrar sem decisão. Negócio: cidade do piloto (feriados), C1–C6, modalidade dos avulsos |
+| Próxima ação exata | Fechar o CP-00B (E2E local: 58 PASS / 5 FALHA CONHECIDA esperados) e iniciar o CP-01; correções na ordem D1/D2 → D3 → demais, cada uma com teste RED → GREEN, `test:*`, E2E e registro aqui |
+| Autorizações e proibições | Autorizado pelo responsável (prompt QA-BS-01, 12/11/2026): inspecionar o repositório, testes locais seguros, criar testes, corrigir código nesta branch, commits nela e PR Draft. Proibidos: merge, Ready for review, Production, HML, Preview remoto com banco, migrations remotas, flags, secrets, exclusão de dados, outro projeto Supabase, alterar outras branches ou PRs (#125, #132, #133), commitar `supabase/config.toml` |
+
+### Tarefa anterior — E2E-REVISAO-02 (12/11/2026, PR #133 em Draft)
 
 | Campo | Valor |
 | --- | --- |

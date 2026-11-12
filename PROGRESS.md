@@ -25,15 +25,51 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FUNC-READY-02 — domingo e feriado em dobro com a resolução OFF, com interruptor (11/11/2026).**
-Migration 051 mesclada (#129) e **aplicada no HML e em Production, com o interruptor ligado nos
-dois**. Site de Production publicado com `ecd67f2`. O ponto de entrada da
-próxima sessão continua sendo o [HANDOFF](docs/HANDOFF.md). **O piloto ainda não começou** (ver
-"Bloqueio do piloto").
+**QA-BS-01 — auditoria, correção e estabilização integral (iniciada em 12/11/2026).** Branch
+`fix/qa-bs-01-estabilizacao`, empilhada sobre o #133 (que inclui o #132), por decisão do
+responsável. Execução por checkpoints (CP-00 a CP-12): auditar, reproduzir, corrigir, testar,
+validar e só então avançar. Estado e próxima ação exata no [HANDOFF](docs/HANDOFF.md).
+
+Tarefa anterior, ainda vigente em HML e Production: **FUNC-READY-02** — domingo e feriado em
+dobro com a resolução OFF (051 aplicada nos dois, interruptor ligado). **O piloto ainda não
+começou** (ver "Bloqueio do piloto").
+
+### QA-BS-01 — checkpoints
+
+| CP     | Escopo                                                                             | Estado       |
+| ------ | ---------------------------------------------------------------------------------- | ------------ |
+| CP-00  | Baseline e inventário (Git, PRs, ambientes, docs, 16 telas + 7 de acesso + 5 APIs) | PASS         |
+| CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | em andamento |
+| CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | não iniciado |
+| CP-02  | Clientes e contratos                                                               | não iniciado |
+| CP-03  | Colaboradores e valores                                                            | não iniciado |
+| CP-04  | Operações, turnos e equipes                                                        | não iniciado |
+| CP-05  | Apontamentos e regras financeiras (maior risco)                                    | não iniciado |
+| CP-06  | Serviços avulsos, adicionais e containers                                          | não iniciado |
+| CP-07  | Fechamento e faturamento                                                           | não iniciado |
+| CP-08  | Dashboard, relatórios e exportações                                                | não iniciado |
+| CP-09  | Interface, clareza e consistência                                                  | não iniciado |
+| CP-10  | Segurança, integridade e infraestrutura                                            | não iniciado |
+| CP-11  | Regressão integrada final                                                          | não iniciado |
+| CP-12  | Roteiro de homologação com o responsável (HML só com autorização)                  | não iniciado |
+
+Defeitos registrados no CP-00 (nenhum corrigido ainda):
+
+| ID  | Defeito                                                                                                   | Prioridade | Evidência                    | CP       |
+| --- | --------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------- | -------- |
+| D1  | Saída antes da entrada (08:00 → 07:50) salva sem aviso como 22h50 (R$ 953,13)                             | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
+| D2  | "Alterar custo": trocar a data substitui o valor digitado pelo antigo                                     | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
+| D3  | Duplo clique duplica cliente e turno; demais cadastros só têm `disabled={isPending}`                      | P2         | E2E #133 + leitura do código | CP-02/04 |
+| D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
+| D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
+| D6  | `billing.ts` usa `<= 15`/`<= 45` (030) e o núcleo V2 `< 15`/`< 45`; só alimenta horas exibidas, não valor | P3         | leitura do código            | CP-05    |
+| D7  | Containers fora do menu, mas acessíveis por URL e links do Faturamento (risco de cobrança dupla)          | P2         | HANDOFF                      | CP-06    |
+| D8  | Exclusões usam `window.confirm` nativo                                                                    | P3         | leitura do código            | CP-09    |
+| I1  | `scripts/e2e-local.sh` usa `setsid`, ausente no macOS: o app não sobe e o E2E local para (saída 7)        | infra      | execução local 12/11         | CP-00B   |
 
 ### Situação
 
-- `main` em `ecd67f2`, com migrations até a **051**. Integrados: #119 (046–050), #120
+- `main` em `1d60ca0` (#131; antes registrado como `ecd67f2`), com migrations até a **051**. Integrados: #119 (046–050), #120
   (rótulos da avulsa), #121 (Containers fora do menu e do cartão; serviço pontual vira
   operação avulsa), #122 (valor acordado pelo contrato), #123 (confirmação antes de gerar
   fatura), #124 (este arquivo), #126 (rótulo "Faturado" no apontamento), #127 (plano de
