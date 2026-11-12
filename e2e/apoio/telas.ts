@@ -220,7 +220,15 @@ export async function lancarDia(
   const salvar = page.getByRole("button", { name: "Salvar", exact: true });
   await expect(salvar).toBeEnabled();
   await salvar.click();
-  await expect(page.getByText("Apontamento salvo.").first()).toBeVisible({ timeout: 30_000 });
+  await esperarAviso(page, "Apontamento salvo.");
+}
+
+/** Espera o aviso da tela depois de salvar e exige o texto de sucesso (mostra o aviso real no erro). */
+export async function esperarAviso(page: Page, sucesso: string) {
+  const aviso = page.locator("[data-sonner-toast]").first();
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  const texto = (await aviso.innerText()).trim();
+  expect(texto, `aviso exibido pela tela: "${texto}"`).toContain(sucesso);
 }
 
 // ---------------------------------------------------------------------------

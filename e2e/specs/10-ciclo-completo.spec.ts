@@ -366,7 +366,8 @@ test.describe("PR #132 — vigências do custo", () => {
 
     const ativas = versoesDeCusto(VERA).filter((v) => v.ativa);
     expect(ativas.map((v) => [v.inicio, v.fim, v.custo])).toEqual([
-      ["2026-10-01", "2026-10-06", "160.00"],
+      // Fim EXCLUSIVO no banco (daterange '[)'): 07/10 = vale até 06/10, como a tela mostra.
+      ["2026-10-01", "2026-10-07", "160.00"],
       ["2026-10-07", null, "170.00"],
     ]);
 

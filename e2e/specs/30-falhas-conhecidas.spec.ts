@@ -14,6 +14,7 @@ import {
   criarOperacao,
   criarTurno,
   dialogo,
+  esperarAviso,
   linhaDo,
 } from "../apoio/telas";
 
@@ -62,7 +63,7 @@ test(
     await tr.locator("input[type=time]").nth(1).fill("07:50");
     await page.getByRole("button", { name: "Salvar", exact: true }).click();
     // Correto seria um aviso de jornada atípica com confirmação. Hoje salva direto:
-    await expect(page.getByText("Apontamento salvo.").first()).toBeVisible({ timeout: 30_000 });
+    await esperarAviso(page, "Apontamento salvo.");
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
     const l = lancamento(OP, HUGO, DATA_B3);
     // Calculado à mão pela regra atual (fator 1,5, tolerância 10 min, blocos de 15/45 min).

@@ -15,6 +15,7 @@ import {
   dialogo,
   emitirFatura,
   escolher,
+  esperarAviso,
   literal,
   reais,
 } from "../apoio/telas";
@@ -96,7 +97,9 @@ test("preparação pelo admin: cliente, operação, turno, equipe e atribuição
   const page = await paginaDo(browser, "admin");
   await criarCliente(page, CLI);
   await criarColaborador(page, { nome: GIL, custo: 150, desde: "2026-10-01" });
-  await criarOperacao(page, { cliente: CLI, nome: OP, tipo: "Fixa", valor: 220 });
+  // Avulsa com data do serviço: o valor próprio vale a partir dessa data. (Uma fixa sem contrato
+  // tem valor a partir de HOJE e recusaria, corretamente, um dia de outubro.)
+  await criarOperacao(page, { cliente: CLI, nome: OP, tipo: "Avulsa", valor: 220, data: DATA });
   await criarTurno(page, {
     operacao: OP,
     nome: TURNO,
@@ -147,7 +150,7 @@ test("operacional: a tela usa só as RPCs e nenhuma resposta traz valor financei
   await linhaDoGil.locator("input[type=time]").nth(0).fill("08:00");
   await linhaDoGil.locator("input[type=time]").nth(1).fill("17:00");
   await page.getByRole("button", { name: "Salvar apontamento" }).click();
-  await expect(page.getByText("Apontamento salvo.").first()).toBeVisible({ timeout: 30_000 });
+  await esperarAviso(page, "Apontamento salvo.");
   await Promise.all(pendentes);
 
   expect(respostas.length).toBeGreaterThan(0);
