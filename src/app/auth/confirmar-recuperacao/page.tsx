@@ -9,11 +9,11 @@ import {
   MENSAGEM_LINK_INVALIDO,
   NOME_DO_COOKIE_PENDENTE,
   ROTA_ESQUECI_SENHA,
-  ROTULO_CONFIRMAR_RECUPERACAO,
   TITULO_CONFIRMAR_RECUPERACAO,
 } from "@/lib/recuperacao-senha";
 
 import { confirmarRecuperacao } from "./actions";
+import { BotaoConfirmarRecuperacao } from "./botao-confirmar";
 
 export const metadata: Metadata = {
   title: TITULO_CONFIRMAR_RECUPERACAO,
@@ -75,12 +75,7 @@ export default async function ConfirmarRecuperacaoPage() {
 
             {temRecuperacaoPendente ? (
               <form action={confirmarRecuperacao}>
-                <Button
-                  type="submit"
-                  className="h-12 w-full rounded-lg bg-[#722F37] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#823B43] hover:text-white"
-                >
-                  {ROTULO_CONFIRMAR_RECUPERACAO}
-                </Button>
+                <BotaoConfirmarRecuperacao />
               </form>
             ) : (
               <Button

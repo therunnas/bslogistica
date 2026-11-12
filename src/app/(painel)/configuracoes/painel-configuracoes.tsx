@@ -394,7 +394,7 @@ function AtivarSegundoFator({
     });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(mensagemDeCodigoInvalido(error));
       setCodigo("");
       setEnviando(false);
       return;

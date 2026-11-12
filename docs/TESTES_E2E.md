@@ -29,15 +29,20 @@ Sequência do script:
    vínculo remoto, **nenhuma instância do Supabase CLI já existente** (container de qualquer
    projeto, em execução ou parado) e nenhuma das portas locais (54321–54324, 3000) ocupada. Uma
    falha aqui encerra a execução **sem `start`, sem reset e sem stop**;
-2. `supabase start` (só os serviços necessários). Só a partir daqui o Supabase do `project_id`
-   desta execução passa a ser dela;
+2. `supabase start` (só os serviços necessários, incluindo o capturador de e-mail Mailpit em
+   `127.0.0.1:54324`). O Auth local sobe com TOTP habilitado e cadastro público desligado, como na
+   Production, **só por variáveis de ambiente do processo** (`SUPABASE_AUTH_MFA_TOTP_*`,
+   `SUPABASE_AUTH_ENABLE_SIGNUP=false`): o `config.toml` não ganha `[auth]`. Só a partir daqui o
+   Supabase do `project_id` desta execução passa a ser dela;
 3. identidade conferida **antes do reset**: API em `http://127.0.0.1:54321`, container
    `supabase_db_bs-e2e-…` rodando e com o rótulo `com.supabase.cli.project` igual ao projeto desta
    execução; depois, `supabase db reset --local` — todas as migrations versionadas, na ordem;
-4. duas contas sintéticas (`e2e-admin@exemplo.test`, `e2e-operacional@exemplo.test`) pela Admin
-   API **local**, com senhas aleatórias desta execução, nunca impressas;
-5. semente: papéis `admin` e `operacional`, motor por vigência ligado pela RPC (sessão sintética
-   temporária), domingo/feriado em dobro ligado, resolução por função desligada;
+4. contas sintéticas pela Admin API **local**, com senhas aleatórias desta execução, nunca
+   impressas: `e2e-admin` e `e2e-operacional` (login global) e, para o CP-01, `e2e-admin2` (MFA,
+   recuperação com MFA, último admin), `e2e-sem-papel`, `e2e-revogar` (operacional que perde o
+   acesso) e `e2e-recupera` (recuperação sem MFA), todas `@exemplo.test`;
+5. semente: papéis (a conta sem papel fica sem linha), motor por vigência ligado pela RPC (sessão
+   sintética temporária), domingo/feriado em dobro ligado, resolução por função desligada;
 6. `npm run build` e `next start` em `127.0.0.1:3000`, com `e2e/guarda/rede.cjs` bloqueando
    qualquer conexão do servidor para fora do loopback. O app sobe num **grupo de processos
    próprio** pelo controle de tarefas do bash (`set -m`), sem `setsid` (ausente no macOS); o script
@@ -96,6 +101,8 @@ e um erro no ensaio encerra o líder e o filho (G22–G25).
 | `10-ciclo-completo.spec.ts` | cadastros pela tela; V1–V5 do PR #132; operação fixa ao centavo (normal, incompleta, horas extras, limites 15/45, sábado, domingo, feriado, noturno, falta, substituição); avulsa genérica com 2 participantes; fechamento; Excel interno × Excel do cliente (sem custo/margem); CSV; adicional e fatura; sem cobrança dupla; faturado travado; Dashboard e Relatórios |
 | `20-seguranca.spec.ts` | operador só por RPC e sem chave financeira; tabela direta devolve zero linha; chave extra recusada com `22023`; admin não usa a RPC do operador; faturado travado para o operador; sem sessão não há dado |
 | `30-falhas-conhecidas.spec.ts` | defeitos e riscos conhecidos: cada teste reproduz o defeito e confere que ele continua lá (etiqueta `@falha-conhecida`) |
+| `40-autenticacao.spec.ts` | CP-01: login (vazio, senha errada, e-mail inexistente, carregamento, logout, cookie antigo), recuperação de senha com o e-mail capturado no Mailpit (scanner GET, Continuar, duplo clique, validações, link reusado/inválido, sessões anteriores), MFA/TOTP real (cadastro, código errado, desafio no login, AAL1 barrada na tela/API/banco, recuperação com um único TOTP, desativação), usuários (convite e aceite, duplo clique, papel, último admin, operação atribuída, revogação e reativação) |
+| `41-permissoes.spec.ts` | CP-01: matriz ADMIN × OPERACIONAL × SEM PAPEL × ANÔNIMO × REVOGADO em URL direta, API Routes, Server Action reenviada com os cookies de outro papel, PostgREST direto e RPC do operador |
 
 Esperado × obtido: os valores esperados estão escritos à mão nos cenários (diária 250, custo 150,
 hora extra 1,5, tolerância 10 min, domingo/feriado em dobro) e são comparados com o que o banco
@@ -141,5 +148,14 @@ O que pode e o que não pode aparecer nesses arquivos:
   o `config.toml`, que **não** descreve a configuração real;
 - dados, feriados e calendário reais do ambiente de homologação;
 - a borda da Vercel (proteção do Preview, CSP servida pela plataforma, domínio);
-- MFA com fator TOTP real (o E2E usa contas sem fator, liberadas em AAL1 como na regra vigente);
-- e-mail (convite, recuperação de senha).
+- o **modelo** de e-mail real (Dashboard): o local usa o modelo padrão do CLI, cujo link aponta
+  para `/auth/v1/verify`; o E2E extrai o `token_hash` da mensagem capturada e abre
+  `/auth/confirm?token_hash=…&type=recovery`, o formato do modelo da Production. A entrega real
+  (SMTP, gateway de segurança do provedor) não é exercitada;
+- o domínio do link: no `next start` local, `request.nextUrl` sai como `http://localhost:3000`
+  qualquer que seja o Host, e o redirecionamento de `/auth/confirm` vai para `localhost`. O E2E abre
+  o link já em `localhost` para o cookie do token pendente acompanhar o salto. Na Vercel o `nextUrl`
+  é o domínio real; confirmar no Preview.
+
+MFA com TOTP real **é** exercitado localmente desde o CP-01 (segredo lido da tela, código calculado
+no teste pela RFC 6238 e verificado pelo GoTrue local).

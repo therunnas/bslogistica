@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
+import { mensagemDeErroDeLogin } from "@/lib/mensagens-de-login";
 import { toast } from "@/lib/notificacoes";
 
 import {
@@ -84,7 +85,9 @@ export default function Login() {
     });
 
     if (error) {
-      toast.error(error.message);
+      // Nunca a mensagem crua do provedor: senha errada, e-mail inexistente e conta revogada
+      // recebem o mesmo texto (ver mensagens-de-login.ts).
+      toast.error(mensagemDeErroDeLogin(error));
       setEnviando(false);
       return;
     }

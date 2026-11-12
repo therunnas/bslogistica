@@ -10,14 +10,16 @@
 -- admin local existe só durante esta transação e é apagada no fim. Os testes, depois, entram
 -- pela tela de login com e-mail e senha, em sessões reais do Auth local.
 --
--- Variáveis psql: admin_id, oper_id, sessao_id.
+-- Variáveis psql: admin_id, oper_id, admin2_id, revogar_id, recupera_id, sessao_id.
 
 \set ON_ERROR_STOP on
 
 begin;
 
 insert into public.user_roles (user_id, role)
-values (:'admin_id', 'admin'), (:'oper_id', 'operacional');
+values (:'admin_id', 'admin'), (:'oper_id', 'operacional'), (:'admin2_id', 'admin'),
+       (:'revogar_id', 'operacional'), (:'recupera_id', 'operacional');
+-- A conta "sem papel" do CP-01 não recebe linha aqui, de propósito.
 
 insert into auth.sessions (id, user_id, not_after) values (:'sessao_id', :'admin_id', null);
 

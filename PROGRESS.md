@@ -41,7 +41,7 @@ começou** (ver "Bloqueio do piloto").
 | ------ | ---------------------------------------------------------------------------------- | ------------ |
 | CP-00  | Baseline e inventário (Git, PRs, ambientes, docs, 16 telas + 7 de acesso + 5 APIs) | PASS         |
 | CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | PASS (Linux) |
-| CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | não iniciado |
+| CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | PASS (local) |
 | CP-02  | Clientes e contratos                                                               | não iniciado |
 | CP-03  | Colaboradores e valores                                                            | não iniciado |
 | CP-04  | Operações, turnos e equipes                                                        | não iniciado |
@@ -67,6 +67,26 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | D7  | Containers fora do menu, mas acessíveis por URL e links do Faturamento (risco de cobrança dupla)          | P2         | HANDOFF                      | CP-06    |
 | D8  | Exclusões usam `window.confirm` nativo                                                                    | P3         | leitura do código            | CP-09    |
 | I1  | `scripts/e2e-local.sh` usava `setsid`, ausente no macOS. **Corrigido** (`set -m`; G22–G25); macOS nativo não comprovado | infra | execução local 12/11 | CP-00B |
+
+Defeitos do CP-01 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
+revalidados (GREEN); detalhe, inventário e matriz em
+[docs/qa/CP-01-autenticacao-e-permissoes.md](docs/qa/CP-01-autenticacao-e-permissoes.md):
+
+| ID        | Defeito                                                                                   | Prioridade | Estado    |
+| --------- | ----------------------------------------------------------------------------------------- | ---------- | --------- |
+| D-CP01-01 | Login mostrava texto cru do Auth ("Invalid login credentials", "User is banned")          | P2         | corrigido |
+| D-CP01-02 | Código TOTP errado mostrava "Invalid TOTP code entered" no `/mfa` e na ativação           | P2         | corrigido |
+| D-CP01-03 | Duplo clique em "Enviar convite" e "Atribuir" executava a ação duas vezes                 | P2         | corrigido |
+| D-CP01-04 | Duplo clique em "Continuar" da recuperação invalidava o próprio link                      | P2         | corrigido |
+| D-CP01-05 | Convite para e-mail existente mostrava texto cru do Auth                                  | P3         | corrigido |
+| D-CP01-06 | Botões só de ícone (gerenciar usuário, remover operação) sem nome acessível               | P3         | corrigido |
+
+CP-01 (12/11/2026, sessão em nuvem, Linux): 35 casos E2E novos (`40-autenticacao`,
+`41-permissoes`) com TOTP real e e-mail capturado no Mailpit local; E2E completo 98 testes (93
+PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 73/73 `test:*`; `sql-local` 52; sem SQL, RLS ou regra
+financeira alterada e com MFA opcional mantido. Pendente de decisão: o Auth responde `user_banned`
+antes de conferir a senha (revela conta revogada pela API do Auth, não pela tela). Não testados:
+expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo.
 
 CP-00B (12/11/2026, sessão em nuvem, Linux): baseline executável completa — lint, `tsc`, 72/72
 `test:*`, build, `sql-local` 52 suítes, E2E local 63 testes (58 PASS, 0 FAIL, 5 FALHA CONHECIDA,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, ShieldCheck } from "lucide-react";
 
 import { sair } from "@/app/(painel)/_acoes";
+import { mensagemDeCodigoInvalido } from "@/app/(painel)/configuracoes/_dominio";
 import { BSBrand } from "@/components/branding/bs-brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -158,7 +159,7 @@ export function PainelMfa({
     });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(mensagemDeCodigoInvalido(error));
       setCodigo("");
       setEnviando(false);
       return;

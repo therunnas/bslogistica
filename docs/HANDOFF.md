@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**QA-BS-01 — auditoria, correção e estabilização integral. CP-00 PASS; CP-00B PASS no Linux (sessão em nuvem e CI), com I1 corrigido de forma portável; execução nativa no macOS não comprovada. Próximo: CP-01. Nenhum defeito D1–D8 corrigido ainda.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
+**QA-BS-01 — auditoria, correção e estabilização integral. CP-00 PASS; CP-00B PASS (Linux); CP-01 (autenticação e permissões) PASS no Supabase local, com 6 defeitos do escopo corrigidos (D-CP01-01 a 06) e TOTP real exercitado. Próximo: CP-02. D1–D8 seguem abertos.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
 | Etapa | QA-BS-01 — auditoria, correção e estabilização integral, por checkpoints CP-00 a CP-12 (plano e defeitos em [PROGRESS](../PROGRESS.md#qa-bs-01--checkpoints)) |
-| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-01 a iniciar |
-| Último gate concluído | CP-00B — baseline executável (12/11/2026, Linux: sessão em nuvem e CI); antes, CP-00 e a RECONCILIACAO-134 |
+| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-01 concluído; CP-02 a iniciar (não iniciado nesta sessão) |
+| Último gate concluído | CP-01 — autenticação e permissões (12/11/2026, sessão em nuvem, sessão 04); antes, CP-00B, CP-00 e a RECONCILIACAO-134 |
 | Worktree | Sessão em nuvem (ambiente principal a partir da sessão 03): worktree isolado `/home/user/bslogistica-qa134` (efêmero), com Docker local da sessão. Sessão anterior no Mac: worktree na pasta temporária do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
 | Branch | `fix/qa-bs-01-estabilizacao`, criada de `origin/test/e2e-playwright-local` (#133, que inclui o #132) por decisão do responsável e reconciliada com a `main` por merge (sem rebase nem force push) |
 | Base | main `f6df1fbf58e8eb34648e2328b926ef99c7ad7164` (squash do #133, sobre `1c6042e`, squash do #132) |
-| HEAD validado | fdda696e783d3776dc20c68dfc3a5361641f1552 (CI: `validar`, `sql-local`, `e2e-local` SUCCESS) + o diff do CP-00B (I1 em `scripts/e2e-local.sh`, guardas G22–G25, docs), validado na sessão em nuvem: lint, `tsc`, 72/72 `test:*`, build, `sql-local` 52 suítes, E2E 58 PASS / 5 FALHA CONHECIDA, 25/25 travas; revalidado na CI no novo HEAD do #134 |
-| Alterações não commitadas | Nenhuma na sessão em nuvem (o `project_id` local trocado só para os testes foi restaurado). No Mac (sessão anterior): `supabase/config.toml` com `project_id = "bs-e2e-qa01"` (**nunca commitar**) e `supabase/.branches/` |
+| HEAD validado | 1b2ee20aa0da60efa89e9916e7250e8b9512f56f (CP-00B; CI `validar`, `sql-local`, `e2e-local` SUCCESS) + o diff do CP-01, validado na sessão em nuvem: lint, `tsc`, `check:workflow`, 73/73 `test:*`, build, `sql-local` 52 suítes, E2E 98 testes (93 PASS, 5 FALHA CONHECIDA, 0 FAIL, 0 PULADO), 25/25 travas; revalidado na CI no novo HEAD do #134 |
+| Alterações não commitadas | Nenhuma na sessão em nuvem (`project_id` trocado só para os testes e restaurado; `supabase/.branches/` não versionado). No Mac (sessão anterior): `supabase/config.toml` com `project_id = "bs-e2e-qa01"` (**nunca commitar**) e `supabase/.branches/` |
 | PR | #134 (Draft), base `main` desde a RECONCILIACAO-134. Integrados: #132 (`1c6042e`) e #133 (`f6df1fb`). Aberto e não tocado: #125 |
 | Ambiente-alvo | Local (Supabase local descartável) e CI. HML, Preview e Production: nenhum acesso |
-| Última ação comprovada | CP-00B na sessão em nuvem (Docker local): baseline estática e executável completa; E2E local 63 testes (58 PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO) com o app subindo sem `setsid`; `sql-local` 52 suítes; encerramento sem sobras (0 containers, 0 volumes, nenhum processo do app) |
-| Próxima ação exata | CP-01 — autenticação e permissões (inclui TOTP real no Supabase local), sem corrigir D1–D8 antes do checkpoint correspondente |
+| Última ação comprovada | CP-01 na sessão em nuvem (Docker local): E2E local com 35 casos novos de autenticação e permissões (login, recuperação com e-mail capturado no Mailpit, MFA com TOTP real, usuários, matriz de 5 perfis × 5 camadas); 6 defeitos reproduzidos (RED), corrigidos e revalidados (GREEN); encerramento sem sobras (0 containers, 0 volumes) |
+| Próxima ação exata | CP-02 — clientes e contratos (inclui D3, duplo clique em cliente), só com nova autorização; não iniciado |
 
 ## Estado atual para retomada
 
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | QA-BS-01 CP-01 — autenticação e permissões (12/11/2026, sessão em nuvem, sessão 04), autorizado pelo responsável. Auditoria completa com navegador real e Supabase local: login, recuperação de senha (e-mail capturado no Mailpit local), MFA/TOTP real (código calculado do segredo da tela e verificado pelo GoTrue local), administração de usuários e matriz ADMIN × OPERACIONAL × SEM PAPEL × NÃO AUTENTICADO × REVOGADO em tela, API Route, Server Action reenviada, PostgREST e RPC. Infra: `scripts/e2e-local.sh` sobe o Auth com TOTP e cadastro desligado **só por variáveis do processo** (sem `[auth]` no `config.toml`) e o Mailpit; quatro contas sintéticas a mais. Inventário, matriz e evidências em [docs/qa/CP-01-autenticacao-e-permissoes.md](qa/CP-01-autenticacao-e-permissoes.md) |
+| Resultados e testes comprovados | **RED no código do `1b2ee20`:** login com "Invalid login credentials" e "User is banned"; TOTP errado com "Invalid TOTP code entered"; duplo clique em "Enviar convite" = 2 e-mails e 2 `convite_criado`, em "Atribuir" = 2 `operacao_atribuida`; duplo clique em "Continuar" da recuperação levou a "link inválido"; convite duplicado com "A user with this email address has already been registered"; lixeira e engrenagem sem nome acessível. **GREEN, sessão em nuvem (Linux, Node 22.23, Docker local):** lint PASS; `tsc` PASS; `check:workflow` PASS; `git diff --check` PASS; 73/73 `test:*` PASS (77 s; nova `test:mensagens-auth` 27/27); build PASS (placeholders da CI); travas 25/25; `npm run e2e:local` completo: **98 testes, 93 PASS, 0 FAIL, 5 FALHA CONHECIDA (as mesmas), 0 PULADO**, 543 s, nenhuma rede externa, encerramento sem sobras; `sql-local` 52 suítes PASS, 82 s. Não testados (motivo no documento do CP-01): expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo |
+| Código e PR afetados | Correções: `src/lib/mensagens-de-login.ts` (novo), `src/app/login/page.tsx`, `src/app/mfa/painel-mfa.tsx`, `src/app/(painel)/configuracoes/painel-configuracoes.tsx`, `src/app/(painel)/usuarios/_trava.ts` (novo), `painel-usuarios.tsx`, `gerenciar-usuario.tsx`, `src/lib/admin-usuarios/servico.ts`, `src/app/auth/confirmar-recuperacao/botao-confirmar.tsx` (novo) e `page.tsx`. Testes: `e2e/specs/40-autenticacao.spec.ts`, `41-permissoes.spec.ts`, `e2e/apoio/{totp,email,contas}.ts`, `scripts/testar-mensagens-auth.mjs` (+ `package.json` e passo no `ci.yml`). Infra/docs: `scripts/e2e-local.sh`, `e2e/sql/semente-local.sql`, `docs/TESTES_E2E.md`, `docs/qa/CP-01-…`, `PROGRESS.md`, este arquivo. **Nenhum SQL, migration, RLS, policy, grant, trigger ou regra financeira.** PR #134 (Draft) |
+| Ambientes envolvidos | Sessão em nuvem: Docker local (vazio no início); Supabase `bs-e2e-cp01` (iteração e execução oficial) e `bs-fin11-cp01` (SQL) criados e encerrados pelo próprio `project_id`; 0 containers e 0 volumes no fim. E-mails só para `@exemplo.test`, capturados localmente. GitHub (CI). HML, Preview e Production: nenhum acesso |
+| Pendências e decisões | (1) Decisão do responsável: o GoTrue responde `user_banned` antes de conferir a senha, então pela API do Auth (fora do app) é possível saber que um e-mail pertence a conta revogada; a tela já não revela. (2) Mensagens do SDK que continuam visíveis por decisão documentada (falha do `unenroll`, falha de leitura de fatores no `/mfa`): rever no CP-09. (3) Confirmar no Preview o domínio do redirecionamento de `/auth/confirm` (no `next start` local sai `localhost`). (4) D1–D8 abertos nos CPs previstos; I1 sem execução nativa no macOS |
+| Próxima ação exata | CP-02 — clientes e contratos, com nova autorização; não iniciado |
+| Autorizações e proibições | Autorizado e usado: inspecionar código e docs, testes locais em Supabase descartável, contas e dados sintéticos locais, TOTP real local, e-mail no capturador local, corrigir defeitos do CP-01 com RED/GREEN, testes de regressão, PROGRESS/HANDOFF/descrição do PR, commit e push só no #134. Proibidos e não feitos: merge, Ready for review, `main` e outros PRs, HML, Production, deploy, migrations remotas, configurações e secrets remotos, outro Supabase remoto, convites para e-mails reais, regras financeiras, excluir dados reais, remover containers ou volumes preexistentes (não havia), afrouxar RLS/MFA/guards, MFA obrigatório, D1–D8, desativar testes, CP-02 |
+
+### Tarefa anterior — QA-BS-01 CP-00B (12/11/2026, sessão em nuvem, sessão 03)
 
 | Campo | Valor |
 | --- | --- |

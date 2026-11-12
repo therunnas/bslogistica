@@ -94,7 +94,13 @@ ESTADO_DIR="$(mktemp -d)"
 # A partir daqui o Supabase deste project_id é desta execução: nada existia antes (passo 1).
 PROJETO="$PROJETO_LIDO"
 SUPABASE_PROPRIO=1
-"${CLI[@]}" start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null
+# Auth local alinhado à Production no que o CP-01 exercita, SÓ pelo ambiente deste processo (o
+# config.toml não tem [auth] de propósito e não é alterado): TOTP habilitado, cadastro público
+# desligado. O capturador local de e-mail (Mailpit, 127.0.0.1:54324) sobe para convite e
+# recuperação; nenhuma mensagem sai da VM.
+SUPABASE_AUTH_MFA_TOTP_ENROLL_ENABLED=true SUPABASE_AUTH_MFA_TOTP_VERIFY_ENABLED=true \
+  SUPABASE_AUTH_ENABLE_SIGNUP=false \
+  "${CLI[@]}" start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,edge-runtime,storage-api >/dev/null
 
 STATUS=$("${CLI[@]}" status -o env)
 valor() { printf '%s\n' "$STATUS" | sed -nE "s/^$1=\"?([^\"]*)\"?$/\1/p" | head -1; }
@@ -131,10 +137,26 @@ criar_usuario() {
 }
 ADMIN_ID=$(criar_usuario "$ADMIN_EMAIL" "$ADMIN_SENHA")
 OPER_ID=$(criar_usuario "$OPER_EMAIL" "$OPER_SENHA")
+# Contas do CP-01 (autenticação e permissões), todas sintéticas e locais: um segundo admin (MFA,
+# recuperação com MFA, último admin), uma conta sem papel, um operacional que será revogado e um
+# operacional para a recuperação de senha sem MFA.
+ADMIN2_EMAIL="e2e-admin2@exemplo.test"
+SEMPAPEL_EMAIL="e2e-sem-papel@exemplo.test"
+REVOGAR_EMAIL="e2e-revogar@exemplo.test"
+RECUPERA_EMAIL="e2e-recupera@exemplo.test"
+ADMIN2_SENHA="E2e-$(openssl rand -hex 16)"
+SEMPAPEL_SENHA="E2e-$(openssl rand -hex 16)"
+REVOGAR_SENHA="E2e-$(openssl rand -hex 16)"
+RECUPERA_SENHA="E2e-$(openssl rand -hex 16)"
+ADMIN2_ID=$(criar_usuario "$ADMIN2_EMAIL" "$ADMIN2_SENHA")
+criar_usuario "$SEMPAPEL_EMAIL" "$SEMPAPEL_SENHA" >/dev/null
+REVOGAR_ID=$(criar_usuario "$REVOGAR_EMAIL" "$REVOGAR_SENHA")
+RECUPERA_ID=$(criar_usuario "$RECUPERA_EMAIL" "$RECUPERA_SENHA")
 
 echo "4. Semente: papéis e configuração igual à Production (motor ON, resolução OFF, dobro ON)"
 docker exec -i "$CONTAINER" psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 \
-  -v admin_id="$ADMIN_ID" -v oper_id="$OPER_ID" \
+  -v admin_id="$ADMIN_ID" -v oper_id="$OPER_ID" -v admin2_id="$ADMIN2_ID" \
+  -v revogar_id="$REVOGAR_ID" -v recupera_id="$RECUPERA_ID" \
   -v sessao_id="$(node -e 'console.log(crypto.randomUUID())')" \
   -f - <e2e/sql/semente-local.sql
 
@@ -172,6 +194,11 @@ echo "6. Playwright"
 set +e
 E2E_ADMIN_EMAIL="$ADMIN_EMAIL" E2E_ADMIN_SENHA="$ADMIN_SENHA" \
   E2E_OPER_EMAIL="$OPER_EMAIL" E2E_OPER_SENHA="$OPER_SENHA" \
+  E2E_ADMIN2_EMAIL="$ADMIN2_EMAIL" E2E_ADMIN2_SENHA="$ADMIN2_SENHA" \
+  E2E_SEMPAPEL_EMAIL="$SEMPAPEL_EMAIL" E2E_SEMPAPEL_SENHA="$SEMPAPEL_SENHA" \
+  E2E_REVOGAR_EMAIL="$REVOGAR_EMAIL" E2E_REVOGAR_SENHA="$REVOGAR_SENHA" \
+  E2E_RECUPERA_EMAIL="$RECUPERA_EMAIL" E2E_RECUPERA_SENHA="$RECUPERA_SENHA" \
+  E2E_MAILPIT_URL="http://127.0.0.1:54324" \
   E2E_DB_CONTAINER="$CONTAINER" E2E_ESTADO_DIR="$ESTADO_DIR" \
   env -u SUPABASE_SERVICE_ROLE_KEY -u PASSWORD_RECOVERY_PROOF_SECRET npx playwright test
 RESULTADO=$?
