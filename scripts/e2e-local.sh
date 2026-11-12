@@ -2,10 +2,14 @@
 # Testes de ponta a ponta (Playwright) contra um Supabase LOCAL descartável e o app rodando em
 # loopback. NUNCA toca HML nem Production:
 #   - o project_id do config.toml precisa ter sido trocado por "bs-e2e-…" (o workflow faz isso);
-#   - todo comando do Supabase CLI é --local; não existe `link`;
+#   - todo comando do Supabase CLI é local; não existe `link`;
 #   - as travas de e2e/guarda/ recusam qualquer referência a projeto real e bloqueiam rede externa
 #     do servidor (rede.cjs) e do navegador (fixture do Playwright);
-#   - o ambiente é destruído no fim (supabase stop --no-backup), passe ou falhe.
+#   - nada destrutivo acontece antes das validações de identidade e destino (passo 1); uma
+#     instância do Supabase que já existia é recusada, nunca reaproveitada nem apagada;
+#   - no fim (passe ou falhe) só é encerrado o que ESTA execução criou: o app que ela subiu e o
+#     Supabase local do projeto dela (`stop --project-id <projeto> --no-backup`). Se a execução
+#     parou nas validações, não há reset nem stop.
 #
 # Pré-requisitos: Docker em execução e `npm ci` feito. Uso: bash scripts/e2e-local.sh
 
@@ -17,36 +21,76 @@ unset SUPABASE_PROJECT_ID SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD
 
 CLI=(npx --yes supabase@2.117.0)
 RESULTADOS="e2e-results"
-ESTADO_DIR="$(mktemp -d)"
 REDE_LOG="$RESULTADOS/rede-servidor.log"
+# Portas do Supabase local (API, banco, Studio, e-mail) e do app: ocupadas = instância alheia.
+PORTAS_LOCAIS=(54321 54322 54323 54324 3000)
+ROTULO_DO_PROJETO="com.supabase.cli.project"
+
+# Recursos desta execução. Ficam vazios/0 até serem criados: o encerramento só mexe no que marcou.
+PROJETO=""
+ESTADO_DIR=""
 APP_PID=""
+SUPABASE_PROPRIO=0
+
+interromper() {
+  echo "E2E INTERROMPIDO: $*" >&2
+  exit 1
+}
 
 encerrar() {
   local codigo=$?
+  trap - EXIT
   # O app roda num grupo de processos próprio (setsid): encerra o npx e o next-server juntos.
   if [ -n "$APP_PID" ]; then kill -- "-$APP_PID" 2>/dev/null || true; fi
-  rm -rf "$ESTADO_DIR"
-  echo "Encerrando o Supabase local (sem backup)..."
-  "${CLI[@]}" stop --no-backup >/dev/null 2>&1 || true
+  if [ -n "$ESTADO_DIR" ]; then rm -rf "$ESTADO_DIR"; fi
+  # Stop só do Supabase que esta execução subiu, pelo project_id dela (nunca o padrão do config,
+  # nunca --all), e de novo conferido o prefixo local.
+  if [ "$SUPABASE_PROPRIO" = "1" ] && [[ "$PROJETO" =~ ^bs-e2e-[a-z0-9-]+$ ]]; then
+    echo "Encerrando o Supabase local desta execução ($PROJETO, sem backup)..."
+    "${CLI[@]}" stop --project-id "$PROJETO" --no-backup >/dev/null 2>&1 || true
+  else
+    echo "Nenhum Supabase desta execução para encerrar (nada foi parado)."
+  fi
   exit "$codigo"
 }
 trap encerrar EXIT
 
+echo "1. Travas e identidade, antes de qualquer operação destrutiva"
+node e2e/guarda/testar-guardas.mjs
+node e2e/guarda/verificar-ambiente.mjs
+docker info >/dev/null || interromper "Docker indisponível."
+
+PROJETO_LIDO=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)"$/\1/p' supabase/config.toml)
+[[ "$PROJETO_LIDO" =~ ^bs-e2e-[a-z0-9-]+$ ]] ||
+  interromper "project_id \"$PROJETO_LIDO\" não é um projeto local do E2E (bs-e2e-…)."
+[ ! -e supabase/.temp/project-ref ] || interromper "existe vínculo remoto (supabase/.temp/project-ref)."
+CONTAINER="supabase_db_${PROJETO_LIDO}"
+
+# Instância preexistente (de qualquer projeto): não é desta execução e não pode ser zerada.
+EXISTENTES=$(
+  {
+    docker ps -a --filter "label=$ROTULO_DO_PROJETO" --format '{{.Names}}'
+    docker ps -a --filter "name=supabase_" --format '{{.Names}}'
+  } | sort -u
+)
+[ -z "$EXISTENTES" ] ||
+  interromper "já existe Supabase local em execução ou parado (não é desta execução): $(echo "$EXISTENTES" | tr '\n' ' ')"
+for porta in "${PORTAS_LOCAIS[@]}"; do
+  if (: <"/dev/tcp/127.0.0.1/$porta") 2>/dev/null; then
+    interromper "a porta local $porta já está em uso por outro processo."
+  fi
+done
+echo "   destino conferido: projeto $PROJETO_LIDO, sem vínculo remoto, sem instância anterior"
+
+echo "2. Supabase local ($PROJETO_LIDO)"
 rm -rf "$RESULTADOS"
 mkdir -p "$RESULTADOS"
 : >"$REDE_LOG"
-
-echo "1. Travas antes de qualquer escrita"
-node e2e/guarda/testar-guardas.mjs
-node e2e/guarda/verificar-ambiente.mjs
-docker info >/dev/null
-
-PROJETO=$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)"$/\1/p' supabase/config.toml)
-CONTAINER="supabase_db_${PROJETO}"
-
-echo "2. Supabase local ($PROJETO)"
+ESTADO_DIR="$(mktemp -d)"
+# A partir daqui o Supabase deste project_id é desta execução: nada existia antes (passo 1).
+PROJETO="$PROJETO_LIDO"
+SUPABASE_PROPRIO=1
 "${CLI[@]}" start -x studio,realtime,logflare,vector,postgres-meta,imgproxy,mailpit,edge-runtime,storage-api >/dev/null
-"${CLI[@]}" db reset --local
 
 STATUS=$("${CLI[@]}" status -o env)
 valor() { printf '%s\n' "$STATUS" | sed -nE "s/^$1=\"?([^\"]*)\"?$/\1/p" | head -1; }
@@ -54,15 +98,19 @@ API_URL=$(valor API_URL)
 ANON_KEY=$(valor ANON_KEY)
 SERVICE_KEY=$(valor SERVICE_ROLE_KEY)
 
-if [ "$API_URL" != "http://127.0.0.1:54321" ]; then
-  echo "E2E INTERROMPIDO: API local inesperada ($API_URL)." >&2
-  exit 1
-fi
-if [ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER")" != "true" ]; then
-  echo "E2E INTERROMPIDO: container $CONTAINER não está rodando." >&2
-  exit 1
-fi
-echo "   identidade conferida: $CONTAINER em $API_URL"
+# Identidade da instância que subiu, ANTES do reset: URL local, container rodando e rótulo do
+# projeto desta execução.
+[ "$API_URL" = "http://127.0.0.1:54321" ] || interromper "API local inesperada ($API_URL)."
+[ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER")" = "true" ] ||
+  interromper "container $CONTAINER não está rodando."
+ROTULO=$(docker inspect --format "{{index .Config.Labels \"$ROTULO_DO_PROJETO\"}}" "$CONTAINER")
+[ "$ROTULO" = "$PROJETO" ] ||
+  interromper "o container $CONTAINER pertence a \"$ROTULO\", não a este projeto ($PROJETO)."
+echo "   identidade conferida: $CONTAINER ($PROJETO) em $API_URL"
+
+"${CLI[@]}" db reset --local
+[ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER")" = "true" ] ||
+  interromper "container $CONTAINER não voltou depois do reset."
 
 echo "3. Usuários sintéticos locais (senhas geradas nesta execução, nunca impressas)"
 ADMIN_EMAIL="e2e-admin@exemplo.test"

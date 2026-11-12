@@ -24,10 +24,16 @@ existe caminho para o HML (`qbnfcm…`) nem para a Production (`ehkduq…`): sem
 
 Sequência do script:
 
-1. travas (`testar-guardas.mjs` e `verificar-ambiente.mjs`), Docker disponível;
-2. `supabase start` (só os serviços necessários) e `supabase db reset --local` — todas as
-   migrations versionadas, na ordem;
-3. identidade conferida: API em `http://127.0.0.1:54321` e container `supabase_db_bs-e2e-…`;
+1. validações, **antes de qualquer operação destrutiva**: travas (`testar-guardas.mjs` e
+   `verificar-ambiente.mjs`), Docker disponível, `project_id` no formato `bs-e2e-…`, nenhum
+   vínculo remoto, **nenhuma instância do Supabase CLI já existente** (container de qualquer
+   projeto, em execução ou parado) e nenhuma das portas locais (54321–54324, 3000) ocupada. Uma
+   falha aqui encerra a execução **sem `start`, sem reset e sem stop**;
+2. `supabase start` (só os serviços necessários). Só a partir daqui o Supabase do `project_id`
+   desta execução passa a ser dela;
+3. identidade conferida **antes do reset**: API em `http://127.0.0.1:54321`, container
+   `supabase_db_bs-e2e-…` rodando e com o rótulo `com.supabase.cli.project` igual ao projeto desta
+   execução; depois, `supabase db reset --local` — todas as migrations versionadas, na ordem;
 4. duas contas sintéticas (`e2e-admin@exemplo.test`, `e2e-operacional@exemplo.test`) pela Admin
    API **local**, com senhas aleatórias desta execução, nunca impressas;
 5. semente: papéis `admin` e `operacional`, motor por vigência ligado pela RPC (sessão sintética
@@ -35,8 +41,11 @@ Sequência do script:
 6. `npm run build` e `next start` em `127.0.0.1:3000`, com `e2e/guarda/rede.cjs` bloqueando
    qualquer conexão do servidor para fora do loopback;
 7. Playwright (1 worker, sem retry); o login é feito pela tela uma vez por papel;
-8. falha se o servidor tentou rede externa; resumo; contexto de cada falha no log;
-9. `supabase stop --no-backup` e encerramento do app no `trap EXIT`, passe ou falhe.
+8. falha se o servidor tentou rede externa; resumo; contexto de cada falha inesperada no log;
+9. encerramento no `trap EXIT`, passe ou falhe, **só do que esta execução criou**: o app que ela
+   subiu, a pasta temporária de sessões e o Supabase do projeto dela
+   (`supabase stop --project-id <bs-e2e-…> --no-backup`; nunca o projeto padrão do config, nunca
+   `--all`). Se a execução parou nas validações do passo 1, nada é parado.
 
 Localmente (com Docker): `npm ci`, trocar o `project_id` do `supabase/config.toml` por
 `bs-e2e-<algo>` **sem commitar** e rodar `npm run e2e:local`. Sem a troca, as travas recusam.
@@ -54,9 +63,19 @@ Localmente (com Docker): `npm ci`, trocar o `project_id` do `supabase/config.tom
 - leitura do banco nos testes: `docker exec` no container local, em transação
   `default_transaction_read_only=on` (escrita é recusada; há teste para isso);
 - o Playwright não recebe a chave `service_role` local (removida do ambiente do processo).
+- instância preexistente do Supabase CLI ou porta local ocupada: recusada antes de qualquer
+  operação destrutiva;
+- encerramento só do que a execução criou, pelo `project_id` dela; validação que falha não dispara
+  reset nem stop.
 
 Os casos G1–G13 de `testar-guardas.mjs` provam cada trava com entradas que **devem** ser
-recusadas.
+recusadas. Os casos G14–G21 rodam uma **cópia** do `scripts/e2e-local.sh` num diretório
+temporário com `docker`, `npx`, `npm` e `curl` falsos (que só registram as chamadas) e provam: destino
+inválido, URL externa e vínculo remoto saem sem `start`, reset nem stop; instância preexistente e
+porta ocupada são recusadas sem operação destrutiva; com instância própria validada e erro no
+ensaio, o reset acontece depois da conferência de identidade e o único stop é
+`stop --project-id <projeto da execução> --no-backup`; identidade divergente depois do `start`
+não dispara reset; nenhum cenário usa stop sem `--project-id` nem `--all`.
 
 ## Cenários
 
@@ -87,8 +106,23 @@ quebre (seletor, preparação) também dá FAIL — nunca vira falha conhecida p
 
 Cada execução publica o artefato `e2e-<SHA>` (14 dias) com `resumo.md`, `resultado.json`,
 relatório HTML, `esperado-x-obtido.json`, logs do build, do app e da rede, e — só nas falhas —
-screenshot e trace. Senhas são geradas por execução e não aparecem em log, screenshot ou
-relatório; cookies e tokens não são gravados nos artefatos.
+screenshot e trace.
+
+O que pode e o que não pode aparecer nesses arquivos:
+
+- **senhas**: geradas a cada execução, não são impressas no log. O login pela tela acontece no
+  `globalSetup`, que não grava trace. O E2E não verifica ausência de senha em todo artefato
+  possível;
+- **traces de falha** (`trace.zip`, também embutido no relatório HTML): registram as requisições
+  do navegador e **podem conter cookies e tokens JWT da sessão sintética local** (assinados pela
+  chave de desenvolvimento do Supabase local, válidos só naquela VM e naquela execução, destruídos
+  no fim). Não há ausência de token comprovada nos traces: trate o artefato como material de
+  teste interno e não o compartilhe fora do repositório;
+- o log e o resumo mostram e-mails sintéticos (`@exemplo.test`) e UUIDs locais da semente, que não
+  são credenciais;
+- nenhuma credencial real existe no E2E: não há secrets no workflow, e as chaves usadas
+  (publicável e `service_role`) são as do Supabase local descartável. A `service_role` local não
+  é repassada ao processo do Playwright.
 
 ## O que continua dependendo do Preview
 

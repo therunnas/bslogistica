@@ -5,7 +5,14 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -132,6 +139,185 @@ caso("G12. servidor: conexão local continua funcionando", () => {
 });
 caso("G13. servidor: a tentativa bloqueada fica registrada", () => {
   assert.match(readFileSync(log, "utf8"), /BLOQUEADO example\.com/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Encerramento do scripts/e2e-local.sh, com STUBS (nenhum docker, supabase, npm ou curl real).
+// Cada cenário roda uma CÓPIA do script num diretório temporário, com config.toml próprio e
+// comandos falsos no PATH que só registram as chamadas. Prova que validação falha sem reset nem
+// stop, que instância alheia é recusada e que a limpeza só atinge o projeto desta execução.
+// ---------------------------------------------------------------------------------------------
+const PROJETO_STUB = "bs-e2e-stub-1";
+const STUBS = {
+  docker: `#!/usr/bin/env bash
+echo "docker $*" >>"$STUB_LOG"
+case "$1" in
+  info) exit 0 ;;
+  ps) [ -n "\${STUB_EXISTENTES:-}" ] && printf '%s\\n' "$STUB_EXISTENTES"; exit 0 ;;
+  inspect)
+    case "$*" in
+      *State.Running*) echo "\${STUB_RODANDO:-true}" ;;
+      *Labels*) echo "\${STUB_ROTULO:-$STUB_PROJETO}" ;;
+    esac
+    exit 0 ;;
+  *) exit 0 ;;
+esac
+`,
+  npx: `#!/usr/bin/env bash
+echo "npx $*" >>"$STUB_LOG"
+case "$*" in
+  *"supabase@"*" status"*)
+    echo "API_URL=\\"\${STUB_API_URL:-http://127.0.0.1:54321}\\""
+    echo 'ANON_KEY="anon-sintetica"'
+    echo 'SERVICE_ROLE_KEY="service-sintetica"' ;;
+  *"supabase@"*" start"*) exit "\${STUB_START_SAIDA:-0}" ;;
+esac
+exit 0
+`,
+  npm: `#!/usr/bin/env bash
+echo "npm $*" >>"$STUB_LOG"
+# Erro durante o ensaio: o build falha depois do reset.
+[ "$*" = "run build" ] && exit "\${STUB_BUILD_SAIDA:-1}"
+exit 0
+`,
+  curl: `#!/usr/bin/env bash
+echo "curl" >>"$STUB_LOG"
+echo '{"id":"00000000-0000-4000-8000-000000000001"}'
+`,
+};
+
+function montarSandbox({ projeto = PROJETO_STUB, vinculo = false } = {}) {
+  const raiz = mkdtempSync(join(tmpdir(), "e2e-encerrar-"));
+  for (const sub of ["scripts", "e2e/guarda", "e2e/sql", "supabase/.temp", "bin"])
+    mkdirSync(join(raiz, sub), { recursive: true });
+  copyFileSync("scripts/e2e-local.sh", join(raiz, "scripts/e2e-local.sh"));
+  for (const arq of ["regras.mjs", "verificar-ambiente.mjs"])
+    copyFileSync(`e2e/guarda/${arq}`, join(raiz, "e2e/guarda", arq));
+  // Na cópia, o autoteste das travas é um no-op (evita recursão); o verificador é o real.
+  writeFileSync(join(raiz, "e2e/guarda/testar-guardas.mjs"), "");
+  writeFileSync(join(raiz, "e2e/sql/semente-local.sql"), "");
+  writeFileSync(join(raiz, "supabase/config.toml"), `project_id = "${projeto}"\n`);
+  if (vinculo) writeFileSync(join(raiz, "supabase/.temp/project-ref"), "qbnfcmrxmssnwkhaitgd\n");
+  for (const [nome, corpo] of Object.entries(STUBS)) {
+    writeFileSync(join(raiz, "bin", nome), corpo);
+    chmodSync(join(raiz, "bin", nome), 0o755);
+  }
+  writeFileSync(join(raiz, "chamadas.log"), "");
+  return raiz;
+}
+
+/** Roda a cópia do script com os stubs; devolve o código de saída e as chamadas registradas. */
+function rodarSandbox(raiz, extras = {}) {
+  const env = {
+    PATH: `${join(raiz, "bin")}:${process.env.PATH}`,
+    HOME: process.env.HOME ?? tmpdir(),
+    STUB_LOG: join(raiz, "chamadas.log"),
+    STUB_PROJETO: PROJETO_STUB,
+    ...extras,
+  };
+  return new Promise((resolve) => {
+    const filho = spawn("bash", [join(raiz, "scripts/e2e-local.sh")], { env, cwd: raiz });
+    let saida = "";
+    filho.stdout.on("data", (p) => (saida += p));
+    filho.stderr.on("data", (p) => (saida += p));
+    const limite = setTimeout(() => filho.kill("SIGKILL"), 60_000);
+    filho.on("close", (codigo) => {
+      clearTimeout(limite);
+      const chamadas = readFileSync(join(raiz, "chamadas.log"), "utf8").split("\n").filter(Boolean);
+      resolve({ codigo, saida, chamadas });
+    });
+  });
+}
+
+const supabase = (r, trecho) =>
+  r.chamadas.filter((c) => c.includes("supabase@") && c.includes(trecho));
+const destrutivas = (r) =>
+  r.chamadas.filter(
+    (c) =>
+      c.includes("supabase@") &&
+      (c.includes(" start") || c.includes(" db reset") || c.includes(" stop")),
+  );
+
+const rDestino = await rodarSandbox(montarSandbox({ projeto: "ehkduqokntemtmqzdrbd" }));
+const rUrl = await rodarSandbox(montarSandbox(), {
+  NEXT_PUBLIC_SUPABASE_URL: "https://qbnfcmrxmssnwkhaitgd.supabase.co",
+});
+const rVinculo = await rodarSandbox(montarSandbox({ vinculo: true }));
+const rExistente = await rodarSandbox(montarSandbox(), {
+  STUB_EXISTENTES: `supabase_db_${PROJETO_STUB}`,
+});
+// Porta da API ocupada por outro processo (servidor de verdade em 127.0.0.1:54321). Se a porta já
+// estiver ocupada por algo desta máquina, o cenário vale igual: o script tem de recusar.
+const ocupante = createServer((_, res) => res.end("alheio"));
+await new Promise((resolve) => {
+  ocupante.once("error", () => resolve());
+  ocupante.listen(54321, "127.0.0.1", resolve);
+});
+const rPorta = await rodarSandbox(montarSandbox());
+await new Promise((resolve) => ocupante.close(() => resolve()));
+const rProprioErro = await rodarSandbox(montarSandbox());
+const rIdentidade = await rodarSandbox(montarSandbox(), {
+  // URL inesperada mas sem referência real (uma com ref real já pararia no passo 1).
+  STUB_API_URL: "http://127.0.0.1:65000",
+});
+const rRotulo = await rodarSandbox(montarSandbox(), { STUB_ROTULO: "bs-e2e-outro" });
+
+caso("G14. destino inválido (project_id da Production): sai sem start, reset nem stop", () => {
+  assert.notEqual(rDestino.codigo, 0);
+  assert.deepEqual(destrutivas(rDestino), []);
+  assert.match(rDestino.saida, /Nenhum Supabase desta execução para encerrar/);
+});
+caso("G15. URL externa no ambiente: sai sem start, reset nem stop", () => {
+  assert.notEqual(rUrl.codigo, 0);
+  assert.deepEqual(destrutivas(rUrl), []);
+});
+caso("G16. vínculo remoto (supabase/.temp/project-ref): sai sem start, reset nem stop", () => {
+  assert.notEqual(rVinculo.codigo, 0);
+  assert.deepEqual(destrutivas(rVinculo), []);
+});
+caso("G17. instância preexistente (container): recusada, nenhuma operação destrutiva", () => {
+  assert.notEqual(rExistente.codigo, 0);
+  assert.match(rExistente.saida, /já existe Supabase local/);
+  assert.deepEqual(destrutivas(rExistente), []);
+});
+caso("G18. porta local ocupada por outro processo: recusada, nenhuma operação destrutiva", () => {
+  assert.notEqual(rPorta.codigo, 0);
+  assert.match(rPorta.saida, /porta local 54321 já está em uso/);
+  assert.deepEqual(destrutivas(rPorta), []);
+});
+caso("G19. instância própria validada + erro no ensaio: reset e stop só do projeto próprio", () => {
+  assert.notEqual(rProprioErro.codigo, 0);
+  assert.equal(supabase(rProprioErro, " start").length, 1);
+  assert.equal(supabase(rProprioErro, " db reset --local").length, 1);
+  const stops = supabase(rProprioErro, " stop");
+  assert.deepEqual(
+    stops.map((c) => c.replace(/^npx --yes supabase@[\d.]+ /, "")),
+    [`stop --project-id ${PROJETO_STUB} --no-backup`],
+  );
+  // O reset veio depois da conferência de identidade (inspect) e antes do stop.
+  const ordem = (trecho) => rProprioErro.chamadas.findIndex((c) => c.includes(trecho));
+  assert.ok(ordem("Labels") < ordem(" db reset"));
+  assert.ok(ordem(" db reset") < ordem(" stop"));
+});
+caso("G20. identidade divergente depois do start: sem reset; stop só do projeto próprio", () => {
+  for (const r of [rIdentidade, rRotulo]) {
+    assert.notEqual(r.codigo, 0);
+    assert.deepEqual(supabase(r, " db reset"), []);
+    assert.deepEqual(
+      supabase(r, " stop").map((c) => c.replace(/^npx --yes supabase@[\d.]+ /, "")),
+      [`stop --project-id ${PROJETO_STUB} --no-backup`],
+    );
+  }
+  assert.match(rIdentidade.saida, /API local inesperada/);
+  assert.match(rRotulo.saida, /pertence a "bs-e2e-outro"/);
+});
+caso("G21. nenhum cenário usa stop sem --project-id nem --all", () => {
+  const todas = [rDestino, rUrl, rVinculo, rExistente, rPorta, rProprioErro, rIdentidade, rRotulo];
+  for (const r of todas)
+    for (const c of supabase(r, " stop")) {
+      assert.match(c, /stop --project-id bs-e2e-[a-z0-9-]+ --no-backup$/);
+      assert.doesNotMatch(c, /--all/);
+    }
 });
 
 console.log(`\n${total} verificações das travas: todas PASS.`);
