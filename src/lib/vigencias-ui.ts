@@ -647,6 +647,59 @@ export function montarRegistro(
   return { rpc: RPC_DE_REGISTRO[tipo], params };
 }
 
+/** RPC que corrige (troca os valores de) uma versão ativa, mantendo o período (023/024/029/043). */
+export const RPC_DE_CORRECAO: Readonly<Record<TipoDeVigencia, string>> = {
+  contrato: "corrigir_condicao_contrato",
+  colaborador: "corrigir_custo_colaborador",
+  operacao: "corrigir_valor_acordado_operacao",
+};
+
+/**
+ * Correção da versão que começa NA MESMA DATA escolhida no "Alterar": o banco não aceita duas
+ * versões começando no mesmo dia, então trocar o valor de novo para a mesma data é corrigir a versão
+ * existente (mesmo período, valores novos). A frequência de fechamento (038) não é parâmetro da
+ * correção: o banco mantém a da versão corrigida.
+ */
+export function montarCorrecao(
+  tipo: TipoDeVigencia,
+  termoId: string,
+  versao: { valid_from: string; valid_to: string | null },
+  f: FormularioDeVigencia,
+): { rpc: string; params: Record<string, string | number | boolean | null> } {
+  const erros = validarNovaVigencia(tipo, {
+    ...f,
+    inicio: versao.valid_from,
+    fim: versao.valid_to ?? "",
+  });
+  if (erros.length > 0 || termoId === "") {
+    throw new Error(erros[0] ?? "Versão não informada.");
+  }
+  const params: Record<string, string | number | boolean | null> = {
+    p_term_id: termoId,
+    p_valid_from: versao.valid_from,
+    p_valid_to: versao.valid_to,
+    p_reason: f.motivo.trim(),
+  };
+  for (const campo of camposDaVigencia(
+    tipo,
+    f.regrasBs === true,
+    f.regrasDefinitivas === true,
+    f.periodoContratual === true,
+  )) {
+    if (campo.requerPeriodoContratual === true) continue;
+    const texto = f.valores[campo.chave] ?? "";
+    if (campo.tipo === "escolha") {
+      const valor = texto.trim() === "" ? (campo.padrao ?? "") : texto.trim();
+      if (campo.opcional === true && valor === "") continue;
+      params[campo.param] = valor;
+      continue;
+    }
+    if (campo.opcional === true && texto.trim() === "") continue;
+    params[campo.param] = lerNumero(texto) as number;
+  }
+  return { rpc: RPC_DE_CORRECAO[tipo], params };
+}
+
 /** RPC que cria a entidade e a vigência inicial na MESMA transação (migration 026). */
 export const RPC_DE_CADASTRO: Readonly<Record<TipoDeVigencia, string>> = {
   contrato: "criar_contrato_com_vigencia",
@@ -825,8 +878,17 @@ export interface TermoDeCusto extends VersaoBase {
 
 const dataBR = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
+/** Dia anterior de um `YYYY-MM-DD` (o fim gravado é exclusivo; a tela mostra o último dia que vale). */
+const diaAnteriorISO = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+};
+
 const periodoDe = (v: VersaoBase) =>
-  `vigência ${dataBR(v.valid_from)} → ${v.valid_to ? dataBR(v.valid_to) : "em aberto"}`;
+  v.valid_to
+    ? `de ${dataBR(v.valid_from)} até ${dataBR(diaAnteriorISO(v.valid_to))}`
+    : `desde ${dataBR(v.valid_from)}`;
 
 /**
  * Espelha `motor_fonte_do_dia` + `motor_custo_do_dia` (migration 025), SÓ para a prévia da
@@ -871,7 +933,7 @@ export function resolverCondicaoDoDia(p: {
       ot_factor: Number(doContrato.ot_factor),
       ot_tolerance_min: Number(doContrato.ot_tolerance_min),
     };
-    origem = `Contrato · ${periodoDe(doContrato)}`;
+    origem = `Preço do contrato ${periodoDe(doContrato)}`;
   } else if (daOperacao) {
     regras = {
       daily_rate: Number(daOperacao.agreed_amount),
@@ -879,11 +941,13 @@ export function resolverCondicaoDoDia(p: {
       ot_factor: 1,
       ot_tolerance_min: 10,
     };
-    origem = `Valor acordado da operação · ${periodoDe(daOperacao)}`;
+    origem = `Valor próprio da operação ${periodoDe(daOperacao)}`;
   } else {
     return {
       ok: false,
-      motivo: `Sem condição financeira vigente em ${quando} para ${p.contratoId ? "o contrato da operação" : "a operação"}. Registre a vigência antes de apontar nesta data; a taxa atual do cadastro não é usada.`,
+      motivo: p.contratoId
+        ? `Sem preço do contrato para ${quando}. Em Clientes e contratos, abra o contrato e use "Alterar condições" com "A partir de" em ${quando} ou antes.`
+        : `Sem valor da operação para ${quando}. Em Operações, abra a operação e use "Alterar valor" com "A partir de" em ${quando} ou antes.`,
     };
   }
 
@@ -891,7 +955,7 @@ export function resolverCondicaoDoDia(p: {
   if (!custo || versoesAmbiguasNaData(p.termosCusto, p.data)) {
     return {
       ok: false,
-      motivo: `Sem custo vigente em ${quando} para o colaborador. Registre a vigência de custo antes de apontar nesta data.`,
+      motivo: `Sem custo do colaborador para ${quando}. Em Colaboradores, abra o colaborador e use "Alterar custo" com "A partir de" em ${quando} ou antes.`,
     };
   }
   const horaExtra = custo.ot_hourly_cost;

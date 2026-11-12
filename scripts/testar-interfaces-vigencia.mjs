@@ -514,7 +514,7 @@ verificar(
 );
 verificar(
   "D2. a origem diz o tipo e o período",
-  /^Contrato · vigência 01\/01\/2026 → 01\/07\/2026$/.test(c1.origem),
+  /^Preço do contrato de 01\/01\/2026 até 30\/06\/2026$/.test(c1.origem),
   true,
 );
 const c2 = resolverCondicaoDoDia({
@@ -525,8 +525,8 @@ const c2 = resolverCondicaoDoDia({
   termosCusto: CUSTOS,
 });
 verificar(
-  "D3. depois do reajuste: a nova taxa; a origem diz 'em aberto'",
-  [c2.regras?.daily_rate, /em aberto/.test(c2.origem)],
+  "D3. depois do reajuste: a nova taxa; a origem diz 'desde' (sem data de fim)",
+  [c2.regras?.daily_rate, /desde/.test(c2.origem)],
   [130, true],
 );
 const c3 = resolverCondicaoDoDia({
@@ -561,12 +561,8 @@ const c5 = resolverCondicaoDoDia({
   termosCusto: CUSTOS,
 });
 verificar(
-  "D6. sem vigência: recusa e diz que a taxa atual NÃO é usada",
-  [
-    c5.ok,
-    /taxa atual do cadastro não é usada/.test(c5.motivo ?? ""),
-    /31\/12\/2025/.test(c5.motivo ?? ""),
-  ],
+  "D6. sem vigência: recusa e diz como resolver (Alterar condições com data anterior)",
+  [c5.ok, /Alterar condições/.test(c5.motivo ?? ""), /31\/12\/2025/.test(c5.motivo ?? "")],
   [false, true, true],
 );
 const c6 = resolverCondicaoDoDia({
@@ -578,7 +574,7 @@ const c6 = resolverCondicaoDoDia({
 });
 verificar(
   "D7. sem custo do colaborador na data: recusa",
-  [c6.ok, /custo vigente/.test(c6.motivo ?? "")],
+  [c6.ok, /Sem custo do colaborador/.test(c6.motivo ?? "")],
   [false, true],
 );
 const c7 = resolverCondicaoDoDia({
@@ -667,7 +663,7 @@ const l1 = entrada({ gravada: true, tocada: false, gravado: GRAVADO });
 verificar(
   "E2. LIGADO, linha gravada e não tocada: os valores do BANCO",
   [l1.tipo, l1.billed, l1.cost, l1.overtime, l1.origem],
-  ["banco", 137.5, 87.5, 120, "Vigência do contrato"],
+  ["banco", 137.5, 87.5, 120, "Preço do contrato"],
 );
 const l2 = entrada({ gravada: true, tocada: true, gravado: GRAVADO });
 verificar(
@@ -1078,7 +1074,7 @@ verificar(
   "G9d. Valor acordado: motivo preenchido automaticamente e validação da vigência preservada",
   /MOTIVO_ALTERACAO_VALOR = "Alteração do valor acordado pela tela da operação"/.test(
     valorAcordado,
-  ) && /validarNovaVigencia\(tipo, form\)/.test(valorAtual),
+  ) && /validarNovaVigencia\(tipo, \{/.test(valorAtual),
   true,
 );
 verificar(
@@ -1086,6 +1082,13 @@ verificar(
   /<details[\s\S]{0,300}Ver histórico[\s\S]{0,300}<HistoricoDeVigencias[\s\S]{0,200}permitirNovo=\{false\}/.test(
     valorAtual,
   ),
+  true,
+);
+verificar(
+  "G9g. Alterar na MESMA data de um valor existente corrige esse valor (mesmo período), sem erro de sobreposição",
+  /ativas\.find\(\(v\) => v\.valid_from === inicio\)/.test(valorAtual) &&
+    /corrigir\.mutate\(/.test(valorAtual) &&
+    /RPC_DE_CORRECAO\[tipo\]/.test(ler("src/lib/vigencias-ui.ts")),
   true,
 );
 verificar(

@@ -90,6 +90,7 @@ import {
   useEstadoDoMotor,
   useFuncoesTurno,
   useResolucaoDeTarifas,
+  useValoresDeHoje,
 } from "@/lib/vigencias-dados";
 import {
   hojeEmSaoPaulo,
@@ -153,6 +154,23 @@ export function PainelOperacoes() {
   const criarOperacaoComVigencia = useCriarComVigencia("operacao", ["operations"]);
   const estadoDoMotor = useEstadoDoMotor();
   const modoDeValor = modoDeEdicaoDeTaxa(estadoDoMotor);
+  // Valores que valem hoje (vigência): a coluna do cadastro não acompanha o "Alterar".
+  const porVigencia = modoDeValor === "por-vigencia";
+  const valoresDasOperacoes = useValoresDeHoje(
+    "operacao",
+    (operations.data ?? []).filter((op) => !op.contract_id).map((op) => op.id),
+    porVigencia,
+  );
+  const contratosDeHoje = useValoresDeHoje(
+    "contrato",
+    (contracts.data ?? []).map((contract) => contract.id),
+    porVigencia,
+  );
+  const custosDeHoje = useValoresDeHoje(
+    "colaborador",
+    (employees.data ?? []).map((e) => e.id),
+    porVigencia,
+  );
   const timesheets = useTimesheets();
   const entries = useEntries();
   const removeOperation = useDeleteRow("operations");
@@ -705,9 +723,15 @@ export function PainelOperacoes() {
                         {contractName(operation.contract_id)}
                       </span>
 
-                      {operation.agreed_amount != null ? (
+                      {!operation.contract_id &&
+                      (valoresDasOperacoes.get(operation.id) ?? operation.agreed_amount != null) ? (
                         <span className="font-medium text-foreground">
-                          {brl(operation.agreed_amount)}
+                          {brl(
+                            Number(
+                              valoresDasOperacoes.get(operation.id)?.["agreed_amount"] ??
+                                operation.agreed_amount,
+                            ),
+                          )}
                         </span>
                       ) : null}
 
@@ -1037,7 +1061,12 @@ export function PainelOperacoes() {
 
                   {clientContracts.map((contract) => (
                     <SelectItem key={contract.id} value={contract.id}>
-                      {contract.name} — {brl(contract.daily_rate)}
+                      {contract.name} —{" "}
+                      {brl(
+                        Number(
+                          contratosDeHoje.get(contract.id)?.["daily_rate"] ?? contract.daily_rate,
+                        ),
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1447,7 +1476,13 @@ export function PainelOperacoes() {
                             {funcoesHabilitadas && employee.job_function_id
                               ? nomeDaFuncao(catalogo, employee.job_function_id)
                               : (employee.role ?? "—")}{" "}
-                            · custo {brl(employee.daily_cost)}
+                            · custo{" "}
+                            {brl(
+                              Number(
+                                custosDeHoje.get(employee.id)?.["daily_cost"] ??
+                                  employee.daily_cost,
+                              ),
+                            )}
                           </p>
                         </div>
                       </div>

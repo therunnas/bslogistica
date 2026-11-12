@@ -61,6 +61,7 @@ import {
   useRegrasDefinitivas,
   useDiariaIndividual,
   useResolucaoDeTarifas,
+  useValoresDeHoje,
   useTarifasPorFuncao,
 } from "@/lib/vigencias-dados";
 import {
@@ -142,6 +143,14 @@ export function PainelClientes() {
   );
   const diariaGenericaSemEfeito = tarifasPorFuncao === "disponivel" && resolucaoDeTarifas === true;
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
+  // Condições que valem hoje (vigência): as colunas do contrato não acompanham o "Alterar condições".
+  const condicoesDeHoje = useValoresDeHoje(
+    "contrato",
+    (contracts.data ?? []).map((contract) => contract.id),
+    modoDeTaxa === "por-vigencia",
+  );
+  const condicao = (contract: { id: string }, chave: string, coluna: number) =>
+    Number(condicoesDeHoje.get(contract.id)?.[chave] ?? coluna);
   const removeContract = useDeleteRow("contracts");
 
   const [clientOpen, setClientOpen] = useState(false);
@@ -594,16 +603,16 @@ export function PainelClientes() {
                               Por função (ver Tarifas)
                             </span>
                           ) : (
-                            brl(contract.daily_rate)
+                            brl(condicao(contract, "daily_rate", contract.daily_rate))
                           )}
                         </TableCell>
 
                         <TableCell className="text-right text-sm text-muted-foreground">
-                          {num(contract.ot_factor, 2)}x
+                          {num(condicao(contract, "ot_factor", contract.ot_factor), 2)}x
                         </TableCell>
 
                         <TableCell className="text-right text-sm text-muted-foreground">
-                          {contract.ot_tolerance_min} min
+                          {condicao(contract, "ot_tolerance_min", contract.ot_tolerance_min)} min
                         </TableCell>
 
                         <TableCell className="whitespace-nowrap text-sm text-muted-foreground">

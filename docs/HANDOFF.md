@@ -13,8 +13,8 @@
 | Último gate concluído | 051 aplicada e interruptor ligado em HML e Production; site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`) |
 | Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
 | Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
-| Base | main `20e9cfcb619933491c0bf67abc91ca659e40b422` |
-| HEAD validado | 20e9cfcb619933491c0bf67abc91ca659e40b422 + o diff deste PR (telas simplificadas, testes estruturais e HANDOFF) |
+| Base | main `1d60ca0215bf36fe5c6af340789380d0198f6d68` |
+| HEAD validado | 1d60ca0215bf36fe5c6af340789380d0198f6d68 + o diff deste PR (valores de hoje nas listas, textos e HANDOFF) |
 | Alterações não commitadas | Nenhuma além deste conjunto |
 | PR | #130 (só documentação). Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
 | Ambiente-alvo | HML e Production (aplicados) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | UX-PENTE-FINO-02 (11/11/2026), achado do responsável no teste: depois de "Alterar custo" (150 → 250 a partir de hoje), a lista de Colaboradores seguia mostrando 150, porque lia a coluna `employees.daily_cost`, que não acompanha a vigência; o apontamento já usava 250 (correto). Novo `useValoresDeHoje` (lê só as tabelas de versões) e as listas passam a mostrar o valor que vale hoje: custo do colaborador (lista, custo médio, equipe da operação), condições do contrato (lista e escolha de contrato na operação) e valor da operação sem contrato (cartão). Textos de origem sem "vigência": "Preço do contrato desde dd/mm/aaaa", "Valor próprio da operação…"; caixa "Preço" sem "diária preço do contrato"; avisos de sucesso em palavras simples. Segundo achado: "Alterar custo" para uma data em que já começa outro valor dava "A vigência informada se sobrepõe…"; agora o "Alterar" corrige esse valor (RPC `corrigir_*`, mesmo período; `montarCorrecao` e `useCorrigirVigencia`) e avisa na janela. Terceiro achado (teste manual): contrato e custo criados com início em 11/11 recusavam apontar 03/11, sem caminho pela tela; agora uma data ANTES do primeiro valor antecipa o início desse valor pela mesma correção (conferido no HML em transação desfeita: contrato, custo e valor da operação; 03/11 passa a gravar 343,75/187,50) e as mensagens de "sem valor para a data" dizem o que fazer |
+| Resultados e testes comprovados | Linux, Node 22: lint, `tsc`, 72/72 `test:*` (D2, D3 e E2 atualizados para os textos novos) e build PASS. Sem verificação visual nesta sessão |
+| Código e PR afetados | `src/lib/vigencias-dados.ts`, `src/lib/vigencias-ui.ts`, `src/lib/apontamentos-financeiro.ts`, telas de colaboradores, clientes, operações e apontamentos, `scripts/testar-interfaces-vigencia.mjs`, `docs/HANDOFF.md` |
+| Ambientes envolvidos | Sessão em nuvem, CI e Preview. Banco, cálculo e Production: nada |
+| Pendências e decisões | Teste manual do responsável no Preview (datas de início do contrato e do custo precisam ser anteriores aos dias lançados). Production só com autorização |
+| Próxima ação exata | Responsável confere as listas e refaz o teste manual |
+| Autorizações e proibições | Autorizado (11/11/2026): pente fino das telas, PR e merge. Proibido sem autorização nominal: Production, banco |
+
+### Tarefa anterior — UX-PENTE-FINO-01 (11/11/2026, #131 mesclado)
 
 | Campo | Valor |
 | --- | --- |

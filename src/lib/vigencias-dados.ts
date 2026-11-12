@@ -25,7 +25,10 @@ import {
   interpretarPeriodoContratual,
   interpretarRegrasDefinitivas,
   montarCadastroAtomico,
+  montarCorrecao,
   montarRegistro,
+  hojeEmSaoPaulo,
+  versaoNaData,
   type EstadoDoMotorUI,
   type FormularioDeVigencia,
   type TipoDeVigencia,
@@ -360,6 +363,48 @@ export function useTermosDoApontamento(p: {
   };
 }
 
+/**
+ * Valor que vale HOJE para cada cadastro da lista, pela vigência. As colunas do cadastro
+ * (`employees.daily_cost`, `contracts.daily_rate`, `operations.agreed_amount`) não acompanham os
+ * reajustes feitos por "Alterar": a lista mostra este valor e só recua para a coluna quando não há
+ * versão que valha hoje (ex.: motor desligado). `habilitado` = motor ligado.
+ */
+export function useValoresDeHoje(
+  tipo: TipoDeVigencia,
+  ids: readonly string[],
+  habilitado: boolean,
+): ReadonlyMap<string, VersaoDeVigencia> {
+  const chave = [...ids].sort().join(",");
+  const consulta = useQuery({
+    queryKey: ["vigencias", "hoje", tipo, chave],
+    enabled: habilitado && ids.length > 0,
+    queryFn: async (): Promise<VersaoDeVigencia[]> => {
+      const db = cliente();
+      if (tipo === "colaborador") return lerCustosDosColaboradores(db, ids, true);
+      const listas = await Promise.all(
+        ids.map((id) =>
+          tipo === "contrato"
+            ? lerVersoesDoContrato(db, id, true)
+            : lerVersoesDaOperacao(db, id, true),
+        ),
+      );
+      return listas.flat();
+    },
+  });
+  const hoje = hojeEmSaoPaulo();
+  const coluna =
+    tipo === "colaborador" ? "employee_id" : tipo === "contrato" ? "contract_id" : "operation_id";
+  const mapa = new Map<string, VersaoDeVigencia>();
+  for (const id of ids) {
+    const versao = versaoNaData(
+      (consulta.data ?? []).filter((v) => v[coluna] === id),
+      hoje,
+    );
+    if (versao) mapa.set(id, versao);
+  }
+  return mapa;
+}
+
 function invalidarVigencias(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ["vigencias"] });
   void queryClient.invalidateQueries({ queryKey: CHAVE_DO_MOTOR });
@@ -385,7 +430,28 @@ export function useRegistrarVigencia(tipo: TipoDeVigencia) {
     },
     onSuccess: () => {
       invalidarVigencias(queryClient);
-      toast.success("Vigência registrada.");
+      toast.success("Novo valor salvo.");
+    },
+    onError: (erro: unknown) =>
+      toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
+  });
+}
+
+/** Corrige a versão que começa na mesma data (mesmo período, valores novos). */
+export function useCorrigirVigencia(tipo: TipoDeVigencia) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: {
+      termoId: string;
+      versao: { valid_from: string; valid_to: string | null };
+      form: FormularioDeVigencia;
+    }) => {
+      const { rpc, params } = montarCorrecao(tipo, v.termoId, v.versao, v.form);
+      await chamar(rpc, params);
+    },
+    onSuccess: () => {
+      invalidarVigencias(queryClient);
+      toast.success("Valor corrigido.");
     },
     onError: (erro: unknown) =>
       toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
@@ -407,7 +473,7 @@ export function useEncerrarVigencia(tipo: TipoDeVigencia) {
     },
     onSuccess: () => {
       invalidarVigencias(queryClient);
-      toast.success("Vigência encerrada.");
+      toast.success("Data de fim salva.");
     },
     onError: (erro: unknown) =>
       toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
@@ -426,7 +492,7 @@ export function useAposentarVigencia(tipo: TipoDeVigencia) {
     },
     onSuccess: () => {
       invalidarVigencias(queryClient);
-      toast.success("Vigência aposentada.");
+      toast.success("Registro cancelado.");
     },
     onError: (erro: unknown) =>
       toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),
@@ -449,7 +515,7 @@ export function useCriarComVigencia(tipo: TipoDeVigencia, invalidar: string[]) {
     onSuccess: () => {
       invalidar.forEach((chave) => void queryClient.invalidateQueries({ queryKey: [chave] }));
       invalidarVigencias(queryClient);
-      toast.success("Cadastro e vigência inicial salvos.");
+      toast.success("Cadastro salvo.");
     },
     onError: (erro: unknown) =>
       toast.error(erro instanceof Error ? erro.message : mensagemDoErro(erro)),

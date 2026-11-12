@@ -1082,8 +1082,8 @@ export function PainelApontamentos() {
           className="mb-5 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-destructive"
         >
           <p className="text-sm font-medium">
-            Sem condição financeira válida para {linhasBloqueadas.length} linha(s). O salvamento
-            está bloqueado.
+            {linhasBloqueadas.length} linha(s) sem preço ou custo para esta data. Não é possível
+            salvar até corrigir.
           </p>
           <p className="mt-1 text-xs leading-5">{linhasBloqueadas[0]?.valor.aviso}</p>
         </div>
@@ -1219,10 +1219,10 @@ export function PainelApontamentos() {
 
             <div className="flex min-h-10 items-center rounded-xl border border-border bg-secondary/35 px-3">
               <p className="text-xs leading-5 text-muted-foreground">
-                <span className="font-medium text-foreground">{clientName}</span> · diária{" "}
+                <span className="font-medium text-foreground">{clientName}</span> ·{" "}
                 {estadoDoMotor.tag === "desligado" ? (
                   <>
-                    {brl(rules.daily_rate)} · jornada{" "}
+                    diária {brl(rules.daily_rate)} · jornada{" "}
                     {minutesToLabel(plannedMinutes || rules.shift_hours * 60)} · HE{" "}
                     {brl((rules.daily_rate / (rules.shift_hours || 8)) * rules.ot_factor)}
                     /h
@@ -1232,7 +1232,7 @@ export function PainelApontamentos() {
                     {(() => {
                       const origem = computed.find((item) => item.valor.origem)?.valor.origem;
                       if (!origem) return "preço calculado em cada linha";
-                      return origem.startsWith("Contrato")
+                      return origem.startsWith("Preço do contrato")
                         ? "preço do contrato"
                         : "valor próprio da operação";
                     })()}
