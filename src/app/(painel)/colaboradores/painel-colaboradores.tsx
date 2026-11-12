@@ -64,12 +64,15 @@ import {
   useEstadoDoMotor,
   useFuncoesTurno,
   useRegrasDaBs,
-  useValoresDeHoje,
+  useValoresDeHojeComEstado,
 } from "@/lib/vigencias-dados";
 import { hojeEmSaoPaulo, modoDeEdicaoDeTaxa } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
+import { useTrava } from "@/lib/trava";
 import { useEmployees } from "@/lib/queries";
 import type { Employee } from "@/lib/types";
+
+import { errosDoCusto, nomeLimpo, nomeValido } from "./_dominio";
 
 type StatusColaborador = "active" | "inactive";
 
@@ -117,13 +120,19 @@ export function PainelColaboradores() {
   const [horaExtraDoCusto, setHoraExtraDoCusto] = useState("");
 
   // Custo que vale hoje (vigência): a coluna do cadastro não acompanha o "Alterar custo".
-  const custosDeHoje = useValoresDeHoje(
+  const custosDeHoje = useValoresDeHojeComEstado(
     "colaborador",
     data.map((employee) => employee.id),
     modoDeCusto === "por-vigencia",
   );
+  // Com o motor por vigência, a coluna `daily_cost` guarda só o custo inicial: enquanto as vigências
+  // carregam, ou se a leitura falhar, a lista e o custo médio NÃO mostram a coluna como custo de hoje.
+  const custoDeHojeDesconhecido =
+    modoDeCusto === "por-vigencia" && (custosDeHoje.carregando || custosDeHoje.erro);
   const custoDeHoje = (employee: Employee) =>
-    Number(custosDeHoje.get(employee.id)?.["daily_cost"] ?? employee.daily_cost);
+    Number(custosDeHoje.valores.get(employee.id)?.["daily_cost"] ?? employee.daily_cost);
+  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique.
+  const trava = useTrava();
 
   const colaboradoresAtivos = data.filter((employee) => employee.status === "active").length;
 
@@ -159,9 +168,17 @@ export function PainelColaboradores() {
   // logo depois, no colaborador recém-criado.
   const funcaoNoFormulario = funcoesHabilitadas;
 
+  const errosDoFormulario =
+    (form.id && modoDeCusto === "por-vigencia") || custoTravado
+      ? []
+      : errosDoCusto(form.daily_cost);
+  const salvando = save.isPending || criarComVigencia.isPending;
+
   function submit() {
+    if (!nomeValido(form.name) || errosDoFormulario.length > 0 || !trava.tentar()) return;
+    let enviado = false;
     const payload: Record<string, unknown> = {
-      name: form.name,
+      name: nomeLimpo(form.name),
       doc: form.doc || null,
       role: form.role || null,
       phone: form.phone || null,
@@ -175,7 +192,7 @@ export function PainelColaboradores() {
 
     if (form.id) {
       payload["id"] = form.id;
-      save.mutate(payload, { onSuccess: () => setOpen(false) });
+      save.mutate(payload, { onSettled: trava.liberar, onSuccess: () => setOpen(false) });
       return;
     }
 
@@ -200,6 +217,7 @@ export function PainelColaboradores() {
           },
         },
         {
+          onSettled: trava.liberar,
           onSuccess: (novoId) => {
             if (funcaoEscolhida && typeof novoId === "string") {
               save.mutate({ id: novoId, job_function_id: funcaoEscolhida });
@@ -212,8 +230,10 @@ export function PainelColaboradores() {
     }
 
     if (modoDeCusto === "direta") {
-      save.mutate(payload, { onSuccess: () => setOpen(false) });
+      enviado = true;
+      save.mutate(payload, { onSettled: trava.liberar, onSuccess: () => setOpen(false) });
     }
+    if (!enviado) trava.liberar();
   }
 
   return (
@@ -282,7 +302,13 @@ export function PainelColaboradores() {
 
         <Resumo
           label="Custo médio"
-          value={brl(custoMedio)}
+          value={
+            custoDeHojeDesconhecido
+              ? custosDeHoje.erro
+                ? "Indisponível"
+                : "Carregando…"
+              : brl(custoMedio)
+          }
           description="Média por diária"
           icon={BadgeDollarSign}
         />
@@ -402,7 +428,11 @@ export function PainelColaboradores() {
                       </TableCell>
 
                       <TableCell className="text-right text-sm font-medium text-foreground">
-                        {brl(custoDeHoje(employee))}
+                        {custoDeHojeDesconhecido ? (
+                          <CustoDesconhecido erro={custosDeHoje.erro} />
+                        ) : (
+                          brl(custoDeHoje(employee))
+                        )}
                       </TableCell>
 
                       <TableCell>
@@ -603,7 +633,7 @@ export function PainelColaboradores() {
             ) : null}
 
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label htmlFor="employee-status">Status</Label>
 
               <Select
                 value={form.status}
@@ -614,7 +644,7 @@ export function PainelColaboradores() {
                   })
                 }
               >
-                <SelectTrigger className={SELECT_CLASS}>
+                <SelectTrigger id="employee-status" className={SELECT_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
 
@@ -626,6 +656,14 @@ export function PainelColaboradores() {
               </Select>
             </div>
           </div>
+
+          {errosDoFormulario.length > 0 ? (
+            <ul role="alert" className="list-disc pl-5 text-xs text-destructive">
+              {errosDoFormulario.map((mensagem) => (
+                <li key={mensagem}>{mensagem}</li>
+              ))}
+            </ul>
+          ) : null}
 
           {custoTravado && modoDeCusto !== "por-vigencia" ? (
             <p className="text-xs text-muted-foreground">
@@ -659,14 +697,14 @@ export function PainelColaboradores() {
               className="rounded-xl"
               onClick={submit}
               disabled={
-                !form.name ||
-                save.isPending ||
-                criarComVigencia.isPending ||
+                !nomeValido(form.name) ||
+                errosDoFormulario.length > 0 ||
+                salvando ||
                 (modoDeCusto === "bloqueada" && !form.id) ||
                 (!form.id && modoDeCusto === "por-vigencia" && !inicioDoCusto)
               }
             >
-              {save.isPending || criarComVigencia.isPending ? "Salvando..." : "Salvar colaborador"}
+              {salvando ? "Salvando..." : "Salvar colaborador"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -683,6 +721,20 @@ export function PainelColaboradores() {
         />
       ) : null}
     </div>
+  );
+}
+
+/** Custo de hoje desconhecido (vigências carregando ou com erro): nunca o custo do cadastro. */
+function CustoDesconhecido({ erro }: { erro: boolean }) {
+  return erro ? (
+    <span
+      className="text-xs font-normal text-destructive"
+      title="Não foi possível ler os custos que valem hoje. Recarregue a página."
+    >
+      Indisponível
+    </span>
+  ) : (
+    <span className="text-xs font-normal text-muted-foreground">Carregando…</span>
   );
 }
 

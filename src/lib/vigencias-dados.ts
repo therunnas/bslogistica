@@ -94,11 +94,38 @@ export function lerVersoesDaOperacao(db: Cliente, operacaoId: string, somenteAti
   );
 }
 
-export function lerCustosDosColaboradores(
+/**
+ * Quantos colaboradores vão em cada `.in(...)`. Os IDs entram na URL do GET: com todos de uma vez,
+ * acima de ~250 colaboradores a URL passava de 8 KB e o gateway local respondia **414 URI Too Long**
+ * (medido no CP-03 da QA-BS-01); a consulta falhava e a lista recuava em silêncio para a coluna do
+ * cadastro. 100 IDs ficam em ~3,8 KB, longe de qualquer limite usual de gateway.
+ */
+export const COLABORADORES_POR_CONSULTA = 100;
+
+/**
+ * Versões de custo dos colaboradores, lidas em lotes de `COLABORADORES_POR_CONSULTA` IDs. Cada lote
+ * continua paginado por linha; o resultado é a concatenação dos lotes, sem repetição (os lotes não
+ * se sobrepõem e cada versão pertence a um único colaborador). Mesmo filtro e mesma ordem por lote:
+ * nada muda no que é lido, só o tamanho de cada pedido. Um lote com erro derruba a leitura inteira
+ * (nunca devolve um resultado parcial como se fosse completo).
+ */
+export async function lerCustosDosColaboradores(
   db: Cliente,
   colaboradores: readonly string[],
   somenteAtivas: boolean,
 ) {
+  const unicos = [...new Set(colaboradores)];
+  const lotes: string[][] = [];
+  for (let i = 0; i < unicos.length; i += COLABORADORES_POR_CONSULTA) {
+    lotes.push(unicos.slice(i, i + COLABORADORES_POR_CONSULTA));
+  }
+  const resultados = await Promise.all(
+    lotes.map((lote) => lerCustosDeUmLote(db, lote, somenteAtivas)),
+  );
+  return resultados.flat();
+}
+
+function lerCustosDeUmLote(db: Cliente, colaboradores: readonly string[], somenteAtivas: boolean) {
   return lerConsultaPaginada(
     ({ depoisDe, limite }) => {
       let q = db.from("employee_cost_terms").select("*").in("employee_id", colaboradores);

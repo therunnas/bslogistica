@@ -43,7 +43,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | PASS (Linux) |
 | CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | PASS (local) |
 | CP-02  | Clientes e contratos                                                               | PASS (local) |
-| CP-03  | Colaboradores e valores                                                            | não iniciado |
+| CP-03  | Colaboradores e valores                                                            | PASS (local) |
 | CP-04  | Operações, turnos e equipes                                                        | não iniciado |
 | CP-05  | Apontamentos e regras financeiras (maior risco)                                    | não iniciado |
 | CP-06  | Serviços avulsos, adicionais e containers                                          | não iniciado |
@@ -59,7 +59,7 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | ID  | Defeito                                                                                                   | Prioridade | Evidência                    | CP       |
 | --- | --------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------- | -------- |
 | D1  | Saída antes da entrada (08:00 → 07:50) salva sem aviso como 22h50 (R$ 953,13)                             | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
-| D2  | "Alterar custo": trocar a data substitui o valor digitado pelo antigo                                     | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
+| D2  | "Alterar custo": trocar a data substituía o valor digitado pelo antigo. **Corrigido no CP-03**            | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
 | D3  | Duplo clique duplica cliente e turno. **Cliente corrigido no CP-02** (envio único); turno segue no CP-04  | P2         | E2E #133 + leitura do código | CP-02/04 |
 | D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
@@ -87,6 +87,28 @@ PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 73/73 `test:*`; `sql-local` 52; sem 
 financeira alterada e com MFA opcional mantido. Pendente de decisão: o Auth responde `user_banned`
 antes de conferir a senha (revela conta revogada pela API do Auth, não pela tela). Não testados:
 expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo.
+
+Defeitos do CP-03 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
+revalidados (GREEN); inventário, cenários de vigência e reconciliação de custos em
+[docs/qa/CP-03-colaboradores-e-valores.md](docs/qa/CP-03-colaboradores-e-valores.md):
+
+| ID        | Defeito                                                                                          | Prioridade | Estado    |
+| --------- | ------------------------------------------------------------------------------------------------ | ---------- | --------- |
+| D2        | "Alterar custo": trocar a data devolvia o campo ao custo antigo (vale para os três "Alterar")    | P1         | corrigido |
+| D-CP03-01 | Com ~250+ colaboradores o `.in(...)` passava de 8 KB (414) e a lista mostrava o custo do cadastro | P2         | corrigido |
+| D-CP03-02 | Lista e "Custo médio" mostravam o custo do cadastro como "hoje" ao carregar ou falhar            | P2         | corrigido |
+| D-CP03-03 | Duplo clique em "Salvar colaborador" criava 2 colaboradores                                      | P2         | corrigido |
+| D-CP03-07 | Duplo clique em "Salvar novo valor" gravava e deixava o diálogo aberto (intermitente)            | P2         | corrigido |
+| D-CP03-04 | Nome só com espaços aceito; espaços das pontas gravados                                          | P3         | corrigido |
+| D-CP03-05 | Custo negativo ia ao banco e voltava como erro genérico                                          | P3         | corrigido |
+| D-CP03-06 | Rótulo "Status" solto do seletor                                                                 | P3         | corrigido |
+
+CP-03 (12/11/2026, sessão em nuvem, Linux): 16 casos E2E novos (`60-colaboradores-custos`); custo
+150 → 250 → 270 aplicado pela data e congelado no lançamento, hora extra pelo custo vigente
+(312,50), retroativo recusado, dois profissionais, fechamento (custo R$ 1.312,50 × receita
+R$ 1.593,75) e relatório (R$ 1.132,50 / R$ 180,00) sem divergência ao centavo; E2E completo 132
+testes (128 PASS, 0 FAIL, 4 FALHA CONHECIDA, 0 PULADO); 75/75 `test:*`; `sql-local` 52; sem SQL,
+RLS ou regra de custo alterada. Decisões do CP-02 seguem pendentes.
 
 Defeitos do CP-02 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
 revalidados (GREEN); inventário, matriz de valores e decisões em

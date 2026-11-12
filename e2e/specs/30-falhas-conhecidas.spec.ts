@@ -107,23 +107,20 @@ test(
   },
 );
 
-test(
-  "[DEFEITO] “Alterar custo”: trocar a data apaga o valor digitado",
-  CONHECIDA,
-  async ({ page }) => {
-    await abrirColaborador(page, HUGO);
-    await dialogo(page).getByRole("button", { name: "Alterar custo" }).click();
-    const d = dialogo(page);
-    await expect(d.getByRole("heading", { name: "Alterar custo" })).toBeVisible();
-    const valor = d.locator("#valor-atual-daily_cost");
-    await valor.fill("199");
-    await expect(valor).toHaveValue("199");
-    await d.locator("#valor-atual-inicio").fill("2026-10-01");
-    // Correto seria manter 199. Hoje a tela recarrega o valor da versão que começa nessa data:
-    await expect(valor).toHaveValue(/^150(\.0+)?$/);
-    await d.getByRole("button", { name: "Cancelar" }).click();
-  },
-);
+// D2: CORRIGIDO no CP-03 (o formulário guarda o que foi digitado ao trocar a data). Deixou de ser
+// falha conhecida: o teste confere o comportamento correto, sem a etiqueta.
+test("[CORRIGIDO D2] “Alterar custo”: trocar a data mantém o valor digitado", async ({ page }) => {
+  await abrirColaborador(page, HUGO);
+  await dialogo(page).getByRole("button", { name: "Alterar custo" }).click();
+  const d = dialogo(page);
+  await expect(d.getByRole("heading", { name: "Alterar custo" })).toBeVisible();
+  const valor = d.locator("#valor-atual-daily_cost");
+  await valor.fill("199");
+  await expect(valor).toHaveValue("199");
+  await d.locator("#valor-atual-inicio").fill("2026-10-01");
+  await expect(valor).toHaveValue("199");
+  await d.getByRole("button", { name: "Cancelar" }).click();
+});
 
 test(
   "[RISCO] a confirmação da fatura não avisa sobre dias ainda abertos",

@@ -2,24 +2,24 @@
 
 <!-- workflow-handoff:v1 -->
 
-**QA-BS-01 — auditoria, correção e estabilização integral. CP-00, CP-00B, CP-01 e CP-02 PASS (local e CI). CP-02 (clientes e contratos) corrigiu D3 em cliente e mais 8 defeitos (D-CP02-01 a 08) e deixou 3 decisões de negócio (DEC-CP02-01 a 03). Próximo: CP-03. D1, D2, D4–D8 e D3 em turno seguem abertos.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
+**QA-BS-01 — auditoria, correção e estabilização integral. CP-00, CP-00B, CP-01, CP-02 e CP-03 PASS (local e CI). CP-03 (colaboradores e valores) corrigiu D2 e mais 7 defeitos (D-CP03-01 a 07). Próximo: CP-04. D1, D3 em turno, D4–D8 e as decisões DEC-CP02-01 a 03 seguem abertos.** Production e HML seguem como em PROD-051-01 (051, dobro ligado); reconferir antes de agir.
 
 ## Identificação
 
 | Campo | Valor |
 | --- | --- |
 | Etapa | QA-BS-01 — auditoria, correção e estabilização integral, por checkpoints CP-00 a CP-12 (plano e defeitos em [PROGRESS](../PROGRESS.md#qa-bs-01--checkpoints)) |
-| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-02 concluído; CP-03 a iniciar (não iniciado nesta sessão) |
-| Último gate concluído | CP-02 — clientes e contratos (12/11/2026, sessão em nuvem, sessão 05); antes, CP-01, CP-00B, CP-00 e a RECONCILIACAO-134 |
+| Gate atual | Gate 1/2 (desenvolvimento e validação local), CP-03 concluído; CP-04 a iniciar (não iniciado nesta sessão) |
+| Último gate concluído | CP-03 — colaboradores e valores (12/11/2026, sessão em nuvem, sessão 06); antes, CP-02, CP-01, CP-00B, CP-00 e a RECONCILIACAO-134 |
 | Worktree | Sessão em nuvem (ambiente principal a partir da sessão 03): worktree isolado `/home/user/bslogistica-qa134` (efêmero), com Docker local da sessão. Sessão anterior no Mac: worktree na pasta temporária do Claude Code (`.../scratchpad/bs-qa`). Descobrir de novo na retomada; o checkout original (`fix/auditoria-bs-202610`) não é o desta tarefa |
 | Branch | `fix/qa-bs-01-estabilizacao`, criada de `origin/test/e2e-playwright-local` (#133, que inclui o #132) por decisão do responsável e reconciliada com a `main` por merge (sem rebase nem force push) |
 | Base | main `f6df1fbf58e8eb34648e2328b926ef99c7ad7164` (squash do #133, sobre `1c6042e`, squash do #132) |
-| HEAD validado | 5a578cb1d7a67c5877f22e4d32d787d593fda0a5 (CP-01; CI `validar`, `sql-local`, `e2e-local` SUCCESS) + o diff do CP-02, validado na sessão em nuvem: lint, `tsc`, `check:workflow`, 74/74 `test:*`, build, `sql-local` 52 suítes, E2E 116 testes (111 PASS, 5 FALHA CONHECIDA, 0 FAIL, 0 PULADO), 25/25 travas; revalidado na CI no novo HEAD do #134 |
+| HEAD validado | b8f08f7ad7db0e5032250338dad789549abbd3db (CP-02; CI `validar`, `sql-local`, `e2e-local` SUCCESS) + o diff do CP-03, validado na sessão em nuvem: lint, `tsc`, `check:workflow`, 75/75 `test:*`, build, `sql-local` 52 suítes, E2E 132 testes (128 PASS, 4 FALHA CONHECIDA, 0 FAIL, 0 PULADO), 25/25 travas; revalidado na CI no novo HEAD do #134 |
 | Alterações não commitadas | Nenhuma na sessão em nuvem (`project_id` trocado só para os testes e restaurado; `supabase/.branches/` não versionado). No Mac (sessão anterior): `supabase/config.toml` com `project_id = "bs-e2e-qa01"` (**nunca commitar**) e `supabase/.branches/` |
 | PR | #134 (Draft), base `main` desde a RECONCILIACAO-134. Integrados: #132 (`1c6042e`) e #133 (`f6df1fb`). Aberto e não tocado: #125 |
 | Ambiente-alvo | Local (Supabase local descartável) e CI. HML, Preview e Production: nenhum acesso |
-| Última ação comprovada | CP-02 na sessão em nuvem (Docker local): 18 casos E2E novos de clientes, contratos, vigências e integração com operação, apontamento e fechamento; 9 defeitos reproduzidos (RED), corrigidos e revalidados (GREEN); encerramento sem sobras (0 containers, 0 volumes) |
-| Próxima ação exata | CP-03 — colaboradores e valores (inclui D2, "Alterar custo", e o `.in(...)` de `useValoresDeHoje` de colaborador), só com nova autorização; não iniciado |
+| Última ação comprovada | CP-03 na sessão em nuvem (Docker local, reiniciado nesta sessão): 16 casos E2E novos de colaboradores, funções, "Alterar custo", valores de hoje (com 300 colaboradores) e integração com equipe, apontamento, fechamento e relatório; 8 defeitos reproduzidos (RED), corrigidos e revalidados (GREEN); encerramento sem sobras (0 containers, 0 volumes) |
+| Próxima ação exata | CP-04 — operações, turnos e equipes (inclui D3 em turno; adotar o valor de hoje com estado na tela de Operações), só com nova autorização; não iniciado |
 
 ## Estado atual para retomada
 
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | QA-BS-01 CP-03 — colaboradores e valores (12/11/2026, sessão em nuvem, sessão 06), autorizado pelo responsável. Auditoria da tela `/colaboradores` (cadastro, catálogo de funções, "Alterar custo", histórico, valores de hoje) com navegador real e Supabase local, e da passagem do custo para equipe, apontamento, fechamento e relatório. D2 corrigido. Inventário, cenários de vigência e reconciliação em [docs/qa/CP-03-colaboradores-e-valores.md](qa/CP-03-colaboradores-e-valores.md) |
+| Resultados e testes comprovados | **RED no `b8f08f7`:** D2 (199 → 150 ao trocar a data); 2 colaboradores no duplo clique; R$ 150,00 do cadastro na lista com erro de leitura e com 300 colaboradores (`.in(...)` > 8 KB → **414**, medido: 200 IDs passam, 300 não); nome com espaços; "Status" solto; e, intermitente na execução completa, o diálogo de "Alterar" aberto depois de duplo clique com o valor já gravado. Bloco F da paginação com a função anterior: "URI Too Long". **GREEN, sessão em nuvem:** lint, `tsc`, `check:workflow`, `git diff --check` PASS; 75/75 `test:*` (nova `test:colaboradores-custos` 17/17; `test:vigencias-paginacao` 31/31); build PASS; travas 25/25; `npm run e2e:local`: **132 testes, 128 PASS, 0 FAIL, 4 FALHA CONHECIDA, 0 PULADO**, 880 s (D2 saiu das falhas conhecidas); `sql-local` 52 suítes. Reconciliação ao centavo: custos 150 → 250 → 270 pela data, hora extra pelo custo vigente (312,50), retroativo recusado, fechamento custo R$ 1.312,50 × receita R$ 1.593,75, relatório Zeca R$ 1.132,50 e Lia R$ 180,00 |
+| Código e PR afetados | Correções: `src/app/(painel)/_components/valor-atual.tsx` (D2 e envio único; vale para os três "Alterar"), `src/lib/vigencias-ui.ts` (`manterDigitados`), `src/lib/vigencias-dados.ts` (custos em lotes de 100), `src/app/(painel)/colaboradores/painel-colaboradores.tsx` e `colaboradores/_dominio.ts` (novo). Testes: `e2e/specs/60-colaboradores-custos.spec.ts`, D2 em `30-falhas-conhecidas` convertido em PASS, `scripts/testar-colaboradores-custos.mjs` (+ `package.json` e `ci.yml`), bloco F em `scripts/testar-vigencias-paginacao.mjs`. Docs: `docs/TESTES_E2E.md`, `docs/qa/CP-03-…`, `PROGRESS.md`, este arquivo. **Nenhum SQL, migration, RLS, policy, grant, trigger ou regra de custo.** PR #134 (Draft) |
+| Ambientes envolvidos | Sessão em nuvem: Docker local reiniciado nesta sessão (vazio no início); Supabase `bs-e2e-cp03` (iteração e execuções oficiais) e `bs-fin11-cp03` (SQL) criados e encerrados pelo próprio `project_id`; 0 containers e 0 volumes no fim. GitHub (CI). HML, Preview e Production: nenhum acesso |
+| Pendências e decisões | Do CP-02, sem mudança: DEC-CP02-01 (fim do contrato não limita a cobrança), DEC-CP02-02 (exclusão de cliente em cascata), DEC-CP02-03 (`01/01/0001` do HML). Dependências: CP-04 (Operações ainda usa o valor de hoje sem estado; função de trabalho de quem já está alocado muda na equipe), CP-05 (salvar o dia grava a equipe inteira), CP-09 (`window.confirm`). D5 (Production sem o #132) só se resolve com publicação autorizada. D1, D3 em turno, D4, D6–D8 abertos |
+| Próxima ação exata | CP-04 — operações, turnos e equipes, com nova autorização; não iniciado |
+| Autorizações e proibições | Autorizado e usado: inspeção do CP-03, testes locais isolados, dados sintéticos, correção de defeitos do módulo e do D2, testes novos, correção da consulta de vigências de colaboradores sem mudar semântica financeira, documentação, commit e push só no #134, descrição do PR. Proibidos e não feitos: merge, Ready for review, `main` e outros PRs, deploy, HML, Production, migrations remotas, flags e secrets remotos, outro Supabase remoto, excluir dados reais, regras financeiras, D1, D3 em turno, D4, decisões do CP-02, afrouxar RLS ou autorização, remover testes, remover containers ou volumes preexistentes (não havia), CP-04 |
+
+### Tarefa anterior — QA-BS-01 CP-02 (12/11/2026, sessão em nuvem, sessão 05)
 
 | Campo | Valor |
 | --- | --- |
