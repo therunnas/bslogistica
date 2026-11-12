@@ -4,7 +4,7 @@
  * Uso: node e2e/guarda/testar-guardas.mjs
  */
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -78,7 +78,12 @@ caso("G9. navegador: só loopback é permitido", () => {
 caso(
   "G10. o config.toml versionado aponta para Production e por isso é recusado sem a troca",
   () => {
-    const projeto = projetoDoConfig(readFileSync("supabase/config.toml", "utf8"));
+    // Lido do Git, não do disco: na CI o arquivo em disco já foi trocado pelo projeto local.
+    const versionado = execFileSync("git", ["show", "HEAD:supabase/config.toml"], {
+      encoding: "utf8",
+    });
+    const projeto = projetoDoConfig(versionado);
+    assert.equal(projeto, "ehkduqokntemtmqzdrbd");
     assert.ok(problemasDoAmbiente({ ...BASE, projetoId: projeto }).length > 0);
   },
 );
