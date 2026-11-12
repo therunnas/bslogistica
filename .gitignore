@@ -47,3 +47,8 @@ next-env.d.ts
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# E2E local (Playwright): relatórios e artefatos por execução
+/e2e-results/
+/playwright-report/
+/test-results/
