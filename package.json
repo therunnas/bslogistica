@@ -13,6 +13,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "e2e:local": "bash scripts/e2e-local.sh",
+    "e2e:guardas": "node e2e/guarda/testar-guardas.mjs",
     "lint": "eslint .",
     "test:dias-especiais": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-dias-especiais.mjs",
     "test:cookies-supabase": "node --experimental-strip-types scripts/testar-cookies-supabase.mjs",
@@ -141,6 +143,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

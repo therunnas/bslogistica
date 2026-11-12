@@ -1,0 +1,75 @@
+name: E2E local
+
+# Testes de ponta a ponta (Playwright) contra o app em loopback e um Supabase LOCAL descartável,
+# criado e destruído nesta VM. Sem secrets, sem vínculo remoto: HML e Production são
+# inalcançáveis por desenho (e2e/guarda/ e docs/TESTES_E2E.md). Separado do ci.yml de propósito.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      E2E_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Mesmo isolamento do job sql-local: VM limpa e project_id descartável, nunca o do
+      # repositório (que é a referência de Production).
+      - name: Isolar identidade do Supabase local
+        env:
+          E2E_PROJETO: bs-e2e-ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          test -z "$(docker ps -aq)"
+          test -z "$(docker volume ls -q)"
+          test ! -e supabase/.temp/project-ref
+          python3 - <<'PY'
+          import os, pathlib, re
+          config = pathlib.Path('supabase/config.toml')
+          text, count = re.subn(r'^project_id\s*=\s*"[^"]+"',
+                               'project_id = "' + os.environ['E2E_PROJETO'] + '"',
+                               config.read_text(), count=1, flags=re.M)
+          assert count == 1
+          config.write_text(text)
+          PY
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testar as travas de isolamento (casos negativos)
+        run: npm run e2e:guardas
+
+      - name: Instalar o Chromium do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E local (Supabase local + app + Playwright)
+        run: npm run e2e:local
+
+      - name: Evidências por SHA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ env.E2E_SHA }}
+          path: e2e-results/
+          retention-days: 14
+          if-no-files-found: warn

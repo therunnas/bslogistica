@@ -14,7 +14,7 @@
 | Worktree | Sessão em nuvem: `/home/user/bslogistica` (efêmero). Windows local: `...\bslogistica` e `...\bslogistica-hml-limpeza-050` (#125). Descobrir de novo na retomada |
 | Branch | `claude/jolly-allen-fqechw` (branch da sessão em nuvem; recebeu a main por merge, sem force push) |
 | Base | main `1d60ca0215bf36fe5c6af340789380d0198f6d68` |
-| HEAD validado | 1d60ca0215bf36fe5c6af340789380d0198f6d68 + o diff deste PR (valores de hoje nas listas, textos e HANDOFF) |
+| HEAD validado | afc2219b1ca1ab07430e3d8cd4481d08761b02b0 + o diff deste PR (infraestrutura E2E e HANDOFF) |
 | Alterações não commitadas | Nenhuma além deste conjunto |
 | PR | #130 (só documentação). Aberto também: #125 (Draft, limpeza do HML, não mesclar) |
 | Ambiente-alvo | HML e Production (aplicados) |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | E2E-IMPLEMENTACAO-01 (12/11/2026, sessão em nuvem), autorizada pelo responsável: infraestrutura de testes de ponta a ponta com Playwright contra o app em loopback e um Supabase LOCAL descartável no GitHub Actions (workflow próprio `.github/workflows/e2e.yml`, sem tocar o `ci.yml`). Travas de isolamento em `e2e/guarda/` (ambiente, `project_id`, vínculo remoto, rede do servidor e do navegador) com testes negativos; semente local com o estado de configuração da Production; usuários sintéticos locais com login real pela tela. Em andamento |
+| Resultados e testes comprovados | Travas: 13/13 PASS local (`npm run e2e:guardas`). Lint e `tsc` PASS. Execução completa só na CI (sem Docker nesta sessão) |
+| Código e PR afetados | `.github/workflows/e2e.yml`, `scripts/e2e-local.sh`, `e2e/**`, `playwright.config.ts`, `package.json`/lockfile (só `@playwright/test` 1.63.0 e os scripts `e2e:local`/`e2e:guardas`), `.gitignore`, docs. PR Draft próprio com base na branch do #132 |
+| Ambientes envolvidos | Sessão em nuvem e GitHub Actions (Supabase local descartável). HML e Production: nenhum acesso |
+| Pendências e decisões | Cenários V1–V5, fixa, avulsa, financeiro e segurança a completar e validar na CI |
+| Próxima ação exata | Fazer o job `e2e-local` passar e completar os cenários |
+| Autorizações e proibições | Autorizado: infraestrutura E2E local, branch e PR Draft próprios. Proibidos: HML, Production, `src/`, migrations, `ci.yml`, merge, deploy, alterar o #132 |
+
+### Tarefa anterior — UX-PENTE-FINO-02 (11/11/2026, PR #132 em Draft)
 
 | Campo | Valor |
 | --- | --- |
