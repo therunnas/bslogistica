@@ -42,7 +42,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-00  | Baseline e inventário (Git, PRs, ambientes, docs, 16 telas + 7 de acesso + 5 APIs) | PASS         |
 | CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | PASS (Linux) |
 | CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | PASS (local) |
-| CP-02  | Clientes e contratos                                                               | não iniciado |
+| CP-02  | Clientes e contratos                                                               | PASS (local) |
 | CP-03  | Colaboradores e valores                                                            | não iniciado |
 | CP-04  | Operações, turnos e equipes                                                        | não iniciado |
 | CP-05  | Apontamentos e regras financeiras (maior risco)                                    | não iniciado |
@@ -60,7 +60,7 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | --- | --------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------- | -------- |
 | D1  | Saída antes da entrada (08:00 → 07:50) salva sem aviso como 22h50 (R$ 953,13)                             | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
 | D2  | "Alterar custo": trocar a data substitui o valor digitado pelo antigo                                     | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
-| D3  | Duplo clique duplica cliente e turno; demais cadastros só têm `disabled={isPending}`                      | P2         | E2E #133 + leitura do código | CP-02/04 |
+| D3  | Duplo clique duplica cliente e turno. **Cliente corrigido no CP-02** (envio único); turno segue no CP-04  | P2         | E2E #133 + leitura do código | CP-02/04 |
 | D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
 | D6  | `billing.ts` usa `<= 15`/`<= 45` (030) e o núcleo V2 `< 15`/`< 45`; só alimenta horas exibidas, não valor | P3         | leitura do código            | CP-05    |
@@ -87,6 +87,33 @@ PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 73/73 `test:*`; `sql-local` 52; sem 
 financeira alterada e com MFA opcional mantido. Pendente de decisão: o Auth responde `user_banned`
 antes de conferir a senha (revela conta revogada pela API do Auth, não pela tela). Não testados:
 expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo.
+
+Defeitos do CP-02 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
+revalidados (GREEN); inventário, matriz de valores e decisões em
+[docs/qa/CP-02-clientes-e-contratos.md](docs/qa/CP-02-clientes-e-contratos.md):
+
+| ID        | Defeito                                                                                     | Prioridade | Estado    |
+| --------- | ------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D3        | Duplo clique em "Salvar cliente" criava 2 clientes (cliente; turno segue no CP-04)          | P2         | corrigido |
+| D-CP02-01 | Duplo clique em "Salvar contrato" criava 2 contratos                                        | P2         | corrigido |
+| D-CP02-02 | Contrato aceitava fim antes do início e ano 0001 (origem provável do `01/01/0001`)          | P2         | corrigido |
+| D-CP02-03 | Lista de contratos mostrava o valor do cadastro como "hoje" ao carregar ou falhar           | P2         | corrigido |
+| D-CP02-04 | Excluir cliente apaga em cascata operações e apontamentos não faturados sem avisar          | P2         | corrigido |
+| D-CP02-05 | Nome só com espaços aceito; espaços das pontas gravados                                     | P3         | corrigido |
+| D-CP02-06 | Falha de rede ("Failed to fetch") e erro da exclusão mostrados crus                         | P3         | corrigido |
+| D-CP02-07 | 14 rótulos dos formulários de cliente e contrato soltos dos campos                          | P3         | corrigido |
+| D-CP02-08 | "Salvar cliente" sem estado de carregamento                                                 | P3         | corrigido |
+
+Decisões pendentes do CP-02: **DEC-CP02-01** (o fim do contrato e o status Inativo não limitam a
+cobrança: dia depois do fim é lançado e cobrado; E2E `@falha-conhecida`), **DEC-CP02-02**
+(excluir cliente sem histórico faturado apaga em cascata apontamentos não faturados; a tela agora
+avisa) e **DEC-CP02-03** (saneamento do registro `01/01/0001` do HML, não lido nesta sessão).
+
+CP-02 (12/11/2026, sessão em nuvem, Linux): 18 casos E2E novos (`50-clientes-contratos`), com
+cenários de integração cliente → contrato → operação → apontamento → fechamento e vigências
+250 → 300 → 320 conferidas ao centavo (fechamento R$ 2.340,00); E2E completo 116 testes (111 PASS,
+0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 74/74 `test:*`; `sql-local` 52; sem SQL, RLS ou regra
+financeira alterada.
 
 CP-00B (12/11/2026, sessão em nuvem, Linux): baseline executável completa — lint, `tsc`, 72/72
 `test:*`, build, `sql-local` 52 suítes, E2E local 63 testes (58 PASS, 0 FAIL, 5 FALHA CONHECIDA,

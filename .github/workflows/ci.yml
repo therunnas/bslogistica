@@ -83,6 +83,9 @@ jobs:
       - name: Teste mensagens-auth
         run: npm run test:mensagens-auth
 
+      - name: Teste clientes-contratos
+        run: npm run test:clientes-contratos
+
       - name: Teste troca
         run: npm run test:troca
 

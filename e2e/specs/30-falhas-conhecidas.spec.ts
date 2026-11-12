@@ -72,23 +72,23 @@ test(
   },
 );
 
-test(
-  "[DEFEITO] duplo clique em “Salvar cliente” cria dois clientes iguais",
-  CONHECIDA,
-  async ({ page }) => {
-    const nome = `${P} Duplo`;
-    await page.goto("/clientes");
-    await page.getByRole("button", { name: "Novo cliente" }).click();
-    const d = dialogo(page);
-    await campo(d, "Nome").fill(nome);
-    // Dois cliques no mesmo instante (mesmo tick), como um duplo clique rápido.
-    await d.getByRole("button", { name: "Salvar cliente" }).evaluate((botao: HTMLElement) => {
-      botao.click();
-      botao.click();
-    });
-    await expect.poll(() => contarPorNome("clients", nome), { timeout: 20_000 }).toBe(2);
-  },
-);
+// D3 em cliente: CORRIGIDO no CP-02 (trava de envio único). Deixou de ser falha conhecida: o
+// teste agora confere o comportamento correto, sem a etiqueta. (D3 em turno segue abaixo, CP-04.)
+test("[CORRIGIDO D3] duplo clique em “Salvar cliente” cria um único cliente", async ({ page }) => {
+  const nome = `${P} Duplo`;
+  await page.goto("/clientes");
+  await page.getByRole("button", { name: "Novo cliente" }).click();
+  const d = dialogo(page);
+  await campo(d, "Nome").fill(nome);
+  // Dois cliques no mesmo instante (mesmo tick), como um duplo clique rápido.
+  await d.getByRole("button", { name: "Salvar cliente" }).evaluate((botao: HTMLElement) => {
+    botao.click();
+    botao.click();
+  });
+  await expect.poll(() => contarPorNome("clients", nome), { timeout: 20_000 }).toBe(1);
+  await page.waitForTimeout(1500);
+  expect(contarPorNome("clients", nome)).toBe(1);
+});
 
 test(
   "[DEFEITO] duplo clique em “Salvar turno” cria dois turnos iguais",
