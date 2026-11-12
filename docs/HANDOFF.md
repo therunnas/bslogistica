@@ -37,7 +37,7 @@
 | Campo | Valor |
 | --- | --- |
 | Tarefa executada | E2E-IMPLEMENTACAO-01 (12/11/2026, sessão em nuvem), autorizada pelo responsável: infraestrutura de testes de ponta a ponta com Playwright contra o app em loopback e um Supabase LOCAL descartável no GitHub Actions (workflow próprio `.github/workflows/e2e.yml`, sem tocar o `ci.yml`). Travas de isolamento em `e2e/guarda/` (ambiente, `project_id`, vínculo remoto, rede do servidor e do navegador) com testes negativos; semente local com o estado de configuração da Production; usuários sintéticos locais com login real pela tela. Em andamento |
-| Resultados e testes comprovados | Travas: 13/13 PASS local (`npm run e2e:guardas`). Lint e `tsc` PASS. Execução completa só na CI (sem Docker nesta sessão) |
+| Resultados e testes comprovados | Travas: 13/13 PASS local e na CI (`npm run e2e:guardas`). Fumaça na CI: 17/17 PASS em `35bdef9` (job `e2e-local`; servidor sem nenhuma tentativa de rede externa). Cenários (ciclo completo, segurança, falhas conhecidas) em ajuste na CI. Lint e `tsc` PASS. Sem Docker nesta sessão: execução completa só na CI |
 | Código e PR afetados | `.github/workflows/e2e.yml`, `scripts/e2e-local.sh`, `e2e/**`, `playwright.config.ts`, `package.json`/lockfile (só `@playwright/test` 1.63.0 e os scripts `e2e:local`/`e2e:guardas`), `.gitignore`, docs. PR Draft próprio com base na branch do #132 |
 | Ambientes envolvidos | Sessão em nuvem e GitHub Actions (Supabase local descartável). HML e Production: nenhum acesso |
 | Pendências e decisões | Cenários V1–V5, fixa, avulsa, financeiro e segurança a completar e validar na CI |

@@ -147,11 +147,22 @@ test("operacional: a tela usa só as RPCs e nenhuma resposta traz valor financei
   await Promise.all(pendentes);
 
   expect(respostas.length).toBeGreaterThan(0);
-  // Nenhuma leitura direta de tabela: só /rest/v1/rpc/<função do operador>.
-  for (const r of respostas)
-    expect(r.caminho).toMatch(
-      /^\/rest\/v1\/rpc\/[a-z_]+_operador$|^\/rest\/v1\/rpc\/salvar_apontamento_operacional$/,
-    );
+  // Nenhuma leitura direta de tabela pelo navegador do operador: só /rest/v1/rpc/<função>.
+  for (const r of respostas) expect(r.caminho).toMatch(/^\/rest\/v1\/rpc\/[a-z0-9_]+$/);
+  // As cinco RPCs do contrato do operador foram as usadas para a tela de apontamento.
+  const usadas = new Set(respostas.map((r) => r.caminho.replace("/rest/v1/rpc/", "")));
+  for (const rpc of [
+    "listar_operacoes_do_operador",
+    "listar_turnos_do_operador",
+    "listar_equipe_do_operador",
+    "listar_apontamentos_do_operador",
+    "salvar_apontamento_operacional",
+  ])
+    expect(usadas.has(rpc), `RPC ${rpc}`).toBe(true);
+  await test.info().attach("rpcs-do-operador.txt", {
+    body: [...usadas].sort().join("\n"),
+    contentType: "text/plain",
+  });
   const vistas = new Set(respostas.flatMap((r) => r.chaves));
   for (const chave of CHAVES_PROIBIDAS) expect(vistas.has(chave), `chave ${chave}`).toBe(false);
 
