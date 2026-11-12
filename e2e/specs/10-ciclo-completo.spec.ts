@@ -559,7 +559,15 @@ test.describe("fechamento, exportações e fatura do cliente fixo", () => {
   test("fechamento depois da fatura: nada a faturar", async ({ page }) => {
     await gerarFechamento(page, { cliente: CLI_FIXO, mes: 10, ano: 2026 });
     await expect(valorDoCartao(page, "Receita total")).toHaveText(reais(Number(FATURA_FIXA)));
-    await expect(valorDoCartao(page, "A faturar")).toHaveText(reais(0));
+    // Painéis "A faturar" e "Já faturado": o total fica no item "Total com adicionais e ajuste".
+    const total = (painel: string) =>
+      page
+        .getByRole("region", { name: painel, exact: true })
+        .locator(
+          "xpath=.//dt[normalize-space(.)='Total com adicionais e ajuste']/following-sibling::dd[1]",
+        );
+    await expect(total("A faturar")).toHaveText(reais(0));
+    await expect(total("Já faturado")).toHaveText(reais(Number(FATURA_FIXA)));
   });
 
   test("lançamento faturado fica travado na tela", async ({ page }) => {
