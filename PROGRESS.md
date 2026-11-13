@@ -120,6 +120,7 @@ competências, conciliação ao centavo, emissão, concorrência, imutabilidade 
 | D-CP07-04 | Fatura complementar na mesma competência sem dizer que já existe fatura                                 | P2         | corrigido (aviso; DEC-CP07-02) |
 | D-CP07-05 | Aviso de cobrança em dobro do CP-06 ausente na confirmação                                              | P2         | corrigido (aviso; DEC-CP06-04) |
 | D-CP07-06 | CSV do Faturamento sem cliente no nome e com a presença crua do banco                                   | P3         | corrigido |
+| D-CP07-07 | "Alterar condições"/"Alterar custo" abria antes de carregar o valor atual: formulário vazio, salvar travado (achado na CI) | P2 | corrigido |
 
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,

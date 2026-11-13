@@ -277,24 +277,27 @@ Nenhum registro faturado foi alterado. Não foi criado cancelamento, estorno nem
 
 ## Defeitos RED/GREEN
 
-| ID        | Sev. | Esperado × obtido (RED no `7e8659f`)                                                                                                            | Correção                                                                                       | Teste       |
-| --------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------- |
-| D4        | P2   | Confirmação sem menção a dias abertos                                                                                                           | dias fechados, abertos e sem apontamento; lista dos abertos; relê antes de abrir; sem bloqueio | D4; spec 30 |
-| D-CP07-01 | P2   | Aba que perde a corrida seguia com R$ 240,00 a faturar e "Gerar fatura" ativo; mensagem genérica                                                | erro relê tudo; mensagem "Nada a faturar…"                                                     | CC1         |
-| D-CP07-02 | P2   | Falha de rede: "TypeError: Failed to fetch" cru; com a resposta perdida, a tela não mostrava a fatura gravada                                   | mensagem própria e releitura                                                                   | RD1, RD2    |
-| D-CP07-03 | P2   | Lançamento salvo depois da conferência: fatura de R$ 480,00 emitida sobre conferência de R$ 240,00, sem aviso                                   | aviso persistente com os dois valores                                                          | ED1         |
-| D-CP07-04 | P2   | Fatura complementar na mesma competência sem dizer que já existe fatura                                                                         | aviso com a fatura existente e "complementar"                                                  | CPL         |
-| D-CP07-05 | P2   | Aviso de cobrança em dobro (CP-06) ausente na confirmação                                                                                       | aviso repetido na confirmação, sem bloqueio                                                    | DUP         |
-| D-CP07-06 | P3   | CSV do Faturamento sem cliente no nome (`faturamento-2027-01-01-2027-01-15.csv`); presença com o valor cru do banco (`present`, lido no código) | nome com o cliente, presença em português                                                      | EX1         |
+| ID        | Sev. | Esperado × obtido (RED no `7e8659f`)                                                                                                                                                                                                  | Correção                                                                                       | Teste                                    |
+| --------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| D4        | P2   | Confirmação sem menção a dias abertos                                                                                                                                                                                                 | dias fechados, abertos e sem apontamento; lista dos abertos; relê antes de abrir; sem bloqueio | D4; spec 30                              |
+| D-CP07-01 | P2   | Aba que perde a corrida seguia com R$ 240,00 a faturar e "Gerar fatura" ativo; mensagem genérica                                                                                                                                      | erro relê tudo; mensagem "Nada a faturar…"                                                     | CC1                                      |
+| D-CP07-02 | P2   | Falha de rede: "TypeError: Failed to fetch" cru; com a resposta perdida, a tela não mostrava a fatura gravada                                                                                                                         | mensagem própria e releitura                                                                   | RD1, RD2                                 |
+| D-CP07-03 | P2   | Lançamento salvo depois da conferência: fatura de R$ 480,00 emitida sobre conferência de R$ 240,00, sem aviso                                                                                                                         | aviso persistente com os dois valores                                                          | ED1                                      |
+| D-CP07-04 | P2   | Fatura complementar na mesma competência sem dizer que já existe fatura                                                                                                                                                               | aviso com a fatura existente e "complementar"                                                  | CPL                                      |
+| D-CP07-05 | P2   | Aviso de cobrança em dobro (CP-06) ausente na confirmação                                                                                                                                                                             | aviso repetido na confirmação, sem bloqueio                                                    | DUP                                      |
+| D-CP07-06 | P3   | CSV do Faturamento sem cliente no nome (`faturamento-2027-01-01-2027-01-15.csv`); presença com o valor cru do banco (`present`, lido no código)                                                                                       | nome com o cliente, presença em português                                                      | EX1                                      |
+| D-CP07-07 | P2   | Achado na CI (CN-C da spec 70, intermitente): "Alterar condições"/"Alterar custo" abria antes de o valor atual carregar e o formulário nascia vazio — inclusive os campos ocultos —, com "Salvar novo valor" desabilitado para sempre | o botão só habilita com as versões lidas; `abrir()` recusa antes disso                         | VA1; `test:colaboradores-custos` A5, A5b |
 
 - **Nenhum cálculo, SQL, migration, RLS, grant, trigger ou contrato de RPC alterado.**
 - **Arquivos:**
   - `src/lib/faturamento-conferencia.ts` (novo): regras puras da conferência;
   - `src/app/(painel)/faturamento/painel-faturamento.tsx`: tela;
-  - `src/lib/erros-banco.ts`: `ehFalhaDeRede` passa a ser exportada.
+  - `src/lib/erros-banco.ts`: `ehFalhaDeRede` passa a ser exportada;
+  - `src/app/(painel)/_components/valor-atual.tsx`: D-CP07-07 (componente comum de contrato, custo e valor da operação).
 - **Ajustes de teste:**
   - `test:interface-simples` C8 confere a abertura pela nova função (que continua sem emitir);
-  - a spec 30 converteu o D4 para o comportamento correto.
+  - a spec 30 converteu o D4 para o comportamento correto;
+  - `test:colaboradores-custos` A5 aceita a guarda nova e A5b a exige.
 
 ## Resultados
 
@@ -302,8 +305,9 @@ Nenhum registro faturado foi alterado. Não foi criado cancelamento, estorno nem
   teste corrigidos (contagem de faltas e seletor de linha ambíguo).
 - **GREEN**, sessão em nuvem: lint, `tsc`, `check:workflow`, `git diff --check` e build PASS;
   **79/79** `test:*` (nova `test:faturamento-cp07`, 38 asserções; `test:interface-simples` 46);
-  travas 25/25; spec 95 **16/16** e spec 30 6/6; `npm run e2e:local` completo: **192 testes, 191
-  PASS, 0 FAIL, 1 FALHA CONHECIDA (CN-D), 0 PULADO**, 1425 s, nenhuma conexão externa do servidor;
+  travas 25/25; spec 95 **17/17** (com o VA1) e spec 30 6/6; `npm run e2e:local` completo, depois
+  do D-CP07-07: **193 testes, 192 PASS, 0 FAIL, 1 FALHA CONHECIDA (CN-D), 0 PULADO**, 1403 s,
+  nenhuma conexão externa do servidor;
   `sql-local` **52 suítes** PASS.
 - **Docker:** 0 containers e 0 volumes antes e depois; as 8 imagens preexistentes intocadas.
 - **CP-01 a CP-06B íntegros:** specs 00 a 90 PASS na mesma execução.
@@ -314,6 +318,11 @@ Nenhum registro faturado foi alterado. Não foi criado cancelamento, estorno nem
   MUDANÇA da linha) o aceitou sem efeito. Defeito do teste: agora o lançamento tem intervalo > 0,
   escolhido de forma determinística, e o `UPDATE` sem mudança é conferido à parte (aceito, nada
   muda). Spec 95 16/16 de novo.
+- **CI no `cd6b98c`:** `validar` e `sql-local` SUCCESS; `e2e-local` FAIL no CN-C da spec 70 (e no
+  CN-E, que depende dele): "Salvar novo valor" desabilitado no "Alterar condições". Causa real, não
+  do teste: o botão abria o formulário antes de as versões carregarem e ele nascia vazio
+  (D-CP07-07). RED (VA1) no código anterior; corrigido; specs 50, 60, 70 e 95 GREEN; E2E completo
+  acima.
 
 ## Riscos residuais
 
@@ -323,6 +332,7 @@ Nenhum registro faturado foi alterado. Não foi criado cancelamento, estorno nem
 - **R-CP07-03 (AUT-CP07-01):** o banco não confere o total conferido; a tela avisa depois.
 - **R-CP07-04:** fatura complementar na mesma competência é permitida pelo banco (DEC-CP07-02).
 - **R-CP07-05:** o CSV do Faturamento não inclui adicionais nem registros antigos.
+- **R-CP07-06 (lido no código, não reproduzido):** sem valor que valha hoje (contrato que só começa no futuro), "Alterar" para uma data DEPOIS da primeira versão parte do valor de hoje, que não existe: os campos ocultos ficam vazios e o salvar não habilita. A data da própria versão funciona (VA1). Para o CP-09, sem correção aqui.
 - **Herdados:**
   - CN-D (DEC-CP02-01), falha conhecida;
   - AUT-CP05-01 (proteção bancária do D1 e da concorrência no apontamento);

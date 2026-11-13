@@ -350,6 +350,39 @@ test("PR preparação: clientes quinzenal e mensal, contrato 240, fixa e avulsa,
   expect(m?.freq).toBe("mensal");
 });
 
+// D-CP07-07 (achado na CI do CP-07, CN-C da spec 70 intermitente): "Alterar condições" abria antes
+// de o valor atual carregar e o formulário nascia VAZIO — inclusive os campos ocultos, que a pessoa
+// não consegue preencher —, com "Salvar novo valor" desabilitado para sempre. Nada é gravado aqui.
+test("VA1 “Alterar condições” só abre depois de carregar o valor atual: formulário nunca nasce vazio", async ({
+  page,
+}) => {
+  let liberar: () => void = () => {};
+  const segurar = new Promise<void>((r) => (liberar = r));
+  await page.route("**/rest/v1/contract_terms*", async (rota) => {
+    await segurar;
+    await rota.continue();
+  });
+  await page.goto("/clientes");
+  await page.getByRole("tab", { name: "Contratos e regras" }).click();
+  await page.getByRole("button", { name: `Editar ${CTR}`, exact: true }).click();
+  const d = dialogo(page);
+  await expect(d.getByText("Carregando…").first()).toBeVisible();
+  await expect(d.getByRole("button", { name: "Alterar condições" })).toBeDisabled();
+  liberar();
+  // O contrato começa em 01/12/2026, depois do "hoje" do relógio: a tela diz que não há valor de
+  // hoje — mas já leu as versões, e só então libera o botão.
+  await expect(d.getByText("Carregando…")).toHaveCount(0, { timeout: 20_000 });
+  await page.unroute("**/rest/v1/contract_terms*");
+  await expect(d.getByRole("button", { name: "Alterar condições" })).toBeEnabled();
+  await d.getByRole("button", { name: "Alterar condições" }).click();
+  const alt = dialogo(page);
+  // Na data da versão existente, o formulário vem com os valores dela e é salvável (não grava).
+  await alt.locator("#valor-atual-inicio").fill("2026-12-01");
+  await expect(alt.locator("#valor-atual-daily_rate")).toHaveValue(/^240(\.0+)?$/);
+  await expect(alt.getByRole("button", { name: "Corrigir valor" })).toBeEnabled();
+  await alt.getByRole("button", { name: "Cancelar" }).click();
+});
+
 // =============================================================================================
 // LANÇAMENTOS DA 1ª QUINZENA DE JANEIRO/2027
 // =============================================================================================

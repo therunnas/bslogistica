@@ -78,9 +78,16 @@ verificar(
 );
 verificar(
   "A5. abrir o formulário zera o que foi digitado (Cancelar e reabrir parte do valor de hoje)",
-  /function abrir\(\) \{\s*setValores\(valoresDe\(vigente\)\);\s*setTocados\(new Set\(\)\);/.test(
+  /function abrir\(\) \{\s*if \(!podeAbrir\) return;[\s\S]*?setValores\(valoresDe\(vigente\)\);\s*setTocados\(new Set\(\)\);/.test(
     alterar,
   ),
+  true,
+);
+// D-CP07-07: o formulário só abre com o valor atual carregado (nunca nasce vazio).
+verificar(
+  "A5b. “Alterar” só habilita com o valor atual lido",
+  /const podeAbrir = liberado && versoes\.isSuccess;/.test(alterar) &&
+    /onClick=\{abrir\} disabled=\{!podeAbrir\}/.test(alterar),
   true,
 );
 

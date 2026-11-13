@@ -182,7 +182,12 @@ export function ValorAtualComAlteracao({
     setTocados((anteriores) => new Set(anteriores).add(chave));
   }
 
+  // D-CP07-07: sem o valor atual carregado, o formulário nasceria vazio — inclusive os campos
+  // ocultos, que a pessoa não consegue preencher — e o "Salvar" ficaria desabilitado para sempre.
+  const podeAbrir = liberado && versoes.isSuccess;
+
   function abrir() {
+    if (!podeAbrir) return;
     // Todos os campos partem do valor de hoje; os ocultos seguem assim no envio.
     setValores(valoresDe(vigente));
     setTocados(new Set());
@@ -208,7 +213,7 @@ export function ValorAtualComAlteracao({
             <p className="mt-1 text-sm text-muted-foreground">Sem valor que valha hoje.</p>
           )}
         </div>
-        <Button type="button" className="h-9 rounded-xl" onClick={abrir} disabled={!liberado}>
+        <Button type="button" className="h-9 rounded-xl" onClick={abrir} disabled={!podeAbrir}>
           {rotuloDoBotao}
         </Button>
       </div>
