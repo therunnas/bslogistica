@@ -243,7 +243,7 @@ Não foi criado catálogo, preço ou unidade (DEC-CP06-01/02 seguem pendentes).
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `UPDATE`/`DELETE` em `invoices`                 | nada muda (sem grant de escrita)                                                                |
 | `UPDATE`/`DELETE` em `invoice_items`            | nada muda                                                                                       |
-| `UPDATE`/`DELETE` em lançamento faturado        | recusado                                                                                        |
+| `UPDATE`/`DELETE` em lançamento faturado        | recusado: a 011 recusa a MUDANÇA da linha; um `UPDATE` que não muda nada é aceito sem efeito    |
 | Cancelar adicional faturado                     | recusado                                                                                        |
 | Cancelar registro antigo faturado               | recusado                                                                                        |
 | Reabrir dia com lançamento faturado             | permitido (estado do dia); campos travados e "Faturado" na tela; valores iguais                 |
@@ -308,6 +308,12 @@ Nenhum registro faturado foi alterado. Não foi criado cancelamento, estorno nem
 - **Docker:** 0 containers e 0 volumes antes e depois; as 8 imagens preexistentes intocadas.
 - **CP-01 a CP-06B íntegros:** specs 00 a 90 PASS na mesma execução.
 - **Falhas conhecidas:** de 2 para 1 — D4 corrigido; CN-D (DEC-CP02-01) sem mudança.
+- **CI no `d58c2f7`:** `validar` e `sql-local` SUCCESS; `e2e-local` FAIL só no IM1 (190 PASS, 1 FAIL,
+  1 FALHA CONHECIDA). Causa: o teste pegava o lançamento faturado com `limit 1` sem ordem; na CI
+  veio um com intervalo 0, o `UPDATE` de teste não mudava nada e o trigger da 011 (que recusa a
+  MUDANÇA da linha) o aceitou sem efeito. Defeito do teste: agora o lançamento tem intervalo > 0,
+  escolhido de forma determinística, e o `UPDATE` sem mudança é conferido à parte (aceito, nada
+  muda). Spec 95 16/16 de novo.
 
 ## Riscos residuais
 

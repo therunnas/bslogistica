@@ -693,10 +693,25 @@ test("IM1 imutabilidade: fatura, itens, lançamentos, adicional e registro antig
   await api.from("invoices").delete().eq("id", fatura!.id);
   await api.from("invoice_items").update({ amount: 1 }).eq("invoice_id", fatura!.id);
   await api.from("invoice_items").delete().eq("invoice_id", fatura!.id);
+  // Lançamento com intervalo > 0, escolhido de forma determinística: o trigger da 011 recusa a
+  // MUDANÇA da linha faturada; um UPDATE que não muda nada (intervalo já 0) é aceito sem efeito.
   const [lanc] = consultar<{ id: string }>(`
-    select te.id from public.timesheet_entries te where te.invoice_id = ${lit(fatura!.id)} limit 1`);
+    select te.id from public.timesheet_entries te
+     where te.invoice_id = ${lit(fatura!.id)} and te.break_minutes > 0
+     order by te.work_date, te.id limit 1`);
   const upd = await api.from("timesheet_entries").update({ break_minutes: 0 }).eq("id", lanc!.id);
   expect(upd.error, "lançamento faturado recusa UPDATE").not.toBeNull();
+  // E o UPDATE sem mudança real é aceito, mas não altera nada (conferido no fim do teste).
+  const [semIntervalo] = consultar<{ id: string }>(`
+    select te.id from public.timesheet_entries te
+     where te.invoice_id = ${lit(fatura!.id)} and te.break_minutes = 0
+     order by te.work_date, te.id limit 1`);
+  expect(semIntervalo, "há lançamento faturado sem intervalo (sábado/domingo)").toBeDefined();
+  const noop = await api
+    .from("timesheet_entries")
+    .update({ break_minutes: 0 })
+    .eq("id", semIntervalo!.id);
+  expect(noop.error, "UPDATE sem mudança é aceito sem efeito").toBeNull();
   const del = await api.from("timesheet_entries").delete().eq("id", lanc!.id);
   expect(del.error, "lançamento faturado recusa DELETE").not.toBeNull();
   const [adic] = consultar<{ id: string }>(`
