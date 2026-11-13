@@ -593,7 +593,10 @@ test("EX1 exportações da competência: Faturamento CSV com nome do cliente, pr
   const iCusto = cab!.indexOf("Custo");
   expect(linhas).toHaveLength(11);
   expect(new Set(linhas.map((l) => l[iPresenca]))).toEqual(new Set(["Presente"]));
-  const soma = (i: number) => linhas.reduce((acc, l) => acc + Math.round(Number(l[i]) * 100), 0);
+  // R-CP08-03 (CP-09): valores com vírgula decimal, como no CSV do Fechamento.
+  expect(linhas.every((l) => /^-?\d+,\d{2}$/.test(l[iValor]!))).toBe(true);
+  const soma = (i: number) =>
+    linhas.reduce((acc, l) => acc + Math.round(Number(l[i]!.replace(",", ".")) * 100), 0);
   expect(brl2(soma(iValor))).toBe("3052.50");
   expect(brl2(soma(iCusto))).toBe("1773.75");
 

@@ -50,7 +50,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-06B | Remoção do painel independente de Contêineres; histórico legado em Operações       | PASS (local) |
 | CP-07  | Fechamento e faturamento                                                           | PASS (local) |
 | CP-08  | Dashboard, relatórios e exportações (+ modelo de negócio consolidado, sessão 13)   | PASS (local) |
-| CP-09  | Interface, clareza e consistência                                                  | não iniciado |
+| CP-09  | Interface, clareza e consistência                                                  | PASS (local) |
 | CP-10  | Segurança, integridade e infraestrutura                                            | não iniciado |
 | CP-11  | Regressão integrada final                                                          | não iniciado |
 | CP-12  | Roteiro de homologação com o responsável (HML só com autorização)                  | não iniciado |
@@ -66,7 +66,7 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
 | D6  | `<= 15`/`<= 45` (030) × `< 15`/`< 45` (V2). **Sem defeito no CP-05**: a 030 só roda com o dobro desligado | P3         | leitura do código            | CP-05    |
 | D7  | Caminho legado de contêiner aberto por URL (cobrança dupla). **Corrigido no CP-06** (cadastro encerrado) e **no CP-06B** (painel removido) | P2 | HANDOFF | CP-06/06B |
-| D8  | Exclusões usam `window.confirm` nativo                                                                    | P3         | leitura do código            | CP-09    |
+| D8  | Exclusões usavam `window.confirm` nativo. **Corrigido no CP-09** (diálogo da tela; regras do banco iguais) | P3         | E2E spec 98 (RED/GREEN)      | CP-09    |
 | I1  | `scripts/e2e-local.sh` usava `setsid`, ausente no macOS. **Corrigido** (`set -m`; G22–G25); macOS nativo não comprovado | infra | execução local 12/11 | CP-00B |
 
 Defeitos do CP-01 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
@@ -148,6 +148,28 @@ na interface — detalhe em
 
 Riscos do CP-08: R-CP08-01 ("Diárias" conta domingo/feriado), R-CP08-02 (margem 0,0% sem receita),
 R-CP08-03 (separador decimal dos CSV), R-CP08-04 (sem relatório por cliente e por tipo).
+
+Defeitos do CP-09 (13/11/2026, sessão 14), reproduzidos no E2E (RED no `6a23dc4`: spec 98 com 13
+falhas) e corrigidos (GREEN 18/18), só na interface — nenhuma migration, RPC, RLS, grant, trigger
+ou regra financeira; detalhe, inventário das telas e **matriz de gates financeiros** em
+[docs/qa/CP-09-interface-clareza-consistencia.md](docs/qa/CP-09-interface-clareza-consistencia.md):
+
+| ID        | Defeito                                                                                                   | Prioridade | Estado    |
+| --------- | --------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D8        | Exclusões pelo `window.confirm` nativo                                                                    | P3         | corrigido (diálogo da tela, foco em Cancelar) |
+| R-CP07-06 | "Alterar" de contrato que só começa no futuro: data depois da 1ª versão abria vazio, salvar travado       | P2         | corrigido (base = versão da data; sem regra nova) |
+| R-CP08-01 | "Diárias" contava domingo/feriado sem dizer                                                               | P3         | corrigido (só o texto; contagem igual) |
+| R-CP08-02 | Margem "0,0%" sem receita                                                                                 | P3         | corrigido ("sem receita no período") |
+| R-CP08-03 | CSV de lançamentos com ponto decimal (texto na planilha pt-BR)                                            | P3         | corrigido (vírgula; valores iguais) |
+| D-CP09-01 | 12 campos com rótulo visível não ligado (Dashboard, Relatórios, Faturamento, adicional, Apontamentos, Operacional) | P3 | corrigido |
+| D-CP09-02 | Tela do operador sem título enquanto carrega, na falha e sem operação                                      | P3         | corrigido |
+| D-CP09-03 | Nova operação citava "contêiner" sem dizer que a cobrança é por diária (produção não existe)              | P3         | corrigido (texto; nenhum campo novo) |
+
+R-CP08-04 (sem relatório por cliente e por tipo) fica registrado como lacuna (depende de
+DEC-CP06-01). Matriz de gates financeiros do CP-09: **bloqueantes para o piloto** — feriados em
+Production e código de Production desatualizado (D5); **decisão pendente** — cobrança e custos
+por produção (se o piloto os tiver), contrato encerrado (DEC-CP02-01) e cancelamento de fatura
+(DEC-CP07-03); os demais itens não bloqueiam, com justificativa no documento.
 
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,

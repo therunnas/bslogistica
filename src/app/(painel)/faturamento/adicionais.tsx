@@ -485,12 +485,12 @@ export function AdicionaisDoPeriodo({
             ) : null}
 
             <div className="space-y-2">
-              <Label>Operação (opcional)</Label>
+              <Label htmlFor="adicional-operacao">Operação (opcional)</Label>
               <Select
                 value={operacaoId === "" ? SEM_OPERACAO : operacaoId}
                 onValueChange={(v) => setOperacaoId(v === SEM_OPERACAO ? "" : v)}
               >
-                <SelectTrigger className={INPUT_CLASS}>
+                <SelectTrigger id="adicional-operacao" className={INPUT_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

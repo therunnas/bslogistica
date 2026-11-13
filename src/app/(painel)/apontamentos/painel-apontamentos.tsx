@@ -1264,10 +1264,10 @@ export function PainelApontamentos() {
       <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-2">
-            <Label>Operação</Label>
+            <Label htmlFor="apontamentos-operacao">Operação</Label>
 
             <Select value={operationId} onValueChange={setOperationId}>
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="apontamentos-operacao" className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
 
@@ -1282,13 +1282,13 @@ export function PainelApontamentos() {
           </div>
 
           <div className="space-y-2">
-            <Label>Turno</Label>
+            <Label htmlFor="apontamentos-turno">Turno</Label>
 
             <Select
               value={turnoId || "none"}
               onValueChange={(value) => setShiftId(value === "none" ? "" : value)}
             >
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="apontamentos-turno" className={SELECT_CLASS}>
                 <SelectValue placeholder="Sem turno" />
               </SelectTrigger>
 
@@ -1308,9 +1308,10 @@ export function PainelApontamentos() {
           </div>
 
           <div className="space-y-2">
-            <Label>Data</Label>
+            <Label htmlFor="apontamentos-data">Data</Label>
 
             <Input
+              id="apontamentos-data"
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}

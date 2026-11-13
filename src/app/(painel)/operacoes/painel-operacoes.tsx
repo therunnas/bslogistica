@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmarExclusao } from "@/lib/confirmar-exclusao";
+import { useConfirmacaoDeExclusao } from "../_components/confirmacao-de-exclusao";
 import { LocalidadeDaOperacao } from "../_components/calendario-territorial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -57,7 +57,10 @@ import { brl, dateBR, minutesToLabel } from "@/lib/format";
 import { exigirLinhaAfetada, useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { toast } from "@/lib/notificacoes";
 import { useTravaDoDialogo } from "@/lib/trava";
-import { MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO } from "@/lib/container-servico-ui";
+import {
+  MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO,
+  MENSAGEM_COBRANCA_POR_DIARIA,
+} from "@/lib/container-servico-ui";
 
 import { AvulsosAntigos } from "./avulsos-antigos";
 import {
@@ -147,6 +150,7 @@ const SELECT_CLASS =
   "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus:ring-primary/20";
 
 export function PainelOperacoes({ origem }: { origem?: string } = {}) {
+  const confirmacao = useConfirmacaoDeExclusao();
   const queryClient = useQueryClient();
 
   const clients = useClients();
@@ -662,27 +666,26 @@ export function PainelOperacoes({ origem }: { origem?: string } = {}) {
     const alocadosNela = (team.data ?? []).filter(
       (t) => t.operation_id === operation.id && t.active,
     ).length;
-    if (
-      confirmarExclusao(
-        `a operação ${operation.name}`,
-        consequenciasDaExclusaoDaOperacao(turnosDela, alocadosNela),
-      )
-    ) {
-      removeOperation.mutate(operation.id);
-    }
+    confirmacao.pedir(
+      `a operação ${operation.name}`,
+      consequenciasDaExclusaoDaOperacao(turnosDela, alocadosNela),
+      () => removeOperation.mutate(operation.id),
+    );
   }
 
   function excluirTurno(shift: Shift) {
     const alocadosNele = (team.data ?? []).filter(
       (t) => t.shift_id === shift.id && t.active,
     ).length;
-    if (confirmarExclusao(`o turno ${shift.name}`, consequenciasDaExclusaoDoTurno(alocadosNele))) {
-      removeShift.mutate(shift.id);
-    }
+    confirmacao.pedir(`o turno ${shift.name}`, consequenciasDaExclusaoDoTurno(alocadosNele), () =>
+      removeShift.mutate(shift.id),
+    );
   }
 
   return (
     <div>
+      {confirmacao.dialogo}
+
       <PageHeader
         title="Operações"
         description="Gerencie operações fixas e avulsas, turnos e equipes alocadas."
@@ -1094,11 +1097,14 @@ export function PainelOperacoes({ origem }: { origem?: string } = {}) {
                 </SelectContent>
               </Select>
 
-              {/* CP-06B: modalidade (fixa × avulsa) não é o tipo do serviço. */}
+              {/* CP-06B: modalidade (fixa × avulsa) não é o tipo do serviço. CP-09: nem o regime de
+                  cobrança — hoje toda operação cobra por diária; a cobrança por quantidade
+                  (produção, NEGOCIO.md §3A) é lacuna e não aparece como se existisse. */}
               <p className="text-xs leading-5 text-muted-foreground">
                 {opForm.type === "spot"
                   ? "Avulsa: serviço pontual — contêiner, carga e descarga, etiquetagem, limpeza, empacotamento, paletização, retrabalho e outros. Identifique o tipo do serviço no nome (ex.: “Contêiner 40 pés — tecidos”)."
-                  : "Fixa: operação recorrente, com contrato, turnos e equipe."}
+                  : "Fixa: operação recorrente, com contrato, turnos e equipe."}{" "}
+                {MENSAGEM_COBRANCA_POR_DIARIA}
               </p>
             </div>
 

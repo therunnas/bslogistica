@@ -323,16 +323,40 @@ export function PainelOperacional() {
     );
   }
 
+  // D-CP09-02: o título da página aparece também enquanto carrega, na falha e sem operação — antes a
+  // tela do operador não tinha nenhum título nesses estados.
+  const cabecalho = (
+    <PageHeader
+      title="Apontamento"
+      description="Registre presença e horários da equipe no turno e na data selecionados."
+    />
+  );
+
   if (operacoes.isError) {
-    return <FalhaDeLeitura oQue="suas operações" tentarDeNovo={() => void operacoes.refetch()} />;
+    return (
+      <>
+        {cabecalho}
+        <FalhaDeLeitura oQue="suas operações" tentarDeNovo={() => void operacoes.refetch()} />
+      </>
+    );
   }
 
   if (operacoes.isPending || !operacoes.data) {
-    return <Aviso tipo="carregando">Carregando suas operações...</Aviso>;
+    return (
+      <>
+        {cabecalho}
+        <Aviso tipo="carregando">Carregando suas operações...</Aviso>
+      </>
+    );
   }
 
   if (operacoes.data.length === 0) {
-    return <Aviso>Nenhuma operação atribuída a você. Procure o administrador.</Aviso>;
+    return (
+      <>
+        {cabecalho}
+        <Aviso>Nenhuma operação atribuída a você. Procure o administrador.</Aviso>
+      </>
+    );
   }
 
   const operacaoSelecionada =
@@ -346,18 +370,15 @@ export function PainelOperacional() {
 
   return (
     <>
-      <PageHeader
-        title="Apontamento"
-        description="Registre presença e horários da equipe no turno e na data selecionados."
-      />
+      {cabecalho}
 
       <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardContent className="grid gap-4 p-5 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Operação</Label>
+            <Label htmlFor="operacional-operacao">Operação</Label>
 
             <Select value={operationId ?? ""} onValueChange={trocarOperacao}>
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="operacional-operacao" className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
 
@@ -372,10 +393,10 @@ export function PainelOperacional() {
           </div>
 
           <div className="space-y-2">
-            <Label>Turno</Label>
+            <Label htmlFor="operacional-turno">Turno</Label>
 
             <Select value={shiftId ?? ""} onValueChange={trocarTurno} disabled={!operationId}>
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="operacional-turno" className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
 
@@ -390,9 +411,10 @@ export function PainelOperacional() {
           </div>
 
           <div className="space-y-2">
-            <Label>Data</Label>
+            <Label htmlFor="operacional-data">Data</Label>
 
             <Input
+              id="operacional-data"
               type="date"
               value={workDate}
               onChange={(event) => trocarData(event.target.value)}

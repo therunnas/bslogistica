@@ -30,9 +30,9 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { attendanceLabel, marginPct } from "@/lib/billing";
+import { attendanceLabel } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
-import { brl, dateBR, minutesToLabel, monthRange, num, pct } from "@/lib/format";
+import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
@@ -43,6 +43,12 @@ import { somarCustoDeContainers } from "@/lib/custo-containers";
 import { useCustoDeContainers } from "@/lib/custo-containers-dados";
 import { descricaoDaReceita } from "@/lib/resumo-financeiro";
 import { useRegrasDaBs, useRegrasDefinitivas } from "@/lib/vigencias-dados";
+import {
+  descricaoDasDiarias,
+  diariasDeDomingoOuFeriado,
+  percentualDaMargem,
+  reaisNoCsv,
+} from "@/lib/apresentacao-indicadores";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -161,6 +167,7 @@ export function PainelRelatorios() {
 
     return {
       dailies: sumBy(period, (row) => row.dailies),
+      dailiesDeDomingoOuFeriado: diariasDeDomingoOuFeriado(period),
       absences: period.filter((row) => row.status === "absent").length,
       overtime: sumBy(period, (row) => row.overtimeMinutes),
       apontamentos,
@@ -200,8 +207,8 @@ export function PainelRelatorios() {
       attendanceLabel[row.status],
       row.workedMinutes,
       row.overtimeMinutes,
-      row.billed.toFixed(2),
-      row.cost.toFixed(2),
+      reaisNoCsv(row.billed),
+      reaisNoCsv(row.cost),
       row.invoiceId === null ? "Não" : "Sim",
     ]);
 
@@ -245,9 +252,10 @@ export function PainelRelatorios() {
       <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label>De</Label>
+            <Label htmlFor="relatorios-inicio">De</Label>
 
             <Input
+              id="relatorios-inicio"
               type="date"
               value={start}
               onChange={(event) => setStart(event.target.value)}
@@ -256,9 +264,10 @@ export function PainelRelatorios() {
           </div>
 
           <div className="space-y-2">
-            <Label>Até</Label>
+            <Label htmlFor="relatorios-fim">Até</Label>
 
             <Input
+              id="relatorios-fim"
               type="date"
               value={end}
               onChange={(event) => setEnd(event.target.value)}
@@ -292,7 +301,10 @@ export function PainelRelatorios() {
             <Resumo
               label="Diárias"
               value={num(totals.dailies, 0)}
-              description={`${totals.absences} falta${totals.absences === 1 ? "" : "s"}`}
+              description={descricaoDasDiarias(
+                `${totals.absences} falta${totals.absences === 1 ? "" : "s"}`,
+                totals.dailiesDeDomingoOuFeriado,
+              )}
               icon={CalendarDays}
             />
 
@@ -321,7 +333,7 @@ export function PainelRelatorios() {
             <Resumo
               label="Margem"
               value={brl(totals.margin)}
-              description={`${pct(marginPct(totals.billed, totals.cost))} · custo ${brl(totals.cost)}`}
+              description={`${percentualDaMargem(totals.billed, totals.cost)} · custo ${brl(totals.cost)}`}
               icon={TrendingUp}
             />
           </div>
@@ -576,7 +588,7 @@ export function PainelRelatorios() {
                                 </p>
 
                                 <p className="mt-0.5 text-[11px] text-primary">
-                                  {pct(marginPct(operation.billed, operation.cost))}
+                                  {percentualDaMargem(operation.billed, operation.cost)}
                                 </p>
                               </TableCell>
                             </TableRow>

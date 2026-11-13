@@ -167,14 +167,29 @@ export function ValorAtualComAlteracao({
     return atuais;
   }
 
+  /**
+   * A versão de onde o formulário parte para a data escolhida: a que começa nela (corrigir), a
+   * primeira quando a data é anterior a ela (antecipar) ou a última que começa antes da data — a
+   * que a nova versão vai encerrar. R-CP07-06: antes, fora dos dois primeiros casos, partia do
+   * valor de HOJE; num contrato que só começa no futuro esse valor não existe e o formulário
+   * nascia vazio (campos ocultos inclusive), com o salvar travado. Só preenchimento: o banco
+   * continua decidindo a vigência.
+   */
+  function versaoNaData(data: string): VersaoComValores | null {
+    if (data === "") return vigente;
+    const igual = ativas.find((v) => v.valid_from === data);
+    if (igual) return igual;
+    if (primeira !== null && data < primeira.valid_from) return primeira;
+    const anteriores = ativas
+      .filter((v) => v.valid_from <= data)
+      .sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+    return anteriores[0] ?? vigente;
+  }
+
   function mudarInicio(data: string) {
     setInicio(data);
-    // Corrigir ou antecipar parte dos valores do valor que será trocado, não dos de hoje.
-    const igual = ativas.find((v) => v.valid_from === data) ?? null;
-    const antes = !igual && primeira !== null && data !== "" && data < primeira.valid_from;
-    setValores((atuais) =>
-      manterDigitados(valoresDe(igual ?? (antes ? primeira : vigente)), atuais, tocados),
-    );
+    // Corrigir, antecipar ou registrar parte dos valores da versão que será trocada, não dos de hoje.
+    setValores((atuais) => manterDigitados(valoresDe(versaoNaData(data)), atuais, tocados));
   }
 
   function digitar(chave: string, valor: string) {
@@ -188,8 +203,9 @@ export function ValorAtualComAlteracao({
 
   function abrir() {
     if (!podeAbrir) return;
-    // Todos os campos partem do valor de hoje; os ocultos seguem assim no envio.
-    setValores(valoresDe(vigente));
+    // Todos os campos partem da versão que vale hoje (ou, sem ela, da que a data de hoje trocaria);
+    // os ocultos seguem assim no envio.
+    setValores(valoresDe(versaoNaData(hoje)));
     setTocados(new Set());
     setInicio(hoje);
     setAberto(true);

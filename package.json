@@ -33,6 +33,7 @@
     "test:servicos-avulsos-cp06": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-servicos-avulsos-cp06.mjs",
     "test:faturamento-cp07": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-faturamento-cp07.mjs",
     "test:colaboradores-custos": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-colaboradores-custos.mjs",
+    "test:interface-cp09": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-interface-cp09.mjs",
     "test:clientes-contratos": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-clientes-contratos.mjs",
     "test:mensagens-auth": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-mensagens-auth.mjs",
     "test:configuracoes": "node --experimental-strip-types scripts/testar-configuracoes.mjs",

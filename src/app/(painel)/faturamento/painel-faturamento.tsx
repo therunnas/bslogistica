@@ -59,7 +59,7 @@ import {
   useCustoDeContainersDoCliente,
 } from "@/lib/custo-containers-dados";
 import { CHAVE_DOS_AJUSTES, useAjustesDeArredondamento } from "@/lib/regras-definitivas-dados";
-import { marginPct, round2 } from "@/lib/billing";
+import { round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
 import {
   ROTULO_DA_PRESENCA,
@@ -85,6 +85,12 @@ import {
   useRegrasDefinitivas,
 } from "@/lib/vigencias-dados";
 import { ROTULO_DA_FREQUENCIA } from "@/lib/vigencias-ui";
+import {
+  descricaoDasDiarias,
+  diariasDeDomingoOuFeriado,
+  percentualDaMargem,
+  reaisNoCsv,
+} from "@/lib/apresentacao-indicadores";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -201,6 +207,7 @@ export function PainelFaturamento() {
       cost: sumBy(period, (row) => row.cost),
       otMinutes: sumBy(period, (row) => row.overtimeMinutes),
       dailies: sumBy(period, (row) => row.dailies),
+      dailiesDeDomingoOuFeriado: diariasDeDomingoOuFeriado(period),
       dailyValue: round2(sumBy(period, (row) => row.dailyValue)),
       otValue: round2(sumBy(period, (row) => row.otValue)),
     };
@@ -414,8 +421,8 @@ export function PainelFaturamento() {
       ROTULO_DA_PRESENCA[row.status] ?? row.status,
       row.workedMinutes,
       row.overtimeMinutes,
-      row.billed.toFixed(2),
-      row.cost.toFixed(2),
+      reaisNoCsv(row.billed),
+      reaisNoCsv(row.cost),
     ]);
 
     const csv = montarCsv(header, lines);
@@ -601,10 +608,10 @@ export function PainelFaturamento() {
       <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardContent className="grid gap-4 p-5 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Cliente</Label>
+            <Label htmlFor="faturamento-cliente">Cliente</Label>
 
             <Select value={selectedClient} onValueChange={setClientId}>
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="faturamento-cliente" className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
 
@@ -619,9 +626,10 @@ export function PainelFaturamento() {
           </div>
 
           <div className="space-y-2">
-            <Label>De</Label>
+            <Label htmlFor="faturamento-inicio">De</Label>
 
             <Input
+              id="faturamento-inicio"
               type="date"
               value={start}
               onChange={(event) => setStart(event.target.value)}
@@ -630,9 +638,10 @@ export function PainelFaturamento() {
           </div>
 
           <div className="space-y-2">
-            <Label>Até</Label>
+            <Label htmlFor="faturamento-fim">Até</Label>
 
             <Input
+              id="faturamento-fim"
               type="date"
               value={end}
               onChange={(event) => setEnd(event.target.value)}
@@ -720,7 +729,7 @@ export function PainelFaturamento() {
             <Resumo
               label="Diárias"
               value={num(totals.dailies, 0)}
-              description={brl(dailiesValue)}
+              description={descricaoDasDiarias(brl(dailiesValue), totals.dailiesDeDomingoOuFeriado)}
               icon={CalendarDays}
             />
 
@@ -747,10 +756,7 @@ export function PainelFaturamento() {
             <Resumo
               label="Margem"
               value={brl(totalAFaturar - custoTotal)}
-              description={`${num(
-                marginPct(totalAFaturar, custoTotal),
-                1,
-              )}% · custo ${brl(custoTotal)}${
+              description={`${percentualDaMargem(totalAFaturar, custoTotal)} · custo ${brl(custoTotal)}${
                 custoContainers > 0
                   ? ` (apontamentos ${brl(totals.cost)} + serviços antigos de contêiner ${brl(custoContainers)})`
                   : ""

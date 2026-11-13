@@ -36,8 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { marginPct } from "@/lib/billing";
-import { brl, dateBR, minutesToHours, monthRange, num, pct } from "@/lib/format";
+import { brl, dateBR, minutesToHours, monthRange, num } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
@@ -48,6 +47,11 @@ import { useResumoFinanceiro } from "@/lib/regras-definitivas-dados";
 import { somarCustoDeContainers } from "@/lib/custo-containers";
 import { useCustoDeContainers } from "@/lib/custo-containers-dados";
 import { descricaoDaReceita } from "@/lib/resumo-financeiro";
+import {
+  descricaoDasDiarias,
+  diariasDeDomingoOuFeriado,
+  percentualDaMargem,
+} from "@/lib/apresentacao-indicadores";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -97,7 +101,8 @@ export function PainelDashboard() {
       revenue,
       cost,
       margin: revenue - cost,
-      marginPct: marginPct(revenue, cost),
+      marginPctTexto: percentualDaMargem(revenue, cost),
+      dailiesDeDomingoOuFeriado: diariasDeDomingoOuFeriado(period),
     };
   }, [period, totalAdicionais, resumo.data, containers.data, start, end]);
 
@@ -193,9 +198,12 @@ export function PainelDashboard() {
         action={
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">De</Label>
+              <Label htmlFor="dashboard-inicio" className="text-xs">
+                De
+              </Label>
 
               <Input
+                id="dashboard-inicio"
                 type="date"
                 value={start}
                 onChange={(event) => setStart(event.target.value)}
@@ -204,9 +212,12 @@ export function PainelDashboard() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">Até</Label>
+              <Label htmlFor="dashboard-fim" className="text-xs">
+                Até
+              </Label>
 
               <Input
+                id="dashboard-fim"
                 type="date"
                 value={end}
                 onChange={(event) => setEnd(event.target.value)}
@@ -269,14 +280,17 @@ export function PainelDashboard() {
             <Kpi
               label="Margem"
               value={brl(kpis.margin)}
-              description={pct(kpis.marginPct)}
+              description={kpis.marginPctTexto}
               icon={TrendingUp}
             />
 
             <Kpi
               label="Diárias"
               value={num(kpis.dailies, 0)}
-              description="Diárias faturáveis"
+              description={descricaoDasDiarias(
+                "Diárias faturáveis",
+                kpis.dailiesDeDomingoOuFeriado,
+              )}
               icon={CalendarDays}
             />
           </div>
@@ -548,7 +562,7 @@ export function PainelDashboard() {
                             <p className="text-sm font-semibold text-foreground">{brl(margin)}</p>
 
                             <p className="mt-1 text-xs font-medium text-primary">
-                              {pct(marginPct(client.receita, client.custo))}
+                              {percentualDaMargem(client.receita, client.custo)}
                             </p>
                           </div>
                         </div>

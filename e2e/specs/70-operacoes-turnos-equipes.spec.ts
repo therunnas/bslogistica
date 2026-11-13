@@ -1,4 +1,4 @@
-import type { Dialog, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { sessaoApi } from "../apoio/contas";
 import { lancamento, lit } from "../apoio/banco";
@@ -51,13 +51,16 @@ async function abrirOperacoes(page: Page) {
   await expect(page.getByRole("heading", { name: "Operações", level: 1 })).toBeVisible();
 }
 
-function responderConfirmacao(page: Page, aceitar: boolean): Promise<string> {
-  return new Promise((resolver) => {
-    page.once("dialog", (d: Dialog) => {
-      const texto = d.message();
-      void (aceitar ? d.accept() : d.dismiss()).then(() => resolver(texto));
-    });
-  });
+async function responderConfirmacao(page: Page, aceitar: boolean): Promise<string> {
+  // D8 (CP-09): a confirmação é o diálogo da tela, não mais o `window.confirm` nativo.
+  const confirmacao = page.getByRole("alertdialog");
+  await expect(confirmacao).toBeVisible({ timeout: 15_000 });
+  const texto = (await confirmacao.innerText()).trim();
+  await confirmacao
+    .getByRole("button", { name: aceitar ? "Excluir" : "Cancelar", exact: true })
+    .click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  return texto;
 }
 
 function contar(tabela: "operations" | "shifts", nome: string, operacao?: string): number {

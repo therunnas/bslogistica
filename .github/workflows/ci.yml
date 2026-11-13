@@ -101,6 +101,9 @@ jobs:
       - name: Testes de fechamento e faturamento (CP-07)
         run: npm run test:faturamento-cp07
 
+      - name: Testes de interface, clareza e consistência (CP-09)
+        run: npm run test:interface-cp09
+
       - name: Teste troca
         run: npm run test:troca
 

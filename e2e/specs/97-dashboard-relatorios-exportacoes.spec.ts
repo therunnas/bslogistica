@@ -594,12 +594,14 @@ test("EX1 CSV dos Relatórios: extrato de lançamentos com modalidade, presença
   expect(new Set(linhas.map((l) => l[i("Modalidade")]))).toEqual(new Set(["Fixa", "Avulsa"]));
   expect(new Set(linhas.map((l) => l[i("Faturado")]))).toEqual(new Set(["Não"]));
   const soma = (col: string) =>
-    linhas.reduce((acc, l) => acc + Math.round(Number(l[i(col)]) * 100), 0);
+    linhas.reduce((acc, l) => acc + Math.round(Number(l[i(col)]!.replace(",", ".")) * 100), 0);
   expect(brl2(soma("Receita"))).toBe(brl2(a.receita));
   expect(brl2(soma("Custo"))).toBe(brl2(a.custo));
-  // Datas ISO, decimais com ponto (o separador de colunas é ";").
+  // Datas ISO; decimais com vírgula desde o CP-09 (R-CP08-03), como no CSV do Fechamento — com
+  // ponto a planilha em português lia a coluna como texto. O separador de colunas é ";".
   expect(linhas.every((l) => /^\d{4}-\d{2}-\d{2}$/.test(l[i("Data")]!))).toBe(true);
-  expect(linhas.every((l) => /^-?\d+\.\d{2}$/.test(l[i("Receita")]!))).toBe(true);
+  expect(linhas.every((l) => /^-?\d+,\d{2}$/.test(l[i("Receita")]!))).toBe(true);
+  expect(linhas.every((l) => /^-?\d+,\d{2}$/.test(l[i("Custo")]!))).toBe(true);
 });
 
 test("EX2 Faturamento: o botão diz que exporta só lançamentos (adicionais e serviços antigos ficam no Fechamento)", async ({

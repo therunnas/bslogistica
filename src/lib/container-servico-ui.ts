@@ -10,6 +10,14 @@ import type { ResultadoContainer, ServicoContainerLista } from "./container-serv
  * novo pelo adicional que o cadastro antigo gera. O cadastro NOVO por esse caminho está
  * encerrado; os registros antigos continuam para consulta, correção e cancelamento.
  */
+/**
+ * CP-09: o que a operação cobra hoje, dito na Nova operação. Toda operação — fixa ou avulsa — cobra
+ * por diária de cada participante; cobrar por quantidade executada (ex.: R$ 300 por contêiner) é
+ * lacuna funcional (NEGOCIO.md §3A; DEC-PROD-01/02), não um campo escondido.
+ */
+export const MENSAGEM_COBRANCA_POR_DIARIA =
+  "A cobrança é por diária de cada participante; cobrar por quantidade executada (ex.: por contêiner) ainda não existe no sistema.";
+
 export const MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO =
   "Contêiner é um tipo de serviço avulso: cadastre em Operações → Nova operação → tipo Avulsa. Não existe mais painel nem cadastro separado de containers; os registros antigos ficam em Operações, na seção “Serviços avulsos antigos”, para consulta, correção e cancelamento.";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmarExclusao } from "@/lib/confirmar-exclusao";
+import { useConfirmacaoDeExclusao } from "../_components/confirmacao-de-exclusao";
 import { useMemo, useState } from "react";
 import {
   Building2,
@@ -120,6 +120,7 @@ const CARD_CLASS =
   "overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]";
 
 export function PainelClientes() {
+  const confirmacao = useConfirmacaoDeExclusao();
   const clients = useClients();
   const contracts = useContracts();
   const operations = useOperations();
@@ -218,14 +219,11 @@ export function PainelClientes() {
   function excluirCliente(client: Client) {
     const contratosDoCliente = (contracts.data ?? []).filter((c) => c.client_id === client.id);
     const operacoesDoCliente = (operations.data ?? []).filter((o) => o.client_id === client.id);
-    if (
-      confirmarExclusao(
-        `o cliente ${client.name}`,
-        consequenciasDaExclusaoDoCliente(contratosDoCliente.length, operacoesDoCliente.length),
-      )
-    ) {
-      removeClient.mutate(client.id);
-    }
+    confirmacao.pedir(
+      `o cliente ${client.name}`,
+      consequenciasDaExclusaoDoCliente(contratosDoCliente.length, operacoesDoCliente.length),
+      () => removeClient.mutate(client.id),
+    );
   }
 
   const totalClientes = clients.data?.length ?? 0;
@@ -360,6 +358,8 @@ export function PainelClientes() {
 
   return (
     <div>
+      {confirmacao.dialogo}
+
       <PageHeader
         title="Clientes e contratos"
         description="Gerencie clientes, contratos comerciais e as regras utilizadas nos cálculos operacionais."
@@ -706,8 +706,9 @@ export function PainelClientes() {
                               size="icon"
                               className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                               onClick={() =>
-                                confirmarExclusao(`o contrato ${contract.name}`) &&
-                                removeContract.mutate(contract.id)
+                                confirmacao.pedir(`o contrato ${contract.name}`, "", () =>
+                                  removeContract.mutate(contract.id),
+                                )
                               }
                               aria-label={`Excluir ${contract.name}`}
                             >

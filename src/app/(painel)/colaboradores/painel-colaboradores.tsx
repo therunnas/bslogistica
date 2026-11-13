@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmarExclusao } from "@/lib/confirmar-exclusao";
+import { useConfirmacaoDeExclusao } from "../_components/confirmacao-de-exclusao";
 import { useState } from "react";
 import {
   BadgeDollarSign,
@@ -97,6 +97,7 @@ const SELECT_CLASS =
   "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus:ring-primary/20";
 
 export function PainelColaboradores() {
+  const confirmacao = useConfirmacaoDeExclusao();
   const { data = [], isLoading } = useEmployees();
 
   const save = useSaveRow("employees");
@@ -239,6 +240,8 @@ export function PainelColaboradores() {
 
   return (
     <div>
+      {confirmacao.dialogo}
+
       <PageHeader
         title="Colaboradores"
         description="Gerencie a equipe disponível para alocação, funções, contatos e custo operacional por diária."
@@ -459,8 +462,9 @@ export function PainelColaboradores() {
                             size="icon"
                             className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             onClick={() =>
-                              confirmarExclusao(`o colaborador ${employee.name}`) &&
-                              remove.mutate(employee.id)
+                              confirmacao.pedir(`o colaborador ${employee.name}`, "", () =>
+                                remove.mutate(employee.id),
+                              )
                             }
                             aria-label={`Excluir ${employee.name}`}
                           >

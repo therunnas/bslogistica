@@ -67,7 +67,7 @@ verificar(
 verificar(
   "A4. trocar a data usa manterDigitados; os dois tipos de campo marcam o que foi digitado",
   [
-    /setValores\(\(atuais\) =>\s*manterDigitados\(valoresDe\(igual \?\? \(antes \? primeira : vigente\)\), atuais, tocados\),?\s*\)/.test(
+    /setValores\(\(atuais\) =>\s*manterDigitados\(valoresDe\(versaoNaData\(data\)\), atuais, tocados\),?\s*\)/.test(
       alterar,
     ),
     (alterar.match(/onChange=\{\(e\) => digitar\(campo\.chave, e\.target\.value\)\}/g) ?? [])
@@ -78,7 +78,16 @@ verificar(
 );
 verificar(
   "A5. abrir o formulário zera o que foi digitado (Cancelar e reabrir parte do valor de hoje)",
-  /function abrir\(\) \{\s*if \(!podeAbrir\) return;[\s\S]*?setValores\(valoresDe\(vigente\)\);\s*setTocados\(new Set\(\)\);/.test(
+  /function abrir\(\) \{\s*if \(!podeAbrir\) return;[\s\S]*?setValores\(valoresDe\(versaoNaData\(hoje\)\)\);\s*setTocados\(new Set\(\)\);/.test(
+    alterar,
+  ),
+  true,
+);
+// R-CP07-06: a base é a versão da data escolhida — a da própria data, a primeira (antecipar) ou a
+// última que começa antes dela —, nunca um "valor de hoje" que pode não existir.
+verificar(
+  "A5c. a base do formulário é a versão que vale na data escolhida",
+  /function versaoNaData\(data: string\)[\s\S]*?const igual = ativas\.find\(\(v\) => v\.valid_from === data\);[\s\S]*?if \(primeira !== null && data < primeira\.valid_from\) return primeira;[\s\S]*?\.filter\(\(v\) => v\.valid_from <= data\)/.test(
     alterar,
   ),
   true,
