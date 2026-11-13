@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "../_components/app-shell";
+import { carregarContainersAction } from "../containers/_acoes";
 import { AdicionaisDoPeriodo } from "./adicionais";
 import { ArredondamentoAcumulado } from "./arredondamento";
 
@@ -51,11 +52,25 @@ import {
 import { criarClienteNavegador } from "@/integrations/supabase/browser";
 import { adicionalElegivel, somarAdicionais } from "@/lib/adicionais";
 import { CHAVE_DOS_ADICIONAIS, useAdicionais } from "@/lib/adicionais-dados";
+import { adicionaisDeContainerEmDuplicidade } from "@/lib/container-servico-ui";
 import { somarCustoDosAdicionais } from "@/lib/custo-containers";
-import { useCustoDeContainersDoCliente } from "@/lib/custo-containers-dados";
+import {
+  CHAVE_DO_CUSTO_DE_CONTAINERS,
+  useCustoDeContainersDoCliente,
+} from "@/lib/custo-containers-dados";
 import { CHAVE_DOS_AJUSTES, useAjustesDeArredondamento } from "@/lib/regras-definitivas-dados";
 import { marginPct, round2 } from "@/lib/billing";
 import { montarCsv } from "@/lib/csv";
+import {
+  ROTULO_DA_PRESENCA,
+  divergenciaDaEmissao,
+  faturasQueCobremOPeriodo,
+  mensagemDaEmissao,
+  resumoDosDias,
+  rotuloDosDiasComApontamento,
+  type Conferido,
+} from "@/lib/faturamento-conferencia";
+import { sanitizarParaArquivo } from "@/lib/fechamento/exportacao";
 import { competenciasDoMes, ehCompetencia } from "@/lib/fechamento/periodo";
 import { brl, dateBR, minutesToLabel, monthRange, num } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
@@ -212,6 +227,35 @@ export function PainelFaturamento() {
     adicionaisElegiveis.map((a) => a.id),
   );
   const custoTotal = round2(totals.cost + custoContainers);
+
+  // CP-07 — conferência na confirmação. D4: dias da competência pelo estado do apontamento (o banco
+  // fatura dia aberto ou fechado; a tela só avisa). Fatura já emitida que cobre o período (a nova
+  // será complementar). Registro antigo de contêiner ligado à operação com apontamentos (CP-06),
+  // repetido aqui para não depender de rolar até o bloco de adicionais.
+  const dias = useMemo(
+    () => resumoDosDias(rows, selectedClient, start, end),
+    [rows, selectedClient, start, end],
+  );
+  const faturasDoPeriodo = useMemo(
+    () => faturasQueCobremOPeriodo(invoices.data ?? [], selectedClient, start, end),
+    [invoices.data, selectedClient, start, end],
+  );
+  const vinculosContainer = useQuery({
+    queryKey: ["containers", "adicionais", selectedClient],
+    enabled: regrasBs && selectedClient !== "",
+    queryFn: () => carregarContainersAction({ clienteId: selectedClient }),
+  });
+  const duplicidades =
+    vinculosContainer.data && vinculosContainer.data.ok
+      ? adicionaisDeContainerEmDuplicidade(
+          adicionaisElegiveis,
+          vinculosContainer.data.data.servicos,
+          operacoesComApontamento,
+        )
+      : [];
+  const nomeDaOperacao = (id: string) =>
+    (operations.data ?? []).find((operation) => operation.id === id)?.name ?? "—";
+
   const semNadaParaGerar =
     (!period.length && !adicionaisElegiveis.length) ||
     !adicionaisProntos ||
@@ -265,20 +309,12 @@ export function PainelFaturamento() {
     },
 
     onSuccess: async (invoice) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["invoices"],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["timesheet_entries"],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: CHAVE_DOS_ADICIONAIS,
-        }),
-        queryClient.invalidateQueries({
-          queryKey: CHAVE_DOS_AJUSTES,
-        }),
-      ]);
+      // CP-07 (ED1): a fatura leva o que estava a faturar NO MOMENTO da emissão. Se alguém lançou,
+      // corrigiu ou cancelou algo depois da conferência, o total difere — e a tela diz.
+      const conferido = conferidoRef.current;
+      setDivergencia(conferido && invoice ? divergenciaDaEmissao(conferido, invoice) : null);
+
+      await atualizarDadosDaFatura();
 
       toast.success(
         invoice
@@ -290,25 +326,63 @@ export function PainelFaturamento() {
       );
     },
 
-    onError: (error: unknown) => {
-      const mensagem =
-        typeof error === "object" && error !== null && "message" in error
-          ? String((error as { message: unknown }).message)
-          : "Não foi possível gerar a fatura.";
-
-      toast.error(mensagem);
+    onError: async (error: unknown) => {
+      // CP-07 (CC1, RD1, RD2): outra aba pode ter faturado antes, e numa falha de rede a fatura
+      // pode ter sido gravada com a resposta perdida. Relê tudo antes de qualquer nova tentativa.
+      toast.error(mensagemDaEmissao(error));
+      await atualizarDadosDaFatura();
     },
   });
+
+  /** Relê tudo o que a fatura usa: lançamentos, folhas, faturas, adicionais e registros antigos. */
+  async function atualizarDadosDaFatura() {
+    await Promise.all(
+      [
+        ["invoices"],
+        ["timesheet_entries"],
+        ["timesheets"],
+        CHAVE_DOS_ADICIONAIS,
+        CHAVE_DOS_AJUSTES,
+        CHAVE_DO_CUSTO_DE_CONTAINERS,
+        ["containers", "adicionais"],
+      ].map((queryKey) => queryClient.refetchQueries({ queryKey: [...queryKey] })),
+    );
+  }
+
+  const conferidoRef = useRef<Conferido | null>(null);
+  const [divergencia, setDivergencia] = useState<{ conferido: number; emitido: number } | null>(
+    null,
+  );
 
   // A fatura emitida é imutável: "Gerar fatura" só abre a confirmação. A emissão acontece em
   // "Emitir fatura", uma vez; a trava cobre dois cliques no mesmo instante, antes de isPending.
   const [confirmarFatura, setConfirmarFatura] = useState(false);
   const cancelarFaturaRef = useRef<HTMLButtonElement>(null);
   const emitindoRef = useRef(false);
+  // D4: a confirmação mostra o estado ATUAL (outra aba pode ter fechado um dia, lançado ou
+  // faturado): relê antes de abrir.
+  const [conferindo, setConferindo] = useState(false);
+
+  async function abrirConfirmacao() {
+    if (conferindo) return;
+    setConferindo(true);
+    try {
+      await atualizarDadosDaFatura();
+    } finally {
+      setConferindo(false);
+    }
+    setConfirmarFatura(true);
+  }
 
   function emitirFatura() {
     if (emitindoRef.current || generate.isPending) return;
     emitindoRef.current = true;
+    conferidoRef.current = {
+      total: totalAFaturar,
+      apontamentos: period.length,
+      adicionais: adicionaisElegiveis.length,
+    };
+    setDivergencia(null);
     generate.mutate(undefined, {
       onSettled: () => {
         emitindoRef.current = false;
@@ -337,7 +411,7 @@ export function PainelFaturamento() {
       row.operationName,
       row.shiftName,
       row.employeeName,
-      row.status,
+      ROTULO_DA_PRESENCA[row.status] ?? row.status,
       row.workedMinutes,
       row.overtimeMinutes,
       row.billed.toFixed(2),
@@ -355,7 +429,9 @@ export function PainelFaturamento() {
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = `faturamento-${start}-${end}.csv`;
+    // CP-07: o nome identifica o cliente, como no Fechamento (dois clientes no mesmo período não
+    // geram arquivos com o mesmo nome).
+    link.download = `faturamento-${sanitizarParaArquivo(clientName(selectedClient))}-${start}-${end}.csv`;
     link.click();
 
     URL.revokeObjectURL(url);
@@ -384,12 +460,12 @@ export function PainelFaturamento() {
             <Button
               type="button"
               className="h-10 rounded-xl"
-              onClick={() => setConfirmarFatura(true)}
-              disabled={semNadaParaGerar || !exibicao.podeAgir || generate.isPending}
+              onClick={() => void abrirConfirmacao()}
+              disabled={semNadaParaGerar || !exibicao.podeAgir || generate.isPending || conferindo}
             >
               <FileText className="h-4 w-4" />
 
-              {generate.isPending ? "Gerando..." : "Gerar fatura"}
+              {generate.isPending ? "Gerando..." : conferindo ? "Conferindo..." : "Gerar fatura"}
             </Button>
           </div>
         }
@@ -427,7 +503,82 @@ export function PainelFaturamento() {
             <dd className="font-medium">{adicionaisElegiveis.length}</dd>
             <dt className="text-muted-foreground">Total a faturar</dt>
             <dd className="font-semibold">{brl(totalAFaturar)}</dd>
+            <dt className="text-muted-foreground">Dias com apontamento</dt>
+            <dd className="font-medium">{rotuloDosDiasComApontamento(dias)}</dd>
+            {dias.jaFaturados > 0 ? (
+              <>
+                <dt className="text-muted-foreground">Dias já faturados</dt>
+                <dd className="font-medium">{dias.jaFaturados}</dd>
+              </>
+            ) : null}
+            <dt className="text-muted-foreground">Dias sem apontamento</dt>
+            <dd className="font-medium">
+              {dias.semApontamento}{" "}
+              <span className="text-xs font-normal text-muted-foreground">(não são pendência)</span>
+            </dd>
           </dl>
+
+          {dias.folhasAbertas.length > 0 ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-800 dark:text-amber-300"
+            >
+              <p className="font-medium">
+                {dias.abertos === 1
+                  ? "1 dia com apontamento ainda aberto:"
+                  : `${dias.abertos} dias com apontamento ainda aberto:`}
+              </p>
+              <ul className="mt-1 list-disc pl-5 text-xs leading-5">
+                {dias.folhasAbertas.map((f) => (
+                  <li key={`${f.data}-${f.operacao}-${f.turno}`}>
+                    {dateBR(f.data)} — {f.operacao} · {f.turno}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs leading-5">
+                Os lançamentos desses dias entram na fatura mesmo com o dia aberto, e o que for
+                alterado depois não muda a fatura emitida. Se ainda houver conferência, feche o dia
+                em Apontamentos antes de emitir.
+              </p>
+            </div>
+          ) : null}
+
+          {faturasDoPeriodo.length > 0 ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground"
+            >
+              <p className="font-medium">Já existe fatura deste cliente neste período:</p>
+              <ul className="mt-1 list-disc pl-5 text-xs leading-5">
+                {faturasDoPeriodo.map((f) => (
+                  <li key={f.id}>
+                    {dateBR(f.period_start)} a {dateBR(f.period_end)} — {brl(f.total_amount)}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs leading-5">
+                Esta será uma fatura complementar: leva só os lançamentos e adicionais ainda não
+                faturados. O que já foi faturado não é cobrado de novo.
+              </p>
+            </div>
+          ) : null}
+
+          {duplicidades.length > 0 ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-sm text-destructive"
+            >
+              <p className="font-medium">
+                Possível cobrança em duplicidade: o mesmo contêiner pode ser cobrado duas vezes (
+                {[...new Set(duplicidades.map((d) => nomeDaOperacao(d.operacaoId)))].join(", ")}).
+              </p>
+              <p className="mt-1 text-xs leading-5">
+                {duplicidades.length} registro(s) antigo(s) de contêiner ligado(s) a uma operação
+                que também tem apontamentos nesta fatura. A emissão não é bloqueada: se for o mesmo
+                serviço, cancele o registro antigo antes de emitir.
+              </p>
+            </div>
+          ) : null}
 
           <AlertDialogFooter>
             <AlertDialogCancel ref={cancelarFaturaRef} disabled={generate.isPending}>
@@ -530,6 +681,30 @@ export function PainelFaturamento() {
           ) : null}
         </CardContent>
       </Card>
+
+      {divergencia ? (
+        <div
+          role="alert"
+          className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] p-5 text-amber-800 dark:text-amber-300"
+        >
+          <p className="text-sm font-semibold">
+            A fatura foi emitida com {brl(divergencia.emitido)}, diferente do conferido na
+            confirmação ({brl(divergencia.conferido)}).
+          </p>
+          <p className="mt-1 text-xs leading-5">
+            Houve lançamento, correção ou cancelamento depois da conferência. A fatura leva o que
+            estava a faturar no momento da emissão: confira-a na lista de faturas.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-3 h-9 rounded-xl"
+            onClick={() => setDivergencia(null)}
+          >
+            Entendi
+          </Button>
+        </div>
+      ) : null}
 
       {exibicao.aviso && (
         <AvisoLedger

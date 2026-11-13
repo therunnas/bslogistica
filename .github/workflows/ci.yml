@@ -98,6 +98,9 @@ jobs:
       - name: Testes de serviços avulsos e contêiner legado (CP-06)
         run: npm run test:servicos-avulsos-cp06
 
+      - name: Testes de fechamento e faturamento (CP-07)
+        run: npm run test:faturamento-cp07
+
       - name: Teste troca
         run: npm run test:troca
 

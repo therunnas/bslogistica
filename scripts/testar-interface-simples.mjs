@@ -222,9 +222,15 @@ verificar(
 );
 // UX-FATURA-01: a fatura emitida é imutável; "Gerar fatura" só abre a confirmação, e a
 // emissão (generate.mutate) acontece apenas em "Emitir fatura", uma vez, sem consulta nova.
+// CP-07 (D4): antes de abrir, a confirmação relê os dados (`abrirConfirmacao`); ela continua só
+// abrindo o diálogo — nenhuma emissão dentro dela.
+const abrirConfirmacaoFat =
+  /async function abrirConfirmacao\(\) \{([\s\S]*?)\n {2}\}/.exec(painelFat)?.[1] ?? "";
 verificar(
   "C8. 'Gerar fatura' abre a confirmação e não emite direto",
-  /onClick=\{\(\) => setConfirmarFatura\(true\)\}/.test(painelFat) &&
+  /onClick=\{\(\) => void abrirConfirmacao\(\)\}/.test(painelFat) &&
+    /setConfirmarFatura\(true\)/.test(abrirConfirmacaoFat) &&
+    !/generate\.mutate|\.rpc\(/.test(abrirConfirmacaoFat) &&
     !/onClick=\{\(\) => generate\.mutate\(\)\}/.test(painelFat),
   true,
 );

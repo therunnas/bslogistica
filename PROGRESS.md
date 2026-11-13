@@ -48,7 +48,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-05  | Apontamentos e regras financeiras (maior risco)                                    | PASS (local) |
 | CP-06  | Serviços avulsos (contêiner é tipo de avulso), adicionais e caminho legado         | PASS (local) |
 | CP-06B | Remoção do painel independente de Contêineres; histórico legado em Operações       | PASS (local) |
-| CP-07  | Fechamento e faturamento                                                           | não iniciado |
+| CP-07  | Fechamento e faturamento                                                           | PASS (local) |
 | CP-08  | Dashboard, relatórios e exportações                                                | não iniciado |
 | CP-09  | Interface, clareza e consistência                                                  | não iniciado |
 | CP-10  | Segurança, integridade e infraestrutura                                            | não iniciado |
@@ -62,7 +62,7 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | D1  | Saída antes da entrada (08:00 → 07:50) salvava sem aviso como 22h50. **Corrigido no CP-05** (telas)      | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
 | D2  | "Alterar custo": trocar a data substituía o valor digitado pelo antigo. **Corrigido no CP-03**            | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
 | D3  | Duplo clique duplicava cliente e turno. **Corrigido**: cliente no CP-02, turno no CP-04 (envio único)     | P2         | E2E #133 + leitura do código | CP-02/04 |
-| D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
+| D4  | Confirmação da fatura não avisava dias ainda abertos. **Corrigido no CP-07** (aviso, sem bloqueio)        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
 | D6  | `<= 15`/`<= 45` (030) × `< 15`/`< 45` (V2). **Sem defeito no CP-05**: a 030 só roda com o dobro desligado | P3         | leitura do código            | CP-05    |
 | D7  | Caminho legado de contêiner aberto por URL (cobrança dupla). **Corrigido no CP-06** (cadastro encerrado) e **no CP-06B** (painel removido) | P2 | HANDOFF | CP-06/06B |
@@ -105,6 +105,29 @@ Decisões do CP-06 (nenhuma implementada): DEC-CP06-01 (catálogo de tipos de av
 DEC-CP06-04 (duplicidade: avisar ou bloquear), DEC-CP06-05 (participante em dois avulsos).
 Autorização pendente: **AUT-CP06-01** (encerrar a RPC de cadastro de contêiner no banco). Segue
 **AUT-CP05-01** como risco financeiro pendente.
+
+Defeitos do CP-07 (13/11/2026, sessão em nuvem), reproduzidos no E2E (RED no `7e8659f`) e
+corrigidos (GREEN), só na interface — nenhum cálculo, SQL, migration, RLS ou contrato de RPC;
+competências, conciliação ao centavo, emissão, concorrência, imutabilidade e decisões em
+[docs/qa/CP-07-fechamento-e-faturamento.md](docs/qa/CP-07-fechamento-e-faturamento.md):
+
+| ID        | Defeito                                                                                                | Prioridade | Estado    |
+| --------- | ------------------------------------------------------------------------------------------------------ | ---------- | --------- |
+| D4        | Confirmação da fatura sem os dias de apontamento ainda abertos (o banco fatura dia aberto ou fechado)  | P2         | corrigido (aviso; sem bloqueio, DEC-CP07-01) |
+| D-CP07-01 | Aba que perdeu a corrida da emissão seguia mostrando valor a faturar; mensagem genérica                | P2         | corrigido |
+| D-CP07-02 | Falha de rede ao emitir: "TypeError: Failed to fetch" cru; resposta perdida sem mostrar a fatura gravada | P2       | corrigido |
+| D-CP07-03 | Lançamento salvo depois da conferência: fatura diferente do conferido, sem aviso                       | P2         | corrigido (aviso; banco: AUT-CP07-01) |
+| D-CP07-04 | Fatura complementar na mesma competência sem dizer que já existe fatura                                 | P2         | corrigido (aviso; DEC-CP07-02) |
+| D-CP07-05 | Aviso de cobrança em dobro do CP-06 ausente na confirmação                                              | P2         | corrigido (aviso; DEC-CP06-04) |
+| D-CP07-06 | CSV do Faturamento sem cliente no nome e com a presença crua do banco                                   | P3         | corrigido |
+
+Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
+bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,
+cancelamento e detalhe da fatura; vínculo com a nota fiscal). Autorização pendente:
+**AUT-CP07-01** (conferência do total esperado dentro de `gerar_fatura`: contrato de RPC e
+migration). Uma fatura financeiramente incorreta (mesmo serviço como avulsa e registro antigo, ou
+como adicional manual) **ainda pode ser emitida**: DEC-CP06-04 segue pendente. CN-D segue falha
+conhecida (DEC-CP02-01).
 
 CP-06B (13/11/2026, sessão em nuvem), por decisão do responsável ("o painel Container não é para
 mais existir"): **D7-B** (P2) — mesmo com o cadastro novo encerrado, `/containers`, o detalhe e a

@@ -100,7 +100,7 @@ export function mensagemDoErro(erro: unknown): string {
 export const MENSAGEM_FALHA_DE_REDE =
   "Não foi possível falar com o servidor. Confira a conexão e tente novamente.";
 
-function ehFalhaDeRede(e: ErroDoBanco, mensagem: string): boolean {
+export function ehFalhaDeRede(e: ErroDoBanco, mensagem: string): boolean {
   if (typeof e.code === "string" && e.code !== "") return false;
   return /^(TypeError: )?(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed|fetch failed)$/i.test(
     mensagem.trim(),

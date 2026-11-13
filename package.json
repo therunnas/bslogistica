@@ -31,6 +31,7 @@
     "test:operacoes-turnos": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-operacoes-turnos.mjs",
     "test:apontamentos-cp05": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-apontamentos-cp05.mjs",
     "test:servicos-avulsos-cp06": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-servicos-avulsos-cp06.mjs",
+    "test:faturamento-cp07": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-faturamento-cp07.mjs",
     "test:colaboradores-custos": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-colaboradores-custos.mjs",
     "test:clientes-contratos": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-clientes-contratos.mjs",
     "test:mensagens-auth": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-mensagens-auth.mjs",

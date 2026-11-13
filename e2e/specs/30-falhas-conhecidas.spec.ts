@@ -25,12 +25,14 @@ import {
  * conhecida por engano); se a correção entrar, a conferência do defeito falha e a CI acusa,
  * obrigando a trocar o teste pelo comportamento correto. Nenhum código da aplicação é alterado.
  *
+ * Desde o CP-07 todos os defeitos deste arquivo (D1, D2, D3 e D4) estão corrigidos e conferidos
+ * pelo comportamento correto. A única falha conhecida restante é a CN-D (`50-clientes-contratos`).
+ *
  * Dados próprios (cliente "Defeitos"), independentes dos outros arquivos.
  */
 
 test.use({ storageState: estadoDe("admin") });
 
-const CONHECIDA = { tag: "@falha-conhecida" };
 const CLI = `${P} Defeitos`;
 const CTR = `${P} Contrato Defeitos`;
 const OP = `${P} Op Defeitos`;
@@ -128,20 +130,22 @@ test("[CORRIGIDO D2] “Alterar custo”: trocar a data mantém o valor digitado
   await d.getByRole("button", { name: "Cancelar" }).click();
 });
 
-test(
-  "[RISCO] a confirmação da fatura não avisa sobre dias ainda abertos",
-  CONHECIDA,
-  async ({ page }) => {
-    await abrirFaturamento(page, { cliente: CLI, inicio: "2026-10-16", fim: "2026-10-31" });
-    // O dia 20/10 continua "Aberto" (ninguém clicou em "Fechar dia").
-    await page.getByRole("button", { name: "Gerar fatura" }).click();
-    const confirmacao = page.getByRole("alertdialog");
-    await expect(confirmacao.getByRole("heading", { name: "Emitir fatura?" })).toBeVisible();
-    await expect(confirmacao).toContainText("Apontamentos1");
-    // Correto seria listar os dias abertos. Hoje não há menção:
-    await expect(confirmacao).not.toContainText(/aberto|não fechad/i);
-    // Nunca emitir aqui: só conferir a confirmação.
-    await confirmacao.getByRole("button", { name: "Cancelar" }).click();
-    await expect(page.getByRole("alertdialog")).toHaveCount(0);
-  },
-);
+// D4: CORRIGIDO no CP-07. A confirmação distingue dias fechados, abertos e sem apontamento e lista
+// os dias ainda abertos, SEM bloquear a emissão (a política de bloqueio não foi decidida). Deixou de
+// ser falha conhecida; a cobertura completa está em `95-fechamento-faturamento` (D4).
+test("[CORRIGIDO D4] a confirmação da fatura avisa sobre dias ainda abertos", async ({ page }) => {
+  await abrirFaturamento(page, { cliente: CLI, inicio: "2026-10-16", fim: "2026-10-31" });
+  // O dia 20/10 continua "Aberto" (ninguém clicou em "Fechar dia").
+  await page.getByRole("button", { name: "Gerar fatura" }).click();
+  const confirmacao = page.getByRole("alertdialog");
+  await expect(confirmacao.getByRole("heading", { name: "Emitir fatura?" })).toBeVisible();
+  await expect(confirmacao).toContainText("Apontamentos1");
+  await expect(confirmacao).toContainText(/Dias com apontamento\s*1 \(0 fechados, 1 aberto\)/);
+  const aviso = confirmacao.getByRole("alert").filter({ hasText: /ainda aberto/i });
+  await expect(aviso).toContainText("20/10/2026");
+  await expect(aviso).toContainText(OP);
+  await expect(confirmacao.getByRole("button", { name: "Emitir fatura" })).toBeEnabled();
+  // Nunca emitir aqui: só conferir a confirmação.
+  await confirmacao.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+});
