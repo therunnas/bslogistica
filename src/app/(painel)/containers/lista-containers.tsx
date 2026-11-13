@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "../_components/app-shell";
 import { carregarContainersAction, carregarFormularioContainerAction } from "./_acoes";
 import type { ServicoContainerLista } from "@/lib/container-servico-dados";
+import { MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO } from "@/lib/container-servico-ui";
 
 export const dinheiroContainer = (centavos: number) =>
   (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -83,11 +84,21 @@ export function ListaContainers() {
     <div className="space-y-6">
       <PageHeader
         title="Containers"
-        description="Serviços avulsos, valores negociados e custos por participante."
+        description="Registros antigos de serviços de contêiner: consulta, correção e cancelamento."
       />
-      <Button asChild>
-        <Link href="/containers/novo">Novo serviço</Link>
-      </Button>
+      {/* D7 (CP-06): o cadastro novo por aqui foi encerrado; contêiner é serviço avulso. */}
+      <div
+        role="status"
+        className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm text-foreground"
+      >
+        <p className="font-medium">Estes são registros antigos.</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          {MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO}
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-2">
+          <Link href="/operacoes">Ir para Operações</Link>
+        </Button>
+      </div>
       {avisoFiltros && <p role="alert">{avisoFiltros}</p>}
       <Card>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-4">

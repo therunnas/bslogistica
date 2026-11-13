@@ -95,6 +95,9 @@ jobs:
       - name: Testes de apontamentos e regras financeiras (CP-05)
         run: npm run test:apontamentos-cp05
 
+      - name: Testes de serviços avulsos e contêiner legado (CP-06)
+        run: npm run test:servicos-avulsos-cp06
+
       - name: Teste troca
         run: npm run test:troca
 

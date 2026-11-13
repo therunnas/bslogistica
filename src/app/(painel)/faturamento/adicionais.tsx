@@ -8,7 +8,11 @@ import {
   carregarContainersAction,
   verificarVinculoAdicionalContainerAction,
 } from "../containers/_acoes";
-import { decidirAcaoAdicionalContainer } from "@/lib/container-servico-ui";
+import {
+  adicionaisDeContainerEmDuplicidade,
+  decidirAcaoAdicionalContainer,
+} from "@/lib/container-servico-ui";
+import { useTravaDoDialogo } from "@/lib/trava";
 import { PackagePlus, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +88,11 @@ export interface AdicionaisDoPeriodoProps {
   erro: boolean;
   /** O banco tem a migration 038: o adicional nasce com a competência de cobrança escolhida. */
   periodoContratual?: boolean;
+  /**
+   * D7 (CP-06): operações do cliente com apontamentos a faturar no período. Um registro antigo de
+   * contêiner ligado a uma delas pode ser o mesmo serviço cobrado duas vezes: a tela avisa.
+   */
+  operacoesComApontamento?: ReadonlySet<string>;
 }
 
 /**
@@ -101,6 +110,7 @@ export function AdicionaisDoPeriodo({
   carregando,
   erro,
   periodoContratual = false,
+  operacoesComApontamento = new Set<string>(),
 }: AdicionaisDoPeriodoProps) {
   const registrar = useRegistrarAdicional();
   const cancelar = useCancelarAdicional();
@@ -115,6 +125,9 @@ export function AdicionaisDoPeriodo({
   });
 
   const [novoOpen, setNovoOpen] = useState(false);
+  // D-CP06-02: envio único. Com o duplo clique, o TanStack Query só roda o `onSuccess` da ÚLTIMA
+  // chamada: o adicional era gravado e o diálogo ficava aberto, convidando a um novo envio.
+  const travaNovo = useTravaDoDialogo(novoOpen);
   const [operacaoId, setOperacaoId] = useState("");
   const [inicioNovo, setInicioNovo] = useState(inicio);
   const [fimNovo, setFimNovo] = useState(fim);
@@ -202,6 +215,15 @@ export function AdicionaisDoPeriodo({
   const nomeDaOperacao = (id: string | null) =>
     id === null ? "—" : (operacoes.find((o) => o.id === id)?.name ?? "—");
 
+  const duplicidades =
+    vinculosContainer.data && vinculosContainer.data.ok
+      ? adicionaisDeContainerEmDuplicidade(
+          doPeriodo.filter((a) => situacaoDoAdicional(a) === "a-faturar"),
+          vinculosContainer.data.data.servicos,
+          operacoesComApontamento,
+        )
+      : [];
+
   function abrirNovo() {
     setOperacaoId("");
     setInicioNovo(inicio);
@@ -229,7 +251,9 @@ export function AdicionaisDoPeriodo({
               </CardTitle>
 
               <p className="mt-1 text-xs text-muted-foreground">
-                Valores extras do período (etiquetagem, separação, contêiner…), separados da diária.
+                Valores complementares do período, autorizados, separados da diária. Serviço avulso
+                (contêiner, etiquetagem, limpeza…) não é adicional: cadastre em Operações → tipo
+                Avulsa, para não cobrar o mesmo serviço duas vezes.
                 {periodoContratual
                   ? " Entram na fatura da competência de cobrança escolhida, mesmo executados em outra data."
                   : " Entram na fatura os que estão inteiramente dentro do período."}
@@ -268,6 +292,23 @@ export function AdicionaisDoPeriodo({
           </p>
         ) : (
           <div className="overflow-x-auto">
+            {duplicidades.length > 0 ? (
+              <div
+                role="alert"
+                className="m-4 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-destructive"
+              >
+                <p className="text-sm font-medium">
+                  Possível cobrança em duplicidade: {duplicidades.length} registro(s) antigo(s) de
+                  contêiner ligado(s) a operação que também tem apontamentos neste período (
+                  {[...new Set(duplicidades.map((d) => nomeDaOperacao(d.operacaoId)))].join(", ")}).
+                </p>
+                <p className="mt-1 text-xs leading-5">
+                  Se forem o mesmo serviço, ele será cobrado duas vezes — pelos apontamentos e pelo
+                  adicional do registro antigo. Confira e, se for o caso, cancele o registro antigo
+                  antes de gerar a fatura.
+                </p>
+              </div>
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow className="border-border bg-secondary/30 hover:bg-secondary/30">
@@ -335,7 +376,7 @@ export function AdicionaisDoPeriodo({
                             className="text-sm underline"
                             href={`/containers/${acaoContainer.id}`}
                           >
-                            Ver container
+                            Ver registro antigo de contêiner
                           </Link>
                         ) : acaoContainer.tipo === "bloqueado" ? (
                           <span className="text-xs text-muted-foreground">
@@ -516,7 +557,13 @@ export function AdicionaisDoPeriodo({
               type="button"
               className="rounded-xl"
               disabled={erros.length > 0 || registrar.isPending}
-              onClick={() => registrar.mutate(formulario, { onSuccess: () => setNovoOpen(false) })}
+              onClick={() => {
+                if (!travaNovo.tentar()) return;
+                registrar.mutate(formulario, {
+                  onError: travaNovo.liberar,
+                  onSuccess: () => setNovoOpen(false),
+                });
+              }}
             >
               Registrar adicional
             </Button>

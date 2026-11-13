@@ -130,6 +130,13 @@ export function PainelFaturamento() {
     [rows, selectedClient, start, end],
   );
 
+  // D7 (CP-06): operações com apontamentos a faturar no período (para o aviso de duplicidade com
+  // registro antigo de contêiner ligado à mesma operação).
+  const operacoesComApontamento = useMemo(
+    () => new Set(period.map((row) => row.operationId)),
+    [period],
+  );
+
   const byOperation = useMemo(() => {
     const map = new Map<
       string,
@@ -708,6 +715,7 @@ export function PainelFaturamento() {
               carregando={adicionais.isLoading}
               erro={adicionais.isError}
               periodoContratual={periodoContratual}
+              operacoesComApontamento={operacoesComApontamento}
             />
           ) : null}
         </>

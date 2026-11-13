@@ -48,13 +48,16 @@ for (const route of ["page.tsx", "novo/page.tsx", "[id]/page.tsx"]) {
       if (id.includes("lista-containers")) return { ListaContainers: "lista" };
       if (id.includes("formulario-container")) return { FormularioContainer: "formulario" };
       if (id.includes("detalhe-container")) return { DetalheDoContainer: "detalhe" };
+      // D7 (CP-06): o cadastro novo foi encerrado; /containers/novo mostra o aviso, não o formulário.
+      if (id.includes("cadastro-encerrado")) return { CadastroDeContainerEncerrado: "encerrado" };
       return nativeRequire(id);
     });
     const props = { params: Promise.resolve({ id: "identificador" }) };
     assert.equal(await pagina.default(props), bloqueio);
     negado = false;
     const resultado = await pagina.default(props);
-    assert.ok(["lista", "formulario", "detalhe"].includes(resultado.type));
+    assert.ok(["lista", "encerrado", "detalhe"].includes(resultado.type));
+    if (route === "novo/page.tsx") assert.equal(resultado.type, "encerrado");
     if (route === "[id]/page.tsx") assert.equal(resultado.props.id, "identificador");
   });
 }
@@ -221,6 +224,19 @@ function navegador(acoes = {}, conteudo = null, config = {}) {
         };
       if (id === "@/lib/adicionais") return adicionaisDominio;
       if (id === "@/lib/container-servico-ui") return containerUi;
+      // CP-06: "Registrar adicional" passou a usar a trava de diálogo (D-CP06-02).
+      if (id === "@/lib/trava") {
+        const criarTrava = () => {
+          let ocupada = false;
+          return {
+            tentar: () => (ocupada ? false : (ocupada = true)),
+            liberar: () => {
+              ocupada = false;
+            },
+          };
+        };
+        return { criarTrava, useTrava: criarTrava, useTravaDoDialogo: criarTrava };
+      }
       if (id === "@/lib/format") return formatos;
       if (id === "@/lib/fechamento/periodo") return { competenciasDoMes: () => [] };
       if (id === "@/lib/vigencias-dados") {
@@ -1242,17 +1258,22 @@ test("operação existente não oferece atalho de container", () => {
   assert.doesNotMatch(source, /Adicionar serviço de container/);
 });
 
-test("rota nova conserva guarda administrativa e transmite operação de origem", async () => {
+// D7 (QA-BS-01, CP-06): a rota nova não abre mais o formulário — nem com operação de origem, que
+// era justamente o caminho para cobrar o mesmo contêiner pela operação avulsa e pelo adicional. A
+// guarda administrativa continua antes de qualquer interface.
+test("rota nova conserva guarda administrativa e não abre o formulário, mesmo com operação de origem", async () => {
   let negado = false;
   const pagina = carregarModulo(path.join(base, "novo/page.tsx"), (id) => {
     if (id.includes("_exigir-admin"))
       return { exigirAdmin: async () => (negado ? "NEGADO" : null) };
     if (id.includes("formulario-container")) return { FormularioContainer: "formulario" };
+    if (id.includes("cadastro-encerrado")) return { CadastroDeContainerEncerrado: "encerrado" };
     return nativeRequire(id);
   });
   const origem = "20000000-0000-4000-8000-000000000003";
   const resultado = await pagina.default({ searchParams: Promise.resolve({ operacao: origem }) });
-  assert.equal(resultado.props.operacaoInicialId, origem);
+  assert.equal(resultado.type, "encerrado");
+  assert.equal(resultado.props.operacaoInicialId, undefined);
   negado = true;
   assert.equal(
     await pagina.default({ searchParams: Promise.resolve({ operacao: origem }) }),

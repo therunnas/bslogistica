@@ -46,7 +46,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-03  | Colaboradores e valores                                                            | PASS (local) |
 | CP-04  | Operações, turnos e equipes                                                        | PASS (local) |
 | CP-05  | Apontamentos e regras financeiras (maior risco)                                    | PASS (local) |
-| CP-06  | Serviços avulsos, adicionais e containers                                          | não iniciado |
+| CP-06  | Serviços avulsos (contêiner é tipo de avulso), adicionais e caminho legado         | PASS (local) |
 | CP-07  | Fechamento e faturamento                                                           | não iniciado |
 | CP-08  | Dashboard, relatórios e exportações                                                | não iniciado |
 | CP-09  | Interface, clareza e consistência                                                  | não iniciado |
@@ -64,7 +64,7 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
 | D6  | `<= 15`/`<= 45` (030) × `< 15`/`< 45` (V2). **Sem defeito no CP-05**: a 030 só roda com o dobro desligado | P3         | leitura do código            | CP-05    |
-| D7  | Containers fora do menu, mas acessíveis por URL e links do Faturamento (risco de cobrança dupla)          | P2         | HANDOFF                      | CP-06    |
+| D7  | Caminho legado de contêiner aberto por URL (cobrança dupla). **Corrigido no CP-06** (cadastro encerrado)   | P2         | HANDOFF                      | CP-06    |
 | D8  | Exclusões usam `window.confirm` nativo                                                                    | P3         | leitura do código            | CP-09    |
 | I1  | `scripts/e2e-local.sh` usava `setsid`, ausente no macOS. **Corrigido** (`set -m`; G22–G25); macOS nativo não comprovado | infra | execução local 12/11 | CP-00B |
 
@@ -87,6 +87,23 @@ PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 73/73 `test:*`; `sql-local` 52; sem 
 financeira alterada e com MFA opcional mantido. Pendente de decisão: o Auth responde `user_banned`
 antes de conferir a senha (revela conta revogada pela API do Auth, não pela tela). Não testados:
 expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo.
+
+Defeitos do CP-06 (13/11/2026, sessão em nuvem), reproduzidos no E2E (RED) e corrigidos (GREEN);
+modelo (operação fixa × serviço avulso; contêiner é tipo de avulso), inventário, D7 e decisões em
+[docs/qa/CP-06-servicos-avulsos.md](docs/qa/CP-06-servicos-avulsos.md):
+
+| ID        | Defeito                                                                                              | Prioridade | Estado                               |
+| --------- | ---------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------ |
+| D7        | `/containers/novo` (caminho legado) seguia aberto por URL e criava receita própria (adicional)       | P2         | corrigido (tela e servidor); banco: AUT-CP06-01 |
+| D-CP06-01 | Registro antigo de contêiner + apontamentos da mesma operação: R$ 1.600 cobrados (certo: 1.000), sem aviso | P2   | corrigido (aviso)                    |
+| D-CP06-02 | Duplo clique em "Registrar adicional": gravado, mas o diálogo ficava aberto (convite a reenviar)     | P2         | corrigido                            |
+| D-CP06-03 | Bloco de adicionais apresentava contêiner e etiquetagem como adicionais                              | P3         | corrigido                            |
+
+Decisões do CP-06 (nenhuma implementada): DEC-CP06-01 (catálogo de tipos de avulso), DEC-CP06-02
+(unidade, quantidade e valor fechado), DEC-CP06-03 (custo do participante por serviço),
+DEC-CP06-04 (duplicidade: avisar ou bloquear), DEC-CP06-05 (participante em dois avulsos).
+Autorização pendente: **AUT-CP06-01** (encerrar a RPC de cadastro de contêiner no banco). Segue
+**AUT-CP05-01** como risco financeiro pendente.
 
 Defeitos do CP-05 (12/11/2026, sessão em nuvem), reproduzidos no E2E (RED) e corrigidos (GREEN);
 inventário, matrizes de jornada, sábado/domingo/feriado, custo × receita, D6 e decisões em

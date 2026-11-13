@@ -1,14 +1,9 @@
 import { exigirAdmin } from "../../_exigir-admin";
-import { FormularioContainer } from "../formulario-container";
+import { CadastroDeContainerEncerrado } from "../cadastro-encerrado";
 
-export default async function NovoContainer({
-  searchParams,
-}: {
-  searchParams?: Promise<{ operacao?: string | string[] }>;
-}) {
+/** D7 (CP-06): cadastro novo encerrado; ver `cadastro-encerrado.tsx`. */
+export default async function NovoContainer() {
   const bloqueio = await exigirAdmin();
   if (bloqueio) return bloqueio;
-  const origem = (await searchParams)?.operacao;
-  if (origem === undefined) return <FormularioContainer key="geral" />;
-  return <FormularioContainer key={JSON.stringify(origem ?? null)} operacaoInicialId={origem} />;
+  return <CadastroDeContainerEncerrado />;
 }
