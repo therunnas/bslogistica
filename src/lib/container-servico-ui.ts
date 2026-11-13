@@ -1,3 +1,5 @@
+import type { Route } from "next";
+
 import type { ResultadoContainer, ServicoContainerLista } from "./container-servico-dados";
 
 /**
@@ -9,7 +11,24 @@ import type { ResultadoContainer, ServicoContainerLista } from "./container-serv
  * encerrado; os registros antigos continuam para consulta, correção e cancelamento.
  */
 export const MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO =
-  "O cadastro separado de containers foi encerrado. Contêiner é um tipo de serviço avulso: cadastre em Operações → Nova operação → tipo Avulsa. Os registros antigos continuam aqui para consulta, correção e cancelamento.";
+  "Contêiner é um tipo de serviço avulso: cadastre em Operações → Nova operação → tipo Avulsa. Não existe mais painel nem cadastro separado de containers; os registros antigos ficam em Operações, na seção “Serviços avulsos antigos”, para consulta, correção e cancelamento.";
+
+/**
+ * CP-06B (decisão do responsável: "O painel Container não é para mais existir"). Os registros
+ * antigos de contêiner são consultados DENTRO de Operações, como histórico legado de serviços
+ * avulsos. As URLs antigas (`/containers…`) só redirecionam para estes caminhos.
+ */
+export const SECAO_DE_AVULSOS_ANTIGOS = "servicos-avulsos-antigos";
+export const CAMINHO_DOS_AVULSOS_ANTIGOS = `/operacoes#${SECAO_DE_AVULSOS_ANTIGOS}` as Route;
+export const CAMINHO_DO_CADASTRO_CANONICO = "/operacoes?origem=conteiner" as Route;
+
+export function caminhoDoAvulsoAntigo(id: string): Route {
+  return `/operacoes/avulsos-antigos/${encodeURIComponent(id)}` as Route;
+}
+
+export function caminhoDaCorrecaoDoAvulsoAntigo(id: string): Route {
+  return `${caminhoDoAvulsoAntigo(id)}/corrigir` as Route;
+}
 
 export function cadastroDeContainerEncerrado(): {
   ok: false;

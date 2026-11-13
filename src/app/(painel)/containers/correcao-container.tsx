@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { caminhoDoAvulsoAntigo } from "@/lib/container-servico-ui";
 import { useEffect, useState } from "react";
 import { loteParaCorrecao } from "@/lib/container-servico-dados";
 import type { LoteDeContainers } from "@/lib/container-servico";
@@ -56,7 +57,7 @@ export function CorrecaoDoContainer({ id }: { id: string }) {
     return (
       <div className="space-y-4">
         <p>Este serviço já foi corrigido. O histórico identifica o substituto.</p>
-        <Link className="underline" href={`/containers/${substituidoPor}`}>
+        <Link className="underline" href={caminhoDoAvulsoAntigo(substituidoPor)}>
           Abrir serviço corrigido
         </Link>
       </div>
@@ -66,7 +67,7 @@ export function CorrecaoDoContainer({ id }: { id: string }) {
   return (
     <div className="space-y-4">
       <p role={mensagem ? "alert" : "status"}>{mensagem || "Carregando serviço…"}</p>
-      <Link className="underline" href={`/containers/${id}`}>
+      <Link className="underline" href={caminhoDoAvulsoAntigo(id)}>
         Voltar para o serviço
       </Link>
     </div>

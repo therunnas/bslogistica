@@ -1,6 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import {
+  CAMINHO_DOS_AVULSOS_ANTIGOS,
+  caminhoDaCorrecaoDoAvulsoAntigo,
+  caminhoDoAvulsoAntigo,
+} from "@/lib/container-servico-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -131,8 +136,8 @@ export function DetalheDoContainer({ id }: { id: string }) {
       <div className="space-y-4">
         <p role="alert">{erro}</p>
         <Button onClick={() => void carregar()}>Tentar novamente</Button>
-        <Link className="block underline" href="/containers">
-          Voltar para containers
+        <Link className="block underline" href={CAMINHO_DOS_AVULSOS_ANTIGOS}>
+          Voltar para Operações
         </Link>
       </div>
     );
@@ -155,9 +160,12 @@ export function DetalheDoContainer({ id }: { id: string }) {
   ];
   return (
     <div className="space-y-6">
-      <PageHeader title="Serviço de containers" description={servico.description} />
-      <Link className="underline" href="/containers">
-        Voltar para containers
+      <PageHeader
+        title="Serviço avulso antigo (contêiner)"
+        description={`${servico.description} · registro do cadastro antigo; novos serviços se cadastram em Operações → Nova operação → Avulsa.`}
+      />
+      <Link className="underline" href={CAMINHO_DOS_AVULSOS_ANTIGOS}>
+        Voltar para Operações
       </Link>
       {erro && (
         <p role="alert" className="rounded-md border p-4">
@@ -167,14 +175,14 @@ export function DetalheDoContainer({ id }: { id: string }) {
       {substituidoPor && (
         <p className="rounded-md border p-4">
           Este serviço foi corrigido e substituído.{" "}
-          <Link className="underline" href={`/containers/${substituidoPor}`}>
+          <Link className="underline" href={caminhoDoAvulsoAntigo(substituidoPor)}>
             Abrir o serviço corrigido
           </Link>
         </p>
       )}
       {servico.situacao === "disponivel" && podeCorrigir && !indeterminado && (
         <Button asChild variant="outline">
-          <Link href={`/containers/${servico.id}/corrigir`}>Corrigir serviço</Link>
+          <Link href={caminhoDaCorrecaoDoAvulsoAntigo(servico.id)}>Corrigir serviço</Link>
         </Button>
       )}
       {indeterminado && (

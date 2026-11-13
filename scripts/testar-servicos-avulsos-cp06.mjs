@@ -14,9 +14,13 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  CAMINHO_DO_CADASTRO_CANONICO,
+  CAMINHO_DOS_AVULSOS_ANTIGOS,
   MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO,
   adicionaisDeContainerEmDuplicidade,
   cadastroDeContainerEncerrado,
+  caminhoDaCorrecaoDoAvulsoAntigo,
+  caminhoDoAvulsoAntigo,
 } from "../src/lib/container-servico-ui.ts";
 
 let passou = 0;
@@ -75,7 +79,7 @@ verificar(
     cadastroDeContainerEncerrado().ok,
     cadastroDeContainerEncerrado().codigo,
     /Operações → Nova operação → tipo Avulsa/.test(MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO),
-    /registros antigos continuam/.test(MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO),
+    /registros antigos ficam em Operações/.test(MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO),
   ],
   [false, "encerrado", true, true],
 );
@@ -92,13 +96,42 @@ verificar(
   /acoes\(\)\.corrigir\(entrada\)/.test(acoes) && /acoes\(\)\.cancelar\(entrada\)/.test(acoes),
   true,
 );
-const novo =
-  semComentarios(ler("src/app/(painel)/containers/novo/page.tsx")) +
-  semComentarios(ler("src/app/(painel)/containers/cadastro-encerrado.tsx"));
+// CP-06B ("O painel Container não é para mais existir"): as rotas antigas só redirecionam.
+const rotasAntigas = [
+  ["src/app/(painel)/containers/page.tsx", "CAMINHO_DOS_AVULSOS_ANTIGOS"],
+  ["src/app/(painel)/containers/novo/page.tsx", "CAMINHO_DO_CADASTRO_CANONICO"],
+  ["src/app/(painel)/containers/[id]/page.tsx", "caminhoDoAvulsoAntigo(id)"],
+  ["src/app/(painel)/containers/[id]/corrigir/page.tsx", "caminhoDaCorrecaoDoAvulsoAntigo(id)"],
+];
 verificar(
-  "B4. /containers/novo não oferece mais o formulário; leva às Operações",
-  [/FormularioContainer/.test(novo), /href="\/operacoes"/.test(novo), /exigirAdmin\(\)/.test(novo)],
-  [false, true, true],
+  "B4. as URLs antigas não renderizam painel nem formulário: guarda e redirecionamento a Operações",
+  rotasAntigas
+    .filter(([f, destino]) => {
+      const fonte = semComentarios(ler(f));
+      return (
+        !/await exigirAdmin\(\);\s*if \(bloqueio\) return bloqueio;/.test(fonte) ||
+        !fonte.includes(`redirect(${destino})`) ||
+        /<[A-Z]\w+/.test(fonte)
+      );
+    })
+    .map(([f]) => f)
+    .join(","),
+  "",
+);
+verificar(
+  "B4b. os caminhos canônicos são de Operações",
+  [
+    CAMINHO_DOS_AVULSOS_ANTIGOS,
+    CAMINHO_DO_CADASTRO_CANONICO,
+    caminhoDoAvulsoAntigo("x"),
+    caminhoDaCorrecaoDoAvulsoAntigo("x"),
+  ],
+  [
+    "/operacoes#servicos-avulsos-antigos",
+    "/operacoes?origem=conteiner",
+    "/operacoes/avulsos-antigos/x",
+    "/operacoes/avulsos-antigos/x/corrigir",
+  ],
 );
 function arquivos(dir) {
   return readdirSync(join(raiz, dir)).flatMap((nome) => {
@@ -111,16 +144,39 @@ function arquivos(dir) {
   });
 }
 verificar(
-  "B5. nenhum link interno abre o cadastro antigo (/containers/novo)",
+  "B5. nenhum link interno, menu ou navegação aponta para /containers",
   arquivos("src")
-    .filter((f) => /["'`]\/containers\/novo/.test(semComentarios(ler(f))))
+    .filter((f) => /["'`]\/containers/.test(semComentarios(ler(f))))
     .join(","),
   "",
 );
 const lista = semComentarios(ler("src/app/(painel)/containers/lista-containers.tsx"));
 verificar(
-  "B6. a lista se apresenta como registros antigos, sem botão de cadastro",
-  /Estes são registros antigos\./.test(lista) && !/Novo serviço/.test(lista),
+  "B6. a lista é histórico dentro de Operações: sem cabeçalho de painel, sem cadastro",
+  [
+    /PageHeader/.test(lista),
+    /title="Containers"/.test(lista),
+    /Novo serviço/.test(lista),
+    /Estes são registros antigos/.test(lista),
+    /caminhoDoAvulsoAntigo\(s\.id\)/.test(lista),
+  ],
+  [false, false, false, true, true],
+);
+const operacoesTela = semComentarios(ler("src/app/(painel)/operacoes/painel-operacoes.tsx"));
+const secao = semComentarios(ler("src/app/(painel)/operacoes/avulsos-antigos.tsx"));
+verificar(
+  "B7. Operações mostra os serviços avulsos antigos e orienta quem vem do cadastro antigo",
+  [
+    /<AvulsosAntigos \/>/.test(operacoesTela),
+    /id=\{SECAO_DE_AVULSOS_ANTIGOS\}/.test(secao),
+    /<ListaContainers \/>/.test(secao),
+    /origem === "conteiner"/.test(operacoesTela),
+  ],
+  [true, true, true, true],
+);
+verificar(
+  "B8. a modalidade Avulsa explica que contêiner é tipo de serviço (não há campo de tipo: DEC-CP06-01)",
+  /Avulsa: serviço pontual — contêiner, carga e descarga, etiquetagem, limpeza/.test(operacoesTela),
   true,
 );
 

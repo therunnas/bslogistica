@@ -152,10 +152,11 @@ test("Dashboard e Relatórios somam o custo de Containers ao custo; o cartão po
     assert.match(f, /useCustoDeContainers\(/, `${nome}: usa o hook`);
     assert.match(f, /somarCustoDeContainers\(/, `${nome}: soma o custo de Containers`);
   }
-  assert.match(dash, /Custo de mão de obra e de Containers/);
+  // CP-06B: sem módulo "Containers" na interface; o custo é dos serviços antigos de contêiner.
+  assert.match(dash, /Custo de mão de obra e dos serviços antigos de contêiner/);
   // O cartão por cliente soma só apontamentos (sem adicionais, Containers e ajuste): diz isso.
   assert.match(dash, /apontamentos \{brl\(client\.receita\)\}/);
-  assert.match(dash, /sem adicionais, Containers e ajuste de arredondamento/);
+  assert.match(dash, /sem adicionais, serviços antigos de contêiner e ajuste de arredondamento/);
 });
 
 test("o hook só LÊ container_services (sem escrita, sem RPC) e usa o mesmo critério da receita", () => {

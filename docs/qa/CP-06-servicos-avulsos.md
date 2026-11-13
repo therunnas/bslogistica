@@ -214,3 +214,146 @@ caminho do D7) e ganhou o stub da trava; a guarda administrativa continua confer
 | DEC-CP06-04 | Duplicidade com registro antigo: só avisar (hoje) ou bloquear a fatura                                                                             |
 | DEC-CP06-05 | Participante em dois avulsos (ou em fixa e avulso) no mesmo período sem mover a alocação                                                           |
 | AUT-CP06-01 | Migration para encerrar `registrar_servico_container` no banco (impacto: só cadastro novo; consulta, correção e cancelamento dos antigos mantidos) |
+
+---
+
+# CP-06B — Remoção do painel independente de Contêineres
+
+Sessão 10 (13/11/2026, sessão em nuvem, Linux, Supabase local descartável). Base: HEAD
+`569c301b6709a199f8fd5b74d9bf697e46bffeea` (CP-06). PR #134 (Draft).
+
+## Regra do responsável
+
+A BS tem dois modelos: **operação fixa** e **serviço avulso**. **Contêiner não é um módulo
+independente**: é um tipo de serviço avulso, e todo serviço novo de contêiner se cadastra por
+**Operações → Nova operação → Avulsa**. "O painel Container não é para mais existir."
+
+O CP-06 tinha encerrado o **cadastro novo** pelo caminho antigo, mas a lista `/containers`, o
+detalhe e a correção continuavam como um painel próprio, alcançável por URL e pelos links do
+Faturamento. Isso não atendia à regra.
+
+## RED (HEAD `569c301`)
+
+Spec 90 reescrito para a regra, rodado contra o código do `569c301`:
+
+- `/containers` renderizava a página própria, título "Containers";
+- o link do Faturamento apontava para `/containers/<id>`;
+- a operação Avulsa não explicava os tipos de serviço;
+- `/operacoes/avulsos-antigos/<id>` não existia (404);
+- as falhas seguintes eram consequência destas.
+
+## O que mudou (GREEN)
+
+| Antes                                                         | Depois                                                                                                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/containers`: painel "Containers" com lista e filtros        | guarda de admin, depois **redireciona** para `/operacoes#servicos-avulsos-antigos`                                                                                       |
+| `/containers/novo`: aviso de cadastro encerrado (CP-06)       | guarda, depois **redireciona** para `/operacoes?origem=conteiner`; Operações mostra "Contêiner é um tipo de serviço avulso" e o caminho correto                          |
+| `/containers/<id>`: detalhe e cancelamento                    | guarda, depois **redireciona** para `/operacoes/avulsos-antigos/<id>`                                                                                                    |
+| `/containers/<id>/corrigir`: correção                         | guarda, depois **redireciona** para `/operacoes/avulsos-antigos/<id>/corrigir`                                                                                           |
+| link "Ver registro antigo de contêiner" (Faturamento)         | aponta para `/operacoes/avulsos-antigos/<id>`                                                                                                                            |
+| lista própria                                                 | seção recolhível **"Serviços avulsos antigos"** no fim de Operações, sem título de painel, sem botão de cadastro, com "Ver registro" por item                            |
+| rótulos "+ containers" em Faturamento, Fechamento e Dashboard | "+ serviços antigos de contêiner" (só texto: o cálculo é o mesmo)                                                                                                        |
+| campo Tipo da Nova operação sem explicação                    | Avulsa: "serviço pontual — contêiner, carga e descarga, etiquetagem, limpeza…; identifique o tipo do serviço no nome"; Fixa: "recorrente, com contrato, turnos e equipe" |
+
+- **Sem painel, menu ou atalho:** nenhum arquivo de `src` contém mais o texto `"/containers`
+  (asserção B5); o menu do admin continua com oito itens, sem Contêineres (E5, E5c).
+- **Guarda primeiro:** cada rota antiga chama `exigirAdmin()` antes do `redirect`; quem não é
+  admin recebe "Área administrativa restrita" e não fica sabendo do destino.
+- **Componente removido:** só `containers/cadastro-encerrado.tsx` (a página de aviso do CP-06,
+  substituída pelo redirect). Os componentes de lista, detalhe, correção, formulário e as Server
+  Actions continuam, agora servidos dentro de Operações.
+
+## Registros históricos
+
+- **Nada foi apagado nem migrado.** As tabelas `container_services`,
+  `container_service_participants` e `container_service_audit`, os adicionais vinculados, a
+  trilha e as RPCs de correção e cancelamento estão intactos. Sem migration, sem alteração de RLS
+  ou de RPC.
+- **Consulta, correção e cancelamento** ficam em Operações (`/operacoes/avulsos-antigos/<id>` e
+  `/corrigir`), sob a mesma guarda e as mesmas Server Actions de antes.
+- **Faturado continua imutável:** o registro antigo faturado mostra "Faturado" e não oferece
+  "Cancelar serviço" (FE1).
+- **Cancelado continua consultável:** D7c cancela, D7d confirma os dois registros no banco, o
+  cancelado incluído.
+
+## Classificação do tipo de serviço (DEC-CP06-01)
+
+**Estado atual:** o tipo do serviço avulso **não é estruturado**. `operations` tem `type`
+(`fixed` | `spot`, a modalidade), `name`, `notes`, `site`, `operation_date` e `agreed_amount`;
+não existe coluna de categoria. A interface agora diz como identificar o tipo no nome e a
+modalidade e o tipo aparecem separados (I1), mas **o nome livre não é um catálogo**: não foi criada
+nenhuma lista falsa de tipos sobre texto livre, nem preço ou regra por tipo.
+
+**Proposta (não executada, exige migration e DEC-CP06-01):**
+
+| Alternativa                                                                        | Impacto                                                                                                 |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| A. Coluna `operations.service_kind` com `CHECK` sobre uma lista fixa, nula na fixa | migration pequena; operações existentes ficam nulas ("não classificado"); a lista só muda por migration |
+| B. Tabela `service_kinds` (catálogo editável pelo admin) + FK em `operations`      | RLS, grants e tela de cadastro novos; o admin mantém a lista; relatórios por tipo ficam possíveis       |
+| C. Manter no nome (hoje)                                                           | sem migration; relatórios não separam por tipo (R-CP06-04); depende da disciplina de quem cadastra      |
+
+Em A ou B: a classificação não entra no cálculo financeiro (nenhuma regra por tipo sem decisão
+própria); os registros antigos de contêiner podem ser mostrados como "contêiner (cadastro antigo)"
+sem copiar dados; a fixa não exige tipo. Recomendação técnica: **B**, se a lista de tipos for
+mudar com o negócio; **A**, se for estável. A escolha é do responsável.
+
+## Faturamento e dupla cobrança
+
+- O custo e a receita dos registros antigos continuam entrando em Faturamento, Fechamento,
+  Dashboard e Relatórios **pelas mesmas funções**, sem mudança de cálculo.
+- Novo serviço de contêiner (operação Avulsa), etiquetagem e limpeza: um lançamento por
+  participante, cobrado uma vez (AV1, AV2, FE1).
+- Registro antigo **cancelado**: sai do total (D7c). Registro antigo **faturado**: congelado
+  (FE1).
+- Registro antigo **sem operação** (R$ 120, custo 50): entra **uma vez** na fatura e continua
+  consultável (D7d, FE1).
+- **Adicional** manual: uma vez (AD1, FE1).
+- **Cliente com serviço novo e registro antigo:** fatura única de **R$ 1.170,00**, custo
+  **R$ 730,00**, 4 lançamentos (FE1). Conta: avulsos 1.000,00 + adicional 50,00 + registro
+  antigo sem operação 120,00; custo 680,00 + 50,00.
+- **A duplicidade continua só avisada** (D7b: total R$ 1.600,00 com o alerta "cobrado duas
+  vezes"); bloquear a fatura é DEC-CP06-04, não decidido aqui. A RPC antiga continua aceitando
+  criação pela API (AUT-CP06-01).
+
+## Testes A–J
+
+| ID  | Exigência                                 | Evidência                                                                                                             |
+| --- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| A   | não existe painel                         | D7: `/containers` cai em Operações, sem h1 "Containers"; B6 (lista sem PageHeader nem "Containers")                   |
+| B   | criação só por Operações                  | D7 (`/containers/novo` → `/operacoes?origem=conteiner`); AV1, AV2; Server Action recusa (CP-06)                       |
+| C   | URLs antigas não abrem cadastro           | D7, D7c; `test:container-telas` (redirect exato, nenhum componente renderizado, nada quando negado)                   |
+| D   | nenhum link interno                       | D7: 0 `a[href^="/containers"]`, nenhum item de menu; B5 (nenhum `"/containers` em `src`); E5c                         |
+| E   | registros antigos consultáveis            | D7b (seção abre e lista), D7c (detalhe por redirect), D7d                                                             |
+| F   | nenhuma perda de dados                    | D7d: os dois registros no banco (um cancelado); nenhuma migration nem DELETE                                          |
+| G   | valores preservados                       | D7b 1.600,00 com aviso; D7c 1.000,00; FE1 1.170,00 / 730,00 ao centavo                                                |
+| H   | permissões                                | SG1 (operacional em `/containers`, `/containers/novo` e `/operacoes/avulsos-antigos/<id>`: restrito); `test:papel` B3 |
+| I   | classificação compreensível e persistente | I1: textos de Avulsa e Fixa; nome com o tipo permanece depois de recarregar                                           |
+| J   | sem cobrança duplicada                    | FE1: uma fatura, "Gerar fatura" desabilitado depois; D7b/D7c                                                          |
+
+Suítes ajustadas para a forma nova (mesmas propriedades, não afrouxadas): `test:container-telas`
+(rotas antigas e novas, 68 asserções), `test:servicos-avulsos-cp06` (15), `test:papel` (B3 confere
+a guarda antes do redirect, 111), `test:custo-containers` e `test:margem-containers` (rótulos).
+
+## Resultados
+
+- **RED** (`569c301`): spec 90 na forma nova — `/containers` com o painel próprio, link do
+  Faturamento para `/containers/<id>`, sem explicação do tipo, rota nova inexistente.
+- **GREEN**, sessão em nuvem: lint, `tsc`, `check:workflow`, `git diff --check` e build PASS
+  (as rotas `/containers…` existem só como redirect); **78/78** `test:*`; travas 25/25; spec 90
+  **12/12**; `npm run e2e:local` completo: **176 testes, 174 PASS, 0 FAIL, 2 FALHA CONHECIDA, 0
+  PULADO**, 1119 s, nenhuma conexão externa do servidor; `sql-local` **52 suítes** PASS; 0
+  containers e 0 volumes no fim.
+- **CP-01 a CP-06 íntegros:** specs 00 a 80 PASS na mesma execução.
+- **Falhas conhecidas:** D4 (CP-07) e CN-D (DEC-CP02-01), sem mudança.
+- `docs/ESTADO_DO_PROJETO.md` não foi alterado: descreve a `main` e a Production, onde o painel
+  ainda existe até a integração deste PR.
+
+## Pendências que continuam
+
+- **AUT-CP06-01:** encerrar `registrar_servico_container` no banco (migration).
+- **DEC-CP06-01** (classificação, acima), **DEC-CP06-02** (unidade e quantidade),
+  **DEC-CP06-03** (custo por serviço), **DEC-CP06-04** (bloquear ou avisar a duplicidade),
+  **DEC-CP06-05** (participante em dois avulsos).
+- **AUT-CP05-01** (trava do D1 e conferência de versão no banco).
+- Incidente do HML (4 chamadas vazias, CP-04/CP-05): continua registrado; **nenhum acesso remoto
+  no CP-06B**.

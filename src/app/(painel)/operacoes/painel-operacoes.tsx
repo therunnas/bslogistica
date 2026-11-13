@@ -57,6 +57,9 @@ import { brl, dateBR, minutesToLabel } from "@/lib/format";
 import { exigirLinhaAfetada, useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { toast } from "@/lib/notificacoes";
 import { useTravaDoDialogo } from "@/lib/trava";
+import { MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO } from "@/lib/container-servico-ui";
+
+import { AvulsosAntigos } from "./avulsos-antigos";
 import {
   useClients,
   useContracts,
@@ -143,7 +146,7 @@ const INPUT_CLASS =
 const SELECT_CLASS =
   "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus:ring-primary/20";
 
-export function PainelOperacoes() {
+export function PainelOperacoes({ origem }: { origem?: string } = {}) {
   const queryClient = useQueryClient();
 
   const clients = useClients();
@@ -702,6 +705,19 @@ export function PainelOperacoes() {
         }
       />
 
+      {/* CP-06B: quem chega pelo antigo cadastro de contêiner (/containers/novo) é orientado aqui. */}
+      {origem === "conteiner" ? (
+        <div
+          role="status"
+          className="mb-5 rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-3 text-sm text-foreground"
+        >
+          <p className="font-medium">Contêiner é um tipo de serviço avulso.</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO}
+          </p>
+        </div>
+      ) : null}
+
       <AvisoDoMotor estado={estadoDoMotor} />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1077,6 +1093,13 @@ export function PainelOperacoes() {
                   <SelectItem value="spot">Avulsa</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* CP-06B: modalidade (fixa × avulsa) não é o tipo do serviço. */}
+              <p className="text-xs leading-5 text-muted-foreground">
+                {opForm.type === "spot"
+                  ? "Avulsa: serviço pontual — contêiner, carga e descarga, etiquetagem, limpeza, empacotamento, paletização, retrabalho e outros. Identifique o tipo do serviço no nome (ex.: “Contêiner 40 pés — tecidos”)."
+                  : "Fixa: operação recorrente, com contrato, turnos e equipe."}
+              </p>
             </div>
 
             <div className="space-y-2 sm:col-span-2">
@@ -1742,6 +1765,8 @@ export function PainelOperacoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AvulsosAntigos />
     </div>
   );
 }

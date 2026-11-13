@@ -576,7 +576,7 @@ export function PainelFaturamento() {
                 1,
               )}% · custo ${brl(custoTotal)}${
                 custoContainers > 0
-                  ? ` (apontamentos ${brl(totals.cost)} + Containers ${brl(custoContainers)})`
+                  ? ` (apontamentos ${brl(totals.cost)} + serviços antigos de contêiner ${brl(custoContainers)})`
                   : ""
               }`}
               icon={TrendingUp}

@@ -62,8 +62,12 @@ const TELAS = [
   ["relatorios", "PainelRelatorios"],
   ["fechamento", "PainelFechamento"],
   ["usuarios", "PainelUsuarios"],
-  ["containers", "ListaContainers"],
+  // CP-06B: /containers não renderiza mais painel nenhum — guarda e depois redireciona para o
+  // histórico dentro de Operações. O "painel" que a guarda precisa preceder é o redirect.
+  ["containers", "redirect(CAMINHO_DOS_AVULSOS_ANTIGOS)"],
 ];
+const marcadorDoPainel = (componente) =>
+  componente.startsWith("redirect(") ? componente : `<${componente} />`;
 
 const fontes = {
   papel: ler("src/app/(painel)/_papel.ts"),
@@ -135,7 +139,8 @@ for (const [rota, componente] of TELAS) {
   verificar(
     `B3.${rota} — o guard vem antes do painel administrativo`,
     fonte.includes(`await ${guarda}()`) &&
-      fonte.indexOf(`await ${guarda}()`) < fonte.indexOf(`<${componente} />`),
+      fonte.includes(marcadorDoPainel(componente)) &&
+      fonte.indexOf(`await ${guarda}()`) < fonte.indexOf(marcadorDoPainel(componente)),
     true,
   );
   // Reimplementar a regra é o que não pode: ler `user_roles` na página ou
@@ -245,7 +250,7 @@ verificar(
 // entrada de conta (`ITEM_USUARIOS`), fora de `NAVEGACAO` de propósito.
 // Somar qualquer uma das duas mediria outra coisa.
 // Containers saiu do menu (UX-AVULSA-02): o serviço passa a ser registrado como
-// operação avulsa; a rota /containers continua existindo e protegida.
+// operação avulsa; a rota /containers continua protegida e, desde o CP-06B, só redireciona.
 const TELAS_NAV = TELAS.filter(([rota]) => rota !== "usuarios" && rota !== "containers");
 {
   const bloco = /admin: \[([\s\S]*?)\],\n  operacional:/.exec(fontes.shell)?.[1] ?? "";

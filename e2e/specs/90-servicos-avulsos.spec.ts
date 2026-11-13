@@ -16,6 +16,7 @@ import {
   criarOperacao,
   criarTurno,
   emitirFatura,
+  escolher,
   esperarAviso,
   gerarFechamento,
   linhaDo,
@@ -175,22 +176,40 @@ test("AV2 etiquetagem e limpeza: cada tipo com o seu valor, um participante cada
 // D7 — CAMINHO LEGADO DE CONTÊINER
 // =============================================================================================
 
-test("D7 o cadastro separado de contêiner não está mais aberto: URL direta e lista apontam para o avulso", async ({
+test("D7 [CP-06B] não existe painel de Contêineres: as URLs antigas levam a Operações, sem menu nem link", async ({
   page,
 }) => {
-  await page.goto("/containers/novo");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("serviço avulso");
-  await expect(page.getByText("Operações → Nova operação → tipo Avulsa").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Revisar serviço" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Ir para Operações" })).toHaveAttribute(
-    "href",
-    "/operacoes",
-  );
-  // A lista continua para consultar os registros antigos, sem oferecer cadastro novo.
   await page.goto("/containers");
-  await expect(page.getByText("Estes são registros antigos.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Novo serviço" })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/operacoes(#servicos-avulsos-antigos)?$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Containers" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Operações" })).toBeVisible();
+  await page.goto("/containers/novo");
+  await expect(page).toHaveURL(/\/operacoes\?origem=conteiner$/);
+  await expect(page.getByText("Contêiner é um tipo de serviço avulso").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Revisar serviço" })).toHaveCount(0);
+  // Nenhum menu nem link interno leva ao antigo painel.
+  expect(await page.locator('a[href^="/containers"]').count()).toBe(0);
+  await expect(
+    page.getByRole("navigation").getByRole("link", { name: /contain|contêiner/i }),
+  ).toHaveCount(0);
   expect(containers(), "nada foi criado pelo caminho legado").toEqual([]);
+});
+
+test("I1 tipo do serviço: a operação Avulsa explica os tipos e o nome identificado permanece depois de recarregar", async ({
+  page,
+}) => {
+  await page.goto("/operacoes");
+  await page.getByRole("button", { name: "Nova operação" }).click();
+  const d = page.getByRole("dialog").last();
+  await escolher(page, campo(d, "Tipo"), "Avulsa");
+  await expect(d.getByText(/Avulsa: serviço pontual/)).toBeVisible();
+  await expect(d.getByText(/contêiner, carga e descarga, etiquetagem, limpeza/)).toBeVisible();
+  await d.getByRole("button", { name: "Cancelar" }).click();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { level: 2, name: CONTEINER, exact: true }),
+    "o tipo do serviço fica no nome da operação (não há campo estruturado: DEC-CP06-01)",
+  ).toBeVisible();
 });
 
 test("D7b registro ANTIGO de contêiner ligado à mesma operação avulsa: o Faturamento avisa a cobrança em dobro", async ({
@@ -227,16 +246,37 @@ test("D7b registro ANTIGO de contêiner ligado à mesma operação avulsa: o Fat
   const alerta = page.getByRole("alert").filter({ hasText: "cobrado duas vezes" });
   await expect(alerta).toBeVisible();
   await expect(alerta).toContainText(CONTEINER);
-  // O histórico continua acessível pelo próprio Faturamento.
-  await expect(page.getByRole("link", { name: /registro antigo/i })).toBeVisible();
+  // O histórico continua acessível pelo Faturamento, dentro de Operações (sem painel próprio).
+  await expect(page.getByRole("link", { name: /registro antigo/i })).toHaveAttribute(
+    "href",
+    /^\/operacoes\/avulsos-antigos\/[0-9a-f-]{36}$/,
+  );
+  // E em Operações, na seção de serviços avulsos antigos.
+  await page.goto("/operacoes");
+  const secao = page.locator("#servicos-avulsos-antigos");
+  await secao.getByText("Serviços avulsos antigos").click();
+  await expect(secao).toContainText("Contêiner 40 pés — tecidos (registro antigo)", {
+    timeout: 20_000,
+  });
+  await expect(secao.getByRole("link", { name: /Ver/ }).first()).toHaveAttribute(
+    "href",
+    /^\/operacoes\/avulsos-antigos\//,
+  );
 });
 
 test("D7c cancelar o registro antigo duplicado: histórico preservado e cobrança única", async ({
   page,
 }) => {
   await abrirFaturamento(page, { cliente: CLI, inicio: "2026-11-01", fim: "2026-11-15" });
-  await page.getByRole("link", { name: /registro antigo/i }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const href = await page.getByRole("link", { name: /registro antigo/i }).getAttribute("href");
+  const id = href!.split("/").pop()!;
+  // A URL antiga do registro leva à consulta dentro de Operações.
+  await page.goto(`/containers/${id}`);
+  await expect(page).toHaveURL(new RegExp(`/operacoes/avulsos-antigos/${id}$`));
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Serviço avulso antigo");
+  await expect(page.getByRole("heading", { level: 1, name: "Serviço de containers" })).toHaveCount(
+    0,
+  );
   await page.locator("#motivo-cancelamento").fill("Duplicado da operação avulsa (CP-06)");
   await page.getByRole("button", { name: "Cancelar serviço" }).click();
   await page
@@ -325,22 +365,47 @@ test("AD2 cancelar adicional não faturado: exige motivo, sai do total e o hist�
   await expect(valorDoCartao(page, "Total a faturar")).toHaveText(reais(1050));
 });
 
+test("D7d registro antigo SEM operação (R$ 120, custo 50): entra uma vez na fatura e continua consultável", async () => {
+  const api = await sessaoApi("ADMIN");
+  const { error } = await api.rpc("registrar_servico_container", {
+    p_dados: prepararLoteDeContainers({
+      clienteId: idDe("clients", CLI),
+      operacaoId: null,
+      solicitadoEm: "2026-11-06",
+      executadoEm: "2026-11-06",
+      descricao: "Contêiner 20 pés — caixas (registro antigo a faturar)",
+      quantidade: 1,
+      totalCobrado: "120",
+      participantes: [{ colaboradorId: idDe("employees", CAIO), valorDevido: "50" }],
+      modalidadeCusto: "por_pessoa",
+    }),
+    p_idempotency_key: randomUUID(),
+    p_reason: "E2E CP-06B: registro antigo a faturar",
+  });
+  expect(error).toBeNull();
+  await api.auth.signOut({ scope: "local" });
+  expect(containers().map((c) => [c.descricao, c.receita, c.custo, c.cancelado])).toEqual([
+    ["Contêiner 40 pés — tecidos (registro antigo)", "600.00", "360.00", true],
+    ["Contêiner 20 pés — caixas (registro antigo a faturar)", "120.00", "50.00", false],
+  ]);
+});
+
 test("FE1 fechamento, fatura única e relatório: avulsos + adicional ao centavo; sem segunda cobrança", async ({
   page,
 }) => {
-  // Receita: 300 + 300 + 220 + 180 = 1.000 de avulsos + 50 de adicional = 1.050.
-  // Custo: 160 + 200 + 150 + 170 = 680 (o contêiner antigo cancelado não entra).
+  // Receita: avulsos 300 + 300 + 220 + 180 = 1.000 + adicional 50 + registro antigo 120 = 1.170.
+  // Custo: 160 + 200 + 150 + 170 = 680 + registro antigo 50 = 730 (o cancelado não entra).
   await gerarFechamento(page, { cliente: CLI, mes: 11, ano: 2026 });
-  await expect(valorDoCartao(page, "Receita total")).toHaveText(reais(1050));
-  await expect(valorDoCartao(page, "Custo previsto")).toHaveText(reais(680));
+  await expect(valorDoCartao(page, "Receita total")).toHaveText(reais(1170));
+  await expect(valorDoCartao(page, "Custo previsto")).toHaveText(reais(730));
 
   await abrirFaturamento(page, { cliente: CLI, inicio: "2026-11-01", fim: "2026-11-15" });
-  await emitirFatura(page, reais(1050));
+  await emitirFatura(page, reais(1170));
   const faturas = faturasDoCliente(CLI);
   expect(faturas).toHaveLength(1);
   expect([faturas[0]?.total, faturas[0]?.custo, faturas[0]?.lancamentos]).toEqual([
-    "1050.00",
-    "680.00",
+    "1170.00",
+    "730.00",
     4,
   ]);
   await abrirFaturamento(page, { cliente: CLI, inicio: "2026-11-01", fim: "2026-11-15" });
@@ -362,6 +427,15 @@ test("FE1 fechamento, fatura única e relatório: avulsos + adicional ao centavo
     });
     await expect(tr, `relatório: custo de ${nome}`).toContainText(reais(custo));
   }
+  await abrirFaturamento(page, { cliente: CLI, inicio: "2026-11-01", fim: "2026-11-15" });
+  // O registro antigo faturado continua consultável em Operações, sem cancelamento.
+  const [{ antigo }] = consultar<{ antigo: string }>(
+    `select s.id::text as antigo from public.container_services s
+      where s.description = 'Contêiner 20 pés — caixas (registro antigo a faturar)'`,
+  );
+  await page.goto(`/operacoes/avulsos-antigos/${antigo}`);
+  await expect(page.getByText("Faturado").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Cancelar serviço" })).toHaveCount(0);
   await abrirFaturamento(page, { cliente: CLI, inicio: "2026-11-01", fim: "2026-11-15" });
   // Faturado é imutável: o adicional não pode mais ser cancelado.
   await expect(
@@ -386,6 +460,8 @@ test("SG1 operacional não acessa o módulo nem os dados de contêiner e adicion
   await op.goto("/containers");
   await expect(op.getByText(/Área administrativa restrita|Acesso não liberado/)).toBeVisible();
   await op.goto("/containers/novo");
+  await expect(op.getByText(/Área administrativa restrita|Acesso não liberado/)).toBeVisible();
+  await op.goto("/operacoes/avulsos-antigos/00000000-0000-4000-8000-000000000000");
   await expect(op.getByText(/Área administrativa restrita|Acesso não liberado/)).toBeVisible();
   await contexto.close();
 

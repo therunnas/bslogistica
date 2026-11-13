@@ -7,10 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeader } from "../_components/app-shell";
 import { carregarContainersAction, carregarFormularioContainerAction } from "./_acoes";
 import type { ServicoContainerLista } from "@/lib/container-servico-dados";
-import { MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO } from "@/lib/container-servico-ui";
+import { caminhoDoAvulsoAntigo } from "@/lib/container-servico-ui";
 
 export const dinheiroContainer = (centavos: number) =>
   (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -81,31 +80,21 @@ export function ListaContainers() {
     };
   }, []);
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Containers"
-        description="Registros antigos de serviços de contêiner: consulta, correção e cancelamento."
-      />
-      {/* D7 (CP-06): o cadastro novo por aqui foi encerrado; contêiner é serviço avulso. */}
-      <div
-        role="status"
-        className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm text-foreground"
-      >
-        <p className="font-medium">Estes são registros antigos.</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          {MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO}
-        </p>
-        <Button asChild variant="outline" size="sm" className="mt-2">
-          <Link href="/operacoes">Ir para Operações</Link>
-        </Button>
-      </div>
+    <div className="space-y-4">
+      {/* CP-06B: sem painel próprio. Esta lista é o histórico legado de serviços avulsos de
+          contêiner, mostrado DENTRO de Operações (seção "Serviços avulsos antigos"). */}
+      <p className="text-xs leading-5 text-muted-foreground">
+        Estes são registros antigos, do cadastro separado de contêiner que não existe mais. Eles
+        continuam valendo para consulta, correção, cancelamento e faturamento. Novos serviços de
+        contêiner: Nova operação → tipo Avulsa.
+      </p>
       {avisoFiltros && <p role="alert">{avisoFiltros}</p>}
       <Card>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-4">
           <div>
-            <Label htmlFor="clienteId">Cliente</Label>
+            <Label htmlFor="antigos-cliente">Cliente</Label>
             <select
-              id="clienteId"
+              id="antigos-cliente"
               className="h-10 w-full rounded-md border bg-background px-3"
               value={clienteId}
               onChange={(e) => setClienteId(e.target.value)}
@@ -119,22 +108,27 @@ export function ListaContainers() {
             </select>
           </div>
           <div>
-            <Label htmlFor="inicio">Execução a partir de</Label>
+            <Label htmlFor="antigos-inicio">Execução a partir de</Label>
             <Input
-              id="inicio"
+              id="antigos-inicio"
               type="date"
               value={inicio}
               onChange={(e) => setInicio(e.target.value)}
             />
           </div>
           <div>
-            <Label htmlFor="fim">Execução até</Label>
-            <Input id="fim" type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
+            <Label htmlFor="antigos-fim">Execução até</Label>
+            <Input
+              id="antigos-fim"
+              type="date"
+              value={fim}
+              onChange={(e) => setFim(e.target.value)}
+            />
           </div>
           <div>
-            <Label htmlFor="situacao">Situação</Label>
+            <Label htmlFor="antigos-situacao">Situação</Label>
             <select
-              id="situacao"
+              id="antigos-situacao"
               className="h-10 w-full rounded-md border bg-background px-3"
               value={situacao}
               onChange={(e) => setSituacao(e.target.value as typeof situacao)}
@@ -157,19 +151,14 @@ export function ListaContainers() {
           </Button>
         </div>
       ) : servicos.length === 0 ? (
-        <p>Nenhum serviço encontrado.</p>
+        <p className="text-sm text-muted-foreground">Nenhum serviço encontrado.</p>
       ) : (
         <div className="space-y-3">
           {servicos.map((s) => (
             <Card key={s.id}>
               <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
                 <div>
-                  <Link
-                    className="font-semibold underline underline-offset-4"
-                    href={`/containers/${s.id}`}
-                  >
-                    {s.description}
-                  </Link>
+                  <p className="font-semibold">{s.description}</p>
                   <p className="text-sm text-muted-foreground">
                     {s.cliente_nome} · {s.executed_on} · {s.quantity} container(s)
                   </p>
@@ -178,13 +167,21 @@ export function ListaContainers() {
                     {dinheiroContainer(s.cost_total_cents)}
                   </p>
                 </div>
-                <Badge variant="outline">
-                  {s.situacao === "disponivel"
-                    ? "Disponível"
-                    : s.situacao === "faturado"
-                      ? "Faturado"
-                      : "Cancelado"}
-                </Badge>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline">
+                    {s.situacao === "disponivel"
+                      ? "Disponível"
+                      : s.situacao === "faturado"
+                        ? "Faturado"
+                        : "Cancelado"}
+                  </Badge>
+                  <Link
+                    className="text-sm underline underline-offset-4"
+                    href={caminhoDoAvulsoAntigo(s.id)}
+                  >
+                    Ver registro
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ))}

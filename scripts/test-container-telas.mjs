@@ -35,30 +35,67 @@ const privacidade = carregarModulo(
   (id) => (id === "./container-servico-intencao" ? intencoes : nativeRequire(id)),
 );
 
-for (const route of ["page.tsx", "novo/page.tsx", "[id]/page.tsx"]) {
-  test(`${route}: bloqueia antes de renderizar a interface administrativa`, async () => {
+// CP-06B ("O painel Container não é para mais existir"): as rotas antigas não renderizam painel
+// nem formulário. A guarda administrativa continua ANTES de tudo (sem admin, nem o destino é
+// revelado) e, liberada, cada rota só redireciona para Operações.
+const ROTAS_ANTIGAS = [
+  ["page.tsx", "/operacoes#servicos-avulsos-antigos"],
+  ["novo/page.tsx", "/operacoes?origem=conteiner"],
+  ["[id]/page.tsx", "/operacoes/avulsos-antigos/identificador"],
+  ["[id]/corrigir/page.tsx", "/operacoes/avulsos-antigos/identificador/corrigir"],
+];
+for (const [route, destino] of ROTAS_ANTIGAS) {
+  test(`${route}: bloqueia antes de tudo e, liberada, só redireciona para Operações`, async () => {
     const source = read(route);
     assert.match(source, /await exigirAdmin\(\)/);
+    assert.doesNotMatch(
+      source,
+      /ListaContainers|FormularioContainer|DetalheDoContainer|CorrecaoDoContainer/,
+    );
     const bloqueio = { restrito: true };
     let negado = true;
+    const redirecionamentos = [];
     const pagina = carregarModulo(path.join(base, route), (id) => {
       if (id.includes("_exigir-admin")) {
         return { exigirAdmin: async () => (negado ? bloqueio : null) };
       }
-      if (id.includes("lista-containers")) return { ListaContainers: "lista" };
-      if (id.includes("formulario-container")) return { FormularioContainer: "formulario" };
-      if (id.includes("detalhe-container")) return { DetalheDoContainer: "detalhe" };
-      // D7 (CP-06): o cadastro novo foi encerrado; /containers/novo mostra o aviso, não o formulário.
-      if (id.includes("cadastro-encerrado")) return { CadastroDeContainerEncerrado: "encerrado" };
+      if (id === "next/navigation") return { redirect: (url) => redirecionamentos.push(url) };
+      if (id === "@/lib/container-servico-ui") return containerUi;
+      return nativeRequire(id);
+    });
+    const props = { params: Promise.resolve({ id: "identificador" }) };
+    assert.equal(await pagina.default(props), bloqueio);
+    assert.deepEqual(redirecionamentos, [], "sem admin, nenhum redirecionamento");
+    negado = false;
+    await pagina.default(props);
+    assert.deepEqual(redirecionamentos, [destino]);
+  });
+}
+
+const baseOperacoes = path.resolve("src/app/(painel)/operacoes/avulsos-antigos");
+for (const [route, componente] of [
+  ["[id]/page.tsx", "DetalheDoContainer"],
+  ["[id]/corrigir/page.tsx", "CorrecaoDoContainer"],
+]) {
+  test(`operacoes/avulsos-antigos/${route}: consulta do registro antigo dentro de Operações, com guarda`, async () => {
+    const source = fs.readFileSync(path.join(baseOperacoes, route), "utf8");
+    assert.match(source, /await exigirAdmin\(\)/);
+    const bloqueio = { restrito: true };
+    let negado = true;
+    const pagina = carregarModulo(path.join(baseOperacoes, route), (id) => {
+      if (id.includes("_exigir-admin")) {
+        return { exigirAdmin: async () => (negado ? bloqueio : null) };
+      }
+      if (id.includes("detalhe-container")) return { DetalheDoContainer: "DetalheDoContainer" };
+      if (id.includes("correcao-container")) return { CorrecaoDoContainer: "CorrecaoDoContainer" };
       return nativeRequire(id);
     });
     const props = { params: Promise.resolve({ id: "identificador" }) };
     assert.equal(await pagina.default(props), bloqueio);
     negado = false;
     const resultado = await pagina.default(props);
-    assert.ok(["lista", "encerrado", "detalhe"].includes(resultado.type));
-    if (route === "novo/page.tsx") assert.equal(resultado.type, "encerrado");
-    if (route === "[id]/page.tsx") assert.equal(resultado.props.id, "identificador");
+    assert.equal(resultado.type, componente);
+    assert.equal(resultado.props.id, "identificador");
   });
 }
 
@@ -549,7 +586,7 @@ test("recuperação confirmada abre UUID existente sem repetir mutação", async
     assert.match(h.text(), /Abrir serviço/);
     assert.equal(h.eventos.filter(([tipo]) => tipo === "registrar").length, 0);
     assert.equal(h.eventos.filter(([tipo]) => tipo === "invalidar").length, 3);
-    assert.ok(h.nodes().some((n) => n.props?.href === `/containers/${servicoId}`));
+    assert.ok(h.nodes().some((n) => n.props?.href === `/operacoes/avulsos-antigos/${servicoId}`));
   } finally {
     h.restaurar();
   }
@@ -873,7 +910,7 @@ test("faturamento com cache antigo confere vínculo atual e encaminha container 
     h.click("Conferir cancelamento");
     await h.pronto();
     assert.deepEqual(consultados, [adicionalSemVinculoNoCache.id]);
-    assert.deepEqual(destinos, [`/containers/${servicoId}`]);
+    assert.deepEqual(destinos, [`/operacoes/avulsos-antigos/${servicoId}`]);
     assert.deepEqual(cancelamentos, []);
     assert.equal(h.nodes().filter((n) => n.type === "Dialog" && n.props.open).length, 0);
   } finally {
@@ -960,7 +997,7 @@ test("faturamento relê vínculo na confirmação e impede legado que virou cont
     await h.pronto();
     assert.equal(consultas, 2);
     assert.deepEqual(cancelamentos, []);
-    assert.deepEqual(destinos, [`/containers/${servicoId}`]);
+    assert.deepEqual(destinos, [`/operacoes/avulsos-antigos/${servicoId}`]);
   } finally {
     h.restaurar();
   }
@@ -1263,17 +1300,20 @@ test("operação existente não oferece atalho de container", () => {
 // guarda administrativa continua antes de qualquer interface.
 test("rota nova conserva guarda administrativa e não abre o formulário, mesmo com operação de origem", async () => {
   let negado = false;
+  const redirecionamentos = [];
   const pagina = carregarModulo(path.join(base, "novo/page.tsx"), (id) => {
     if (id.includes("_exigir-admin"))
       return { exigirAdmin: async () => (negado ? "NEGADO" : null) };
     if (id.includes("formulario-container")) return { FormularioContainer: "formulario" };
-    if (id.includes("cadastro-encerrado")) return { CadastroDeContainerEncerrado: "encerrado" };
+    if (id === "next/navigation") return { redirect: (url) => redirecionamentos.push(url) };
+    if (id === "@/lib/container-servico-ui") return containerUi;
     return nativeRequire(id);
   });
   const origem = "20000000-0000-4000-8000-000000000003";
   const resultado = await pagina.default({ searchParams: Promise.resolve({ operacao: origem }) });
-  assert.equal(resultado.type, "encerrado");
-  assert.equal(resultado.props.operacaoInicialId, undefined);
+  // CP-06B: nem formulário nem operação de origem; só o cadastro canônico em Operações.
+  assert.equal(resultado, undefined);
+  assert.deepEqual(redirecionamentos, ["/operacoes?origem=conteiner"]);
   negado = true;
   assert.equal(
     await pagina.default({ searchParams: Promise.resolve({ operacao: origem }) }),
@@ -1607,7 +1647,9 @@ test("reload da correção já commitada oferece o substituto auditado sem nova 
   try {
     await h.pronto();
     assert.ok(
-      h.nodes().find((n) => n.type === "a" && n.props.href === `/containers/${substituto}`),
+      h
+        .nodes()
+        .find((n) => n.type === "a" && n.props.href === `/operacoes/avulsos-antigos/${substituto}`),
     );
     assert.match(h.text(), /corrigid/);
   } finally {

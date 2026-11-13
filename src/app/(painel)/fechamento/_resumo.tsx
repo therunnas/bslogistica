@@ -166,7 +166,7 @@ export function ResumoDoFechamento({ dados }: { dados: FechamentoData }) {
           valor={moeda(f.custoCentavos)}
           descricao={
             f.custoContainersCentavos > 0
-              ? `Apontamentos ${moeda(f.custoApontamentosCentavos)} + Containers ${moeda(f.custoContainersCentavos)} (valor devido, previsto)`
+              ? `Apontamentos ${moeda(f.custoApontamentosCentavos)} + serviços antigos de contêiner ${moeda(f.custoContainersCentavos)} (valor devido, previsto)`
               : "Valor devido aos colaboradores (previsto)"
           }
           icon={WalletCards}

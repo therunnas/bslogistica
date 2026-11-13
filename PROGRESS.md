@@ -47,6 +47,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-04  | Operações, turnos e equipes                                                        | PASS (local) |
 | CP-05  | Apontamentos e regras financeiras (maior risco)                                    | PASS (local) |
 | CP-06  | Serviços avulsos (contêiner é tipo de avulso), adicionais e caminho legado         | PASS (local) |
+| CP-06B | Remoção do painel independente de Contêineres; histórico legado em Operações       | PASS (local) |
 | CP-07  | Fechamento e faturamento                                                           | não iniciado |
 | CP-08  | Dashboard, relatórios e exportações                                                | não iniciado |
 | CP-09  | Interface, clareza e consistência                                                  | não iniciado |
@@ -64,7 +65,7 @@ Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
 | D4  | Confirmação da fatura não avisa dias ainda abertos                                                        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
 | D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
 | D6  | `<= 15`/`<= 45` (030) × `< 15`/`< 45` (V2). **Sem defeito no CP-05**: a 030 só roda com o dobro desligado | P3         | leitura do código            | CP-05    |
-| D7  | Caminho legado de contêiner aberto por URL (cobrança dupla). **Corrigido no CP-06** (cadastro encerrado)   | P2         | HANDOFF                      | CP-06    |
+| D7  | Caminho legado de contêiner aberto por URL (cobrança dupla). **Corrigido no CP-06** (cadastro encerrado) e **no CP-06B** (painel removido) | P2 | HANDOFF | CP-06/06B |
 | D8  | Exclusões usam `window.confirm` nativo                                                                    | P3         | leitura do código            | CP-09    |
 | I1  | `scripts/e2e-local.sh` usava `setsid`, ausente no macOS. **Corrigido** (`set -m`; G22–G25); macOS nativo não comprovado | infra | execução local 12/11 | CP-00B |
 
@@ -104,6 +105,16 @@ Decisões do CP-06 (nenhuma implementada): DEC-CP06-01 (catálogo de tipos de av
 DEC-CP06-04 (duplicidade: avisar ou bloquear), DEC-CP06-05 (participante em dois avulsos).
 Autorização pendente: **AUT-CP06-01** (encerrar a RPC de cadastro de contêiner no banco). Segue
 **AUT-CP05-01** como risco financeiro pendente.
+
+CP-06B (13/11/2026, sessão em nuvem), por decisão do responsável ("o painel Container não é para
+mais existir"): **D7-B** (P2) — mesmo com o cadastro novo encerrado, `/containers`, o detalhe e a
+correção continuavam como painel próprio, por URL e pelos links do Faturamento. Corrigido sem
+migration nem dado apagado: as URLs antigas conferem o admin e redirecionam para Operações; os
+registros antigos ficam na seção recolhível "Serviços avulsos antigos" de Operações e em
+`/operacoes/avulsos-antigos/<id>` (consulta, correção e cancelamento); o campo Tipo explica Fixa e
+Avulsa e os tipos de avulso. Classificação estruturada do tipo **não implementada**: proposta com
+alternativas e impacto em DEC-CP06-01 (exige migration). Detalhe e testes A–J em
+[docs/qa/CP-06-servicos-avulsos.md](docs/qa/CP-06-servicos-avulsos.md#cp-06b--remoção-do-painel-independente-de-contêineres).
 
 Defeitos do CP-05 (12/11/2026, sessão em nuvem), reproduzidos no E2E (RED) e corrigidos (GREEN);
 inventário, matrizes de jornada, sábado/domingo/feriado, custo × receita, D6 e decisões em

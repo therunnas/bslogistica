@@ -249,8 +249,8 @@ export function PainelDashboard() {
               value={brl(kpis.cost)}
               description={
                 containers.isError
-                  ? "Custo de mão de obra (custo de Containers indisponível)"
-                  : "Custo de mão de obra e de Containers"
+                  ? "Custo de mão de obra (custo dos serviços antigos de contêiner indisponível)"
+                  : "Custo de mão de obra e dos serviços antigos de contêiner"
               }
               icon={WalletCards}
             />
@@ -501,8 +501,8 @@ export function PainelDashboard() {
                     </CardTitle>
 
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Resultado dos apontamentos por cliente (sem adicionais, Containers e ajuste de
-                      arredondamento).
+                      Resultado dos apontamentos por cliente (sem adicionais, serviços antigos de
+                      contêiner e ajuste de arredondamento).
                     </p>
                   </div>
 

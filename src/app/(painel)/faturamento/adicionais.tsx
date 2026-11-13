@@ -10,6 +10,7 @@ import {
 } from "../containers/_acoes";
 import {
   adicionaisDeContainerEmDuplicidade,
+  caminhoDoAvulsoAntigo,
   decidirAcaoAdicionalContainer,
 } from "@/lib/container-servico-ui";
 import { useTravaDoDialogo } from "@/lib/trava";
@@ -154,7 +155,7 @@ export function AdicionaisDoPeriodo({
       }
       if (resultado.data.tipo === "container") {
         setCancelando(null);
-        router.push(`/containers/${resultado.data.id}`);
+        router.push(caminhoDoAvulsoAntigo(resultado.data.id));
         return;
       }
       if (confirmar) {
@@ -374,7 +375,7 @@ export function AdicionaisDoPeriodo({
                         {acaoContainer.tipo === "container" ? (
                           <Link
                             className="text-sm underline"
-                            href={`/containers/${acaoContainer.id}`}
+                            href={caminhoDoAvulsoAntigo(acaoContainer.id)}
                           >
                             Ver registro antigo de contêiner
                           </Link>
