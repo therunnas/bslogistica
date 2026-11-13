@@ -452,9 +452,10 @@ export function PainelFaturamento() {
               className="h-10 rounded-xl"
               onClick={exportCsv}
               disabled={!period.length || !exibicao.podeAgir}
+              title="Extrato dos lançamentos (apontamentos) a faturar. Adicionais, serviços antigos de contêiner e arredondamento acumulado não entram: o espelho completo é o Excel do Fechamento."
             >
               <Download className="h-4 w-4" />
-              Exportar CSV
+              Exportar lançamentos (CSV)
             </Button>
 
             <Button

@@ -579,7 +579,7 @@ test("EX1 exportações da competência: Faturamento CSV com nome do cliente, pr
   await abrirFaturamento(page, { cliente: CLI, ...Q1 });
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "Exportar CSV" }).click(),
+    page.getByRole("button", { name: "Exportar lançamentos (CSV)" }).click(),
   ]);
   const nome = download.suggestedFilename();
   expect(nome, "nome do arquivo identifica cliente e período").toMatch(/cp07-cliente/i);

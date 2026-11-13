@@ -11,6 +11,78 @@ confirmada documentalmente e separa a seção 15 ainda a confirmar. Não copiar 
 HANDOFF, a matriz antiga ou os demais documentos do #112 sobre os atuais.
 A referência original por SHA permanece no histórico abaixo.
 
+## Revisão QA-BS-01 · sessão 13 (13/11/2026): duração × regime de cobrança × tipo de serviço
+
+Fonte de negócio: esclarecimento direto do responsável, registrado em
+[NEGOCIO.md §3A](NEGOCIO.md#3a-duração-da-operação-regime-de-cobrança-e-tipo-de-serviço). Fonte do
+sistema: código do PR #134 no HEAD `12f55289f23ec45a0af1cb9427b4f1c74e3e6661` e as evidências E2E
+dos CP-04 a CP-07. **Esta revisão prevalece sobre os itens 6, 8, 9, 10 e 11 abaixo onde
+conflitarem**; eles ficam como histórico (o módulo de Containers citado neles foi encerrado para
+cadastro novo no CP-06 e deixou de ser painel no CP-06B).
+
+### O que o sistema implementa hoje (conferido no código)
+
+- **Modalidade:** `operations.type` = `fixed` (Fixa) ou `spot` (Avulsa). Não existe coluna de
+  **tipo de serviço** nem de **regime de cobrança**.
+- **Único regime de cobrança: diária por trabalhador.** Cada lançamento de participante gera uma
+  diária pelo preço vigente na data: `contract_terms` (com contrato) ou
+  `operation_terms.agreed_amount` (sem contrato; jornada 8 h, fator de HE 1, tolerância 10 min,
+  fixos — migration 025). Nenhuma migration trata `spot` de forma diferente: a avulsa por diária
+  segue as mesmas regras de jornada, saída antecipada, HE, sábado, domingo e feriado.
+- **Custo:** sempre a diária do cadastro do colaborador (vigência), separada da cobrança.
+- **Valor fechado e produção:** não existem na operação. Só por **adicional** manual
+  (`billing_additionals`, que não tem custo nem quantidade) — uso inadequado como cobrança
+  principal — ou pelo **registro antigo de contêiner** (045–050), que tinha total negociado e
+  quantidade física sem preço unitário e está **encerrado para cadastro novo** (CP-06/CP-06B).
+
+### Paridade técnica × aderência comercial
+
+Fechamento, Faturamento, Dashboard e Relatórios reproduzem o MESMO total (provado ao centavo nos
+CP-05 e CP-07). Isso prova **paridade técnica** — o sistema é coerente com o modelo que
+implementa. **Não prova aderência comercial**: um contêiner cobrado por unidade, cadastrado hoje
+como Avulsa por diária, sai com o mesmo valor errado em todas as telas.
+
+### Matriz (16 itens)
+
+Classificação: ALINHADO · PARCIAL · NÃO IMPLEMENTADO · DIVERGENTE · DEPENDE DE DECISÃO.
+
+| #   | Situação de negócio                             | Classificação                                 | Evidência e impacto                                                                                                                                                                                                                        |
+| --- | ----------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Mão de obra recorrente por diária               | ALINHADO                                      | Fixa + contrato com vigência; E2E specs 80 e 95 ao centavo                                                                                                                                                                                 |
+| 2   | Mão de obra temporária por diária (semana, mês) | PARCIAL · DEPENDE DE DECISÃO                  | Funciona como Fixa com contrato de prazo ou Avulsa sem contrato (E2E 90/95). Avulsa sem contrato tem HE fator 1 e tolerância 10 fixos; regras de jornada da fixa aplicadas sem decisão (DEC-AV-01); contrato encerrado não bloqueia (CN-D) |
+| 3   | Serviço avulso por produção                     | NÃO IMPLEMENTADO                              | Não há preço unitário, unidade nem quantidade na operação. Lacuna funcional: exige implementação específica                                                                                                                                |
+| 4   | Contêiner cobrado por unidade (10 × R$ 300)     | DIVERGENTE                                    | Cadastrado hoje como Avulsa, sai como diária × participantes (ex.: 4 pessoas × diária ≠ R$ 3.000). O registro antigo tinha só total negociado                                                                                              |
+| 5   | Serviço de quantidade variável                  | NÃO IMPLEMENTADO                              | Sem quantidade executada                                                                                                                                                                                                                   |
+| 6   | Participantes com custos diferentes             | ALINHADO                                      | Custo por colaborador e por vigência (E2E 90: 160/200; 95: 150/180/120/140)                                                                                                                                                                |
+| 7   | Remuneração do colaborador por produção         | NÃO IMPLEMENTADO · DEPENDE DE DECISÃO         | Custo é sempre a diária do cadastro. A regra de remuneração por produção não foi esclarecida                                                                                                                                               |
+| 8   | Ausência                                        | ALINHADO (diária)                             | Falta = zero de receita e custo (E2E 80/95). Em produção, não se aplica                                                                                                                                                                    |
+| 9   | Hora extra                                      | ALINHADO (fixa) · DEPENDE DE DECISÃO (avulsa) | Fixa pelo contrato (E2E 80/95). Avulsa sem contrato: fator 1 fixo no banco                                                                                                                                                                 |
+| 10  | Alteração da quantidade executada               | NÃO IMPLEMENTADO                              | —                                                                                                                                                                                                                                          |
+| 11  | Execução parcial                                | PARCIAL                                       | Diária: saída antecipada proporcional (E2E 80/95). Produção: não se aplica hoje                                                                                                                                                            |
+| 12  | Serviço realizado em mais de um dia             | PARCIAL · DEPENDE DE DECISÃO                  | A "Data do serviço" não restringe apontamentos (código): a avulsa aceita vários dias sem declarar (DEC-AV-02)                                                                                                                              |
+| 13  | Alteração do preço negociado                    | ALINHADO (diária)                             | Vigências de contrato, operação e custo; faturado congelado (E2E 10 V1–V5, 50, 60, 70)                                                                                                                                                     |
+| 14  | Competência de faturamento                      | ALINHADO (diária)                             | Quinzenal/mensal, competência inteira na tela e no banco (E2E 95 CP1); adicional com competência própria. Produção: não se aplica hoje                                                                                                     |
+| 15  | Cancelamento                                    | PARCIAL                                       | Adicional e registro antigo: cancelamento com motivo (E2E 90). Fatura: sem cancelamento/estorno (DEC-CP07-03)                                                                                                                              |
+| 16  | Duplicidade de cobrança                         | PARCIAL · DEPENDE DE DECISÃO                  | Sem bloqueio no banco; aviso só para registro antigo ligado à mesma operação (E2E 95 DUP emite R$ 600 por serviço de R$ 300). DEC-CP06-04                                                                                                  |
+
+### Decisões pendentes consolidadas
+
+| ID          | Pergunta                                                                                                                                             |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DEC-CP06-01 | Catálogo de tipos de serviço (recomendação técnica: catálogo editável pelo admin, sem impacto em preço)                                              |
+| DEC-CP06-02 | Regimes de cobrança: diária por trabalhador (existe) e produção = quantidade × preço unitário; "valor fechado" = unidade "serviço" × 1, se praticado |
+| DEC-CP06-03 | Custo dos participantes por serviço (diária do cadastro ou valor por execução)                                                                       |
+| DEC-PROD-01 | **Remuneração dos colaboradores em serviços por produção** (por pessoa, por unidade, total dividido, outro critério)                                 |
+| DEC-PROD-02 | Unidades de produção praticadas, conferência da quantidade executada, execução parcial e alteração de quantidade                                     |
+| DEC-CP06-04 | Bloqueio de duplicidade financeira                                                                                                                   |
+| DEC-CP06-05 | Mesmo colaborador em mais de um avulso no mesmo período                                                                                              |
+| DEC-AV-01   | Regras de jornada (proporcional, HE, sábado, domingo, feriado) na mão de obra temporária por diária                                                  |
+| DEC-AV-02   | Serviço de um dia ou de vários dias                                                                                                                  |
+
+Nenhuma delas autoriza implementação. O plano de compatibilidade e de prevenção de cobrança
+duplicada para a cobrança por produção fica em
+[docs/qa/CP-08-dashboard-relatorios-exportacoes.md](qa/CP-08-dashboard-relatorios-exportacoes.md#proposta-futura-cobrança-por-produção-não-implementada).
+
 ## Fontes, SHAs e limite da revisão original
 
 - Main atual: `75c47cd9a30e4888b197ca6ae27aa236c71ec589`, após squash documental #116; CI aprovada.
@@ -129,6 +201,8 @@ P2=melhoria/recorte posterior ao núcleo; P3=fora da entrega aprovada.
 
 ### 6. Tipos de serviço avulso
 
+> Revisado na sessão 13 (13/11/2026): ver a matriz de 16 itens no início deste documento.
+
 - **Regra esperada:** Avulso é conjunto de atividades pontuais; contêiner é um dos tipos, não o conjunto inteiro. Catálogo inicial extensível documentado no #112.
 - **Main comprovada por fonte:** Existe operação spot por diária e módulo Containers por serviço. Este último não possui catálogo genérico de tipos, e a UI o apresenta como contêiner.
 - **Candidato #111:** Melhora spot e Containers, mas não implementa o catálogo genérico. Não confundir validação de operação avulsa com generalização do módulo.
@@ -151,6 +225,8 @@ P2=melhoria/recorte posterior ao núcleo; P3=fora da entrega aprovada.
 
 ### 8. Quantidade e unidade do avulso
 
+> Revisado na sessão 13 (13/11/2026): ver a matriz de 16 itens no início deste documento.
+
 - **Regra esperada:** Tipo, unidade de cobrança e quantidade devem ser identificados por serviço.
 - **Main comprovada por fonte:** Quantidade inteira de contêineres existe; não há unidade genérica por serviço.
 - **Candidato #111:** Mesmo modelo de quantidade; resumos de custos e UI não acrescentam unidade ou catálogo de serviço.
@@ -161,6 +237,8 @@ P2=melhoria/recorte posterior ao núcleo; P3=fora da entrega aprovada.
 - **Evidências:** K4. Estado: Lacuna confirmada; não é teste novo aprovado nesta sessão.
 
 ### 9. Modalidade de cobrança do avulso
+
+> Revisado na sessão 13 (13/11/2026): ver a matriz de 16 itens no início deste documento.
 
 - **Regra esperada:** Diária, unidade ou valor fechado são possibilidades; só a referência diária de contêiner foi informada, demais práticas ainda a confirmar.
 - **Main comprovada por fonte:** Total negociado representa valor fechado sem modalidade explícita; spot já admite preço por diária, em outro fluxo. Não existe cálculo genérico por unidade no serviço pontual.
@@ -173,6 +251,8 @@ P2=melhoria/recorte posterior ao núcleo; P3=fora da entrega aprovada.
 
 ### 10. Custo dos participantes do avulso
 
+> Revisado na sessão 13 (13/11/2026): ver a matriz de 16 itens no início deste documento.
+
 - **Regra esperada:** Valor devido informado por profissional; prática por pessoa ou total distribuído ainda requer confirmação.
 - **Main comprovada por fonte:** por_pessoa e total_distribuido já existem; participantes com custo em centavos e validação de soma, sem status de pagamento realizado.
 - **Candidato #111:** Reutiliza o modelo; melhora carregamento/visibilidade/resumo de custos e correção auditada via049, ainda não aplicada no HML.
@@ -183,6 +263,8 @@ P2=melhoria/recorte posterior ao núcleo; P3=fora da entrega aprovada.
 - **Evidências:** K4,K5,K7. Estado: Alinhado / decisão de uso; não é teste novo aprovado nesta sessão.
 
 ### 11. Avulso não é diária/HE individual
+
+> Revisado na sessão 13 (13/11/2026): ver a matriz de 16 itens no início deste documento.
 
 - **Regra esperada:** Diária comercial do serviço avulso não se confunde com diária individual da operação fixa.
 - **Main comprovada por fonte:** Containers gera serviço/adicional com receita única e custo por participante, sem gerar presença, diária ou HE.

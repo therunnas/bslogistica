@@ -71,6 +71,8 @@ export function PainelDashboard() {
   const containers = useCustoDeContainers(start, end, true);
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
+  // D-CP08-04: período invertido não é falha de leitura — a tela diz o que está errado.
+  const periodoInvertido = start !== "" && end !== "" && start > end;
 
   const period = useMemo(
     () => rows.filter((row) => inPeriod(row.date, start, end)),
@@ -215,7 +217,16 @@ export function PainelDashboard() {
         }
       />
 
-      {ledger.estado === "carregando" ? (
+      {periodoInvertido ? (
+        <div role="alert" className="rounded-2xl border border-border bg-secondary/40 p-5">
+          <p className="text-sm font-semibold text-foreground">
+            A data inicial é posterior à final.
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Ajuste o período para ver os indicadores.
+          </p>
+        </div>
+      ) : ledger.estado === "carregando" ? (
         <DashboardSkeleton />
       ) : !exibicao.mostrarValores ? (
         exibicao.aviso && (
@@ -307,7 +318,7 @@ export function PainelDashboard() {
           <div className="mt-6 grid gap-4 xl:grid-cols-2">
             <GraficoCard
               title="Receita x custo por cliente"
-              description="Comparativo financeiro dos clientes no período."
+              description="Comparativo dos clientes no período. Somente apontamentos: sem adicionais nem serviços antigos de contêiner."
             >
               {byClient.length ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -378,7 +389,7 @@ export function PainelDashboard() {
 
             <GraficoCard
               title="Diárias por dia"
-              description="Evolução das diárias registradas ao longo do período."
+              description="Evolução das diárias registradas ao longo do período. Somente apontamentos: sem adicionais nem serviços antigos de contêiner."
             >
               {byDay.length ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -448,7 +459,7 @@ export function PainelDashboard() {
 
             <GraficoCard
               title="Receita por tipo de operação"
-              description="Distribuição entre operações fixas e avulsas."
+              description="Distribuição entre operações fixas e avulsas. Somente apontamentos: sem adicionais nem serviços antigos de contêiner."
             >
               {byType.length ? (
                 <ResponsiveContainer width="100%" height="100%">

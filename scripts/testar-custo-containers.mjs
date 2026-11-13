@@ -8,8 +8,11 @@
  * do hook de leitura. NADA aqui acessa rede, banco ou Production.
  *
  * REGRA TESTADA. O custo de Containers é `cost_total_cents` do SERVIÇO (nunca a soma dos
- * participantes, que é o mesmo valor), dos serviços NÃO cancelados executados no período, o mesmo
- * critério do adicional de receita (`period_start/period_end` = data da execução). Soma-se em
+ * participantes, que é o mesmo valor), dos serviços NÃO cancelados cuja JANELA DE COBRANÇA cabe no
+ * período: a competência do adicional do serviço (038) ou, sem ela, a execução — o mesmo critério da
+ * receita desse adicional em `resumo_financeiro_periodo`, e o do Fechamento e da fatura. D-CP08-01
+ * (QA-BS-01): antes valia a data de EXECUÇÃO, e o caso real do HML (competência na 1ª quinzena,
+ * execução em 16/10) só fechava com a fatura porque o teste de paridade trocava a data. Soma-se em
  * centavos inteiros. Custo persistido, fatura e Fechamento não mudam.
  */
 import assert from "node:assert/strict";
@@ -47,20 +50,34 @@ const { lerServicosDoPeriodo } = await import("../src/lib/custo-containers-dados
 
 const A = "5c4a0000-0000-4000-8000-0000000000a1";
 const B = "5c4a0000-0000-4000-8000-0000000000b1";
-const s = (o) => ({
-  id: crypto.randomUUID(),
-  client_id: A,
-  operation_id: null,
-  executed_on: "2026-10-09",
-  cost_total_cents: 0,
-  canceled_at: null,
-  ...o,
-});
+const s = (o) => {
+  const base = {
+    id: crypto.randomUUID(),
+    client_id: A,
+    operation_id: null,
+    executed_on: "2026-10-09",
+    cost_total_cents: 0,
+    canceled_at: null,
+    ...o,
+  };
+  // Sem competência própria, a janela de cobrança é a execução (como no adicional).
+  return {
+    cobranca_inicio: base.executed_on,
+    cobranca_fim: base.executed_on,
+    ...base,
+  };
+};
 
 // Cenário do HML (cliente A, 1ª quinzena de outubro): quatro serviços ativos, um cancelado e um de 2ª quinzena.
 const SERVICOS = [
   s({ cost_total_cents: 25000 }),
-  s({ cost_total_cents: 30001, executed_on: "2026-10-16" }), // competência 1ª, execução 16/10: ver nota abaixo
+  // Caso real do HML: executado em 16/10, cobrado na 1ª quinzena (competência). Entra na 1ª.
+  s({
+    cost_total_cents: 30001,
+    executed_on: "2026-10-16",
+    cobranca_inicio: "2026-10-01",
+    cobranca_fim: "2026-10-15",
+  }),
   s({ cost_total_cents: 2000, executed_on: "2026-10-12" }),
   s({ cost_total_cents: 6000, executed_on: "2026-10-12" }),
   s({ cost_total_cents: 5000, executed_on: "2026-10-12", canceled_at: "2026-10-13T00:00:00Z" }),
@@ -68,13 +85,29 @@ const SERVICOS = [
   s({ client_id: B, cost_total_cents: 30000, executed_on: "2026-10-20" }),
 ];
 
-test("soma os serviços ativos executados no período, em reais exatos", () => {
-  // 01–15/10: 250,00 + 20,00 + 60,00 = 330,00 (cancelado e execuções fora do período ficam de fora)
-  assert.equal(somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-15"), 330);
+test("soma os serviços ativos COBRADOS no período (competência ou execução), em reais exatos", () => {
+  // 01–15/10: 250,00 + 300,01 (cobrado na 1ª, executado em 16/10) + 20,00 + 60,00 = 630,01
+  // (cancelado e cobranças fora do período ficam de fora)
+  assert.equal(somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-15"), 630.01);
+  // 16–31/10: o executado em 16/10 NÃO entra de novo (é cobrado na 1ª quinzena).
+  assert.equal(somarCustoDeContainers(SERVICOS, "2026-10-16", "2026-10-31"), 340);
   assert.equal(
     somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-31"),
     330 + 300.01 + 40 + 300,
   );
+});
+
+test("D-CP08-01: executado num mês e cobrado no outro — custo junto com a receita, na competência", () => {
+  const b = s({
+    cost_total_cents: 7000,
+    executed_on: "2027-04-28",
+    cobranca_inicio: "2027-05-01",
+    cobranca_fim: "2027-05-15",
+  });
+  assert.equal(somarCustoDeContainers([b], "2027-04-16", "2027-04-30"), 0);
+  assert.equal(somarCustoDeContainers([b], "2027-05-01", "2027-05-15"), 70);
+  // Janela que não cabe inteira no período não entra (o mesmo critério da receita).
+  assert.equal(somarCustoDeContainers([b], "2027-05-01", "2027-05-10"), 0);
 });
 
 test("serviço cancelado nunca entra no custo", () => {
@@ -115,11 +148,9 @@ test("sem duplicidade: o custo é o do serviço, não o dos participantes", () =
 test("paridade com a fatura do HML: margem do período = receita − (apontamentos + containers)", () => {
   const receita = 3782.51;
   const custoApontamentos = 1151.63;
-  const containers = somarCustoDeContainers(
-    [25000, 30001, 2000, 6000].map((c) => s({ cost_total_cents: c, executed_on: "2026-10-12" })),
-    "2026-10-01",
-    "2026-10-15",
-  );
+  // Os MESMOS serviços do cenário (o de 30001 executado em 16/10, cobrado na 1ª quinzena), sem
+  // trocar a data de execução: o custo do período passa a ser o da fatura emitida no HML.
+  const containers = somarCustoDeContainers(SERVICOS, "2026-10-01", "2026-10-15");
   assert.equal(containers, 630.01);
   assert.equal(Math.round((custoApontamentos + containers) * 100) / 100, 1781.64); // total_cost da fatura emitida em HML
   assert.equal(Math.round((receita - custoApontamentos - containers) * 100) / 100, 2000.87);
@@ -163,8 +194,17 @@ test("o hook só LÊ container_services (sem escrita, sem RPC) e usa o mesmo cri
   const f = ler("src/lib/custo-containers-dados.ts");
   assert.match(f, /from\("container_services"\)/);
   assert.match(f, /export async function lerServicosDoPeriodo/);
-  assert.match(f, /gte\("executed_on"/);
-  assert.match(f, /lte\("executed_on"/);
+  // D-CP08-01: a janela de cobrança do adicional do serviço (competência, ou execução sem ela).
+  assert.match(
+    f,
+    /billing_additionals!inner\(period_start, period_end, billing_period_start, billing_period_end\)/,
+  );
+  assert.match(f, /gte\("billing_additionals\.billing_period_start", inicio\)/);
+  assert.match(f, /lte\("billing_additionals\.billing_period_end", fim\)/);
+  assert.match(f, /is\("billing_additionals\.billing_period_start", null\)/);
+  assert.match(f, /gte\("billing_additionals\.period_start", inicio\)/);
+  assert.match(f, /lte\("billing_additionals\.period_end", fim\)/);
+  assert.ok(!/gte\("executed_on"/.test(f), "a data de execução não decide o período");
   assert.match(f, /is\("canceled_at", null\)/);
   assert.ok(!/\.(insert|update|delete|upsert|rpc)\(/.test(f));
   assert.match(f, /ehSchemaSemContainers/);

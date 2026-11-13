@@ -67,6 +67,8 @@ export function PainelRelatorios() {
     () => rows.filter((row) => inPeriod(row.date, start, end)),
     [rows, start, end],
   );
+  // D-CP08-04: período invertido não é falha de leitura — a tela diz o que está errado.
+  const periodoInvertido = start !== "" && end !== "" && start > end;
 
   const byEmployee = useMemo(() => {
     const map = new Map<
@@ -111,8 +113,10 @@ export function PainelRelatorios() {
     const map = new Map<
       string,
       {
+        id: string;
         name: string;
         client: string;
+        type: "fixed" | "spot";
         dailies: number;
         otMinutes: number;
         billed: number;
@@ -122,8 +126,10 @@ export function PainelRelatorios() {
 
     period.forEach((row) => {
       const item = map.get(row.operationId) ?? {
+        id: row.operationId,
         name: row.operationName,
         client: row.clientName,
+        type: row.operationType,
         dailies: 0,
         otMinutes: 0,
         billed: 0,
@@ -167,9 +173,12 @@ export function PainelRelatorios() {
   function exportCsv() {
     if (!exibicao.podeAgir) return;
 
+    // D-CP08-05: é um EXTRATO DE LANÇAMENTOS (apontamentos), não o relatório financeiro
+    // consolidado: adicionais, serviços antigos de contêiner e arredondamento acumulado ficam fora.
     const header = [
       "Data",
       "Cliente",
+      "Modalidade",
       "Operação",
       "Turno",
       "Colaborador",
@@ -178,11 +187,13 @@ export function PainelRelatorios() {
       "Hora extra (min)",
       "Receita",
       "Custo",
+      "Faturado",
     ];
 
     const lines = period.map((row) => [
       row.date,
       row.clientName,
+      row.operationType === "spot" ? "Avulsa" : "Fixa",
       row.operationName,
       row.shiftName,
       row.employeeName,
@@ -191,6 +202,7 @@ export function PainelRelatorios() {
       row.overtimeMinutes,
       row.billed.toFixed(2),
       row.cost.toFixed(2),
+      row.invoiceId === null ? "Não" : "Sim",
     ]);
 
     const csv = montarCsv(header, lines);
@@ -204,7 +216,7 @@ export function PainelRelatorios() {
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = `relatorio-${start}-${end}.csv`;
+    link.download = `lancamentos-${start}-${end}.csv`;
     link.click();
 
     URL.revokeObjectURL(url);
@@ -221,10 +233,11 @@ export function PainelRelatorios() {
             variant="outline"
             className="h-10 rounded-xl"
             onClick={exportCsv}
-            disabled={!period.length || !exibicao.podeAgir}
+            disabled={!period.length || !exibicao.podeAgir || periodoInvertido}
+            title="Extrato dos lançamentos (apontamentos) do período. Adicionais, serviços antigos de contêiner e arredondamento acumulado não entram: o espelho completo da cobrança é o Excel do Fechamento."
           >
             <Download className="h-4 w-4" />
-            Exportar CSV
+            Exportar lançamentos (CSV)
           </Button>
         }
       />
@@ -262,7 +275,18 @@ export function PainelRelatorios() {
         />
       )}
 
-      {exibicao.mostrarValores && (
+      {periodoInvertido ? (
+        <div role="alert" className="mb-5 rounded-2xl border border-border bg-secondary/40 p-5">
+          <p className="text-sm font-semibold text-foreground">
+            A data inicial é posterior à final.
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Ajuste o período para ver os relatórios.
+          </p>
+        </div>
+      ) : null}
+
+      {!periodoInvertido && exibicao.mostrarValores && (
         <>
           <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Resumo
@@ -471,6 +495,10 @@ export function PainelRelatorios() {
                             Cliente
                           </TableHead>
 
+                          <TableHead className="text-xs font-semibold text-muted-foreground">
+                            Modalidade
+                          </TableHead>
+
                           <TableHead className="text-right text-xs font-semibold text-muted-foreground">
                             Diárias
                           </TableHead>
@@ -496,14 +524,14 @@ export function PainelRelatorios() {
                       <TableBody>
                         {byOperation.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7}>
+                            <TableCell colSpan={8}>
                               <EstadoVazio />
                             </TableCell>
                           </TableRow>
                         ) : (
                           byOperation.map((operation) => (
                             <TableRow
-                              key={operation.name}
+                              key={operation.id}
                               className="border-border transition-colors hover:bg-secondary/20"
                             >
                               <TableCell className="py-4">
@@ -520,6 +548,10 @@ export function PainelRelatorios() {
 
                               <TableCell className="text-sm text-muted-foreground">
                                 {operation.client}
+                              </TableCell>
+
+                              <TableCell className="text-sm text-muted-foreground">
+                                {operation.type === "spot" ? "Avulsa" : "Fixa"}
                               </TableCell>
 
                               <TableCell className="text-right text-sm text-muted-foreground">

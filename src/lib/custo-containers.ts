@@ -8,8 +8,12 @@
  * REGRAS (apresentação/agregação, nada persistido muda):
  *   - O custo de um serviço é `cost_total_cents` do próprio serviço. Os custos por participante
  *     somam exatamente esse valor e NÃO entram de novo: seria duplicidade.
- *   - Entram os serviços não cancelados executados dentro do período, o mesmo critério do
- *     adicional de receita (`period_start/period_end` = data da execução).
+ *   - Entram os serviços não cancelados cuja JANELA DE COBRANÇA cabe inteira no período: a
+ *     competência do adicional do serviço (`billing_period_start/end`, migration 038) ou, sem
+ *     competência, a execução (`period_start/end`). É o MESMO critério da receita desse adicional
+ *     em `resumo_financeiro_periodo`, e o do Fechamento e da fatura (custo dos adicionais do
+ *     recorte). D-CP08-01 (QA-BS-01): antes contava a data de EXECUÇÃO; um serviço executado num
+ *     período e cobrado em outro punha o custo num lugar e a receita em outro.
  *   - A soma é em centavos inteiros e só no fim vira reais.
  *   - Não calcula receita, fatura nem Fechamento. A fatura já soma o custo do serviço uma vez.
  *
@@ -23,20 +27,23 @@ export interface ServicoComCusto {
   executed_on: string;
   cost_total_cents: number;
   canceled_at: string | null;
+  /** Janela de cobrança do adicional do serviço: competência ou, sem ela, execução. */
+  cobranca_inicio: string;
+  cobranca_fim: string;
 }
 
 function dentroDoPeriodo(s: ServicoComCusto, inicio: string, fim: string): boolean {
   return (
     inicio <= fim &&
     s.canceled_at === null &&
-    s.executed_on >= inicio &&
-    s.executed_on <= fim &&
+    s.cobranca_inicio >= inicio &&
+    s.cobranca_fim <= fim &&
     Number.isSafeInteger(s.cost_total_cents) &&
     s.cost_total_cents >= 0
   );
 }
 
-/** Custo total dos serviços ativos executados no período, em reais. */
+/** Custo total dos serviços ativos cobrados no período (pela janela de cobrança), em reais. */
 export function somarCustoDeContainers(
   servicos: readonly ServicoComCusto[],
   inicio: string,

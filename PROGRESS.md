@@ -49,7 +49,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-06  | Serviços avulsos (contêiner é tipo de avulso), adicionais e caminho legado         | PASS (local) |
 | CP-06B | Remoção do painel independente de Contêineres; histórico legado em Operações       | PASS (local) |
 | CP-07  | Fechamento e faturamento                                                           | PASS (local) |
-| CP-08  | Dashboard, relatórios e exportações                                                | não iniciado |
+| CP-08  | Dashboard, relatórios e exportações (+ modelo de negócio consolidado, sessão 13)   | PASS (local) |
 | CP-09  | Interface, clareza e consistência                                                  | não iniciado |
 | CP-10  | Segurança, integridade e infraestrutura                                            | não iniciado |
 | CP-11  | Regressão integrada final                                                          | não iniciado |
@@ -121,6 +121,33 @@ competências, conciliação ao centavo, emissão, concorrência, imutabilidade 
 | D-CP07-05 | Aviso de cobrança em dobro do CP-06 ausente na confirmação                                              | P2         | corrigido (aviso; DEC-CP06-04) |
 | D-CP07-06 | CSV do Faturamento sem cliente no nome e com a presença crua do banco                                   | P3         | corrigido |
 | D-CP07-07 | "Alterar condições"/"Alterar custo" abria antes de carregar o valor atual: formulário vazio, salvar travado (achado na CI) | P2 | corrigido |
+
+Sessão 13 (13/11/2026, sessão em nuvem): **modelo de negócio consolidado** pelo esclarecimento
+direto do responsável — duração da operação e forma de cobrança são independentes; três dimensões
+(modalidade Fixa/Avulsa, regime diária/produção, tipo de serviço); mão de obra por diária pode ser
+recorrente ou temporária; serviços por produção cobram quantidade executada × preço unitário
+(10 contêineres × R$ 300 = R$ 3.000). Registrado em [docs/NEGOCIO.md §3A](docs/NEGOCIO.md) e
+reconciliado em [docs/NEGOCIO_X_SISTEMA.md](docs/NEGOCIO_X_SISTEMA.md) (matriz de 16 itens).
+**Cobrança por produção = lacuna funcional** que exige implementação específica (migrations, RPC
+e regra financeira, com autorização); contêiner por unidade hoje **diverge** (sai como diária ×
+participantes). Novas decisões: **DEC-PROD-01** (remuneração dos colaboradores em serviços por
+produção), **DEC-PROD-02** (unidades, quantidade executada, parcial), **DEC-AV-01** (jornada na
+temporária por diária), **DEC-AV-02** (um ou vários dias).
+
+Defeitos do CP-08 (13/11/2026), reproduzidos no E2E (RED no `12f5528`) e corrigidos (GREEN), só
+na interface — detalhe em
+[docs/qa/CP-08-dashboard-relatorios-exportacoes.md](docs/qa/CP-08-dashboard-relatorios-exportacoes.md):
+
+| ID        | Defeito                                                                                                    | Prioridade | Estado    |
+| --------- | ---------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D-CP08-01 | Custo dos serviços antigos de contêiner pela execução e receita pela competência: Dashboard/Relatórios com custo errado | P2 | corrigido |
+| D-CP08-02 | Gráficos do Dashboard somam só apontamentos sem dizer                                                       | P3         | corrigido |
+| D-CP08-03 | Relatório por operação sem Fixa/Avulsa                                                                      | P3         | corrigido |
+| D-CP08-04 | Período invertido mostrado como falha de leitura                                                            | P3         | corrigido |
+| D-CP08-05 | CSVs de lançamentos rotulados como exportação geral; sem modalidade e situação faturada                     | P3         | corrigido |
+
+Riscos do CP-08: R-CP08-01 ("Diárias" conta domingo/feriado), R-CP08-02 (margem 0,0% sem receita),
+R-CP08-03 (separador decimal dos CSV), R-CP08-04 (sem relatório por cliente e por tipo).
 
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,
