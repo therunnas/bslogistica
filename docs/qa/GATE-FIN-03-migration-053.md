@@ -2,7 +2,7 @@
 
 Sessão 19 (14/11/2026, sessão em nuvem, Linux, Supabase local descartável). Branch
 `fix/gate-fin-03-migration-053`, criada do HEAD `458108397a4a2bba253283f26b8d9daee462e56c` do #135
-(`fix/gate-fin-02-migration-052`), em PR Draft **empilhado** sobre o #135. O #134 e o #135 não foram
+(`fix/gate-fin-02-migration-052`), em PR Draft **empilhado** sobre o #135 (#136). O #134 e o #135 não foram
 tocados.
 
 **Estado: implementada e testada LOCALMENTE e na CI. NÃO aplicada em HML nem em Production.**
