@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 import { linhasDoCsv } from "../apoio/arquivos";
 import { faturasDoCliente, lit } from "../apoio/banco";
 import { clienteApi, sessaoApi } from "../apoio/contas";
+import { registrarRegistroAntigoLocal } from "../apoio/legado-local";
 import { consultar, estadoDe, expect, test } from "../apoio/fixtures";
 import {
   P,
@@ -258,7 +259,7 @@ async function registroAntigo(o: {
   competencia?: { inicio: string; fim: string };
 }): Promise<string> {
   const api = await sessaoApi("ADMIN");
-  const { data, error } = await api.rpc("registrar_servico_container", {
+  const { data, error } = await registrarRegistroAntigoLocal(api, {
     p_dados: prepararLoteDeContainers({
       clienteId: idDe("clients", CLI_AV),
       operacaoId: null,

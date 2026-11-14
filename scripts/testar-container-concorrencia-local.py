@@ -70,6 +70,9 @@ CLIENTS = [f"5c45c100-0000-4000-8000-{n:012d}" for n in range(1, 4)]
 KEYS = [f"5c45d100-0000-4000-8000-{n:012d}" for n in range(1, 4)]
 CLAIMS = json.dumps({"sub": ADMIN, "role": "authenticated", "aal": "aal1", "session_id": SESSION})
 AUTH = f"select set_config('request.jwt.claims','{CLAIMS}',true); set local role authenticated;"
+# GATE-FIN-02 (052): a RPC legada não é mais executável por authenticated; o registro antigo entra
+# como fixture histórica pela dona da função (postgres), com as mesmas claims do admin.
+AUTH_DONO = f"select set_config('request.jwt.claims','{CLAIMS}',true);"
 
 
 def sql(statement, expect_error=None):
@@ -105,7 +108,8 @@ def transaction(statement, app, hold=False):
     # precisa esperar essa mesma trava; pg_stat_activity prova a sobreposição.
     return (
         f"begin; set local statement_timeout='12s'; set local application_name='{app}'; "
-        + AUTH + statement + ("select pg_sleep(3);" if hold else "") + "commit;"
+        + (AUTH_DONO if "registrar_servico_container" in statement else AUTH)
+        + statement + ("select pg_sleep(3);" if hold else "") + "commit;"
     )
 
 

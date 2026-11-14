@@ -67,7 +67,7 @@ create function pg_temp.payload(altera jsonb default '{}') returns jsonb languag
 $$;
 create function pg_temp.registrar(dados jsonb, chave uuid default gen_random_uuid(), motivo text default 'Registro sintético 050')
 returns text language sql as $$
-  select pg_temp.adm(format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text',dados,chave,motivo))
+  select pg_temp.medir('postgres',pg_temp.claims(),format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text',dados,chave,motivo))
 $$;
 create function pg_temp.salvar(k text, dados jsonb, chave uuid default gen_random_uuid()) returns void language plpgsql as $$
 declare r text;

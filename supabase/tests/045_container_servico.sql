@@ -65,9 +65,15 @@ create function pg_temp.payload(altera jsonb default '{}') returns jsonb languag
       jsonb_build_object('colaboradorId',pg_temp.emp(1),'custoCentavos',1001),
       jsonb_build_object('colaboradorId',pg_temp.emp(2),'custoCentavos',2002))) || altera
 $$;
+-- GATE-FIN-02 (052): o registro antigo de contêiner é DADO HISTÓRICO de fixture; desde a 052 a RPC
+-- não é executável por authenticated. A fixture chama a função como a dona (postgres), com as claims do
+-- admin: dentro dela (SECURITY DEFINER) nada muda — mesma guarda, mesmos gatilhos, mesma trilha.
+create function pg_temp.dono(comando text) returns text language sql as $$
+  select pg_temp.medir('postgres',pg_temp.claims(),comando)
+$$;
 create function pg_temp.registrar(dados jsonb, chave uuid default gen_random_uuid(), motivo text default 'Registro sintético 045')
 returns text language sql as $$
-  select pg_temp.adm(format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text',dados,chave,motivo))
+  select pg_temp.dono(format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text',dados,chave,motivo))
 $$;
 create function pg_temp.salvar(k text, dados jsonb, chave uuid default gen_random_uuid()) returns void language plpgsql as $$
 declare r text;

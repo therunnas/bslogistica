@@ -101,7 +101,7 @@ create function pg_temp.adicional(k text, cliente integer, inicio date, fim date
     pg_temp.cli(cliente), inicio, fim, 'Etiquetagem sintética 046 '||k, valor)))
 $$;
 create function pg_temp.container(k text, cliente integer) returns void language sql as $$
-  select pg_temp.guardar(k, pg_temp.adm(format('select public.registrar_servico_container(%L::jsonb,gen_random_uuid(),%L)::text',
+  select pg_temp.guardar(k, pg_temp.como('postgres', pg_temp.claims(), format('select public.registrar_servico_container(%L::jsonb,gen_random_uuid(),%L)::text',
     pg_temp.payload(cliente), 'Registro sintético 046')))
 $$;
 create function pg_temp.faturar(k text, cliente integer, inicio date, fim date) returns void language sql as $$

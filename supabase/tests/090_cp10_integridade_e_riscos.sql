@@ -65,6 +65,21 @@ create or replace function pg_temp.ope(_sql text) returns text language sql as $
   select pg_temp.como('5c100000-0000-4000-8000-0000000000a2', _sql) $$;
 create or replace function pg_temp.sem(_sql text) returns text language sql as $$
   select pg_temp.como('5c100000-0000-4000-8000-0000000000a3', _sql) $$;
+-- GATE-FIN-02 (052): registro antigo de contêiner como FIXTURE histórica — a função chamada pela dona
+-- (postgres), com as claims do admin; dentro dela (SECURITY DEFINER) nada muda.
+create or replace function pg_temp.dono(_sql text) returns text language plpgsql as $$
+declare _r text;
+begin
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', '5c100000-0000-4000-8000-0000000000a1',
+    'role', 'authenticated', 'aal', 'aal1', 'session_id', 'ec100000-0000-4000-8000-0000000000a1')::text, true);
+  begin
+    execute _sql into _r;
+  exception when others then
+    return 'erro ' || sqlstate;
+  end;
+  return coalesce(_r, 'nulo');
+end;
+$$;
 
 insert into auth.users (id) values
   ('5c100000-0000-4000-8000-0000000000a1'), ('5c100000-0000-4000-8000-0000000000a2'),
@@ -295,7 +310,7 @@ select pg_temp.registrar('SEGURO', 'D2. mesma chave com payload diferente é rec
 select pg_temp.registrar('RISCO', 'D3. DEC-CP06-04: outro adicional IGUAL (mesmo serviço, referência e valor) com outra chave é aceito', 'true',
   (pg_temp.adm($q$select public.registrar_adicional_idempotente('5c10a0d0-0000-4000-8000-0000000000d2', '5c10c000-0000-4000-8000-0000000000c2', '2026-03-04', '2026-03-04', 'Contêiner 40 pés', 500, 'CNT-1', '5c10e000-0000-4000-8000-0000000000a2', '2026-03-01', '2026-03-15')::text$q$) ~ '^[0-9a-f-]{36}$')::text);
 select pg_temp.registrar('RISCO', 'D4. registro antigo de contêiner da MESMA operação avulsa também é aceito (a tela só avisa)', 'true',
-  (pg_temp.adm(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000d3', 'CP10 duplicidade')::text$q$,
+  (pg_temp.dono(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000d3', 'CP10 duplicidade')::text$q$,
     jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', '5c10e000-0000-4000-8000-0000000000a2',
       'solicitadoEm', '2026-03-04', 'executadoEm', '2026-03-04', 'descricao', 'Contêiner 40 pés', 'quantidade', 1,
       'receitaCentavos', 50000, 'custoTotalCentavos', 10000, 'referencia', 'CNT-1', 'modalidadeCusto', 'total_distribuido',

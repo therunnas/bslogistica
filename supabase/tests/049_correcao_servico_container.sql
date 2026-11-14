@@ -90,8 +90,11 @@ returns jsonb language sql as $$
     'modalidadeCusto', 'total_distribuido',
     'competenciaCobranca', jsonb_build_object('inicio', '2026-02-01', 'fim', '2026-02-15'))
 $$;
+-- GATE-FIN-02 (052): o registro antigo de contêiner é DADO HISTÓRICO de fixture; desde a 052 a RPC
+-- não é executável por authenticated. A fixture chama a função como a dona (postgres), com as claims do
+-- admin: dentro dela (SECURITY DEFINER) nada muda — mesma guarda, mesmos gatilhos, mesma trilha.
 create function pg_temp.registrar_servico(chave uuid, d jsonb) returns text language sql as $$
-  select pg_temp.adm(format('select public.registrar_servico_container(%L::jsonb, %L::uuid, %L)::text', d, chave, 'Registro sintético 049'))
+  select pg_temp.como('postgres', pg_temp.claims(), format('select public.registrar_servico_container(%L::jsonb, %L::uuid, %L)::text', d, chave, 'Registro sintético 049'))
 $$;
 create function pg_temp.corrigir(servico uuid, d jsonb, chave uuid, claims jsonb default null) returns text language sql as $$
   select pg_temp.como('authenticated', coalesce(claims, pg_temp.claims()),
