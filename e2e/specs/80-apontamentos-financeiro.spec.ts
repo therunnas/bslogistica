@@ -254,6 +254,25 @@ async function conferirPrevia(page: Page, l: Linha & { data: string }) {
   );
 }
 
+/** O administrador atribui a operação ao operador sintético, pela tela (uma vez: repetir não duplica). */
+async function garantirOperacaoDoOperador(page: Page) {
+  const [{ atribuida }] = consultar<{ atribuida: boolean }>(
+    `select exists (select 1 from public.user_operation_access a
+                      join public.operations o on o.id = a.operation_id
+                      join auth.users u on u.id = a.user_id
+                     where o.name = ${lit(OP)} and u.email = ${lit(ambiente("E2E_OPER_EMAIL"))}) as atribuida`,
+  );
+  if (!atribuida) {
+    await page.goto("/usuarios");
+    const linha = page.locator("tr").filter({ hasText: ambiente("E2E_OPER_EMAIL") });
+    await linha.getByRole("button").last().click();
+    const d = dialogo(page);
+    await escolher(page, campo(d, "Atribuir operação"), OP);
+    await d.getByRole("button", { name: "Atribuir", exact: true }).click();
+    await expect(d.getByText(OP, { exact: true })).toBeVisible({ timeout: 20_000 });
+  }
+}
+
 // =============================================================================================
 // PREPARAÇÃO
 // =============================================================================================
@@ -716,22 +735,7 @@ test("D1 operador: saída antes da entrada no turno diurno bloqueia até confirm
   browser,
 }) => {
   const data = "2026-11-17";
-  // O administrador atribui a operação ao operador sintético (uma vez: repetir o teste não duplica).
-  const [{ atribuida }] = consultar<{ atribuida: boolean }>(
-    `select exists (select 1 from public.user_operation_access a
-                      join public.operations o on o.id = a.operation_id
-                      join auth.users u on u.id = a.user_id
-                     where o.name = ${lit(OP)} and u.email = ${lit(ambiente("E2E_OPER_EMAIL"))}) as atribuida`,
-  );
-  if (!atribuida) {
-    await page.goto("/usuarios");
-    const linha = page.locator("tr").filter({ hasText: ambiente("E2E_OPER_EMAIL") });
-    await linha.getByRole("button").last().click();
-    const d = dialogo(page);
-    await escolher(page, campo(d, "Atribuir operação"), OP);
-    await d.getByRole("button", { name: "Atribuir", exact: true }).click();
-    await expect(d.getByText(OP, { exact: true })).toBeVisible({ timeout: 20_000 });
-  }
+  await garantirOperacaoDoOperador(page);
 
   const contexto = await browser.newContext({ storageState: estadoDe("operacional") });
   const op = await contexto.newPage();
@@ -859,4 +863,190 @@ test("IN1 fechamento e relatório da 1ª quinzena de novembro batem com o cálcu
       timeout: 30_000,
     });
   }
+});
+
+// =============================================================================================
+// GATE-FIN-03 (migration 053): intervalo maior que o tempo entre entrada e saída é recusado
+// pelo banco, com mensagem própria (23514), em todos os caminhos de gravação.
+//
+// Diagnóstico corrigido na sessão 19: com o motor por vigência LIGADO (esta semente, HML e
+// Production) o núcleo já recusava a jornada zerada com 22023 `nucleo:zero_minuto_com_horarios`,
+// mensagem técnica e genérica; com o motor DESLIGADO (SQL 090 I5) era gravado com jornada 0 e a
+// diária cobrada. A 053 dispara ANTES do motor e vale com ele ligado ou desligado. O limite exato
+// (intervalo = duração, jornada 0) não é regra da 053: com o motor ligado o núcleo continua a
+// recusá-lo, como antes. Datas da 2ª quinzena de novembro: fora do IN1.
+// =============================================================================================
+
+const MENSAGEM_INTERVALO = (intervalo: number, duracao: number) =>
+  `O intervalo de ${intervalo} min é maior que o tempo entre a entrada e a saída (${duracao} min). Corrija o intervalo ou os horários antes de salvar.`;
+
+/** Clica em "Salvar" (habilitado) e espera a RECUSA: o aviso de erro, nunca o de sucesso. */
+async function salvarRecusado(page: Page, aviso: string | RegExp) {
+  await expect(salvarBotao(page)).toBeEnabled();
+  await salvarBotao(page).click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: aviso })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: "Apontamento salvo." }),
+  ).toHaveCount(0);
+}
+
+test("IJ1 admin: intervalo maior que a jornada é recusado com a mensagem da 053 e nada é gravado; um minuto abaixo do limite salva", async ({
+  page,
+}) => {
+  const data = "2026-11-24";
+  await abrirDia(page, { operacao: OP, turno: DIA, data });
+  await preencher(page, [{ colaborador: ANA, entrada: "08:00", saida: "09:00", intervalo: 300 }]);
+  await salvarRecusado(page, MENSAGEM_INTERVALO(300, 60));
+  // A gravação do dia é atômica: nenhuma das seis linhas entrou.
+  expect(gravados(`and te.work_date = ${lit(data)}`)).toHaveLength(0);
+
+  // Limite exato (intervalo = duração, jornada 0): a 053 deixa passar; o núcleo do motor ligado
+  // recusa como já recusava antes da 053 (comportamento inalterado, não é regra nova).
+  await abrirDia(page, { operacao: OP, turno: DIA, data });
+  await preencher(page, [{ colaborador: ANA, entrada: "08:00", saida: "09:00", intervalo: 60 }]);
+  await salvarRecusado(page, /nenhum minuto trabalhado/);
+  expect(gravados(`and te.work_date = ${lit(data)}`)).toHaveLength(0);
+
+  // Um minuto abaixo do limite: salva, com a jornada e o valor proporcionais de sempre.
+  await abrirDia(page, { operacao: OP, turno: DIA, data });
+  await preencher(page, [{ colaborador: ANA, entrada: "08:00", saida: "09:00", intervalo: 59 }]);
+  await salvar(page);
+  const g = conferir(ANA, data);
+  expect({ intervalo: g.intervalo, trabalhados: g.trabalhados, receita: g.receita }).toEqual({
+    intervalo: 59,
+    trabalhados: 1,
+    receita: "0.50",
+  });
+  // Os demais da equipe entraram com o horário do turno, valores de sempre.
+  for (const n of EQUIPE_DIA.filter((n) => n !== ANA)) {
+    expect(`${conferir(n, data).receita}/${gravado(n, data)!.custo}`).toBe("240.00/160.00");
+  }
+});
+
+test("IJ2 admin: turno que vira a meia-noite — intervalo maior recusado; jornada 22:00→07:00 com 60 salva 8 h", async ({
+  page,
+}) => {
+  const data = "2026-11-25";
+  await abrirDia(page, { operacao: OP, turno: NOITE, data });
+  await preencher(page, [{ colaborador: NINA, entrada: "22:00", saida: "23:00", intervalo: 90 }]);
+  await salvarRecusado(page, MENSAGEM_INTERVALO(90, 60));
+  expect(gravado(NINA, data)).toBeUndefined();
+
+  await abrirDia(page, { operacao: OP, turno: NOITE, data });
+  await preencher(page, [{ colaborador: NINA, entrada: "22:00", saida: "07:00", intervalo: 60 }]);
+  await salvar(page);
+  const g = conferir(NINA, data);
+  expect({ trabalhados: g.trabalhados, receita: g.receita, custo: g.custo }).toEqual({
+    trabalhados: 480,
+    receita: "240.00",
+    custo: "160.00",
+  });
+});
+
+test("IJ3 operador: intervalo maior que a jornada é recusado pela RPC e nada é gravado; abaixo do limite salva", async ({
+  page,
+  browser,
+}) => {
+  const data = "2026-11-26";
+  await garantirOperacaoDoOperador(page);
+  const contexto = await browser.newContext({ storageState: estadoDe("operacional") });
+  const op = await contexto.newPage();
+  await op.goto("/operacional");
+  await escolher(op, campo(op, "Operação"), new RegExp(`^${literal(OP)} — `));
+  await escolher(op, campo(op, "Turno"), new RegExp(`^${literal(DIA)} — `));
+  await campo(op, "Data").fill(data);
+  const tr = op.locator("tr").filter({ hasText: ANA }).first();
+  await expect(tr).toBeVisible();
+  for (const n of EQUIPE_DIA.filter((n) => n !== ANA)) {
+    await escolher(
+      op,
+      op.locator("tr").filter({ hasText: n }).first().getByRole("combobox").first(),
+      "Falta",
+    );
+  }
+  await tr.locator("input[type=time]").nth(0).fill("08:00");
+  await tr.locator("input[type=time]").nth(1).fill("09:00");
+  await tr.locator("input[type=number]").first().fill("120");
+  const salvarOp = op.getByRole("button", { name: "Salvar apontamento" });
+  await expect(salvarOp).toBeEnabled();
+  await salvarOp.click();
+  // O operador recebe a explicação fixa do 23514 (sem valor nem detalhe do banco).
+  await expect(
+    op.locator("[data-sonner-toast]").filter({ hasText: /Revise turno, equipe e intervalo/ }),
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(
+    op.locator("[data-sonner-toast]").filter({ hasText: "Apontamento salvo." }),
+  ).toHaveCount(0);
+  expect(gravados(`and te.work_date = ${lit(data)}`)).toHaveLength(0);
+
+  await tr.locator("input[type=number]").first().fill("59");
+  await salvarOp.click();
+  await esperarAviso(op, "Apontamento salvo.");
+  await contexto.close();
+  const g = conferir(ANA, data);
+  expect({ intervalo: g.intervalo, trabalhados: g.trabalhados }).toEqual({
+    intervalo: 59,
+    trabalhados: 1,
+  });
+});
+
+test("IJ4 API direta (PostgREST, admin): INSERT e UPDATE com intervalo maior recusados com 23514; a linha fica", async () => {
+  const api = await sessaoApi("ADMIN");
+  const data = "2026-11-24";
+  const [linha] = consultar<{ id: string; timesheet_id: string; employee_id: string }>(
+    `select te.id, te.timesheet_id, te.employee_id from public.timesheet_entries te
+       join public.employees e on e.id = te.employee_id
+       join public.operations o on o.id = te.operation_id
+      where o.name = ${lit(OP)} and e.name = ${lit(BIA)} and te.work_date = ${lit(data)}`,
+  );
+  expect(linha, "Bia gravada no IJ1").toBeDefined();
+
+  // UPDATE direto da linha da Bia (08:00–17:00): intervalo 541 em 540.
+  const u = await api
+    .from("timesheet_entries")
+    .update({ break_minutes: 541 })
+    .eq("id", linha!.id)
+    .select("id");
+  expect({ code: u.error?.code, message: u.error?.message }).toEqual({
+    code: "23514",
+    message: MENSAGEM_INTERVALO(541, 540),
+  });
+  expect(gravado(BIA, data)!.intervalo).toBe(60);
+
+  // Encolher a saída para 08:30 com o intervalo de 60 também é recusado.
+  const u2 = await api
+    .from("timesheet_entries")
+    .update({ check_out: "08:30" })
+    .eq("id", linha!.id)
+    .select("id");
+  expect(u2.error?.code).toBe("23514");
+  expect(gravado(BIA, data)!.saida).toBe("17:00");
+
+  // INSERT direto (Nina, numa folha do turno diurno de outra data): recusado, nada gravado.
+  const [folha] = consultar<{ id: string }>(
+    `select t.id from public.timesheets t join public.operations o on o.id = t.operation_id
+       join public.shifts s on s.id = t.shift_id
+      where o.name = ${lit(OP)} and s.name = ${lit(DIA)} and t.work_date = ${lit("2026-11-26")}`,
+  );
+  expect(folha, "folha do IJ3").toBeDefined();
+  const [{ id: nina }] = consultar<{ id: string }>(
+    `select id from public.employees where name = ${lit(NINA)}`,
+  );
+  const i = await api
+    .from("timesheet_entries")
+    .insert({
+      timesheet_id: folha!.id,
+      employee_id: nina,
+      status: "present",
+      check_in: "08:00",
+      check_out: "09:00",
+      break_minutes: 61,
+    })
+    .select("id");
+  expect(i.error?.code).toBe("23514");
+  expect(gravado(NINA, "2026-11-26")).toBeUndefined();
+  // Só ESTA sessão: o escopo padrão (global) derrubaria a sessão do admin das specs seguintes.
+  await api.auth.signOut({ scope: "local" });
 });
