@@ -302,3 +302,31 @@ test("M7 cabeçalhos: CSP com nonce, anti-frame e sem anunciar o framework (X-Po
     }
   }
 });
+
+test("M8 052: a RPC legada de contêiner não cria nada pela API — nem para o admin (AUT-CP06-01)", async () => {
+  const antes = contar("container_services");
+  const corpo = {
+    p_dados: {},
+    p_idempotency_key: "5c10a0d0-0000-4000-8000-0000000000e8",
+    p_reason: "E2E 052: tentativa pela API",
+  };
+  const codigos: Record<string, string | null> = {};
+  for (const [nome, c] of [
+    ["ADMIN", admin],
+    ["OPER", clientes.OPER],
+    ["SEMPAPEL", clientes.SEMPAPEL],
+    ["ANON", clientes.ANON],
+  ] as const) {
+    const { error } = await c.rpc("registrar_servico_container", corpo);
+    expect(error, `${nome}: recusado`).not.toBeNull();
+    expect(error?.code, `${nome}: a chamada chegou ao banco`).not.toBe("PGRST202");
+    codigos[nome] = error?.code ?? null;
+  }
+  // Sem EXECUTE o PostgreSQL recusa antes do corpo da função: 42501 para todos.
+  expect(codigos).toEqual({ ADMIN: "42501", OPER: "42501", SEMPAPEL: "42501", ANON: "42501" });
+  expect(contar("container_services"), "nada foi gravado").toBe(antes);
+  expect(
+    funcoesDefiner().some((f) => f.nome === "registrar_servico_container"),
+    "fora da lista de RPCs executáveis por authenticated",
+  ).toBe(false);
+});

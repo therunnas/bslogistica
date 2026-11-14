@@ -4,6 +4,7 @@ import type { Page } from "@playwright/test";
 
 import { faturasDoCliente, lit } from "../apoio/banco";
 import { sessaoApi } from "../apoio/contas";
+import { registrarRegistroAntigoLocal } from "../apoio/legado-local";
 import { consultar, estadoDe, expect, test } from "../apoio/fixtures";
 import {
   P,
@@ -232,7 +233,7 @@ test("D7b registro ANTIGO de contêiner ligado à mesma operação avulsa: o Fat
     ],
     modalidadeCusto: "por_pessoa",
   });
-  const { error } = await api.rpc("registrar_servico_container", {
+  const { error } = await registrarRegistroAntigoLocal(api, {
     p_dados: lote,
     p_idempotency_key: randomUUID(),
     p_reason: "E2E CP-06: registro antigo de contêiner",
@@ -367,7 +368,7 @@ test("AD2 cancelar adicional não faturado: exige motivo, sai do total e o hist�
 
 test("D7d registro antigo SEM operação (R$ 120, custo 50): entra uma vez na fatura e continua consultável", async () => {
   const api = await sessaoApi("ADMIN");
-  const { error } = await api.rpc("registrar_servico_container", {
+  const { error } = await registrarRegistroAntigoLocal(api, {
     p_dados: prepararLoteDeContainers({
       clienteId: idDe("clients", CLI),
       operacaoId: null,

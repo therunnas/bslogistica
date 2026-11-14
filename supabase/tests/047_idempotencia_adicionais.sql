@@ -241,11 +241,11 @@ create function pg_temp.payload_container() returns jsonb language sql as $$
     'modalidadeCusto','total_distribuido','competenciaCobranca',null,'participantes',jsonb_build_array(
       jsonb_build_object('colaboradorId',pg_temp.emp(1),'custoCentavos',1000),jsonb_build_object('colaboradorId',pg_temp.emp(2),'custoCentavos',2000)))
 $$;
-select pg_temp.guardar('container', pg_temp.adm(format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text', pg_temp.payload_container(), pg_temp.chave(40), 'Registro sintético 047')));
+select pg_temp.guardar('container', pg_temp.como('postgres', pg_temp.claims(), format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text', pg_temp.payload_container(), pg_temp.chave(40), 'Registro sintético 047')));
 select pg_temp.assert_eq('container registra o adicional pelo caminho interno (chave de adicional nula)',
  pg_temp.q(format('select (a.idempotency_key is null and a.request_payload is null and a.amount = 120.00)::text from public.container_services s join public.billing_additionals a on a.id = s.billing_additional_id where s.id = %L', pg_temp.id('container'))), 'true');
 select pg_temp.assert_eq('retry do container segue idempotente (sem 2º adicional)',
- pg_temp.adm(format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text', pg_temp.payload_container(), pg_temp.chave(40), 'Registro sintético 047')), pg_temp.id('container')::text);
+ pg_temp.como('postgres', pg_temp.claims(), format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text', pg_temp.payload_container(), pg_temp.chave(40), 'Registro sintético 047')), pg_temp.id('container')::text);
 select pg_temp.assert_eq('o cliente do container tem 1 adicional',
  (select count(*)::text from public.billing_additionals where client_id = pg_temp.cli(5)), '1');
 

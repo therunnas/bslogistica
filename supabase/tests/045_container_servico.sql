@@ -65,9 +65,15 @@ create function pg_temp.payload(altera jsonb default '{}') returns jsonb languag
       jsonb_build_object('colaboradorId',pg_temp.emp(1),'custoCentavos',1001),
       jsonb_build_object('colaboradorId',pg_temp.emp(2),'custoCentavos',2002))) || altera
 $$;
+-- GATE-FIN-02 (052): o registro antigo de contêiner é DADO HISTÓRICO de fixture; desde a 052 a RPC
+-- não é executável por authenticated. A fixture chama a função como a dona (postgres), com as claims do
+-- admin: dentro dela (SECURITY DEFINER) nada muda — mesma guarda, mesmos gatilhos, mesma trilha.
+create function pg_temp.dono(comando text) returns text language sql as $$
+  select pg_temp.medir('postgres',pg_temp.claims(),comando)
+$$;
 create function pg_temp.registrar(dados jsonb, chave uuid default gen_random_uuid(), motivo text default 'Registro sintético 045')
 returns text language sql as $$
-  select pg_temp.adm(format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text',dados,chave,motivo))
+  select pg_temp.dono(format('select public.registrar_servico_container(%L::jsonb,%L::uuid,%L)::text',dados,chave,motivo))
 $$;
 create function pg_temp.salvar(k text, dados jsonb, chave uuid default gen_random_uuid()) returns void language plpgsql as $$
 declare r text;
@@ -230,6 +236,13 @@ begin
     pg_temp.payload(),gen_random_uuid(),'Sonda sintética segurança')
     else format('select public.cancelar_servico_container(%L::uuid,%L)',pg_temp.id('principal'),'Sonda sintética cancelamento') end;
    obtido:=pg_temp.medir(ident.papel,claims,comando,true);
+   if rpc='registrar' then
+    -- 052 (GATE-FIN-02): pela API nenhum papel registra (sem EXECUTE)...
+    perform pg_temp.assert_eq('registrar pela API bloqueia '||ident.nome,obtido,'erro 42501');
+    -- ...e a guarda interna da função continua valendo quando ela é chamada pela dona (é o caminho de
+    -- corrigir_servico_container): mesma matriz de papel e piso de MFA de antes.
+    obtido:=pg_temp.medir('postgres',claims,comando,true);
+   end if;
    if ident.permitido then
     perform pg_temp.assert_eq(rpc||' permite '||ident.nome,
       (case when rpc='registrar' then obtido ~ '^[0-9a-f-]{36}$' else obtido='' end)::text,'true');

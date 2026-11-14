@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 import { linhasDoCsv } from "../apoio/arquivos";
 import { faturasDoCliente, lit } from "../apoio/banco";
 import { MENSAGEM_CRUA, clienteApi, sessaoApi, textoDoAviso } from "../apoio/contas";
+import { registrarRegistroAntigoLocal } from "../apoio/legado-local";
 import { consultar, estadoDe, expect, test } from "../apoio/fixtures";
 import {
   P,
@@ -428,7 +429,7 @@ test("AP lançamentos da competência: feriado, sábado, domingo, falta, saída 
 
   // Registro antigo de contêiner (histórico legado), sem operação, a faturar nesta competência.
   const api = await sessaoApi("ADMIN");
-  const { error } = await api.rpc("registrar_servico_container", {
+  const { error } = await registrarRegistroAntigoLocal(api, {
     p_dados: prepararLoteDeContainers({
       clienteId: idDe("clients", CLI),
       operacaoId: null,
@@ -825,7 +826,7 @@ test("DUP registro antigo ligado à mesma avulsa: a confirmação repete o aviso
     linhas: [{ colaborador: FABIO, entrada: "08:00", saida: "17:00", intervalo: 60 }],
   });
   const api = await sessaoApi("ADMIN");
-  const { error } = await api.rpc("registrar_servico_container", {
+  const { error } = await registrarRegistroAntigoLocal(api, {
     p_dados: prepararLoteDeContainers({
       clienteId: idDe("clients", CLI_DUP),
       operacaoId: idDe("operations", AVULSA_DUP),

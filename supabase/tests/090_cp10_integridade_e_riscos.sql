@@ -65,6 +65,21 @@ create or replace function pg_temp.ope(_sql text) returns text language sql as $
   select pg_temp.como('5c100000-0000-4000-8000-0000000000a2', _sql) $$;
 create or replace function pg_temp.sem(_sql text) returns text language sql as $$
   select pg_temp.como('5c100000-0000-4000-8000-0000000000a3', _sql) $$;
+-- GATE-FIN-02 (052): registro antigo de contêiner como FIXTURE histórica — a função chamada pela dona
+-- (postgres), com as claims do admin; dentro dela (SECURITY DEFINER) nada muda.
+create or replace function pg_temp.dono(_sql text) returns text language plpgsql as $$
+declare _r text;
+begin
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', '5c100000-0000-4000-8000-0000000000a1',
+    'role', 'authenticated', 'aal', 'aal1', 'session_id', 'ec100000-0000-4000-8000-0000000000a1')::text, true);
+  begin
+    execute _sql into _r;
+  exception when others then
+    return 'erro ' || sqlstate;
+  end;
+  return coalesce(_r, 'nulo');
+end;
+$$;
 
 insert into auth.users (id) values
   ('5c100000-0000-4000-8000-0000000000a1'), ('5c100000-0000-4000-8000-0000000000a2'),
@@ -295,7 +310,7 @@ select pg_temp.registrar('SEGURO', 'D2. mesma chave com payload diferente é rec
 select pg_temp.registrar('RISCO', 'D3. DEC-CP06-04: outro adicional IGUAL (mesmo serviço, referência e valor) com outra chave é aceito', 'true',
   (pg_temp.adm($q$select public.registrar_adicional_idempotente('5c10a0d0-0000-4000-8000-0000000000d2', '5c10c000-0000-4000-8000-0000000000c2', '2026-03-04', '2026-03-04', 'Contêiner 40 pés', 500, 'CNT-1', '5c10e000-0000-4000-8000-0000000000a2', '2026-03-01', '2026-03-15')::text$q$) ~ '^[0-9a-f-]{36}$')::text);
 select pg_temp.registrar('RISCO', 'D4. registro antigo de contêiner da MESMA operação avulsa também é aceito (a tela só avisa)', 'true',
-  (pg_temp.adm(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000d3', 'CP10 duplicidade')::text$q$,
+  (pg_temp.dono(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000d3', 'CP10 duplicidade')::text$q$,
     jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', '5c10e000-0000-4000-8000-0000000000a2',
       'solicitadoEm', '2026-03-04', 'executadoEm', '2026-03-04', 'descricao', 'Contêiner 40 pés', 'quantidade', 1,
       'receitaCentavos', 50000, 'custoTotalCentavos', 10000, 'referencia', 'CNT-1', 'modalidadeCusto', 'total_distribuido',
@@ -308,27 +323,84 @@ select pg_temp.registrar('RISCO', 'D5. a fatura do avulso cobra o MESMO contêin
 -- C. RPC legada de contêiner (AUT-CP06-01)
 -- ---------------------------------------------------------------------------
 
-create temporary table _c1 on commit drop as select pg_temp.adm(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000c1', 'CP10 legado')::text$q$,
+-- 052 (GATE-FIN-02): o cadastro NOVO pela API está encerrado também no banco. O registro antigo usado
+-- nos casos abaixo entra como fixture pela dona (o mesmo caminho que `corrigir_servico_container` usa
+-- por dentro); correção e cancelamento do histórico seguem pela API do admin.
+create temporary table _antes_c1 on commit drop as select count(*) as n from public.container_services;
+create temporary table _tentativa_c1 on commit drop as select pg_temp.adm(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000c9', 'CP10 legado pela API')::text$q$,
+    jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', null,
+      'solicitadoEm', '2026-03-20', 'executadoEm', '2026-03-20', 'descricao', 'Contêiner legado CP10', 'quantidade', 1,
+      'receitaCentavos', 30000, 'custoTotalCentavos', 10000, 'referencia', 'LEG-1', 'modalidadeCusto', 'total_distribuido',
+      'competenciaCobranca', null, 'participantes', jsonb_build_array(jsonb_build_object('colaboradorId', '5c10f000-0000-4000-8000-000000000003', 'custoCentavos', 10000))))) as r;
+select pg_temp.registrar('SEGURO', 'C1. AUT-CP06-01 (052): o admin NÃO cria registro de contêiner pela RPC legada (42501) e nada é gravado',
+  'erro 42501|0',
+  (select r from _tentativa_c1) || '|' || ((select count(*) from public.container_services) - (select n from _antes_c1))::text);
+create temporary table _c1 on commit drop as select pg_temp.dono(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000c1', 'CP10 legado')::text$q$,
     jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', null,
       'solicitadoEm', '2026-03-20', 'executadoEm', '2026-03-20', 'descricao', 'Contêiner legado CP10', 'quantidade', 1,
       'receitaCentavos', 30000, 'custoTotalCentavos', 10000, 'referencia', 'LEG-1', 'modalidadeCusto', 'total_distribuido',
       'competenciaCobranca', null, 'participantes', jsonb_build_array(jsonb_build_object('colaboradorId', '5c10f000-0000-4000-8000-000000000003', 'custoCentavos', 10000))))) as id;
-select pg_temp.registrar('RISCO', 'C1. AUT-CP06-01: o admin ainda CRIA registro de contêiner pela RPC legada (o painel saiu, a RPC não) e ele vira receita',
+select pg_temp.registrar('SEGURO', 'C1b. a função continua existindo e criando pela DONA (fixture histórica; é o caminho interno da correção), com o adicional de R$ 300',
   'true|300.00', ((select id from _c1) ~ '^[0-9a-f-]{36}$')::text || '|' ||
   coalesce((select a.amount::text from public.container_services cs join public.billing_additionals a on a.id = cs.billing_additional_id
              where cs.id = (select id from _c1)::uuid), 'sem adicional'));
 select pg_temp.registrar('SEGURO', 'C2. repetir a chamada com a mesma chave devolve o mesmo registro (idempotente)', 'true',
-  (pg_temp.adm(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000c1', 'CP10 legado')::text$q$,
+  (pg_temp.dono(format($q$select public.registrar_servico_container(%L::jsonb, '5c10a0d0-0000-4000-8000-0000000000c1', 'CP10 legado')::text$q$,
     jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', null,
       'solicitadoEm', '2026-03-20', 'executadoEm', '2026-03-20', 'descricao', 'Contêiner legado CP10', 'quantidade', 1,
       'receitaCentavos', 30000, 'custoTotalCentavos', 10000, 'referencia', 'LEG-1', 'modalidadeCusto', 'total_distribuido',
       'competenciaCobranca', null, 'participantes', jsonb_build_array(jsonb_build_object('colaboradorId', '5c10f000-0000-4000-8000-000000000003', 'custoCentavos', 10000))))) = (select id from _c1))::text);
 select pg_temp.registrar('SEGURO', 'C3. payload inválido é recusado', 'true',
-  (pg_temp.adm($q$select public.registrar_servico_container('{"clienteId":"x"}'::jsonb, gen_random_uuid(), 'CP10 inválido')::text$q$) like 'erro %')::text);
-select pg_temp.registrar('SEGURO', 'C4. operacional e sem papel não chamam a RPC legada; anônimo não tem EXECUTE', 'erro 42501|erro 42501|false',
-  pg_temp.ope($q$select public.registrar_servico_container('{}'::jsonb, gen_random_uuid(), 'x')::text$q$)
+  (pg_temp.dono($q$select public.registrar_servico_container('{"clienteId":"x"}'::jsonb, gen_random_uuid(), 'CP10 inválido')::text$q$) like 'erro %')::text);
+select pg_temp.registrar('SEGURO', 'C4. nenhum papel externo chama a RPC legada: admin, operacional e sem papel 42501; anônimo e service_role sem EXECUTE',
+  'erro 42501|erro 42501|erro 42501|false|false|false',
+  pg_temp.adm($q$select public.registrar_servico_container('{}'::jsonb, gen_random_uuid(), 'x')::text$q$)
+  || '|' || pg_temp.ope($q$select public.registrar_servico_container('{}'::jsonb, gen_random_uuid(), 'x')::text$q$)
   || '|' || pg_temp.sem($q$select public.registrar_servico_container('{}'::jsonb, gen_random_uuid(), 'x')::text$q$)
-  || '|' || has_function_privilege('anon', 'public.registrar_servico_container(jsonb,uuid,text)', 'EXECUTE')::text);
+  || '|' || has_function_privilege('anon', 'public.registrar_servico_container(jsonb,uuid,text)', 'EXECUTE')::text
+  || '|' || has_function_privilege('authenticated', 'public.registrar_servico_container(jsonb,uuid,text)', 'EXECUTE')::text
+  || '|' || has_function_privilege('service_role', 'public.registrar_servico_container(jsonb,uuid,text)', 'EXECUTE')::text);
+-- Correção e cancelamento do histórico (pela API do admin) continuam funcionando depois da 052.
+create temporary table _c5 on commit drop as select pg_temp.adm(format($q$select public.corrigir_servico_container(%L::uuid, %L::jsonb, '5c10a0d0-0000-4000-8000-0000000000c5', 'CP10 correção: valor')::text$q$,
+    (select id from _c1), jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', null,
+      'solicitadoEm', '2026-03-20', 'executadoEm', '2026-03-20', 'descricao', 'Contêiner legado CP10', 'quantidade', 1,
+      'receitaCentavos', 30000, 'custoTotalCentavos', 10000, 'referencia', 'LEG-1', 'modalidadeCusto', 'total_distribuido',
+      'competenciaCobranca', null, 'participantes', jsonb_build_array(jsonb_build_object('colaboradorId', '5c10f000-0000-4000-8000-000000000003', 'custoCentavos', 10000))) || jsonb_build_object('receitaCentavos', 32000))) as id;
+select pg_temp.registrar('SEGURO', 'C5. a correção de registro antigo disponível segue pela API: um único substituto ativo, adicional de R$ 320, original cancelado, trilha corrected',
+  'true|1|320.00|true|1',
+  ((select id from _c5) ~ '^[0-9a-f-]{36}$')::text
+  || '|' || (select count(*)::text from public.container_services where client_id = '5c10c000-0000-4000-8000-0000000000c2'
+               and description = 'Contêiner legado CP10' and canceled_at is null)
+  || '|' || coalesce((select a.amount::text from public.container_services cs join public.billing_additionals a on a.id = cs.billing_additional_id
+                        where cs.id = (select id from _c5)::uuid), 'sem adicional')
+  || '|' || ((select canceled_at is not null from public.container_services where id = (select id from _c1)::uuid))::text
+  || '|' || (select count(*)::text from public.container_service_audit where service_id = (select id from _c1)::uuid and action = 'corrected'));
+select pg_temp.registrar('SEGURO', 'C6. repetir a correção com a mesma chave devolve o mesmo substituto (idempotente)', 'true',
+  (pg_temp.adm(format($q$select public.corrigir_servico_container(%L::uuid, %L::jsonb, '5c10a0d0-0000-4000-8000-0000000000c5', 'CP10 correção: valor')::text$q$,
+    (select id from _c1), jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', null,
+      'solicitadoEm', '2026-03-20', 'executadoEm', '2026-03-20', 'descricao', 'Contêiner legado CP10', 'quantidade', 1,
+      'receitaCentavos', 30000, 'custoTotalCentavos', 10000, 'referencia', 'LEG-1', 'modalidadeCusto', 'total_distribuido',
+      'competenciaCobranca', null, 'participantes', jsonb_build_array(jsonb_build_object('colaboradorId', '5c10f000-0000-4000-8000-000000000003', 'custoCentavos', 10000))) || jsonb_build_object('receitaCentavos', 32000))) = (select id from _c5))::text);
+select pg_temp.registrar('SEGURO', 'C7. registro CANCELADO não é corrigido (55000)', 'erro 55000',
+  pg_temp.adm(format($q$select public.corrigir_servico_container(%L::uuid, %L::jsonb, gen_random_uuid(), 'CP10 correção indevida')::text$q$,
+    (select id from _c1), jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', null,
+      'solicitadoEm', '2026-03-20', 'executadoEm', '2026-03-20', 'descricao', 'Contêiner legado CP10', 'quantidade', 1,
+      'receitaCentavos', 30000, 'custoTotalCentavos', 10000, 'referencia', 'LEG-1', 'modalidadeCusto', 'total_distribuido',
+      'competenciaCobranca', null, 'participantes', jsonb_build_array(jsonb_build_object('colaboradorId', '5c10f000-0000-4000-8000-000000000003', 'custoCentavos', 10000))) || jsonb_build_object('receitaCentavos', 99900))));
+select pg_temp.registrar('SEGURO', 'C8. registro FATURADO (o do D4, na fatura do D5) não é corrigido (55000)', 'erro 55000',
+  pg_temp.adm(format($q$select public.corrigir_servico_container(%L::uuid, %L::jsonb, gen_random_uuid(), 'CP10 correção de faturado')::text$q$,
+    (select cs.id from public.container_services cs join public.billing_additionals a on a.id = cs.billing_additional_id
+      where a.invoice_id = (select id from _f2)::uuid limit 1),
+    jsonb_build_object('clienteId', '5c10c000-0000-4000-8000-0000000000c2', 'operacaoId', '5c10e000-0000-4000-8000-0000000000a2',
+      'solicitadoEm', '2026-03-04', 'executadoEm', '2026-03-04', 'descricao', 'Contêiner 40 pés', 'quantidade', 1,
+      'receitaCentavos', 99900, 'custoTotalCentavos', 10000, 'referencia', 'CNT-1', 'modalidadeCusto', 'total_distribuido',
+      'competenciaCobranca', null, 'participantes', jsonb_build_array(jsonb_build_object('colaboradorId', '5c10f000-0000-4000-8000-000000000003', 'custoCentavos', 10000))))));
+create temporary table _c9 on commit drop as
+  select pg_temp.adm(format($q$select public.cancelar_servico_container(%L::uuid, 'CP10 cancelamento do substituto')::text$q$, (select id from _c5))) as r;
+select pg_temp.registrar('SEGURO', 'C9. o cancelamento do histórico segue pela API do admin (o substituto da correção), com trilha canceled', 'true|true|1',
+  ((select r from _c9) not like 'erro %')::text
+  || '|' || (select canceled_at is not null from public.container_services where id = (select id from _c5)::uuid)::text
+  || '|' || (select count(*)::text from public.container_service_audit where service_id = (select id from _c5)::uuid and action = 'canceled'));
 
 -- ---------------------------------------------------------------------------
 -- K. Contrato encerrado (DEC-CP02-01)

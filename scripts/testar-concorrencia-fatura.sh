@@ -33,6 +33,8 @@ T=$(mktemp -d "${TMPDIR:-/tmp}/conc-fatura.XXXXXX"); trap 'rm -rf "$T"' EXIT
 psql_() { docker exec -i "$CONTAINER" psql -U postgres -d postgres -X -q -At -v ON_ERROR_STOP=1 "$@"; }
 CLAIMS='{"sub":"5c470000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal1","session_id":"ec470000-0000-4000-8000-0000000000a1"}'
 adm() { printf "begin; select set_config('request.jwt.claims','%s',true); set local role authenticated; %s commit;" "$CLAIMS" "$1"; }
+# GATE-FIN-02 (052): registro antigo de contêiner como fixture histórica, pela dona da função.
+dono() { printf "begin; select set_config('request.jwt.claims','%s',true); %s commit;" "$CLAIMS" "$1"; }
 cli() { printf '5c47c000-0000-4000-8000-%012d' "$1"; }
 
 PASS=0; FAIL=0
@@ -81,7 +83,7 @@ vitorias_f=0; vitorias_c=0
 echo "R2  gerar_fatura × cancelar_servico_container ($RODADAS rodadas)"
 for r in $(seq 1 "$RODADAS"); do
   c=$((RODADAS + r))
-  srv=$(psql_ -c "$(adm "$(sql_container "$c")")" | tail -1)
+  srv=$(psql_ -c "$(dono "$(sql_container "$c")")" | tail -1)
   correr R2 "$(adm "$(sql_fatura "$c")")" "$(adm "select public.cancelar_servico_container('$srv'::uuid,'corrida')::text;")"
   rcA=$(cat "$T/A.rc"); rcB=$(cat "$T/B.rc")
   eq "R2 rodada $r: exatamente uma das operações vence" "$(( (rcA==0) + (rcB==0) ))" "1"
