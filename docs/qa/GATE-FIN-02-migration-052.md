@@ -101,13 +101,13 @@ e C5–C9 são casos novos da 052.
 
 ## Regressão completa (com a 052)
 
-| Verificação | Resultado |
-| --- | --- |
-| `npm run e2e:local` | **238 testes · 237 PASS · 0 FAIL · 1 FALHA CONHECIDA (CN-D) · 0 PULADO** · 1671 s · nenhuma rede externa (237 de antes + M8) |
-| SQL local | 53 suítes PASS (090: 32 SEGURO, 14 RISCO) |
-| `test:*` | 82/82 (`test:legado-local` 13, novo; inventário de migrations atualizado em 4 suítes) |
-| lint · `tsc` · Prettier · `check:workflow` · `git diff --check` · build | PASS |
-| travas | 25/25 |
+| Verificação                                                             | Resultado                                                                                                                    |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `npm run e2e:local`                                                     | **238 testes · 237 PASS · 0 FAIL · 1 FALHA CONHECIDA (CN-D) · 0 PULADO** · 1671 s · nenhuma rede externa (237 de antes + M8) |
+| SQL local                                                               | 53 suítes PASS (090: 32 SEGURO, 14 RISCO)                                                                                    |
+| `test:*`                                                                | 82/82 (`test:legado-local` 13, novo; inventário de migrations atualizado em 4 suítes)                                        |
+| lint · `tsc` · Prettier · `check:workflow` · `git diff --check` · build | PASS                                                                                                                         |
+| travas                                                                  | 25/25                                                                                                                        |
 
 ## Rollback e compatibilidade
 
