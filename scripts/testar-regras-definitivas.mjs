@@ -644,9 +644,9 @@ const migrations = readdirSync("supabase/migrations")
   .filter((f) => f.endsWith(".sql"))
   .sort();
 verificar(
-  "G1. a 030 existe, a 052 (encerra o cadastro pela RPC legada de contêiner, GATE-FIN-02) é a última migration e a 019 continua ausente",
+  "G1. a 030 existe, a 053 (recusa intervalo maior que a jornada, GATE-FIN-03) é a última migration e a 019 continua ausente",
   [migrations.includes(NOME), migrations.at(-1), migrations.some((m) => m.includes("_019_"))],
-  [true, "20261119120000_052_encerrar_cadastro_container_legado.sql", false],
+  [true, "20261120120000_053_recusar_intervalo_maior_que_jornada.sql", false],
 );
 verificar(
   "G2. arredondamento só na COBRANÇA: o custo usa o excedente exato; o feriado só no custo",

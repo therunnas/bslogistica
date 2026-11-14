@@ -15,9 +15,10 @@
 -- admin livre para inflar o valor derivado, que foi exatamente o estado
 -- anterior.
 --
--- O QUE ESTE ARQUIVO NÃO PROVA: que existe teto. Não existe, de propósito —
--- `break_minutes` maior que a jornada continua aceito e é absorvido pelo
--- `GREATEST(0, …)` da 010. Teto é decisão separada, registrada no PROGRESS.md.
+-- O QUE ESTE ARQUIVO NÃO PROVA: o teto. A 014 não o criou, de propósito. Desde a
+-- 053 (GATE-FIN-03) o intervalo maior que o tempo entre entrada e saída é
+-- recusado por trigger próprio, provado em `053_intervalo_maior_que_jornada.sql`;
+-- aqui ele só entra no inventário de triggers (I1).
 
 begin;
 
@@ -544,7 +545,9 @@ begin
   -- escrita em folha fechada: são 15.
   -- A 040 acrescenta o gatilho que grava os snapshots de função e período (sem tocar em valor): são 16.
   -- A 044 acrescenta somente o snapshot territorial: 17 no banco 044, os 16 originais no 043.
-  perform pg_temp.registrar('I1. lista exata de triggers de timesheet_entries preserva todos os anteriores e o snapshot territorial da 044 quando instalada',
+  -- A 053 acrescenta a recusa de intervalo maior que a jornada (o teto que este arquivo dizia
+  -- não existir): são 18.
+  perform pg_temp.registrar('I1. lista exata de triggers de timesheet_entries preserva todos os anteriores, o snapshot territorial da 044 quando instalada e o teto do intervalo da 053',
     'trg_timesheet_entries_ancora_folha, ' ||
     case when to_regclass('public.municipality_catalog') is null then ''
       else 'trg_timesheet_entries_ba_snapshot_territorial, ' end ||
@@ -554,6 +557,7 @@ begin
     'trg_timesheet_entries_bloqueia_desvinculo, trg_timesheet_entries_bloqueia_edicao_faturada, '
     'trg_timesheet_entries_bloqueia_folha_fechada, '
     'trg_timesheet_entries_bloqueia_horario_igual, '
+    'trg_timesheet_entries_bloqueia_intervalo_maior, '
     'trg_timesheet_entries_bloqueia_truncate, trg_timesheet_entries_bloqueia_vinculo_direto, '
     'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_bz_snapshots_funcao_periodo, '
     'trg_timesheet_entries_calculo_financeiro, '

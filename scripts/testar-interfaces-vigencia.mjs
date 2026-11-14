@@ -1220,13 +1220,13 @@ console.log("I. Migrations intactas, scripts e CI");
 
 const migrations = readdirSync(new URL("../supabase/migrations/", import.meta.url)).sort();
 verificar(
-  "I1. a 052 (encerra o cadastro pela RPC legada de contêiner, GATE-FIN-02) é a última migration, a 051, a 050, a 048, a 047, a 046, a 045, a 044, a 043, a 042, a 041, a 040, a 039, a 038, a 037, a 035, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
+  "I1. a 053 (recusa intervalo maior que a jornada, GATE-FIN-03) é a última migration, a 052, a 051, a 050, a 048, a 047, a 046, a 045, a 044, a 043, a 042, a 041, a 040, a 039, a 038, a 037, a 035, a 034, a 033, a 032, a 031, a 030, a 029, a 028, a 027, a 026 e a 025 não são a última e a 019 está ausente",
   [
     migrations.length,
     migrations[migrations.length - 1],
     migrations.some((m) => m.includes("_019_")),
   ],
-  [57, "20261119120000_052_encerrar_cadastro_container_legado.sql", false],
+  [58, "20261120120000_053_recusar_intervalo_maior_que_jornada.sql", false],
 );
 verificar(
   "I2. a migration 025 não foi alterada (SHA-256 aprovado na homologação)",
