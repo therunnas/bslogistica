@@ -655,9 +655,9 @@ select pg_temp.registrar('V3. as 16 funções SECURITY DEFINER são do postgres,
                         'condicoes_exigir_admin', 'condicoes_auditar', 'condicoes_encerrar_contrato_interno', 'condicoes_encerrar_colaborador_interno')));
 -- O inventário permanece fixado no conjunto da 023: o snapshot territorial da 044
 -- é aditivo e fica explicitamente fora, como os acréscimos posteriores já listados.
-select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (os da 024, 029, 031, 040 e 044, se aplicadas, ficam de fora da conta)', '11',
+select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (os da 024, 029, 031, 040, 044 e 053, se aplicadas, ficam de fora da conta)', '11',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'
-      and tgname not in ('trg_timesheet_entries_bloqueia_condicoes_operacao', 'trg_timesheet_entries_bloqueia_horario_igual', 'trg_timesheet_entries_bloqueia_folha_fechada', 'trg_timesheet_entries_bz_snapshots_funcao_periodo', 'trg_timesheet_entries_ba_snapshot_territorial')));
+      and tgname not in ('trg_timesheet_entries_bloqueia_condicoes_operacao', 'trg_timesheet_entries_bloqueia_horario_igual', 'trg_timesheet_entries_bloqueia_folha_fechada', 'trg_timesheet_entries_bz_snapshots_funcao_periodo', 'trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior')));
 select pg_temp.registrar('V5. a derivação financeira e gerar_fatura não citam as versões (continuam como estavam)', '0',
   (select count(*)::text from pg_proc where pronamespace = 'public'::regnamespace and proname in ('derivar_valores_financeiros', 'gerar_fatura')
      and (prosrc ilike '%contract_terms%' or prosrc ilike '%employee_cost_terms%' or prosrc ilike '%financial_terms_audit%')));

@@ -13,7 +13,7 @@ import {
  */
 
 test.describe("ambiente local", () => {
-  test("banco local com as migrations do repositório (57: as 56 da Production + a 052 só local; motor ON, resolução OFF, dobro ON)", () => {
+  test("banco local com as migrations do repositório (58: as 56 da Production + a 052 e a 053 só locais; motor ON, resolução OFF, dobro ON)", () => {
     const estado = consultar<{
       migrations: number;
       head: string;
@@ -31,8 +31,8 @@ test.describe("ambiente local", () => {
              where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
                and not c.relrowsecurity) as sem_rls`)[0];
     expect(estado).toEqual({
-      migrations: 57,
-      head: "20261119120000",
+      migrations: 58,
+      head: "20261120120000",
       motor: true,
       resolucao: false,
       dobro: true,

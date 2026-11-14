@@ -73,6 +73,13 @@ Fora da cadeia financeira acima:
   052 → estado 051 só quanto ao `EXECUTE` de `registrar_servico_container` (`GRANT` a `authenticated`).
   **Reabre AUT-CP06-01** (cadastro de contêiner com receita pela API, fora da interface). Não toca dados
   nem corpos; a correção do histórico funciona igual com ou sem o grant. Ensaiado só localmente.
+  Não apaga o registro da 052 em `schema_migrations` (corrigido no GATE-FIN-03): o histórico fica e a
+  reversão de privilégio é registrada como operação distinta.
+- [rollback-recusar-intervalo-maior-que-jornada.sql](rollback-recusar-intervalo-maior-que-jornada.sql):
+  053 → estado 052 quanto ao teto do intervalo (`DROP` do trigger e da função da 053). **Reabre o I5**:
+  com o motor desligado o intervalo maior volta a zerar a jornada com a diária cobrada; com o motor
+  ligado, o núcleo volta a ser a única barreira, com mensagem técnica (22023). Não toca dados nem
+  `schema_migrations`. Ensaiado só localmente.
 
 A ordem nominal inversa (043 → 042 → … → 035) é apenas uma relação de
 precedência dos estágios financeiros. **Não é uma sequência de comandos pronta
