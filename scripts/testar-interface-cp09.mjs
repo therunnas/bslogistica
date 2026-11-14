@@ -260,6 +260,23 @@ verificar(
   [],
 );
 
+// D-CP10-02 (achado no E2E completo do CP-10): a grade do dia, com linhas, também precisa de nome
+// em cada campo — o rótulo da coluna não é rótulo do campo.
+verificar(
+  "E3. grade do admin: presença, entrada, saída e intervalo de cada linha com o nome do colaborador",
+  ["Presença", "Entrada", "Saída", "Intervalo (min)"].map((r) =>
+    telas.apontamentos.includes("aria-label={`" + r + ' de ${employee?.name ?? "colaborador"}`}'),
+  ),
+  [true, true, true, true],
+);
+verificar(
+  "E4. grade do operador: os mesmos campos e a observação",
+  ["Presença", "Entrada", "Saída", "Intervalo (min)", "Observação"].map((r) =>
+    telas.operacional.includes("aria-label={`" + r + " de ${linha.employee_name}`}"),
+  ),
+  [true, true, true, true, true],
+);
+
 // ---------------------------------------------------------------------------------------------
 // F. D-CP09-02 — a tela do operador tem título em todos os estados
 // ---------------------------------------------------------------------------------------------

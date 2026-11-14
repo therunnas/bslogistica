@@ -1622,7 +1622,11 @@ export function PainelApontamentos() {
                           }
                           disabled={isClosed || faturados.has(row.employeeId)}
                         >
-                          <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
+                          {/* D-CP10-02: nome acessível por linha (leitor de tela anuncia de quem é o campo). */}
+                          <SelectTrigger
+                            aria-label={`Presença de ${employee?.name ?? "colaborador"}`}
+                            className="h-9 w-36 rounded-xl border-input bg-secondary/40"
+                          >
                             <SelectValue />
                           </SelectTrigger>
 
@@ -1641,6 +1645,7 @@ export function PainelApontamentos() {
                       <TableCell>
                         <Input
                           type="time"
+                          aria-label={`Entrada de ${employee?.name ?? "colaborador"}`}
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                           value={row.checkIn}
                           disabled={
@@ -1657,6 +1662,7 @@ export function PainelApontamentos() {
                       <TableCell>
                         <Input
                           type="time"
+                          aria-label={`Saída de ${employee?.name ?? "colaborador"}`}
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                           value={row.checkOut}
                           disabled={
@@ -1694,6 +1700,7 @@ export function PainelApontamentos() {
                         <Input
                           type="number"
                           min="0"
+                          aria-label={`Intervalo (min) de ${employee?.name ?? "colaborador"}`}
                           className="h-9 w-20 rounded-xl border-input bg-secondary/40"
                           value={row.breakMinutes}
                           disabled={

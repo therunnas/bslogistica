@@ -643,7 +643,11 @@ export function PainelOperacional() {
                                 })
                               }
                             >
-                              <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
+                              {/* D-CP10-02: nome acessível por linha. */}
+                              <SelectTrigger
+                                aria-label={`Presença de ${linha.employee_name}`}
+                                className="h-9 w-36 rounded-xl border-input bg-secondary/40"
+                              >
                                 <SelectValue />
                               </SelectTrigger>
 
@@ -660,6 +664,7 @@ export function PainelOperacional() {
                           <TableCell>
                             <Input
                               type="time"
+                              aria-label={`Entrada de ${linha.employee_name}`}
                               className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                               value={linha.check_in.slice(0, 5)}
                               disabled={travada || linha.status === "absent"}
@@ -674,6 +679,7 @@ export function PainelOperacional() {
                           <TableCell>
                             <Input
                               type="time"
+                              aria-label={`Saída de ${linha.employee_name}`}
                               className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                               value={linha.check_out.slice(0, 5)}
                               disabled={travada || linha.status === "absent"}
@@ -709,6 +715,7 @@ export function PainelOperacional() {
                             <Input
                               type="number"
                               min={0}
+                              aria-label={`Intervalo (min) de ${linha.employee_name}`}
                               className="h-9 w-24 rounded-xl border-input bg-secondary/40"
                               value={linha.break_minutes}
                               disabled={travada || linha.status === "absent"}
@@ -722,6 +729,7 @@ export function PainelOperacional() {
 
                           <TableCell>
                             <Input
+                              aria-label={`Observação de ${linha.employee_name}`}
                               className="h-9 min-w-48 rounded-xl border-input bg-secondary/40"
                               value={linha.notes}
                               disabled={travada}

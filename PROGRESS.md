@@ -51,7 +51,7 @@ começou** (ver "Bloqueio do piloto").
 | CP-07  | Fechamento e faturamento                                                           | PASS (local) |
 | CP-08  | Dashboard, relatórios e exportações (+ modelo de negócio consolidado, sessão 13)   | PASS (local) |
 | CP-09  | Interface, clareza e consistência                                                  | PASS (local) |
-| CP-10  | Segurança, integridade e infraestrutura                                            | não iniciado |
+| CP-10  | Segurança, integridade e infraestrutura                                            | PASS com pendências bloqueantes (local) |
 | CP-11  | Regressão integrada final                                                          | não iniciado |
 | CP-12  | Roteiro de homologação com o responsável (HML só com autorização)                  | não iniciado |
 
@@ -170,6 +170,23 @@ DEC-CP06-01). Matriz de gates financeiros do CP-09: **bloqueantes para o piloto*
 Production e código de Production desatualizado (D5); **decisão pendente** — cobrança e custos
 por produção (se o piloto os tiver), contrato encerrado (DEC-CP02-01) e cancelamento de fatura
 (DEC-CP07-03); os demais itens não bloqueiam, com justificativa no documento.
+
+CP-10 (14/11/2026, sessão 15) — **PASS COM PENDÊNCIAS BLOQUEANTES**: auditoria de autenticação,
+sessões, autorização, RLS, grants, RPCs, integridade e infraestrutura, só no Supabase local; detalhe
+em [docs/qa/CP-10-seguranca-integridade-infraestrutura.md](docs/qa/CP-10-seguranca-integridade-infraestrutura.md).
+**Comprovado seguro:** matriz pela API (31 tabelas × 4 verbos × operacional, sem papel e anônimo:
+nada lido nem gravado; spec 99), as 65 RPCs `SECURITY DEFINER` recusam quem não é admin (e o
+admin nas do operador), nenhuma DEFINER sem `search_path` ou executável por `anon`, JWT anterior ao
+logout sem efeito, faturado imutável. **Corrigidos:** D-CP10-01 (`X-Powered-By: Next.js`) e
+D-CP10-02 (campos da grade do dia sem nome acessível, achado no E2E completo).
+**Riscos reproduzidos no banco** (suíte SQL 090, 15 casos): jornada impossível aceita pelas RPCs
+das duas telas com o motor ligado (08:00→07:50 = R$ 953,13 num dia; AUT-CP05-01); emissão diferente
+do conferido (AUT-CP07-01); o mesmo contêiner cobrado 4× numa fatura (DEC-CP06-04, sem depender de
+registro antigo); a RPC legada de contêiner ainda cria receita (AUT-CP06-01); cobrança depois do
+fim do contrato (DEC-CP02-01); sem cancelamento de fatura (DEC-CP07-03). **A matriz de gates do
+CP-09 foi substituída:** demonstração fictícia GO condicionado; **piloto financeiro real NO-GO**
+até P-CP10-01/03/05/06 (migrations, com autorização e decisões), os feriados e a publicação.
+`npm audit`: 12 moderadas em dependências de build/dev (antes zero).
 
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,

@@ -104,6 +104,9 @@ jobs:
       - name: Testes de interface, clareza e consistência (CP-09)
         run: npm run test:interface-cp09
 
+      - name: Testes de segurança da aplicação (CP-10)
+        run: npm run test:seguranca-cp10
+
       - name: Teste troca
         run: npm run test:troca
 

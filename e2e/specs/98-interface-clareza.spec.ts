@@ -5,6 +5,7 @@ import { contarPorNome, lit } from "../apoio/banco";
 import { consultar, estadoDe, expect, test } from "../apoio/fixtures";
 import {
   P,
+  abrirDia,
   abrirFaturamento,
   alocar,
   campo,
@@ -216,6 +217,30 @@ test.describe("AU auditoria automática dos diálogos de cadastro", () => {
         await expect(page.getByRole("dialog")).toHaveCount(0);
       }
       expect(achados, achados.join("\n")).toEqual([]);
+    });
+  }
+});
+
+test.describe("AU grade de apontamentos com linhas", () => {
+  test.use({ storageState: estadoDe("admin") });
+  // D-CP10-02: a auditoria das rotas passa pelo /apontamentos com a seleção padrão, que pode não ter
+  // equipe — e então a grade fica vazia e nada é auditado. Aqui a grade TEM linha (ANA no turno).
+  for (const vp of [VIEWPORTS[0], VIEWPORTS[2]]) {
+    test(`AU grade ${vp.nome} ${vp.width}px: presença, entrada, saída e intervalo de cada linha têm nome`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await abrirDia(page, { operacao: OP, turno: DIA, data: "2027-07-06" });
+      const linha = page.locator("tr").filter({ hasText: ANA }).first();
+      // A grade chega depois da linha: só audita com os campos da linha já na tela.
+      await expect(linha.getByRole("combobox").first()).toBeVisible();
+      await expect(linha.locator("input[type=time]")).toHaveCount(2);
+      const achados = await auditar(page);
+      expect(achados, achados.join("\n")).toEqual([]);
+      await expect(linha.getByRole("combobox", { name: `Presença de ${ANA}` })).toBeVisible();
+      await expect(linha.getByLabel(`Entrada de ${ANA}`)).toBeVisible();
+      await expect(linha.getByLabel(`Saída de ${ANA}`)).toBeVisible();
+      await expect(linha.getByLabel(`Intervalo (min) de ${ANA}`)).toBeVisible();
     });
   }
 });

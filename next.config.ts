@@ -64,6 +64,10 @@ const nextConfig: NextConfig = {
   // quebrado vira erro de compilação em vez de 404 em produção.
   typedRoutes: true,
 
+  // D-CP10-01: não anunciar o framework (X-Powered-By: Next.js) — informação de graça para quem
+  // procura versão vulnerável. Os demais cabeçalhos de segurança seguem abaixo e no proxy (CSP).
+  poweredByHeader: false,
+
   async headers() {
     return [{ source: "/:path*", headers: cabecalhosDeSeguranca }];
   },
