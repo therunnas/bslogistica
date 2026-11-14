@@ -165,6 +165,47 @@ const src = readdirSync(new URL("../src/", import.meta.url), { recursive: true }
   .filter((n) => /legado-local|registrarRegistroAntigoLocal/.test(ler(`src/${n}`)));
 verificar("D1. nada no app importa o helper de teste", src, []);
 
+console.log("\nE. Migration 052 e rollback\n");
+
+const sem = (t) => t.replace(/--.*$/gm, "");
+const m052 = sem(
+  ler("supabase/migrations/20261119120000_052_encerrar_cadastro_container_legado.sql"),
+);
+verificar(
+  "E1. a 052 só revoga o EXECUTE externo da RPC legada (nenhum DROP, GRANT, função reescrita ou dado tocado)",
+  [
+    /revoke execute on function public\.registrar_servico_container\(jsonb, uuid, text\)\s+from public, anon, authenticated, service_role;/.test(
+      m052,
+    ),
+    /\bdrop\b/i.test(m052),
+    /\bgrant\b/i.test(m052),
+    /create (or replace )?function/i.test(m052),
+    /\b(insert|update|delete|truncate)\b\s/i.test(m052.replace(/raise exception[^;]*;/g, "")),
+  ],
+  [true, false, false, false, false],
+);
+verificar(
+  "E2. a autoverificação confere os papéis externos, a dona e que correção e cancelamento seguem disponíveis",
+  [
+    "'anon', 'authenticated', 'service_role'",
+    "aclexplode",
+    "corrigir_servico_container",
+    "cancelar_servico_container",
+  ].every((t) => m052.includes(t)),
+  true,
+);
+const rb = sem(ler("docs/runbooks/rollback-encerrar-cadastro-container-legado.sql"));
+verificar(
+  "E3. o rollback devolve o EXECUTE só a authenticated, sem tocar dados",
+  [
+    /grant execute on function public\.registrar_servico_container\(jsonb, uuid, text\) to authenticated;/.test(
+      rb,
+    ),
+    /\b(insert|update|delete|truncate|drop)\b\s/i.test(rb.replace(/raise exception[^;]*;/g, "")),
+  ],
+  [true, false],
+);
+
 console.log(`\n${passou} asserções passaram, ${falhas.length} falharam.\n`);
 
 if (falhas.length > 0) {

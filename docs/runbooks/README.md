@@ -67,6 +67,13 @@ são um resumo: o SQL completo e seus dependentes devem ser conferidos.
 | [rollback-diaria-individual-bonus.sql](rollback-diaria-individual-bonus.sql)   | 042 → estágio 041                                       | Recusa diária individual, vínculo, bônus ou auditoria. Preservar os dados; analisar dependentes posteriores antes de restaurar funções da 041.                                                         |
 | [rollback-dias-especiais-v2.sql](rollback-dias-especiais-v2.sql)               | 043 → estágio 042                                       | Recusa uso/configuração especial incompatível, inclusive auditada. Restaura derivação e capacidades da 042; não verifica toda versão futura. Não executar diretamente se outro schema depender da 043. |
 
+Fora da cadeia financeira acima:
+
+- [rollback-encerrar-cadastro-container-legado.sql](rollback-encerrar-cadastro-container-legado.sql):
+  052 → estado 051 só quanto ao `EXECUTE` de `registrar_servico_container` (`GRANT` a `authenticated`).
+  **Reabre AUT-CP06-01** (cadastro de contêiner com receita pela API, fora da interface). Não toca dados
+  nem corpos; a correção do histórico funciona igual com ou sem o grant. Ensaiado só localmente.
+
 A ordem nominal inversa (043 → 042 → … → 035) é apenas uma relação de
 precedência dos estágios financeiros. **Não é uma sequência de comandos pronta
 para execução:** qualquer utilização incompatível pode impedir uma das reversões.

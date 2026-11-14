@@ -188,6 +188,15 @@ CP-09 foi substituída:** demonstração fictícia GO condicionado; **piloto fin
 até P-CP10-01/03/05/06 (migrations, com autorização e decisões), os feriados e a publicação.
 `npm audit`: 12 moderadas em dependências de build/dev (antes zero).
 
+GATE-FIN-02 (14/11/2026, sessão 18, PR Draft empilhado sobre o #134, branch
+`fix/gate-fin-02-migration-052`): **migration 052** encerra no banco o cadastro pela RPC legada de
+contêiner (AUT-CP06-01) — `REVOKE EXECUTE` de `registrar_servico_container` para os papéis externos,
+sem DROP; correção e cancelamento do histórico seguem. Fixtures SQL e E2E do registro antigo passam
+pela dona da função (helper local documentado). **Implementada e testada só no Supabase local e na
+CI; não aplicada em HML nem em Production.** Detalhe em
+[docs/qa/GATE-FIN-02-migration-052.md](docs/qa/GATE-FIN-02-migration-052.md). Seguem bloqueantes:
+AUT-CP05-01, AUT-CP07-01, DEC-CP06-04, DEC-CP07-03, DEC-CP02-01.
+
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,
 cancelamento e detalhe da fatura; vínculo com a nota fiscal). Autorização pendente:

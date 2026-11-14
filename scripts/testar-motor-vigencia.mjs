@@ -55,7 +55,7 @@ verificar(
   1,
 );
 verificar(
-  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), a 027 (ativação com divergência), a 028 (contrato da operação), a 029 (regras da BS), a 030 (regras definitivas) e as seguintes (031 a 051), que são posteriores a ela",
+  "A3. o timestamp é posterior ao de todas as outras migrations, exceto a 026 (cadastro atômico), a 027 (ativação com divergência), a 028 (contrato da operação), a 029 (regras da BS), a 030 (regras definitivas) e as seguintes (031 a 052), que são posteriores a ela",
   arquivos
     .filter(
       (a) =>
@@ -85,7 +85,8 @@ verificar(
         !a.includes("_048_") &&
         !a.includes("_049_") &&
         !a.includes("_050_") &&
-        !a.includes("_051_"),
+        !a.includes("_051_") &&
+        !a.includes("_052_"),
     )
     .every((a) => a.split("_")[0] < NOME.split("_")[0]),
   true,

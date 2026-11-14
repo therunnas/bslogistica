@@ -236,6 +236,13 @@ begin
     pg_temp.payload(),gen_random_uuid(),'Sonda sintética segurança')
     else format('select public.cancelar_servico_container(%L::uuid,%L)',pg_temp.id('principal'),'Sonda sintética cancelamento') end;
    obtido:=pg_temp.medir(ident.papel,claims,comando,true);
+   if rpc='registrar' then
+    -- 052 (GATE-FIN-02): pela API nenhum papel registra (sem EXECUTE)...
+    perform pg_temp.assert_eq('registrar pela API bloqueia '||ident.nome,obtido,'erro 42501');
+    -- ...e a guarda interna da função continua valendo quando ela é chamada pela dona (é o caminho de
+    -- corrigir_servico_container): mesma matriz de papel e piso de MFA de antes.
+    obtido:=pg_temp.medir('postgres',claims,comando,true);
+   end if;
    if ident.permitido then
     perform pg_temp.assert_eq(rpc||' permite '||ident.nome,
       (case when rpc='registrar' then obtido ~ '^[0-9a-f-]{36}$' else obtido='' end)::text,'true');
