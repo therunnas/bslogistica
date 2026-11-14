@@ -25,12 +25,14 @@ import {
  * conhecida por engano); se a correção entrar, a conferência do defeito falha e a CI acusa,
  * obrigando a trocar o teste pelo comportamento correto. Nenhum código da aplicação é alterado.
  *
+ * Desde o CP-07 todos os defeitos deste arquivo (D1, D2, D3 e D4) estão corrigidos e conferidos
+ * pelo comportamento correto. A única falha conhecida restante é a CN-D (`50-clientes-contratos`).
+ *
  * Dados próprios (cliente "Defeitos"), independentes dos outros arquivos.
  */
 
 test.use({ storageState: estadoDe("admin") });
 
-const CONHECIDA = { tag: "@falha-conhecida" };
 const CLI = `${P} Defeitos`;
 const CTR = `${P} Contrato Defeitos`;
 const OP = `${P} Op Defeitos`;
@@ -53,92 +55,97 @@ test("preparação: cliente, contrato 250, colaborador, operação e turno", asy
   await alocar(page, { operacao: OP, colaborador: HUGO, turno: TURNO });
 });
 
-test(
-  "B3 [DEFEITO]: saída antes da entrada (08:00 → 07:50) salva sem aviso como jornada de 22h50",
-  CONHECIDA,
-  async ({ page }) => {
-    await abrirDia(page, { operacao: OP, turno: TURNO, data: DATA_B3 });
-    const tr = linhaDo(page, HUGO);
-    await tr.locator("input[type=time]").nth(0).fill("08:00");
-    await tr.locator("input[type=time]").nth(1).fill("07:50");
-    await page.getByRole("button", { name: "Salvar", exact: true }).click();
-    // Correto seria um aviso de jornada atípica com confirmação. Hoje salva direto:
-    await esperarAviso(page, "Apontamento salvo.");
-    await expect(page.getByRole("alertdialog")).toHaveCount(0);
-    const l = lancamento(OP, HUGO, DATA_B3);
-    // Calculado à mão pela regra atual (fator 1,5, tolerância 10 min, blocos de 15/45 min).
-    expect(l?.receita).toBe("953.13");
-    expect(l?.custo).toBe("428.13");
-  },
-);
+// D1/B3: CORRIGIDO no CP-05. Saída antes da entrada num turno que não vira o dia não é mais
+// gravada em silêncio: a tela bloqueia até corrigir o horário ou confirmar a linha. Deixou de ser
+// falha conhecida: o teste confere o comportamento correto, sem a etiqueta. O cálculo não mudou.
+test("[CORRIGIDO D1] saída antes da entrada (08:00 → 07:50): aviso e bloqueio até confirmar", async ({
+  page,
+}) => {
+  await abrirDia(page, { operacao: OP, turno: TURNO, data: DATA_B3 });
+  const tr = linhaDo(page, HUGO);
+  await tr.locator("input[type=time]").nth(0).fill("08:00");
+  await tr.locator("input[type=time]").nth(1).fill("07:50");
+  const salvar = page.getByRole("button", { name: "Salvar", exact: true });
+  await expect(page.getByRole("alert").filter({ hasText: "saída antes da entrada" })).toBeVisible();
+  await expect(salvar).toBeDisabled();
+  expect(lancamento(OP, HUGO, DATA_B3), "nada gravado sem confirmação").toBeUndefined();
+  // Confirmada expressamente, grava pelo cálculo de sempre (fator 1,5, tolerância 10, blocos 15/45).
+  await tr
+    .getByRole("checkbox", { name: /Confirmo que a jornada atravessou a meia-noite/ })
+    .check();
+  await salvar.click();
+  await esperarAviso(page, "Apontamento salvo.");
+  const l = lancamento(OP, HUGO, DATA_B3);
+  expect(l?.receita).toBe("953.13");
+  expect(l?.custo).toBe("428.13");
+});
 
-test(
-  "[DEFEITO] duplo clique em “Salvar cliente” cria dois clientes iguais",
-  CONHECIDA,
-  async ({ page }) => {
-    const nome = `${P} Duplo`;
-    await page.goto("/clientes");
-    await page.getByRole("button", { name: "Novo cliente" }).click();
-    const d = dialogo(page);
-    await campo(d, "Nome").fill(nome);
-    // Dois cliques no mesmo instante (mesmo tick), como um duplo clique rápido.
-    await d.getByRole("button", { name: "Salvar cliente" }).evaluate((botao: HTMLElement) => {
-      botao.click();
-      botao.click();
-    });
-    await expect.poll(() => contarPorNome("clients", nome), { timeout: 20_000 }).toBe(2);
-  },
-);
+// D3 em cliente: CORRIGIDO no CP-02 (trava de envio único). Deixou de ser falha conhecida: o
+// teste agora confere o comportamento correto, sem a etiqueta. (D3 em turno segue abaixo, CP-04.)
+test("[CORRIGIDO D3] duplo clique em “Salvar cliente” cria um único cliente", async ({ page }) => {
+  const nome = `${P} Duplo`;
+  await page.goto("/clientes");
+  await page.getByRole("button", { name: "Novo cliente" }).click();
+  const d = dialogo(page);
+  await campo(d, "Nome").fill(nome);
+  // Dois cliques no mesmo instante (mesmo tick), como um duplo clique rápido.
+  await d.getByRole("button", { name: "Salvar cliente" }).evaluate((botao: HTMLElement) => {
+    botao.click();
+    botao.click();
+  });
+  await expect.poll(() => contarPorNome("clients", nome), { timeout: 20_000 }).toBe(1);
+  await page.waitForTimeout(1500);
+  expect(contarPorNome("clients", nome)).toBe(1);
+});
 
-test(
-  "[DEFEITO] duplo clique em “Salvar turno” cria dois turnos iguais",
-  CONHECIDA,
-  async ({ page }) => {
-    const nome = "Turno Duplo";
-    await page.goto("/operacoes");
-    await cartaoDaOperacao(page, OP).getByRole("button", { name: "Turno", exact: true }).click();
-    const d = dialogo(page);
-    await campo(d, "Nome do turno").fill(nome);
-    await d.getByRole("button", { name: "Salvar turno" }).evaluate((botao: HTMLElement) => {
-      botao.click();
-      botao.click();
-    });
-    await expect.poll(() => contarPorNome("shifts", nome), { timeout: 20_000 }).toBe(2);
-  },
-);
+// D3 em turno: CORRIGIDO no CP-04 (trava de envio único). Deixou de ser falha conhecida: o teste
+// agora confere o comportamento correto, sem a etiqueta.
+test("[CORRIGIDO D3] duplo clique em “Salvar turno” cria um único turno", async ({ page }) => {
+  const nome = "Turno Duplo";
+  await page.goto("/operacoes");
+  await cartaoDaOperacao(page, OP).getByRole("button", { name: "Turno", exact: true }).click();
+  const d = dialogo(page);
+  await campo(d, "Nome do turno").fill(nome);
+  await d.getByRole("button", { name: "Salvar turno" }).evaluate((botao: HTMLElement) => {
+    botao.click();
+    botao.click();
+  });
+  await expect.poll(() => contarPorNome("shifts", nome), { timeout: 20_000 }).toBe(1);
+  await page.waitForTimeout(1500);
+  expect(contarPorNome("shifts", nome)).toBe(1);
+});
 
-test(
-  "[DEFEITO] “Alterar custo”: trocar a data apaga o valor digitado",
-  CONHECIDA,
-  async ({ page }) => {
-    await abrirColaborador(page, HUGO);
-    await dialogo(page).getByRole("button", { name: "Alterar custo" }).click();
-    const d = dialogo(page);
-    await expect(d.getByRole("heading", { name: "Alterar custo" })).toBeVisible();
-    const valor = d.locator("#valor-atual-daily_cost");
-    await valor.fill("199");
-    await expect(valor).toHaveValue("199");
-    await d.locator("#valor-atual-inicio").fill("2026-10-01");
-    // Correto seria manter 199. Hoje a tela recarrega o valor da versão que começa nessa data:
-    await expect(valor).toHaveValue(/^150(\.0+)?$/);
-    await d.getByRole("button", { name: "Cancelar" }).click();
-  },
-);
+// D2: CORRIGIDO no CP-03 (o formulário guarda o que foi digitado ao trocar a data). Deixou de ser
+// falha conhecida: o teste confere o comportamento correto, sem a etiqueta.
+test("[CORRIGIDO D2] “Alterar custo”: trocar a data mantém o valor digitado", async ({ page }) => {
+  await abrirColaborador(page, HUGO);
+  await dialogo(page).getByRole("button", { name: "Alterar custo" }).click();
+  const d = dialogo(page);
+  await expect(d.getByRole("heading", { name: "Alterar custo" })).toBeVisible();
+  const valor = d.locator("#valor-atual-daily_cost");
+  await valor.fill("199");
+  await expect(valor).toHaveValue("199");
+  await d.locator("#valor-atual-inicio").fill("2026-10-01");
+  await expect(valor).toHaveValue("199");
+  await d.getByRole("button", { name: "Cancelar" }).click();
+});
 
-test(
-  "[RISCO] a confirmação da fatura não avisa sobre dias ainda abertos",
-  CONHECIDA,
-  async ({ page }) => {
-    await abrirFaturamento(page, { cliente: CLI, inicio: "2026-10-16", fim: "2026-10-31" });
-    // O dia 20/10 continua "Aberto" (ninguém clicou em "Fechar dia").
-    await page.getByRole("button", { name: "Gerar fatura" }).click();
-    const confirmacao = page.getByRole("alertdialog");
-    await expect(confirmacao.getByRole("heading", { name: "Emitir fatura?" })).toBeVisible();
-    await expect(confirmacao).toContainText("Apontamentos1");
-    // Correto seria listar os dias abertos. Hoje não há menção:
-    await expect(confirmacao).not.toContainText(/aberto|não fechad/i);
-    // Nunca emitir aqui: só conferir a confirmação.
-    await confirmacao.getByRole("button", { name: "Cancelar" }).click();
-    await expect(page.getByRole("alertdialog")).toHaveCount(0);
-  },
-);
+// D4: CORRIGIDO no CP-07. A confirmação distingue dias fechados, abertos e sem apontamento e lista
+// os dias ainda abertos, SEM bloquear a emissão (a política de bloqueio não foi decidida). Deixou de
+// ser falha conhecida; a cobertura completa está em `95-fechamento-faturamento` (D4).
+test("[CORRIGIDO D4] a confirmação da fatura avisa sobre dias ainda abertos", async ({ page }) => {
+  await abrirFaturamento(page, { cliente: CLI, inicio: "2026-10-16", fim: "2026-10-31" });
+  // O dia 20/10 continua "Aberto" (ninguém clicou em "Fechar dia").
+  await page.getByRole("button", { name: "Gerar fatura" }).click();
+  const confirmacao = page.getByRole("alertdialog");
+  await expect(confirmacao.getByRole("heading", { name: "Emitir fatura?" })).toBeVisible();
+  await expect(confirmacao).toContainText("Apontamentos1");
+  await expect(confirmacao).toContainText(/Dias com apontamento\s*1 \(0 fechados, 1 aberto\)/);
+  const aviso = confirmacao.getByRole("alert").filter({ hasText: /ainda aberto/i });
+  await expect(aviso).toContainText("20/10/2026");
+  await expect(aviso).toContainText(OP);
+  await expect(confirmacao.getByRole("button", { name: "Emitir fatura" })).toBeEnabled();
+  // Nunca emitir aqui: só conferir a confirmação.
+  await confirmacao.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+});

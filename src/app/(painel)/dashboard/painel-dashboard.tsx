@@ -36,8 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { marginPct } from "@/lib/billing";
-import { brl, dateBR, minutesToHours, monthRange, num, pct } from "@/lib/format";
+import { brl, dateBR, minutesToHours, monthRange, num } from "@/lib/format";
 import { inPeriod, sumBy, useLedger } from "@/lib/ledger";
 import { decidirExibicao, linhasParaExibicao } from "@/lib/ledger-estado";
 import type { AvisoDoLedger } from "@/lib/ledger-estado";
@@ -48,6 +47,11 @@ import { useResumoFinanceiro } from "@/lib/regras-definitivas-dados";
 import { somarCustoDeContainers } from "@/lib/custo-containers";
 import { useCustoDeContainers } from "@/lib/custo-containers-dados";
 import { descricaoDaReceita } from "@/lib/resumo-financeiro";
+import {
+  descricaoDasDiarias,
+  diariasDeDomingoOuFeriado,
+  percentualDaMargem,
+} from "@/lib/apresentacao-indicadores";
 
 const INPUT_CLASS =
   "h-10 rounded-xl border-input bg-secondary/50 text-foreground focus-visible:border-primary/60 focus-visible:ring-primary/20";
@@ -71,6 +75,8 @@ export function PainelDashboard() {
   const containers = useCustoDeContainers(start, end, true);
   const exibicao = decidirExibicao(ledger);
   const rows = linhasParaExibicao(ledger);
+  // D-CP08-04: período invertido não é falha de leitura — a tela diz o que está errado.
+  const periodoInvertido = start !== "" && end !== "" && start > end;
 
   const period = useMemo(
     () => rows.filter((row) => inPeriod(row.date, start, end)),
@@ -95,7 +101,8 @@ export function PainelDashboard() {
       revenue,
       cost,
       margin: revenue - cost,
-      marginPct: marginPct(revenue, cost),
+      marginPctTexto: percentualDaMargem(revenue, cost),
+      dailiesDeDomingoOuFeriado: diariasDeDomingoOuFeriado(period),
     };
   }, [period, totalAdicionais, resumo.data, containers.data, start, end]);
 
@@ -191,9 +198,12 @@ export function PainelDashboard() {
         action={
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">De</Label>
+              <Label htmlFor="dashboard-inicio" className="text-xs">
+                De
+              </Label>
 
               <Input
+                id="dashboard-inicio"
                 type="date"
                 value={start}
                 onChange={(event) => setStart(event.target.value)}
@@ -202,9 +212,12 @@ export function PainelDashboard() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">Até</Label>
+              <Label htmlFor="dashboard-fim" className="text-xs">
+                Até
+              </Label>
 
               <Input
+                id="dashboard-fim"
                 type="date"
                 value={end}
                 onChange={(event) => setEnd(event.target.value)}
@@ -215,7 +228,16 @@ export function PainelDashboard() {
         }
       />
 
-      {ledger.estado === "carregando" ? (
+      {periodoInvertido ? (
+        <div role="alert" className="rounded-2xl border border-border bg-secondary/40 p-5">
+          <p className="text-sm font-semibold text-foreground">
+            A data inicial é posterior à final.
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Ajuste o período para ver os indicadores.
+          </p>
+        </div>
+      ) : ledger.estado === "carregando" ? (
         <DashboardSkeleton />
       ) : !exibicao.mostrarValores ? (
         exibicao.aviso && (
@@ -249,8 +271,8 @@ export function PainelDashboard() {
               value={brl(kpis.cost)}
               description={
                 containers.isError
-                  ? "Custo de mão de obra (custo de Containers indisponível)"
-                  : "Custo de mão de obra e de Containers"
+                  ? "Custo de mão de obra (custo dos serviços antigos de contêiner indisponível)"
+                  : "Custo de mão de obra e dos serviços antigos de contêiner"
               }
               icon={WalletCards}
             />
@@ -258,14 +280,17 @@ export function PainelDashboard() {
             <Kpi
               label="Margem"
               value={brl(kpis.margin)}
-              description={pct(kpis.marginPct)}
+              description={kpis.marginPctTexto}
               icon={TrendingUp}
             />
 
             <Kpi
               label="Diárias"
               value={num(kpis.dailies, 0)}
-              description="Diárias faturáveis"
+              description={descricaoDasDiarias(
+                "Diárias faturáveis",
+                kpis.dailiesDeDomingoOuFeriado,
+              )}
               icon={CalendarDays}
             />
           </div>
@@ -307,7 +332,7 @@ export function PainelDashboard() {
           <div className="mt-6 grid gap-4 xl:grid-cols-2">
             <GraficoCard
               title="Receita x custo por cliente"
-              description="Comparativo financeiro dos clientes no período."
+              description="Comparativo dos clientes no período. Somente apontamentos: sem adicionais nem serviços antigos de contêiner."
             >
               {byClient.length ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -378,7 +403,7 @@ export function PainelDashboard() {
 
             <GraficoCard
               title="Diárias por dia"
-              description="Evolução das diárias registradas ao longo do período."
+              description="Evolução das diárias registradas ao longo do período. Somente apontamentos: sem adicionais nem serviços antigos de contêiner."
             >
               {byDay.length ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -448,7 +473,7 @@ export function PainelDashboard() {
 
             <GraficoCard
               title="Receita por tipo de operação"
-              description="Distribuição entre operações fixas e avulsas."
+              description="Distribuição entre operações fixas e avulsas. Somente apontamentos: sem adicionais nem serviços antigos de contêiner."
             >
               {byType.length ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -501,8 +526,8 @@ export function PainelDashboard() {
                     </CardTitle>
 
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Resultado dos apontamentos por cliente (sem adicionais, Containers e ajuste de
-                      arredondamento).
+                      Resultado dos apontamentos por cliente (sem adicionais, serviços antigos de
+                      contêiner e ajuste de arredondamento).
                     </p>
                   </div>
 
@@ -537,7 +562,7 @@ export function PainelDashboard() {
                             <p className="text-sm font-semibold text-foreground">{brl(margin)}</p>
 
                             <p className="mt-1 text-xs font-medium text-primary">
-                              {pct(marginPct(client.receita, client.custo))}
+                              {percentualDaMargem(client.receita, client.custo)}
                             </p>
                           </div>
                         </div>

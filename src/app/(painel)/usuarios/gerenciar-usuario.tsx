@@ -54,6 +54,7 @@ import {
   useRevogarAcesso,
   useUsuarios,
 } from "./_hooks";
+import { useTrava } from "./_trava";
 
 const PAPEIS: readonly Papel[] = ["admin", "operacional"];
 
@@ -100,6 +101,8 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
   const todasOperacoes = useOperacoesDisponiveis();
   const atribuir = useAtribuirOperacao();
   const remover = useRemoverOperacao();
+  // Uma ação por vez neste diálogo; ver _trava.ts.
+  const trava = useTrava();
 
   const [papelParaRevogar, setPapelParaRevogar] = useState<Papel | null>(null);
   const [bannerPapel, setBannerPapel] = useState<Feedback | null>(null);
@@ -113,9 +116,11 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
   const [bannerOperacoes, setBannerOperacoes] = useState<Feedback | null>(null);
 
   function conceder(papel: Papel) {
+    if (!trava.tentar()) return;
     alterarPapel.mutate(
       { userId: atual.id, papel, acao: "conceder" },
       {
+        onSettled: trava.liberar,
         onSuccess: (resultado) =>
           aplicarFeedback(feedbackDaAlteracaoDePapel(resultado), setBannerPapel),
         onError: () =>
@@ -128,9 +133,11 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
     if (!papelParaRevogar) return;
     const papel = papelParaRevogar;
     setPapelParaRevogar(null);
+    if (!trava.tentar()) return;
     alterarPapel.mutate(
       { userId: atual.id, papel, acao: "revogar" },
       {
+        onSettled: trava.liberar,
         onSuccess: (resultado) =>
           aplicarFeedback(feedbackDaAlteracaoDePapel(resultado), setBannerPapel),
         onError: () =>
@@ -141,9 +148,11 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
 
   function confirmarRevogacaoDeAcesso() {
     setConfirmandoRevogacaoDeAcesso(false);
+    if (!trava.tentar()) return;
     revogarAcesso.mutate(
       { userId: atual.id },
       {
+        onSettled: trava.liberar,
         onSuccess: (resultado) =>
           aplicarFeedback(feedbackDaRevogacaoDeAcesso(resultado), setBannerAcesso),
         onError: () =>
@@ -153,9 +162,11 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
   }
 
   function reativarAcesso() {
+    if (!trava.tentar()) return;
     reativar.mutate(
       { userId: atual.id, papel: papelDeReativacao },
       {
+        onSettled: trava.liberar,
         onSuccess: (resultado) => aplicarFeedback(feedbackDaReativacao(resultado), setBannerAcesso),
         onError: () =>
           aplicarFeedback({ tipo: "erro", texto: "Falha ao reativar usuário." }, setBannerAcesso),
@@ -165,9 +176,11 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
 
   function atribuirOperacaoSelecionada() {
     if (!operationIdParaAtribuir) return;
+    if (!trava.tentar()) return;
     atribuir.mutate(
       { userId: atual.id, operationId: operationIdParaAtribuir },
       {
+        onSettled: trava.liberar,
         onSuccess: (resultado) => {
           const feedback = feedbackDaAtribuicaoDeOperacao(resultado);
           aplicarFeedback(feedback, setBannerOperacoes);
@@ -186,9 +199,11 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
     if (!operacaoParaRemover) return;
     const operationId = operacaoParaRemover;
     setOperacaoParaRemover(null);
+    if (!trava.tentar()) return;
     remover.mutate(
       { userId: atual.id, operationId },
       {
+        onSettled: trava.liberar,
         onSuccess: (resultado) =>
           aplicarFeedback(feedbackDaRemocaoDeOperacao(resultado), setBannerOperacoes),
         onError: () =>
@@ -331,6 +346,8 @@ function ConteudoGerenciarUsuario({ usuario }: { usuario: UsuarioAdministrativo 
                   variant="ghost"
                   size="icon"
                   disabled={remover.isPending}
+                  aria-label="Remover operação"
+                  title="Remover operação"
                   onClick={() => setOperacaoParaRemover(atribuicao.operationId)}
                 >
                   <Trash2 className="size-4 text-destructive" />

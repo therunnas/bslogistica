@@ -969,3 +969,19 @@ export function resolverCondicaoDoDia(p: {
     horas,
   };
 }
+
+/**
+ * Valores ao trocar a data: os campos que a pessoa NÃO tocou acompanham a versão daquela data (para
+ * corrigir ou antecipar partindo do que já existe); os que ela digitou ficam como estão.
+ */
+export function manterDigitados(
+  daVersao: Readonly<Record<string, string>>,
+  atuais: Readonly<Record<string, string>>,
+  tocados: ReadonlySet<string>,
+): Record<string, string> {
+  const resultado: Record<string, string> = { ...daVersao };
+  for (const chave of tocados) {
+    if (chave in atuais) resultado[chave] = atuais[chave] ?? "";
+  }
+  return resultado;
+}

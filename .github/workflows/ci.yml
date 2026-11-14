@@ -80,6 +80,33 @@ jobs:
       - name: Teste prova
         run: npm run test:prova
 
+      - name: Teste mensagens-auth
+        run: npm run test:mensagens-auth
+
+      - name: Teste clientes-contratos
+        run: npm run test:clientes-contratos
+
+      - name: Teste colaboradores-custos
+        run: npm run test:colaboradores-custos
+
+      - name: Teste operacoes-turnos
+        run: npm run test:operacoes-turnos
+
+      - name: Testes de apontamentos e regras financeiras (CP-05)
+        run: npm run test:apontamentos-cp05
+
+      - name: Testes de serviços avulsos e contêiner legado (CP-06)
+        run: npm run test:servicos-avulsos-cp06
+
+      - name: Testes de fechamento e faturamento (CP-07)
+        run: npm run test:faturamento-cp07
+
+      - name: Testes de interface, clareza e consistência (CP-09)
+        run: npm run test:interface-cp09
+
+      - name: Testes de segurança da aplicação (CP-10)
+        run: npm run test:seguranca-cp10
+
       - name: Teste troca
         run: npm run test:troca
 

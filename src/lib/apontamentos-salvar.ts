@@ -242,6 +242,70 @@ export function montarCargaDaRpc(
   });
 }
 
+// ---------------------------------------------------------------------------
+// D-CP05-02 (QA-BS-01) — duas abas (ou duas pessoas) no mesmo dia
+//
+// A RPC grava por colaborador na folha, sem conferir versão: a segunda aba, com a leitura de antes,
+// regravava as linhas da primeira (no E2E, a saída das 18:00 virou falta sem aviso). Antes de
+// gravar, a tela lê a versão (`updated_at`) de cada linha no servidor e compara com a versão sobre
+// a qual a pessoa editou. Diferente: nada é gravado e a tela pede para recarregar.
+
+/** Versão de uma linha no servidor: o `updated_at` do apontamento, ou `VERSAO_NOVA` sem apontamento. */
+export const VERSAO_NOVA = "novo";
+
+export function versaoDoGravado(gravado: { updated_at?: string | null } | undefined): string {
+  return gravado?.updated_at ?? VERSAO_NOVA;
+}
+
+/**
+ * As linhas do lote que outra sessão gravou desde que esta tela as mostrou.
+ *
+ * - `bases`: a versão em que a pessoa COMEÇOU a editar cada linha (registrada na 1ª edição);
+ * - `mostradas`: a versão que a tela tem agora, para a linha que não foi editada (a linha nova,
+ *   ainda não gravada, entra no lote mesmo sem edição);
+ * - `atuais`: as versões lidas do servidor imediatamente antes de gravar.
+ */
+export function linhasEmConflito(
+  colaboradores: readonly string[],
+  bases: ReadonlyMap<string, string>,
+  mostradas: ReadonlyMap<string, string>,
+  atuais: ReadonlyMap<string, string>,
+): string[] {
+  return colaboradores.filter((id) => {
+    const base = bases.get(id) ?? mostradas.get(id) ?? VERSAO_NOVA;
+    return (atuais.get(id) ?? VERSAO_NOVA) !== base;
+  });
+}
+
+export function mensagemDeConflito(nomes: readonly string[]): string {
+  const quem =
+    nomes.length > 3
+      ? `${nomes.slice(0, 3).join(", ")} e mais ${nomes.length - 3}`
+      : nomes.join(", ");
+  return `Este dia foi alterado em outra aba ou por outra pessoa depois que você o abriu (${quem}). Nada foi gravado. Recarregue a página para ver o que está gravado e refaça a alteração.`;
+}
+
+/** As bases depois de uma edição: a 1ª edição registra a versão vista; desfazer a edição a esquece. */
+export function basesAposEdicao(
+  bases: ReadonlyMap<string, string>,
+  employeeId: string,
+  continuaSuja: boolean,
+  versaoMostrada: string,
+): Map<string, string> {
+  const novo = new Map(bases);
+  if (!continuaSuja) novo.delete(employeeId);
+  else if (!novo.has(employeeId)) novo.set(employeeId, versaoMostrada);
+  return novo;
+}
+
+/** Só sobrevivem as bases das linhas que continuam sujas (as gravadas passam a valer o servidor). */
+export function basesDasSujas(
+  bases: ReadonlyMap<string, string>,
+  sujas: ReadonlySet<string>,
+): Map<string, string> {
+  return new Map([...bases].filter(([id]) => sujas.has(id)));
+}
+
 /**
  * O resultado de um salvamento só vale para o contexto (operação, turno e data) que o pediu. Um
  * retorno atrasado, depois de a pessoa trocar de contexto, não toca no rascunho de agora.

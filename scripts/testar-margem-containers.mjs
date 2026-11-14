@@ -233,7 +233,11 @@ test("Fechamento (tela) mostra custo de apontamentos, de Containers e o total", 
   const r = ler("src/app/(painel)/fechamento/_resumo.tsx");
   assert.match(r, /f\.custoCentavos/);
   assert.match(r, /custoContainersCentavos/);
-  assert.match(r, /Apontamentos \$\{moeda\(f\.custoApontamentosCentavos\)\} \+ Containers/);
+  // CP-06B: o rótulo diz "serviços antigos de contêiner" (não há mais módulo "Containers").
+  assert.match(
+    r,
+    /Apontamentos \$\{moeda\(f\.custoApontamentosCentavos\)\} \+ serviços antigos de contêiner/,
+  );
 });
 
 test("Faturamento (tela) soma o custo de Containers à prévia de margem", () => {

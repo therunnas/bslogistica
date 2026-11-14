@@ -94,11 +94,38 @@ export function lerVersoesDaOperacao(db: Cliente, operacaoId: string, somenteAti
   );
 }
 
-export function lerCustosDosColaboradores(
+/**
+ * Quantos colaboradores vão em cada `.in(...)`. Os IDs entram na URL do GET: com todos de uma vez,
+ * acima de ~250 colaboradores a URL passava de 8 KB e o gateway local respondia **414 URI Too Long**
+ * (medido no CP-03 da QA-BS-01); a consulta falhava e a lista recuava em silêncio para a coluna do
+ * cadastro. 100 IDs ficam em ~3,8 KB, longe de qualquer limite usual de gateway.
+ */
+export const COLABORADORES_POR_CONSULTA = 100;
+
+/**
+ * Versões de custo dos colaboradores, lidas em lotes de `COLABORADORES_POR_CONSULTA` IDs. Cada lote
+ * continua paginado por linha; o resultado é a concatenação dos lotes, sem repetição (os lotes não
+ * se sobrepõem e cada versão pertence a um único colaborador). Mesmo filtro e mesma ordem por lote:
+ * nada muda no que é lido, só o tamanho de cada pedido. Um lote com erro derruba a leitura inteira
+ * (nunca devolve um resultado parcial como se fosse completo).
+ */
+export async function lerCustosDosColaboradores(
   db: Cliente,
   colaboradores: readonly string[],
   somenteAtivas: boolean,
 ) {
+  const unicos = [...new Set(colaboradores)];
+  const lotes: string[][] = [];
+  for (let i = 0; i < unicos.length; i += COLABORADORES_POR_CONSULTA) {
+    lotes.push(unicos.slice(i, i + COLABORADORES_POR_CONSULTA));
+  }
+  const resultados = await Promise.all(
+    lotes.map((lote) => lerCustosDeUmLote(db, lote, somenteAtivas)),
+  );
+  return resultados.flat();
+}
+
+function lerCustosDeUmLote(db: Cliente, colaboradores: readonly string[], somenteAtivas: boolean) {
   return lerConsultaPaginada(
     ({ depoisDe, limite }) => {
       let q = db.from("employee_cost_terms").select("*").in("employee_id", colaboradores);
@@ -368,16 +395,41 @@ export function useTermosDoApontamento(p: {
  * (`employees.daily_cost`, `contracts.daily_rate`, `operations.agreed_amount`) não acompanham os
  * reajustes feitos por "Alterar": a lista mostra este valor e só recua para a coluna quando não há
  * versão que valha hoje (ex.: motor desligado). `habilitado` = motor ligado.
+ *
+ * Esta forma devolve só o mapa: carregando, erro e "sem versão hoje" ficam iguais a "ausente".
+ * Quem não pode confundir esses casos com o valor do cadastro usa `useValoresDeHojeComEstado`.
  */
 export function useValoresDeHoje(
   tipo: TipoDeVigencia,
   ids: readonly string[],
   habilitado: boolean,
 ): ReadonlyMap<string, VersaoDeVigencia> {
+  return useValoresDeHojeComEstado(tipo, ids, habilitado).valores;
+}
+
+export interface ValoresDeHoje {
+  valores: ReadonlyMap<string, VersaoDeVigencia>;
+  /** A consulta das vigências ainda não respondeu. */
+  carregando: boolean;
+  /** A consulta das vigências falhou: o valor de hoje é DESCONHECIDO, não o do cadastro. */
+  erro: boolean;
+}
+
+/**
+ * Igual a `useValoresDeHoje`, com o estado da consulta. Existe para a lista não exibir a coluna do
+ * cadastro (que fica no valor inicial depois de um "Alterar") como se fosse o valor de hoje
+ * enquanto carrega ou quando a leitura falha — CP-02 da QA-BS-01.
+ */
+export function useValoresDeHojeComEstado(
+  tipo: TipoDeVigencia,
+  ids: readonly string[],
+  habilitado: boolean,
+): ValoresDeHoje {
   const chave = [...ids].sort().join(",");
+  const ativa = habilitado && ids.length > 0;
   const consulta = useQuery({
     queryKey: ["vigencias", "hoje", tipo, chave],
-    enabled: habilitado && ids.length > 0,
+    enabled: ativa,
     queryFn: async (): Promise<VersaoDeVigencia[]> => {
       const db = cliente();
       if (tipo === "colaborador") return lerCustosDosColaboradores(db, ids, true);
@@ -402,7 +454,11 @@ export function useValoresDeHoje(
     );
     if (versao) mapa.set(id, versao);
   }
-  return mapa;
+  return {
+    valores: mapa,
+    carregando: ativa && consulta.isPending,
+    erro: ativa && consulta.isError,
+  };
 }
 
 function invalidarVigencias(queryClient: ReturnType<typeof useQueryClient>) {

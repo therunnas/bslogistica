@@ -12,11 +12,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function Operacoes() {
+export default async function Operacoes({
+  searchParams,
+}: {
+  searchParams?: Promise<{ origem?: string | string[] }>;
+}) {
   // Bloqueio server-side: o painel administrativo nem chega a existir na
   // árvore quando a sessão não é de administrador.
   const bloqueio = await exigirAdmin();
   if (bloqueio) return bloqueio;
 
-  return <PainelOperacoes />;
+  // CP-06B: `?origem=conteiner` vem do antigo /containers/novo (orientação, não estado).
+  const origem = (await searchParams)?.origem;
+  return origem === "conteiner" ? <PainelOperacoes origem="conteiner" /> : <PainelOperacoes />;
 }

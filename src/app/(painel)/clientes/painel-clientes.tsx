@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmarExclusao } from "@/lib/confirmar-exclusao";
+import { useConfirmacaoDeExclusao } from "../_components/confirmacao-de-exclusao";
 import { useMemo, useState } from "react";
 import {
   Building2,
@@ -61,7 +61,7 @@ import {
   useRegrasDefinitivas,
   useDiariaIndividual,
   useResolucaoDeTarifas,
-  useValoresDeHoje,
+  useValoresDeHojeComEstado,
   useTarifasPorFuncao,
 } from "@/lib/vigencias-dados";
 import {
@@ -71,8 +71,16 @@ import {
   PARAMETROS_030_INICIAIS,
 } from "@/lib/vigencias-ui";
 import { useDeleteRow, useSaveRow } from "@/lib/mutations";
+import { useTravaDoDialogo } from "@/lib/trava";
 import { useClients, useContracts, useEmployees, useOperations } from "@/lib/queries";
 import type { Client, Contract } from "@/lib/types";
+
+import {
+  consequenciasDaExclusaoDoCliente,
+  errosDasDatasDoContrato,
+  nomeLimpo,
+  nomeValido,
+} from "./_dominio";
 
 const emptyClient = {
   id: "",
@@ -112,6 +120,7 @@ const CARD_CLASS =
   "overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]";
 
 export function PainelClientes() {
+  const confirmacao = useConfirmacaoDeExclusao();
   const clients = useClients();
   const contracts = useContracts();
   const operations = useOperations();
@@ -144,17 +153,24 @@ export function PainelClientes() {
   const diariaGenericaSemEfeito = tarifasPorFuncao === "disponivel" && resolucaoDeTarifas === true;
   const modoDeTaxa = modoDeEdicaoDeTaxa(estadoDoMotor);
   // Condições que valem hoje (vigência): as colunas do contrato não acompanham o "Alterar condições".
-  const condicoesDeHoje = useValoresDeHoje(
+  const condicoesDeHoje = useValoresDeHojeComEstado(
     "contrato",
     (contracts.data ?? []).map((contract) => contract.id),
     modoDeTaxa === "por-vigencia",
   );
+  // Com o motor por vigência, a coluna do contrato guarda só o valor inicial: enquanto as vigências
+  // carregam, ou se a leitura falhar, a lista NÃO mostra a coluna como se fosse o valor de hoje.
+  const condicaoDeHojeDesconhecida =
+    modoDeTaxa === "por-vigencia" && (condicoesDeHoje.carregando || condicoesDeHoje.erro);
   const condicao = (contract: { id: string }, chave: string, coluna: number) =>
-    Number(condicoesDeHoje.get(contract.id)?.[chave] ?? coluna);
+    Number(condicoesDeHoje.valores.get(contract.id)?.[chave] ?? coluna);
   const removeContract = useDeleteRow("contracts");
-
   const [clientOpen, setClientOpen] = useState(false);
   const [contractOpen, setContractOpen] = useState(false);
+  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique; e
+  // depois de gravar a trava só se solta quando o diálogo abre de novo (ver useTravaDoDialogo).
+  const travaCliente = useTravaDoDialogo(clientOpen);
+  const travaContrato = useTravaDoDialogo(contractOpen);
 
   const [clientForm, setClientForm] = useState(emptyClient);
   const [contractForm, setContractForm] = useState(emptyContract);
@@ -196,6 +212,20 @@ export function PainelClientes() {
         )
       : [];
 
+  const errosDasDatas = errosDasDatasDoContrato(contractForm.valid_from, contractForm.valid_to);
+  const salvandoCliente = saveClient.isPending;
+  const salvandoContrato = saveContract.isPending || criarContratoComVigencia.isPending;
+
+  function excluirCliente(client: Client) {
+    const contratosDoCliente = (contracts.data ?? []).filter((c) => c.client_id === client.id);
+    const operacoesDoCliente = (operations.data ?? []).filter((o) => o.client_id === client.id);
+    confirmacao.pedir(
+      `o cliente ${client.name}`,
+      consequenciasDaExclusaoDoCliente(contratosDoCliente.length, operacoesDoCliente.length),
+      () => removeClient.mutate(client.id),
+    );
+  }
+
   const totalClientes = clients.data?.length ?? 0;
 
   const clientesAtivos = clients.data?.filter((client) => client.status === "active").length ?? 0;
@@ -221,8 +251,9 @@ export function PainelClientes() {
   }
 
   function submitClient() {
+    if (!nomeValido(clientForm.name) || !travaCliente.tentar()) return;
     const payload: Record<string, unknown> = {
-      name: clientForm.name,
+      name: nomeLimpo(clientForm.name),
       doc: clientForm.doc || null,
       contact_name: clientForm.contact_name || null,
       email: clientForm.email || null,
@@ -236,6 +267,7 @@ export function PainelClientes() {
     }
 
     saveClient.mutate(payload, {
+      onError: travaCliente.liberar,
       onSuccess: () => setClientOpen(false),
     });
   }
@@ -259,9 +291,13 @@ export function PainelClientes() {
   }
 
   function submitContract() {
+    if (!nomeValido(contractForm.name) || errosDasDatas.length > 0) return;
+    if (!travaContrato.tentar()) return;
+    // Nenhum dos caminhos abaixo enviou nada: libera a trava (ex.: estado do motor desconhecido).
+    let enviado = false;
     const payload: Record<string, unknown> = {
       client_id: contractForm.client_id,
-      name: contractForm.name,
+      name: nomeLimpo(contractForm.name),
       valid_from: contractForm.valid_from,
       valid_to: contractForm.valid_to || null,
       status: contractForm.status,
@@ -278,7 +314,10 @@ export function PainelClientes() {
 
     if (contractForm.id) {
       payload["id"] = contractForm.id;
-      saveContract.mutate(payload, { onSuccess: () => setContractOpen(false) });
+      saveContract.mutate(payload, {
+        onError: travaContrato.liberar,
+        onSuccess: () => setContractOpen(false),
+      });
       return;
     }
 
@@ -302,18 +341,25 @@ export function PainelClientes() {
             periodoContratual: camposDa030.length > 0 && periodoContratual,
           },
         },
-        { onSuccess: () => setContractOpen(false) },
+        { onError: travaContrato.liberar, onSuccess: () => setContractOpen(false) },
       );
       return;
     }
 
     if (modoDeTaxa === "direta") {
-      saveContract.mutate(payload, { onSuccess: () => setContractOpen(false) });
+      enviado = true;
+      saveContract.mutate(payload, {
+        onError: travaContrato.liberar,
+        onSuccess: () => setContractOpen(false),
+      });
     }
+    if (!enviado) travaContrato.liberar();
   }
 
   return (
     <div>
+      {confirmacao.dialogo}
+
       <PageHeader
         title="Clientes e contratos"
         description="Gerencie clientes, contratos comerciais e as regras utilizadas nos cálculos operacionais."
@@ -476,10 +522,7 @@ export function PainelClientes() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() =>
-                                confirmarExclusao(`o cliente ${client.name}`) &&
-                                removeClient.mutate(client.id)
-                              }
+                              onClick={() => excluirCliente(client)}
                               aria-label={`Excluir ${client.name}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -602,17 +645,27 @@ export function PainelClientes() {
                             <span className="text-xs font-normal text-muted-foreground">
                               Por função (ver Tarifas)
                             </span>
+                          ) : condicaoDeHojeDesconhecida ? (
+                            <CondicaoDesconhecida erro={condicoesDeHoje.erro} />
                           ) : (
                             brl(condicao(contract, "daily_rate", contract.daily_rate))
                           )}
                         </TableCell>
 
                         <TableCell className="text-right text-sm text-muted-foreground">
-                          {num(condicao(contract, "ot_factor", contract.ot_factor), 2)}x
+                          {condicaoDeHojeDesconhecida ? (
+                            <CondicaoDesconhecida erro={condicoesDeHoje.erro} />
+                          ) : (
+                            `${num(condicao(contract, "ot_factor", contract.ot_factor), 2)}x`
+                          )}
                         </TableCell>
 
                         <TableCell className="text-right text-sm text-muted-foreground">
-                          {condicao(contract, "ot_tolerance_min", contract.ot_tolerance_min)} min
+                          {condicaoDeHojeDesconhecida ? (
+                            <CondicaoDesconhecida erro={condicoesDeHoje.erro} />
+                          ) : (
+                            `${condicao(contract, "ot_tolerance_min", contract.ot_tolerance_min)} min`
+                          )}
                         </TableCell>
 
                         <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
@@ -653,8 +706,9 @@ export function PainelClientes() {
                               size="icon"
                               className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                               onClick={() =>
-                                confirmarExclusao(`o contrato ${contract.name}`) &&
-                                removeContract.mutate(contract.id)
+                                confirmacao.pedir(`o contrato ${contract.name}`, "", () =>
+                                  removeContract.mutate(contract.id),
+                                )
                               }
                               aria-label={`Excluir ${contract.name}`}
                             >
@@ -702,9 +756,10 @@ export function PainelClientes() {
 
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label>Nome</Label>
+              <Label htmlFor="cliente-nome">Nome</Label>
 
               <Input
+                id="cliente-nome"
                 value={clientForm.name}
                 onChange={(event) =>
                   setClientForm({
@@ -717,9 +772,10 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>CNPJ</Label>
+              <Label htmlFor="cliente-cnpj">CNPJ</Label>
 
               <Input
+                id="cliente-cnpj"
                 value={clientForm.doc}
                 onChange={(event) =>
                   setClientForm({
@@ -732,9 +788,10 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Contato</Label>
+              <Label htmlFor="cliente-contato">Contato</Label>
 
               <Input
+                id="cliente-contato"
                 value={clientForm.contact_name}
                 onChange={(event) =>
                   setClientForm({
@@ -747,10 +804,11 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>E-mail</Label>
+              <Label htmlFor="cliente-email">E-mail</Label>
 
               <Input
                 type="email"
+                id="cliente-email"
                 value={clientForm.email}
                 onChange={(event) =>
                   setClientForm({
@@ -763,9 +821,10 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Telefone</Label>
+              <Label htmlFor="cliente-telefone">Telefone</Label>
 
               <Input
+                id="cliente-telefone"
                 value={clientForm.phone}
                 onChange={(event) =>
                   setClientForm({
@@ -778,9 +837,10 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label>Observações</Label>
+              <Label htmlFor="cliente-observacoes">Observações</Label>
 
               <Textarea
+                id="cliente-observacoes"
                 value={clientForm.notes}
                 onChange={(event) =>
                   setClientForm({
@@ -793,7 +853,7 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label htmlFor="cliente-status">Status</Label>
 
               <Select
                 value={clientForm.status}
@@ -804,7 +864,7 @@ export function PainelClientes() {
                   })
                 }
               >
-                <SelectTrigger className={SELECT_CLASS}>
+                <SelectTrigger id="cliente-status" className={SELECT_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
 
@@ -831,9 +891,9 @@ export function PainelClientes() {
               type="button"
               className="rounded-xl"
               onClick={submitClient}
-              disabled={!clientForm.name}
+              disabled={!nomeValido(clientForm.name) || salvandoCliente}
             >
-              Salvar cliente
+              {salvandoCliente ? "Salvando..." : "Salvar cliente"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -853,7 +913,7 @@ export function PainelClientes() {
 
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Cliente</Label>
+              <Label htmlFor="contrato-cliente">Cliente</Label>
 
               <Select
                 value={contractForm.client_id}
@@ -865,7 +925,7 @@ export function PainelClientes() {
                   })
                 }
               >
-                <SelectTrigger className={SELECT_CLASS}>
+                <SelectTrigger id="contrato-cliente" className={SELECT_CLASS}>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
 
@@ -887,9 +947,10 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Nome do contrato</Label>
+              <Label htmlFor="contrato-nome">Nome do contrato</Label>
 
               <Input
+                id="contrato-nome"
                 value={contractForm.name}
                 onChange={(event) =>
                   setContractForm({
@@ -912,9 +973,10 @@ export function PainelClientes() {
               </div>
             ) : condicoesPorBloco ? null : (
               <div className="space-y-2">
-                <Label>Valor da diária (R$)</Label>
+                <Label htmlFor="contrato-diaria">Valor da diária (R$)</Label>
 
                 <Input
+                  id="contrato-diaria"
                   type="number"
                   step="0.01"
                   value={contractForm.daily_rate}
@@ -933,9 +995,10 @@ export function PainelClientes() {
             {condicoesPorBloco ? null : (
               <>
                 <div className="space-y-2">
-                  <Label>Hora extra (fator)</Label>
+                  <Label htmlFor="contrato-fator">Hora extra (fator)</Label>
 
                   <Input
+                    id="contrato-fator"
                     type="number"
                     step="0.05"
                     value={contractForm.ot_factor}
@@ -952,9 +1015,10 @@ export function PainelClientes() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Tolerância antes da hora extra (min)</Label>
+                  <Label htmlFor="contrato-tolerancia">Tolerância antes da hora extra (min)</Label>
 
                   <Input
+                    id="contrato-tolerancia"
                     type="number"
                     value={contractForm.ot_tolerance_min}
                     disabled={taxaTravada}
@@ -975,9 +1039,10 @@ export function PainelClientes() {
             )}
 
             <div className="space-y-2">
-              <Label>Início do contrato</Label>
+              <Label htmlFor="contrato-inicio">Início do contrato</Label>
 
               <Input
+                id="contrato-inicio"
                 type="date"
                 value={contractForm.valid_from}
                 onChange={(event) =>
@@ -991,9 +1056,10 @@ export function PainelClientes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Fim do contrato (opcional)</Label>
+              <Label htmlFor="contrato-fim">Fim do contrato (opcional)</Label>
 
               <Input
+                id="contrato-fim"
                 type="date"
                 value={contractForm.valid_to}
                 onChange={(event) =>
@@ -1006,6 +1072,14 @@ export function PainelClientes() {
               />
             </div>
           </div>
+
+          {errosDasDatas.length > 0 ? (
+            <ul role="alert" className="list-disc pl-5 text-xs text-destructive">
+              {errosDasDatas.map((mensagem) => (
+                <li key={mensagem}>{mensagem}</li>
+              ))}
+            </ul>
+          ) : null}
 
           {camposDa030.length > 0 ? (
             <div className="space-y-3 rounded-xl border border-border p-4">
@@ -1092,15 +1166,15 @@ export function PainelClientes() {
               className="rounded-xl"
               onClick={submitContract}
               disabled={
-                !contractForm.name ||
+                !nomeValido(contractForm.name) ||
                 !contractForm.client_id ||
                 (modoDeTaxa === "bloqueada" && !contractForm.id) ||
                 errosDa030.length > 0 ||
-                saveContract.isPending ||
-                criarContratoComVigencia.isPending
+                errosDasDatas.length > 0 ||
+                salvandoContrato
               }
             >
-              Salvar contrato
+              {salvandoContrato ? "Salvando..." : "Salvar contrato"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1116,6 +1190,20 @@ export function PainelClientes() {
         />
       ) : null}
     </div>
+  );
+}
+
+/** Valor de hoje desconhecido (vigências carregando ou com erro): nunca o valor do cadastro. */
+function CondicaoDesconhecida({ erro }: { erro: boolean }) {
+  return erro ? (
+    <span
+      className="text-xs font-normal text-destructive"
+      title="Não foi possível ler as condições que valem hoje. Recarregue a página."
+    >
+      Indisponível
+    </span>
+  ) : (
+    <span className="text-xs font-normal text-muted-foreground">Carregando…</span>
   );
 }
 

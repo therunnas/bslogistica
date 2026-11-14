@@ -71,6 +71,8 @@ export function useDeleteRow(table: string, invalidate: string[] = [table]) {
       invalidate.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
       toast.success("Registro removido.");
     },
-    onError: (error: Error) => toast.error(error.message),
+    // Mesma tradução do salvar: as recusas do banco já vêm em português e são mantidas; o que
+    // chegava cru (chave estrangeira, falha de rede) vira texto da tela.
+    onError: (error: Error) => toast.error(mensagemDoErro(error)),
   });
 }

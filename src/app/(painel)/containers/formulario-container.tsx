@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CAMINHO_DOS_AVULSOS_ANTIGOS, caminhoDoAvulsoAntigo } from "@/lib/container-servico-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -474,7 +475,7 @@ export function FormularioContainer({
         />
         {avisoDeOrigem && <p role="alert">{avisoDeOrigem}</p>}
         <Button asChild>
-          <Link href={`/containers/${confirmado}`}>Abrir serviço</Link>
+          <Link href={caminhoDoAvulsoAntigo(confirmado)}>Abrir serviço</Link>
         </Button>
         <Button
           variant="outline"
@@ -518,7 +519,11 @@ export function FormularioContainer({
   return (
     <div className="space-y-6">
       <PageHeader
-        title={correcao ? "Corrigir serviço de containers" : "Novo serviço de containers"}
+        title={
+          correcao
+            ? "Corrigir serviço avulso antigo (contêiner)"
+            : "Serviço avulso antigo (contêiner)"
+        }
         description={
           correcao
             ? "Ajuste os dados abaixo. Ao confirmar, o serviço original é cancelado e substituído por este, numa única operação; o histórico liga os dois."
@@ -527,9 +532,9 @@ export function FormularioContainer({
       />
       <Link
         className="underline"
-        href={correcao ? `/containers/${correcao.servicoId}` : "/containers"}
+        href={correcao ? caminhoDoAvulsoAntigo(correcao.servicoId) : CAMINHO_DOS_AVULSOS_ANTIGOS}
       >
-        {correcao ? "Voltar para o serviço" : "Voltar para containers"}
+        {correcao ? "Voltar para o serviço" : "Voltar para Operações"}
       </Link>
       {avisoDeOrigem && <p role="alert">{avisoDeOrigem}</p>}
       {mensagem && (

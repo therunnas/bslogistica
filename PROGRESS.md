@@ -25,21 +25,294 @@ faturamento por período e relatórios. Duas trilhas de uso:
 
 ## Tarefa ativa única
 
-**FUNC-READY-02 — domingo e feriado em dobro com a resolução OFF, com interruptor (11/11/2026).**
-Migration 051 mesclada (#129) e **aplicada no HML e em Production, com o interruptor ligado nos
-dois**. Site de Production publicado com `ecd67f2`. O ponto de entrada da
-próxima sessão continua sendo o [HANDOFF](docs/HANDOFF.md). **O piloto ainda não começou** (ver
-"Bloqueio do piloto").
+**QA-BS-01 — auditoria, correção e estabilização integral (iniciada em 12/11/2026).** Branch
+`fix/qa-bs-01-estabilizacao`, criada sobre o #133 (que inclui o #132) por decisão do
+responsável e, depois dos squashes do #132 (`1c6042e`) e do #133 (`f6df1fb`), reconciliada com a
+`main` por merge (RECONCILIACAO-134; PR #134 com base `main`). Execução por checkpoints (CP-00 a CP-12): auditar, reproduzir, corrigir, testar,
+validar e só então avançar. Estado e próxima ação exata no [HANDOFF](docs/HANDOFF.md).
+
+Tarefa anterior, ainda vigente em HML e Production: **FUNC-READY-02** — domingo e feriado em
+dobro com a resolução OFF (051 aplicada nos dois, interruptor ligado). **O piloto ainda não
+começou** (ver "Bloqueio do piloto").
+
+### QA-BS-01 — checkpoints
+
+| CP     | Escopo                                                                             | Estado       |
+| ------ | ---------------------------------------------------------------------------------- | ------------ |
+| CP-00  | Baseline e inventário (Git, PRs, ambientes, docs, 16 telas + 7 de acesso + 5 APIs) | PASS         |
+| CP-00B | Baseline executável local (lint, `tsc`, `test:*`, build, E2E, SQL)                 | PASS (Linux) |
+| CP-01  | Autenticação e permissões (inclui TOTP real no Supabase local)                     | PASS (local) |
+| CP-02  | Clientes e contratos                                                               | PASS (local) |
+| CP-03  | Colaboradores e valores                                                            | PASS (local) |
+| CP-04  | Operações, turnos e equipes                                                        | PASS (local) |
+| CP-05  | Apontamentos e regras financeiras (maior risco)                                    | PASS (local) |
+| CP-06  | Serviços avulsos (contêiner é tipo de avulso), adicionais e caminho legado         | PASS (local) |
+| CP-06B | Remoção do painel independente de Contêineres; histórico legado em Operações       | PASS (local) |
+| CP-07  | Fechamento e faturamento                                                           | PASS (local) |
+| CP-08  | Dashboard, relatórios e exportações (+ modelo de negócio consolidado, sessão 13)   | PASS (local) |
+| CP-09  | Interface, clareza e consistência                                                  | PASS (local) |
+| CP-10  | Segurança, integridade e infraestrutura                                            | PASS com pendências bloqueantes (local) |
+| CP-11  | Regressão integrada final                                                          | não iniciado |
+| CP-12  | Roteiro de homologação com o responsável (HML só com autorização)                  | não iniciado |
+
+Defeitos registrados no CP-00 (D1–D8 sem correção; I1 corrigido no CP-00B):
+
+| ID  | Defeito                                                                                                   | Prioridade | Evidência                    | CP       |
+| --- | --------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------- | -------- |
+| D1  | Saída antes da entrada (08:00 → 07:50) salvava sem aviso como 22h50. **Corrigido no CP-05** (telas)      | P1         | E2E #133 `@falha-conhecida`  | CP-05    |
+| D2  | "Alterar custo": trocar a data substituía o valor digitado pelo antigo. **Corrigido no CP-03**            | P1         | E2E #133 `@falha-conhecida`  | CP-03    |
+| D3  | Duplo clique duplicava cliente e turno. **Corrigido**: cliente no CP-02, turno no CP-04 (envio único)     | P2         | E2E #133 + leitura do código | CP-02/04 |
+| D4  | Confirmação da fatura não avisava dias ainda abertos. **Corrigido no CP-07** (aviso, sem bloqueio)        | P2         | E2E #133 `@falha-conhecida`  | CP-07    |
+| D5  | Production (`ecd67f2`) sem o #132: lista de colaboradores mostra custo antigo                             | P2         | #132                         | CP-03    |
+| D6  | `<= 15`/`<= 45` (030) × `< 15`/`< 45` (V2). **Sem defeito no CP-05**: a 030 só roda com o dobro desligado | P3         | leitura do código            | CP-05    |
+| D7  | Caminho legado de contêiner aberto por URL (cobrança dupla). **Corrigido no CP-06** (cadastro encerrado) e **no CP-06B** (painel removido) | P2 | HANDOFF | CP-06/06B |
+| D8  | Exclusões usavam `window.confirm` nativo. **Corrigido no CP-09** (diálogo da tela; regras do banco iguais) | P3         | E2E spec 98 (RED/GREEN)      | CP-09    |
+| I1  | `scripts/e2e-local.sh` usava `setsid`, ausente no macOS. **Corrigido** (`set -m`; G22–G25); macOS nativo não comprovado | infra | execução local 12/11 | CP-00B |
+
+Defeitos do CP-01 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
+revalidados (GREEN); detalhe, inventário e matriz em
+[docs/qa/CP-01-autenticacao-e-permissoes.md](docs/qa/CP-01-autenticacao-e-permissoes.md):
+
+| ID        | Defeito                                                                                   | Prioridade | Estado    |
+| --------- | ----------------------------------------------------------------------------------------- | ---------- | --------- |
+| D-CP01-01 | Login mostrava texto cru do Auth ("Invalid login credentials", "User is banned")          | P2         | corrigido |
+| D-CP01-02 | Código TOTP errado mostrava "Invalid TOTP code entered" no `/mfa` e na ativação           | P2         | corrigido |
+| D-CP01-03 | Duplo clique em "Enviar convite" e "Atribuir" executava a ação duas vezes                 | P2         | corrigido |
+| D-CP01-04 | Duplo clique em "Continuar" da recuperação invalidava o próprio link                      | P2         | corrigido |
+| D-CP01-05 | Convite para e-mail existente mostrava texto cru do Auth                                  | P3         | corrigido |
+| D-CP01-06 | Botões só de ícone (gerenciar usuário, remover operação) sem nome acessível               | P3         | corrigido |
+
+CP-01 (12/11/2026, sessão em nuvem, Linux): 35 casos E2E novos (`40-autenticacao`,
+`41-permissoes`) com TOTP real e e-mail capturado no Mailpit local; E2E completo 98 testes (93
+PASS, 0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 73/73 `test:*`; `sql-local` 52; sem SQL, RLS ou regra
+financeira alterada e com MFA opcional mantido. Pendente de decisão: o Auth responde `user_banned`
+antes de conferir a senha (revela conta revogada pela API do Auth, não pela tela). Não testados:
+expiração natural do JWT, renovação isolada pelo `proxy.ts`, link expirado por tempo.
+
+Defeitos do CP-06 (13/11/2026, sessão em nuvem), reproduzidos no E2E (RED) e corrigidos (GREEN);
+modelo (operação fixa × serviço avulso; contêiner é tipo de avulso), inventário, D7 e decisões em
+[docs/qa/CP-06-servicos-avulsos.md](docs/qa/CP-06-servicos-avulsos.md):
+
+| ID        | Defeito                                                                                              | Prioridade | Estado                               |
+| --------- | ---------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------ |
+| D7        | `/containers/novo` (caminho legado) seguia aberto por URL e criava receita própria (adicional)       | P2         | corrigido (tela e servidor); banco: AUT-CP06-01 |
+| D-CP06-01 | Registro antigo de contêiner + apontamentos da mesma operação: R$ 1.600 cobrados (certo: 1.000), sem aviso | P2   | corrigido (aviso)                    |
+| D-CP06-02 | Duplo clique em "Registrar adicional": gravado, mas o diálogo ficava aberto (convite a reenviar)     | P2         | corrigido                            |
+| D-CP06-03 | Bloco de adicionais apresentava contêiner e etiquetagem como adicionais                              | P3         | corrigido                            |
+
+Decisões do CP-06 (nenhuma implementada): DEC-CP06-01 (catálogo de tipos de avulso), DEC-CP06-02
+(unidade, quantidade e valor fechado), DEC-CP06-03 (custo do participante por serviço),
+DEC-CP06-04 (duplicidade: avisar ou bloquear), DEC-CP06-05 (participante em dois avulsos).
+Autorização pendente: **AUT-CP06-01** (encerrar a RPC de cadastro de contêiner no banco). Segue
+**AUT-CP05-01** como risco financeiro pendente.
+
+Defeitos do CP-07 (13/11/2026, sessão em nuvem), reproduzidos no E2E (RED no `7e8659f`) e
+corrigidos (GREEN), só na interface — nenhum cálculo, SQL, migration, RLS ou contrato de RPC;
+competências, conciliação ao centavo, emissão, concorrência, imutabilidade e decisões em
+[docs/qa/CP-07-fechamento-e-faturamento.md](docs/qa/CP-07-fechamento-e-faturamento.md):
+
+| ID        | Defeito                                                                                                | Prioridade | Estado    |
+| --------- | ------------------------------------------------------------------------------------------------------ | ---------- | --------- |
+| D4        | Confirmação da fatura sem os dias de apontamento ainda abertos (o banco fatura dia aberto ou fechado)  | P2         | corrigido (aviso; sem bloqueio, DEC-CP07-01) |
+| D-CP07-01 | Aba que perdeu a corrida da emissão seguia mostrando valor a faturar; mensagem genérica                | P2         | corrigido |
+| D-CP07-02 | Falha de rede ao emitir: "TypeError: Failed to fetch" cru; resposta perdida sem mostrar a fatura gravada | P2       | corrigido |
+| D-CP07-03 | Lançamento salvo depois da conferência: fatura diferente do conferido, sem aviso                       | P2         | corrigido (aviso; banco: AUT-CP07-01) |
+| D-CP07-04 | Fatura complementar na mesma competência sem dizer que já existe fatura                                 | P2         | corrigido (aviso; DEC-CP07-02) |
+| D-CP07-05 | Aviso de cobrança em dobro do CP-06 ausente na confirmação                                              | P2         | corrigido (aviso; DEC-CP06-04) |
+| D-CP07-06 | CSV do Faturamento sem cliente no nome e com a presença crua do banco                                   | P3         | corrigido |
+| D-CP07-07 | "Alterar condições"/"Alterar custo" abria antes de carregar o valor atual: formulário vazio, salvar travado (achado na CI) | P2 | corrigido |
+
+Sessão 13 (13/11/2026, sessão em nuvem): **modelo de negócio consolidado** pelo esclarecimento
+direto do responsável — duração da operação e forma de cobrança são independentes; três dimensões
+(modalidade Fixa/Avulsa, regime diária/produção, tipo de serviço); mão de obra por diária pode ser
+recorrente ou temporária; serviços por produção cobram quantidade executada × preço unitário
+(10 contêineres × R$ 300 = R$ 3.000). Registrado em [docs/NEGOCIO.md §3A](docs/NEGOCIO.md) e
+reconciliado em [docs/NEGOCIO_X_SISTEMA.md](docs/NEGOCIO_X_SISTEMA.md) (matriz de 16 itens).
+**Cobrança por produção = lacuna funcional** que exige implementação específica (migrations, RPC
+e regra financeira, com autorização); contêiner por unidade hoje **diverge** (sai como diária ×
+participantes). Novas decisões: **DEC-PROD-01** (remuneração dos colaboradores em serviços por
+produção), **DEC-PROD-02** (unidades, quantidade executada, parcial), **DEC-AV-01** (jornada na
+temporária por diária), **DEC-AV-02** (um ou vários dias).
+
+Defeitos do CP-08 (13/11/2026), reproduzidos no E2E (RED no `12f5528`) e corrigidos (GREEN), só
+na interface — detalhe em
+[docs/qa/CP-08-dashboard-relatorios-exportacoes.md](docs/qa/CP-08-dashboard-relatorios-exportacoes.md):
+
+| ID        | Defeito                                                                                                    | Prioridade | Estado    |
+| --------- | ---------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D-CP08-01 | Custo dos serviços antigos de contêiner pela execução e receita pela competência: Dashboard/Relatórios com custo errado | P2 | corrigido |
+| D-CP08-02 | Gráficos do Dashboard somam só apontamentos sem dizer                                                       | P3         | corrigido |
+| D-CP08-03 | Relatório por operação sem Fixa/Avulsa                                                                      | P3         | corrigido |
+| D-CP08-04 | Período invertido mostrado como falha de leitura                                                            | P3         | corrigido |
+| D-CP08-05 | CSVs de lançamentos rotulados como exportação geral; sem modalidade e situação faturada                     | P3         | corrigido |
+
+Riscos do CP-08: R-CP08-01 ("Diárias" conta domingo/feriado), R-CP08-02 (margem 0,0% sem receita),
+R-CP08-03 (separador decimal dos CSV), R-CP08-04 (sem relatório por cliente e por tipo).
+
+Defeitos do CP-09 (13/11/2026, sessão 14), reproduzidos no E2E (RED no `6a23dc4`: spec 98 com 13
+falhas) e corrigidos (GREEN 18/18), só na interface — nenhuma migration, RPC, RLS, grant, trigger
+ou regra financeira; detalhe, inventário das telas e **matriz de gates financeiros** em
+[docs/qa/CP-09-interface-clareza-consistencia.md](docs/qa/CP-09-interface-clareza-consistencia.md):
+
+| ID        | Defeito                                                                                                   | Prioridade | Estado    |
+| --------- | --------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D8        | Exclusões pelo `window.confirm` nativo                                                                    | P3         | corrigido (diálogo da tela, foco em Cancelar) |
+| R-CP07-06 | "Alterar" de contrato que só começa no futuro: data depois da 1ª versão abria vazio, salvar travado       | P2         | corrigido (base = versão da data; sem regra nova) |
+| R-CP08-01 | "Diárias" contava domingo/feriado sem dizer                                                               | P3         | corrigido (só o texto; contagem igual) |
+| R-CP08-02 | Margem "0,0%" sem receita                                                                                 | P3         | corrigido ("sem receita no período") |
+| R-CP08-03 | CSV de lançamentos com ponto decimal (texto na planilha pt-BR)                                            | P3         | corrigido (vírgula; valores iguais) |
+| D-CP09-01 | 12 campos com rótulo visível não ligado (Dashboard, Relatórios, Faturamento, adicional, Apontamentos, Operacional) | P3 | corrigido |
+| D-CP09-02 | Tela do operador sem título enquanto carrega, na falha e sem operação                                      | P3         | corrigido |
+| D-CP09-03 | Nova operação citava "contêiner" sem dizer que a cobrança é por diária (produção não existe)              | P3         | corrigido (texto; nenhum campo novo) |
+
+R-CP08-04 (sem relatório por cliente e por tipo) fica registrado como lacuna (depende de
+DEC-CP06-01). Matriz de gates financeiros do CP-09: **bloqueantes para o piloto** — feriados em
+Production e código de Production desatualizado (D5); **decisão pendente** — cobrança e custos
+por produção (se o piloto os tiver), contrato encerrado (DEC-CP02-01) e cancelamento de fatura
+(DEC-CP07-03); os demais itens não bloqueiam, com justificativa no documento.
+
+CP-10 (14/11/2026, sessão 15) — **PASS COM PENDÊNCIAS BLOQUEANTES**: auditoria de autenticação,
+sessões, autorização, RLS, grants, RPCs, integridade e infraestrutura, só no Supabase local; detalhe
+em [docs/qa/CP-10-seguranca-integridade-infraestrutura.md](docs/qa/CP-10-seguranca-integridade-infraestrutura.md).
+**Comprovado seguro:** matriz pela API (31 tabelas × 4 verbos × operacional, sem papel e anônimo:
+nada lido nem gravado; spec 99), as 65 RPCs `SECURITY DEFINER` recusam quem não é admin (e o
+admin nas do operador), nenhuma DEFINER sem `search_path` ou executável por `anon`, JWT anterior ao
+logout sem efeito, faturado imutável. **Corrigidos:** D-CP10-01 (`X-Powered-By: Next.js`) e
+D-CP10-02 (campos da grade do dia sem nome acessível, achado no E2E completo).
+**Riscos reproduzidos no banco** (suíte SQL 090, 15 casos): jornada impossível aceita pelas RPCs
+das duas telas com o motor ligado (08:00→07:50 = R$ 953,13 num dia; AUT-CP05-01); emissão diferente
+do conferido (AUT-CP07-01); o mesmo contêiner cobrado 4× numa fatura (DEC-CP06-04, sem depender de
+registro antigo); a RPC legada de contêiner ainda cria receita (AUT-CP06-01); cobrança depois do
+fim do contrato (DEC-CP02-01); sem cancelamento de fatura (DEC-CP07-03). **A matriz de gates do
+CP-09 foi substituída:** demonstração fictícia GO condicionado; **piloto financeiro real NO-GO**
+até P-CP10-01/03/05/06 (migrations, com autorização e decisões), os feriados e a publicação.
+`npm audit`: 12 moderadas em dependências de build/dev (antes zero).
+
+Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
+bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,
+cancelamento e detalhe da fatura; vínculo com a nota fiscal). Autorização pendente:
+**AUT-CP07-01** (conferência do total esperado dentro de `gerar_fatura`: contrato de RPC e
+migration). Uma fatura financeiramente incorreta (mesmo serviço como avulsa e registro antigo, ou
+como adicional manual) **ainda pode ser emitida**: DEC-CP06-04 segue pendente. CN-D segue falha
+conhecida (DEC-CP02-01).
+
+CP-06B (13/11/2026, sessão em nuvem), por decisão do responsável ("o painel Container não é para
+mais existir"): **D7-B** (P2) — mesmo com o cadastro novo encerrado, `/containers`, o detalhe e a
+correção continuavam como painel próprio, por URL e pelos links do Faturamento. Corrigido sem
+migration nem dado apagado: as URLs antigas conferem o admin e redirecionam para Operações; os
+registros antigos ficam na seção recolhível "Serviços avulsos antigos" de Operações e em
+`/operacoes/avulsos-antigos/<id>` (consulta, correção e cancelamento); o campo Tipo explica Fixa e
+Avulsa e os tipos de avulso. Classificação estruturada do tipo **não implementada**: proposta com
+alternativas e impacto em DEC-CP06-01 (exige migration). Detalhe e testes A–J em
+[docs/qa/CP-06-servicos-avulsos.md](docs/qa/CP-06-servicos-avulsos.md#cp-06b--remoção-do-painel-independente-de-contêineres).
+
+Defeitos do CP-05 (12/11/2026, sessão em nuvem), reproduzidos no E2E (RED) e corrigidos (GREEN);
+inventário, matrizes de jornada, sábado/domingo/feriado, custo × receita, D6 e decisões em
+[docs/qa/CP-05-apontamentos-e-regras-financeiras.md](docs/qa/CP-05-apontamentos-e-regras-financeiras.md):
+
+| ID        | Defeito                                                                                              | Prioridade | Estado                        |
+| --------- | ---------------------------------------------------------------------------------------------------- | ---------- | ----------------------------- |
+| D1        | Saída antes da entrada em turno diurno gravada sem aviso (22h50); agora bloqueia até corrigir/confirmar | P1         | corrigido nas telas; banco: AUT-CP05-01 |
+| D-CP05-01 | "Salvar o dia" gravava as linhas novas da equipe sem a tela distinguir linha gravada de sugerida     | P2         | corrigido (aviso)             |
+| D-CP05-02 | Duas abas: a segunda sobrescrevia sem aviso o que a primeira gravou                                  | P2         | corrigido (tela do admin)     |
+
+Decisões do CP-05 (nenhuma implementada): DEC-CP05-01 (limite de jornada em turno noturno e
+registro da confirmação), DEC-CP05-02 (substituto fora da equipe), DEC-CP05-03 (linha nova nasce
+presente), DEC-CP05-04 (jornada que cruza tipos de dia), DEC-CP05-05 (presença sem horário = diária
+inteira). Autorização pendente: **AUT-CP05-01** (trava do D1 e da concorrência no banco, migration
+com plano de compatibilidade no documento do CP-05).
+
+Defeitos do CP-04 (12/11/2026, sessão em nuvem), todos corrigidos e revalidados; inventário,
+matrizes de turnos e equipes e conciliação em
+[docs/qa/CP-04-operacoes-turnos-equipes.md](docs/qa/CP-04-operacoes-turnos-equipes.md):
+
+| ID        | Defeito                                                                                               | Prioridade | Estado    |
+| --------- | ----------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D3        | Duplo clique em "Salvar turno" criava 2 turnos (sem carregamento no botão)                            | P2         | corrigido |
+| D-CP04-01 | Duplo clique em "Salvar operação" criava 2 operações                                                  | P2         | corrigido |
+| D-CP04-02 | Cartão da avulsa, seletor de contrato e custo na equipe mostravam o valor do cadastro como "hoje"     | P2         | corrigido |
+| D-CP04-03 | Turno "vira a meia-noite" com fim depois do início (32 h) e intervalo maior que o turno eram aceitos  | P2         | corrigido |
+| D-CP04-04 | Cliente inativo e contrato encerrado/inativo sem identificação no formulário (agora identificados)    | P3         | corrigido |
+| D-CP04-05 | Nome de operação/turno só com espaços aceito; espaços das pontas gravados                             | P3         | corrigido |
+| D-CP04-06 | 12 rótulos soltos nos formulários de operação e turno                                                 | P3         | corrigido |
+| D-CP04-07 | Excluir turno/operação não dizia que a equipe e os turnos saem junto                                  | P3         | corrigido |
+| D-CP04-08 | Alocar/desalocar mostravam a mensagem crua do erro                                                    | P3         | corrigido |
+| D-CP04-09 | Clique/Enter durante o fechamento do diálogo gravava de novo (cliente, colaborador, operação, turno)  | P2         | corrigido |
+
+Decisões do CP-04: **DEC-CP04-01** (turno com início igual ao fim é aceito como 24 h, com aviso) e
+alternativas registradas para a DEC-CP02-01 (contrato encerrado continua selecionável e cobrando;
+a tela agora identifica e avisa, sem bloquear).
+
+CP-04 (12/11/2026, sessão em nuvem, Linux): 17 casos E2E novos (`70-operacoes-turnos-equipes`, com o D3b);
+fechamento R$ 2.450,00 de receita e R$ 1.490,00 de custo e relatório (Rui 620, Sol 720, Tito 150)
+sem divergência ao centavo; E2E completo 149 testes (146 PASS, 0 FAIL, 3 FALHA CONHECIDA, 0
+PULADO); 76/76 `test:*`; `sql-local` 52; sem SQL, RLS ou cálculo alterado.
+
+Defeitos do CP-03 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
+revalidados (GREEN); inventário, cenários de vigência e reconciliação de custos em
+[docs/qa/CP-03-colaboradores-e-valores.md](docs/qa/CP-03-colaboradores-e-valores.md):
+
+| ID        | Defeito                                                                                          | Prioridade | Estado    |
+| --------- | ------------------------------------------------------------------------------------------------ | ---------- | --------- |
+| D2        | "Alterar custo": trocar a data devolvia o campo ao custo antigo (vale para os três "Alterar")    | P1         | corrigido |
+| D-CP03-01 | Com ~250+ colaboradores o `.in(...)` passava de 8 KB (414) e a lista mostrava o custo do cadastro | P2         | corrigido |
+| D-CP03-02 | Lista e "Custo médio" mostravam o custo do cadastro como "hoje" ao carregar ou falhar            | P2         | corrigido |
+| D-CP03-03 | Duplo clique em "Salvar colaborador" criava 2 colaboradores                                      | P2         | corrigido |
+| D-CP03-07 | Duplo clique em "Salvar novo valor" gravava e deixava o diálogo aberto (intermitente)            | P2         | corrigido |
+| D-CP03-04 | Nome só com espaços aceito; espaços das pontas gravados                                          | P3         | corrigido |
+| D-CP03-05 | Custo negativo ia ao banco e voltava como erro genérico                                          | P3         | corrigido |
+| D-CP03-06 | Rótulo "Status" solto do seletor                                                                 | P3         | corrigido |
+
+CP-03 (12/11/2026, sessão em nuvem, Linux): 16 casos E2E novos (`60-colaboradores-custos`); custo
+150 → 250 → 270 aplicado pela data e congelado no lançamento, hora extra pelo custo vigente
+(312,50), retroativo recusado, dois profissionais, fechamento (custo R$ 1.312,50 × receita
+R$ 1.593,75) e relatório (R$ 1.132,50 / R$ 180,00) sem divergência ao centavo; E2E completo 132
+testes (128 PASS, 0 FAIL, 4 FALHA CONHECIDA, 0 PULADO); 75/75 `test:*`; `sql-local` 52; sem SQL,
+RLS ou regra de custo alterada. Decisões do CP-02 seguem pendentes.
+
+Defeitos do CP-02 (12/11/2026, sessão em nuvem), todos reproduzidos no E2E (RED), corrigidos e
+revalidados (GREEN); inventário, matriz de valores e decisões em
+[docs/qa/CP-02-clientes-e-contratos.md](docs/qa/CP-02-clientes-e-contratos.md):
+
+| ID        | Defeito                                                                                     | Prioridade | Estado    |
+| --------- | ------------------------------------------------------------------------------------------- | ---------- | --------- |
+| D3        | Duplo clique em "Salvar cliente" criava 2 clientes (cliente; turno segue no CP-04)          | P2         | corrigido |
+| D-CP02-01 | Duplo clique em "Salvar contrato" criava 2 contratos                                        | P2         | corrigido |
+| D-CP02-02 | Contrato aceitava fim antes do início e ano 0001 (origem provável do `01/01/0001`)          | P2         | corrigido |
+| D-CP02-03 | Lista de contratos mostrava o valor do cadastro como "hoje" ao carregar ou falhar           | P2         | corrigido |
+| D-CP02-04 | Excluir cliente apaga em cascata operações e apontamentos não faturados sem avisar          | P2         | corrigido |
+| D-CP02-05 | Nome só com espaços aceito; espaços das pontas gravados                                     | P3         | corrigido |
+| D-CP02-06 | Falha de rede ("Failed to fetch") e erro da exclusão mostrados crus                         | P3         | corrigido |
+| D-CP02-07 | 14 rótulos dos formulários de cliente e contrato soltos dos campos                          | P3         | corrigido |
+| D-CP02-08 | "Salvar cliente" sem estado de carregamento                                                 | P3         | corrigido |
+
+Decisões pendentes do CP-02: **DEC-CP02-01** (o fim do contrato e o status Inativo não limitam a
+cobrança: dia depois do fim é lançado e cobrado; E2E `@falha-conhecida`), **DEC-CP02-02**
+(excluir cliente sem histórico faturado apaga em cascata apontamentos não faturados; a tela agora
+avisa) e **DEC-CP02-03** (saneamento do registro `01/01/0001` do HML, não lido nesta sessão).
+
+CP-02 (12/11/2026, sessão em nuvem, Linux): 18 casos E2E novos (`50-clientes-contratos`), com
+cenários de integração cliente → contrato → operação → apontamento → fechamento e vigências
+250 → 300 → 320 conferidas ao centavo (fechamento R$ 2.340,00); E2E completo 116 testes (111 PASS,
+0 FAIL, 5 FALHA CONHECIDA, 0 PULADO); 74/74 `test:*`; `sql-local` 52; sem SQL, RLS ou regra
+financeira alterada.
+
+CP-00B (12/11/2026, sessão em nuvem, Linux): baseline executável completa — lint, `tsc`, 72/72
+`test:*`, build, `sql-local` 52 suítes, E2E local 63 testes (58 PASS, 0 FAIL, 5 FALHA CONHECIDA,
+0 PULADO, 47/47 conferências financeiras) e 25/25 travas; I1 corrigido de forma portável (sem
+`setsid`). **Execução nativa no macOS não comprovada**: o Mac deixa de ser requisito para avançar;
+o ambiente principal passa a ser a sessão em nuvem e a CI.
 
 ### Situação
 
-- `main` em `ecd67f2`, com migrations até a **051**. Integrados: #119 (046–050), #120
+- `main` em `f6df1fb` (#133, E2E local), sobre `1c6042e` (#132, valores de hoje nas listas) e
+  `1d60ca0` (#131), com migrations até a **051**. Integrados: #119 (046–050), #120
   (rótulos da avulsa), #121 (Containers fora do menu e do cartão; serviço pontual vira
   operação avulsa), #122 (valor acordado pelo contrato), #123 (confirmação antes de gerar
   fatura), #124 (este arquivo), #126 (rótulo "Faturado" no apontamento), #127 (plano de
   Production), #128 (tela de operação simplificada: localidade oculta com a resolução OFF e
   "Valor atual" + "Alterar valor"), #129 (migration 051: domingo e feriado em dobro com
-  interruptor).
+  interruptor), #131 (pente fino das telas), #132 e #133 (12/11/2026, squash).
 - **Production** (`ehkduqokntemtmqzdrbd`): **051 desde 11/11/2026**, interruptor de domingo/feriado
   em dobro **ligado**, resolução comercial OFF (035–050 com o
   [plano](docs/runbooks/producao-034-050.md), 051 com o
@@ -87,7 +360,7 @@ dependências do `npm audit`. O HML já foi limpo (o #125 pode ser fechado ou at
 Decisões de negócio em aberto que não bloqueiam: tipos de serviço avulso e modalidade de
 cobrança; três particularidades da Dynamis; C1–C6 da matriz.
 
-### Testes E2E com Supabase local (E2E-IMPLEMENTACAO-01, PR Draft sobre o #132)
+### Testes E2E com Supabase local (#133, integrado em `f6df1fb`)
 
 Infraestrutura Playwright contra o app em loopback e um Supabase **local descartável** no
 GitHub Actions (job `e2e-local`, workflow próprio), sem secrets e sem caminho para HML ou

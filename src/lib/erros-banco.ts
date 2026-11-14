@@ -84,7 +84,27 @@ export function mensagemDoErro(erro: unknown): string {
     return traducao;
   }
 
+  if (ehFalhaDeRede(e, mensagem)) {
+    return MENSAGEM_FALHA_DE_REDE;
+  }
+
   return mensagem || "Não foi possível concluir a operação.";
+}
+
+/**
+ * Falha de rede do navegador (servidor fora do ar, conexão caída): o supabase-js devolve um erro
+ * sem código com o texto do `fetch` ("TypeError: Failed to fetch" no Chromium, "NetworkError…" no
+ * Firefox, "Load failed" no Safari). Antes ia cru para a tela (E2E do CP-02). Erro com código do
+ * banco nunca entra aqui.
+ */
+export const MENSAGEM_FALHA_DE_REDE =
+  "Não foi possível falar com o servidor. Confira a conexão e tente novamente.";
+
+export function ehFalhaDeRede(e: ErroDoBanco, mensagem: string): boolean {
+  if (typeof e.code === "string" && e.code !== "") return false;
+  return /^(TypeError: )?(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed|fetch failed)$/i.test(
+    mensagem.trim(),
+  );
 }
 
 /**

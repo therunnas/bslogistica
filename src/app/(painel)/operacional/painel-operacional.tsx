@@ -37,7 +37,13 @@ import {
 
 import { todayISO } from "@/lib/format";
 import { toast } from "@/lib/notificacoes";
-import { MENSAGEM_ENTRADA_IGUAL_SAIDA, entradaIgualSaida } from "@/lib/horarios";
+import {
+  MENSAGEM_ENTRADA_IGUAL_SAIDA,
+  MENSAGEM_SAIDA_ANTES_DA_ENTRADA,
+  chaveDaConfirmacaoDeVirada,
+  entradaIgualSaida,
+  saidaAntesDaEntradaForaDoTurno,
+} from "@/lib/horarios";
 import { useSalvarApontamentoOperacional } from "@/lib/operacional/mutations";
 import {
   useApontamentosDoOperador,
@@ -160,6 +166,10 @@ export function PainelOperacional() {
   const [operationId, setOperationId] = useState<string | null>(null);
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [workDate, setWorkDate] = useState(todayISO());
+  // D1: confirmações expressas de jornada que atravessou a meia-noite fora de turno noturno.
+  const [viradasConfirmadas, setViradasConfirmadas] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   const [rascunho, setRascunho] = useState<{
     escopo: string;
@@ -254,6 +264,29 @@ export function PainelOperacional() {
     entradaIgualSaida(linha.status, linha.check_in, linha.check_out),
   );
 
+  // D1/B3: saída antes da entrada num turno que não vira o dia exige corrigir ou confirmar a linha.
+  const chaveDaVirada = (linha: {
+    employee_id: string;
+    check_in?: string | null;
+    check_out?: string | null;
+  }) =>
+    `${escopo}|${chaveDaConfirmacaoDeVirada(linha.employee_id, linha.check_in, linha.check_out)}`;
+  const viradasForaDoTurno = pendentes.filter((linha) =>
+    saidaAntesDaEntradaForaDoTurno(linha.status, linha.check_in, linha.check_out, turno),
+  );
+  const viradasPendentes = viradasForaDoTurno.filter(
+    (linha) => !viradasConfirmadas.has(chaveDaVirada(linha)),
+  );
+  const linhaComVirada = new Set(viradasForaDoTurno.map((linha) => linha.employee_id));
+
+  // D-CP05-01: linhas ainda sem apontamento entram no salvamento como estão — presença, mesmo sem
+  // horário (diária inteira no dia útil e no sábado). A tela diz isso antes de salvar.
+  const gravadosDoDia = new Set((apontamentos.data ?? []).map((a) => a.employee_id));
+  const novasPresencas = pendentes.filter(
+    (linha) => linha.status !== "absent" && !gravadosDoDia.has(linha.employee_id),
+  );
+  const novasSemHorario = novasPresencas.filter((linha) => !linha.check_in || !linha.check_out);
+
   function enviar() {
     if (!operationId || !shiftId || !pronto) return;
 
@@ -265,6 +298,12 @@ export function PainelOperacional() {
 
     if (horariosIguais.length > 0) {
       toast.error(MENSAGEM_ENTRADA_IGUAL_SAIDA);
+
+      return;
+    }
+
+    if (viradasPendentes.length > 0) {
+      toast.error(MENSAGEM_SAIDA_ANTES_DA_ENTRADA);
 
       return;
     }
@@ -284,16 +323,40 @@ export function PainelOperacional() {
     );
   }
 
+  // D-CP09-02: o título da página aparece também enquanto carrega, na falha e sem operação — antes a
+  // tela do operador não tinha nenhum título nesses estados.
+  const cabecalho = (
+    <PageHeader
+      title="Apontamento"
+      description="Registre presença e horários da equipe no turno e na data selecionados."
+    />
+  );
+
   if (operacoes.isError) {
-    return <FalhaDeLeitura oQue="suas operações" tentarDeNovo={() => void operacoes.refetch()} />;
+    return (
+      <>
+        {cabecalho}
+        <FalhaDeLeitura oQue="suas operações" tentarDeNovo={() => void operacoes.refetch()} />
+      </>
+    );
   }
 
   if (operacoes.isPending || !operacoes.data) {
-    return <Aviso tipo="carregando">Carregando suas operações...</Aviso>;
+    return (
+      <>
+        {cabecalho}
+        <Aviso tipo="carregando">Carregando suas operações...</Aviso>
+      </>
+    );
   }
 
   if (operacoes.data.length === 0) {
-    return <Aviso>Nenhuma operação atribuída a você. Procure o administrador.</Aviso>;
+    return (
+      <>
+        {cabecalho}
+        <Aviso>Nenhuma operação atribuída a você. Procure o administrador.</Aviso>
+      </>
+    );
   }
 
   const operacaoSelecionada =
@@ -307,18 +370,15 @@ export function PainelOperacional() {
 
   return (
     <>
-      <PageHeader
-        title="Apontamento"
-        description="Registre presença e horários da equipe no turno e na data selecionados."
-      />
+      {cabecalho}
 
       <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardContent className="grid gap-4 p-5 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Operação</Label>
+            <Label htmlFor="operacional-operacao">Operação</Label>
 
             <Select value={operationId ?? ""} onValueChange={trocarOperacao}>
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="operacional-operacao" className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
 
@@ -333,10 +393,10 @@ export function PainelOperacional() {
           </div>
 
           <div className="space-y-2">
-            <Label>Turno</Label>
+            <Label htmlFor="operacional-turno">Turno</Label>
 
             <Select value={shiftId ?? ""} onValueChange={trocarTurno} disabled={!operationId}>
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="operacional-turno" className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
 
@@ -351,9 +411,10 @@ export function PainelOperacional() {
           </div>
 
           <div className="space-y-2">
-            <Label>Data</Label>
+            <Label htmlFor="operacional-data">Data</Label>
 
             <Input
+              id="operacional-data"
               type="date"
               value={workDate}
               onChange={(event) => trocarData(event.target.value)}
@@ -582,7 +643,11 @@ export function PainelOperacional() {
                                 })
                               }
                             >
-                              <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
+                              {/* D-CP10-02: nome acessível por linha. */}
+                              <SelectTrigger
+                                aria-label={`Presença de ${linha.employee_name}`}
+                                className="h-9 w-36 rounded-xl border-input bg-secondary/40"
+                              >
                                 <SelectValue />
                               </SelectTrigger>
 
@@ -599,6 +664,7 @@ export function PainelOperacional() {
                           <TableCell>
                             <Input
                               type="time"
+                              aria-label={`Entrada de ${linha.employee_name}`}
                               className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                               value={linha.check_in.slice(0, 5)}
                               disabled={travada || linha.status === "absent"}
@@ -613,6 +679,7 @@ export function PainelOperacional() {
                           <TableCell>
                             <Input
                               type="time"
+                              aria-label={`Saída de ${linha.employee_name}`}
                               className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                               value={linha.check_out.slice(0, 5)}
                               disabled={travada || linha.status === "absent"}
@@ -622,12 +689,33 @@ export function PainelOperacional() {
                                 })
                               }
                             />
+
+                            {linhaComVirada.has(linha.employee_id) ? (
+                              <label className="mt-1.5 flex w-44 items-start gap-1.5 text-[11px] leading-4 text-destructive">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
+                                  checked={viradasConfirmadas.has(chaveDaVirada(linha))}
+                                  onChange={(event) => {
+                                    const chave = chaveDaVirada(linha);
+                                    setViradasConfirmadas((atuais) => {
+                                      const novas = new Set(atuais);
+                                      if (event.target.checked) novas.add(chave);
+                                      else novas.delete(chave);
+                                      return novas;
+                                    });
+                                  }}
+                                />
+                                Confirmo que a jornada atravessou a meia-noite
+                              </label>
+                            ) : null}
                           </TableCell>
 
                           <TableCell>
                             <Input
                               type="number"
                               min={0}
+                              aria-label={`Intervalo (min) de ${linha.employee_name}`}
                               className="h-9 w-24 rounded-xl border-input bg-secondary/40"
                               value={linha.break_minutes}
                               disabled={travada || linha.status === "absent"}
@@ -641,6 +729,7 @@ export function PainelOperacional() {
 
                           <TableCell>
                             <Input
+                              aria-label={`Observação de ${linha.employee_name}`}
                               className="h-9 min-w-48 rounded-xl border-input bg-secondary/40"
                               value={linha.notes}
                               disabled={travada}
@@ -682,6 +771,22 @@ export function PainelOperacional() {
                   {MENSAGEM_ENTRADA_IGUAL_SAIDA}
                 </p>
               ) : null}
+
+              {novasSemHorario.length > 0 ? (
+                <p className="mt-1 text-xs font-medium text-foreground">
+                  {novasSemHorario.length === 1
+                    ? "1 colaborador ainda sem apontamento será gravado como presente sem horário."
+                    : `${novasSemHorario.length} colaboradores ainda sem apontamento serão gravados como presentes sem horário.`}{" "}
+                  Marque Falta para quem não trabalhou, ou informe os horários.
+                </p>
+              ) : null}
+
+              {viradasPendentes.length > 0 ? (
+                <p role="alert" className="mt-1 text-xs text-destructive">
+                  {viradasPendentes.length} linha(s) com saída antes da entrada num turno que não
+                  atravessa a meia-noite. {MENSAGEM_SAIDA_ANTES_DA_ENTRADA}
+                </p>
+              ) : null}
             </div>
 
             <Button
@@ -694,7 +799,9 @@ export function PainelOperacional() {
                   fechada,
                   pendentes: pendentes.length,
                   salvando: salvar.isPending,
-                }) || horariosIguais.length > 0
+                }) ||
+                horariosIguais.length > 0 ||
+                viradasPendentes.length > 0
               }
             >
               <Save className="h-4 w-4" />

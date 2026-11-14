@@ -93,11 +93,33 @@ export async function convidarUsuario(
     });
     return { situacao: "convidado", userId };
   } catch (erro) {
-    return {
-      situacao: "erro",
-      mensagem: erro instanceof Error ? erro.message : "Falha ao convidar usuário.",
-    };
+    return { situacao: "erro", mensagem: mensagemDeFalhaDoConvite(erro) };
   }
+}
+
+export const MENSAGEM_CONVITE_EMAIL_EXISTENTE =
+  "Já existe uma conta com este e-mail. Para dar acesso a ela, abra a conta na lista e conceda o papel.";
+export const MENSAGEM_CONVITE_LIMITE_DE_ENVIO =
+  "Limite de envio de e-mails atingido. Tente novamente em alguns minutos.";
+export const MENSAGEM_CONVITE_FALHA = "Falha ao convidar usuário.";
+
+/**
+ * Texto da falha do convite. O erro do Auth (`ErroAdministrativo`) chega com a mensagem crua do
+ * GoTrue, em inglês ("A user with this email address has already been registered" — reproduzido
+ * no E2E do CP-01): nunca vai para a tela. Os casos conhecidos têm texto próprio, o resto cai no
+ * genérico. Erros que não vêm do provedor são deste módulo e já estão em português.
+ */
+export function mensagemDeFalhaDoConvite(erro: unknown): string {
+  if (erro instanceof ErroAdministrativo) {
+    if (erro.code === "email_exists" || erro.code === "user_already_exists") {
+      return MENSAGEM_CONVITE_EMAIL_EXISTENTE;
+    }
+    if (erro.code === "over_email_send_rate_limit" || erro.code === "over_request_rate_limit") {
+      return MENSAGEM_CONVITE_LIMITE_DE_ENVIO;
+    }
+    return MENSAGEM_CONVITE_FALHA;
+  }
+  return erro instanceof Error ? erro.message : MENSAGEM_CONVITE_FALHA;
 }
 
 /** Código que `proteger_ultimo_admin()` (migration 017) usa para recusar. */

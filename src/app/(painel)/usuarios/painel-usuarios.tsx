@@ -38,6 +38,7 @@ import type { Papel, UsuarioAdministrativo } from "@/lib/admin-usuarios/tipos";
 
 import { faseDaListagem, feedbackDoConvite, ROTULO_PAPEL, situacaoDoUsuario } from "./_dominio";
 import { useConvidarUsuario, useUsuarios } from "./_hooks";
+import { useTrava } from "./_trava";
 import { GerenciarUsuario } from "./gerenciar-usuario";
 
 const CONVITE_VAZIO: { email: string; papel: Papel } = { email: "", papel: "operacional" };
@@ -60,6 +61,7 @@ function BadgeDeSituacao({ usuario }: { usuario: UsuarioAdministrativo }) {
 export function PainelUsuarios() {
   const usuarios = useUsuarios();
   const convidar = useConvidarUsuario();
+  const trava = useTrava();
 
   const [convidarAberto, setConvidarAberto] = useState(false);
   const [convite, setConvite] = useState(CONVITE_VAZIO);
@@ -72,12 +74,15 @@ export function PainelUsuarios() {
   });
 
   function enviarConvite() {
-    // `mutate` some com o clique duplo por si só (React Query não reexecuta
-    // uma mutation já `isPending`), mas o botão também fica desabilitado —
-    // dois cinturões para o mesmo risco, ver DESIGN do checkout.
+    // `mutate` REEXECUTA a cada chamada, e o `isPending` que desabilita o
+    // botão só chega depois do próximo ciclo: um duplo clique enviava dois
+    // convites (E2E do CP-01). A trava síncrona barra o segundo clique; o
+    // botão desabilitado continua como segunda barreira.
+    if (!trava.tentar()) return;
     convidar.mutate(
       { email: convite.email, papel: convite.papel },
       {
+        onSettled: trava.liberar,
         onSuccess: (resultado) => {
           const feedback = feedbackDoConvite(resultado);
           if (feedback.tipo === "sucesso") {
@@ -170,7 +175,13 @@ export function PainelUsuarios() {
                     <TableCell>{dateBR(usuario.criadoEm)}</TableCell>
                     <TableCell>{dateBR(usuario.ultimoLoginEm)}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => setSelecionado(usuario)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Gerenciar ${usuario.email ?? "usuário"}`}
+                        title="Gerenciar usuário"
+                        onClick={() => setSelecionado(usuario)}
+                      >
                         <Settings className="size-4" />
                       </Button>
                     </TableCell>

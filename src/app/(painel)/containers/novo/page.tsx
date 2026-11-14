@@ -1,14 +1,16 @@
-import { exigirAdmin } from "../../_exigir-admin";
-import { FormularioContainer } from "../formulario-container";
+import { redirect } from "next/navigation";
 
-export default async function NovoContainer({
-  searchParams,
-}: {
-  searchParams?: Promise<{ operacao?: string | string[] }>;
-}) {
+import { CAMINHO_DO_CADASTRO_CANONICO } from "@/lib/container-servico-ui";
+
+import { exigirAdmin } from "../../_exigir-admin";
+
+/**
+ * CP-06B: não existe cadastro separado de contêiner. A URL antiga leva ao cadastro canônico
+ * (Operações → Nova operação → Avulsa), que explica a mudança. O servidor também recusa o
+ * registro pelo caminho antigo (`registrarContainerAction`).
+ */
+export default async function NovoContainer() {
   const bloqueio = await exigirAdmin();
   if (bloqueio) return bloqueio;
-  const origem = (await searchParams)?.operacao;
-  if (origem === undefined) return <FormularioContainer key="geral" />;
-  return <FormularioContainer key={JSON.stringify(origem ?? null)} operacaoInicialId={origem} />;
+  redirect(CAMINHO_DO_CADASTRO_CANONICO);
 }

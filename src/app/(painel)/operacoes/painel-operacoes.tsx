@@ -1,6 +1,6 @@
 "use client";
 
-import { confirmarExclusao } from "@/lib/confirmar-exclusao";
+import { useConfirmacaoDeExclusao } from "../_components/confirmacao-de-exclusao";
 import { LocalidadeDaOperacao } from "../_components/calendario-territorial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -56,6 +56,13 @@ import { shiftPlannedMinutes } from "@/lib/billing";
 import { brl, dateBR, minutesToLabel } from "@/lib/format";
 import { exigirLinhaAfetada, useDeleteRow, useSaveRow } from "@/lib/mutations";
 import { toast } from "@/lib/notificacoes";
+import { useTravaDoDialogo } from "@/lib/trava";
+import {
+  MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO,
+  MENSAGEM_COBRANCA_POR_DIARIA,
+} from "@/lib/container-servico-ui";
+
+import { AvulsosAntigos } from "./avulsos-antigos";
 import {
   useClients,
   useContracts,
@@ -69,7 +76,7 @@ import {
 import type { Operation, Shift } from "@/lib/types";
 import { AvisoDoMotor } from "../_components/vigencias";
 import { ValorAcordadoDaOperacao } from "./valor-acordado";
-import { MENSAGEM_TURNO_PROTEGIDO } from "@/lib/erros-banco";
+import { MENSAGEM_TURNO_PROTEGIDO, mensagemDoErro } from "@/lib/erros-banco";
 import {
   camposDePeriodoDoTurno,
   ehPeriodoDoTurno,
@@ -90,7 +97,7 @@ import {
   useEstadoDoMotor,
   useFuncoesTurno,
   useResolucaoDeTarifas,
-  useValoresDeHoje,
+  useValoresDeHojeComEstado,
 } from "@/lib/vigencias-dados";
 import {
   hojeEmSaoPaulo,
@@ -99,6 +106,17 @@ import {
   novoTurnoAPartir,
   turnoTemApontamentos,
 } from "@/lib/vigencias-ui";
+
+import {
+  avisosDoTurno,
+  consequenciasDaExclusaoDaOperacao,
+  consequenciasDaExclusaoDoTurno,
+  errosDoTurno,
+  nomeLimpo,
+  nomeValido,
+  rotuloDoCliente,
+  situacaoDoContrato,
+} from "./_dominio";
 
 const emptyOperation = {
   id: "",
@@ -131,7 +149,8 @@ const INPUT_CLASS =
 const SELECT_CLASS =
   "h-11 rounded-xl border-input bg-secondary/50 text-foreground focus:ring-primary/20";
 
-export function PainelOperacoes() {
+export function PainelOperacoes({ origem }: { origem?: string } = {}) {
+  const confirmacao = useConfirmacaoDeExclusao();
   const queryClient = useQueryClient();
 
   const clients = useClients();
@@ -156,21 +175,28 @@ export function PainelOperacoes() {
   const modoDeValor = modoDeEdicaoDeTaxa(estadoDoMotor);
   // Valores que valem hoje (vigência): a coluna do cadastro não acompanha o "Alterar".
   const porVigencia = modoDeValor === "por-vigencia";
-  const valoresDasOperacoes = useValoresDeHoje(
+  const valoresDasOperacoes = useValoresDeHojeComEstado(
     "operacao",
     (operations.data ?? []).filter((op) => !op.contract_id).map((op) => op.id),
     porVigencia,
   );
-  const contratosDeHoje = useValoresDeHoje(
+  const contratosDeHoje = useValoresDeHojeComEstado(
     "contrato",
     (contracts.data ?? []).map((contract) => contract.id),
     porVigencia,
   );
-  const custosDeHoje = useValoresDeHoje(
+  const custosDeHoje = useValoresDeHojeComEstado(
     "colaborador",
     (employees.data ?? []).map((e) => e.id),
     porVigencia,
   );
+  // Com o motor por vigência, as colunas do cadastro (agreed_amount, daily_rate, daily_cost) guardam
+  // só o valor inicial: enquanto as vigências carregam, ou se a leitura falhar, a tela NÃO as mostra
+  // como valor de hoje (CP-04 da QA-BS-01, mesmo tratamento das listas de contratos e colaboradores).
+  const desconhecido = (v: { carregando: boolean; erro: boolean }) =>
+    porVigencia && (v.carregando || v.erro);
+  const textoDesconhecido = (v: { erro: boolean }) => (v.erro ? "Indisponível" : "Carregando…");
+  const hoje = hojeEmSaoPaulo();
   const timesheets = useTimesheets();
   const entries = useEntries();
   const removeOperation = useDeleteRow("operations");
@@ -180,6 +206,10 @@ export function PainelOperacoes() {
 
   const [opOpen, setOpOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
+  // Envio único: o `isPending` do TanStack Query chega um ciclo depois e não barra o 2º clique; e
+  // depois de gravar a trava só se solta quando o diálogo abre de novo (ver useTravaDoDialogo).
+  const travaOperacao = useTravaDoDialogo(opOpen);
+  const travaTurno = useTravaDoDialogo(shiftOpen);
   const [teamOpen, setTeamOpen] = useState<Operation | null>(null);
 
   const [equipeBusca, setEquipeBusca] = useState("");
@@ -278,9 +308,7 @@ export function PainelOperacoes() {
       toast.error(
         codigo === "23505"
           ? "Este colaborador já foi alocado em outra operação. Atualize a equipe e tente novamente."
-          : error instanceof Error
-            ? error.message
-            : "Não foi possível alocar o colaborador.",
+          : mensagemDoErro(error),
       );
     },
   });
@@ -306,7 +334,7 @@ export function PainelOperacoes() {
         queryKey: ["operation_team"],
       }),
 
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(mensagemDoErro(error)),
   });
 
   /**
@@ -512,11 +540,12 @@ export function PainelOperacoes() {
   const operacaoAvulsa = opForm.type === "spot";
 
   function submitOperation() {
+    if (!nomeValido(opForm.name) || !opForm.client_id || !travaOperacao.tentar()) return;
     const payload: Record<string, unknown> = {
       client_id: opForm.client_id,
       contract_id: opForm.contract_id || null,
       type: opForm.type,
-      name: opForm.name,
+      name: nomeLimpo(opForm.name),
       site: opForm.site || null,
       operation_date: opForm.operation_date || null,
       status: opForm.status,
@@ -532,7 +561,10 @@ export function PainelOperacoes() {
 
     if (opForm.id) {
       payload["id"] = opForm.id;
-      saveOperation.mutate(payload, { onSuccess: () => setOpOpen(false) });
+      saveOperation.mutate(payload, {
+        onError: travaOperacao.liberar,
+        onSuccess: () => setOpOpen(false),
+      });
       return;
     }
 
@@ -548,12 +580,15 @@ export function PainelOperacoes() {
             encerrarAnterior: false,
           },
         },
-        { onSuccess: () => setOpOpen(false) },
+        { onError: travaOperacao.liberar, onSuccess: () => setOpOpen(false) },
       );
       return;
     }
 
-    saveOperation.mutate(payload, { onSuccess: () => setOpOpen(false) });
+    saveOperation.mutate(payload, {
+      onError: travaOperacao.liberar,
+      onSuccess: () => setOpOpen(false),
+    });
   }
 
   // Turnos (U7): a jornada de turno com apontamento é protegida quando o motor está ligado ou o
@@ -582,10 +617,27 @@ export function PainelOperacoes() {
   const periodoEscolhido = ehPeriodoDoTurno(shiftForm.shift_period) ? shiftForm.shift_period : null;
   const errosDoPeriodo = validarPeriodoDoTurno(periodoEscolhido, !shiftForm.id, precoPorFuncao);
 
+  const turnoDigitado = {
+    inicio: shiftForm.start_time,
+    fim: shiftForm.end_time,
+    intervalo: Number(shiftForm.break_minutes),
+    viraAMeiaNoite: shiftForm.crosses_midnight,
+  };
+  // Jornada travada (turno com apontamento): os horários não vão no envio, nada a conferir.
+  const errosDaJornada = jornadaTravada ? [] : errosDoTurno(turnoDigitado);
+  const avisosDaJornada = jornadaTravada ? [] : avisosDoTurno(turnoDigitado);
+
   function submitShift() {
+    if (
+      !nomeValido(shiftForm.name) ||
+      errosDoPeriodo.length > 0 ||
+      errosDaJornada.length > 0 ||
+      !travaTurno.tentar()
+    )
+      return;
     const payload: Record<string, unknown> = {
       operation_id: shiftForm.operation_id,
-      name: shiftForm.name,
+      name: nomeLimpo(shiftForm.name),
       status: shiftForm.status,
       // Classificação diurno/noturno: dado de cadastro, sem relação com a jornada protegida.
       ...camposDePeriodoDoTurno(periodoEscolhido, funcoesHabilitadas),
@@ -604,12 +656,36 @@ export function PainelOperacoes() {
     }
 
     saveShift.mutate(payload, {
+      onError: travaTurno.liberar,
       onSuccess: () => setShiftOpen(false),
     });
   }
 
+  function excluirOperacao(operation: Operation) {
+    const turnosDela = (shifts.data ?? []).filter((s) => s.operation_id === operation.id).length;
+    const alocadosNela = (team.data ?? []).filter(
+      (t) => t.operation_id === operation.id && t.active,
+    ).length;
+    confirmacao.pedir(
+      `a operação ${operation.name}`,
+      consequenciasDaExclusaoDaOperacao(turnosDela, alocadosNela),
+      () => removeOperation.mutate(operation.id),
+    );
+  }
+
+  function excluirTurno(shift: Shift) {
+    const alocadosNele = (team.data ?? []).filter(
+      (t) => t.shift_id === shift.id && t.active,
+    ).length;
+    confirmacao.pedir(`o turno ${shift.name}`, consequenciasDaExclusaoDoTurno(alocadosNele), () =>
+      removeShift.mutate(shift.id),
+    );
+  }
+
   return (
     <div>
+      {confirmacao.dialogo}
+
       <PageHeader
         title="Operações"
         description="Gerencie operações fixas e avulsas, turnos e equipes alocadas."
@@ -631,6 +707,19 @@ export function PainelOperacoes() {
           </Button>
         }
       />
+
+      {/* CP-06B: quem chega pelo antigo cadastro de contêiner (/containers/novo) é orientado aqui. */}
+      {origem === "conteiner" ? (
+        <div
+          role="status"
+          className="mb-5 rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-3 text-sm text-foreground"
+        >
+          <p className="font-medium">Contêiner é um tipo de serviço avulso.</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {MENSAGEM_CADASTRO_DE_CONTAINER_ENCERRADO}
+          </p>
+        </div>
+      ) : null}
 
       <AvisoDoMotor estado={estadoDoMotor} />
 
@@ -723,12 +812,21 @@ export function PainelOperacoes() {
                         {contractName(operation.contract_id)}
                       </span>
 
-                      {!operation.contract_id &&
-                      (valoresDasOperacoes.get(operation.id) ?? operation.agreed_amount != null) ? (
+                      {!operation.contract_id && desconhecido(valoresDasOperacoes) ? (
+                        <span
+                          className={
+                            valoresDasOperacoes.erro ? "text-destructive" : "text-muted-foreground"
+                          }
+                        >
+                          {textoDesconhecido(valoresDasOperacoes)}
+                        </span>
+                      ) : !operation.contract_id &&
+                        (valoresDasOperacoes.valores.get(operation.id) ??
+                          operation.agreed_amount != null) ? (
                         <span className="font-medium text-foreground">
                           {brl(
                             Number(
-                              valoresDasOperacoes.get(operation.id)?.["agreed_amount"] ??
+                              valoresDasOperacoes.valores.get(operation.id)?.["agreed_amount"] ??
                                 operation.agreed_amount,
                             ),
                           )}
@@ -790,10 +888,7 @@ export function PainelOperacoes() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() =>
-                        confirmarExclusao(`a operação ${operation.name}`) &&
-                        removeOperation.mutate(operation.id)
-                      }
+                      onClick={() => excluirOperacao(operation)}
                       aria-label={`Excluir ${operation.name}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -896,10 +991,7 @@ export function PainelOperacoes() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                  onClick={() =>
-                                    confirmarExclusao(`o turno ${shift.name}`) &&
-                                    removeShift.mutate(shift.id)
-                                  }
+                                  onClick={() => excluirTurno(shift)}
                                   aria-label={`Excluir turno ${shift.name}`}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -956,7 +1048,7 @@ export function PainelOperacoes() {
 
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Cliente</Label>
+              <Label htmlFor="op-cliente">Cliente</Label>
 
               <Select
                 value={opForm.client_id}
@@ -968,14 +1060,14 @@ export function PainelOperacoes() {
                   })
                 }
               >
-                <SelectTrigger className={SELECT_CLASS}>
+                <SelectTrigger id="op-cliente" className={SELECT_CLASS}>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
 
                 <SelectContent>
                   {(clients.data ?? []).map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name}
+                      {rotuloDoCliente(client)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -983,7 +1075,7 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Tipo</Label>
+              <Label htmlFor="op-tipo">Tipo</Label>
 
               <Select
                 value={opForm.type}
@@ -994,7 +1086,7 @@ export function PainelOperacoes() {
                   })
                 }
               >
-                <SelectTrigger className={SELECT_CLASS}>
+                <SelectTrigger id="op-tipo" className={SELECT_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
 
@@ -1004,12 +1096,23 @@ export function PainelOperacoes() {
                   <SelectItem value="spot">Avulsa</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* CP-06B: modalidade (fixa × avulsa) não é o tipo do serviço. CP-09: nem o regime de
+                  cobrança — hoje toda operação cobra por diária; a cobrança por quantidade
+                  (produção, NEGOCIO.md §3A) é lacuna e não aparece como se existisse. */}
+              <p className="text-xs leading-5 text-muted-foreground">
+                {opForm.type === "spot"
+                  ? "Avulsa: serviço pontual — contêiner, carga e descarga, etiquetagem, limpeza, empacotamento, paletização, retrabalho e outros. Identifique o tipo do serviço no nome (ex.: “Contêiner 40 pés — tecidos”)."
+                  : "Fixa: operação recorrente, com contrato, turnos e equipe."}{" "}
+                {MENSAGEM_COBRANCA_POR_DIARIA}
+              </p>
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label>Nome da operação</Label>
+              <Label htmlFor="op-nome">Nome da operação</Label>
 
               <Input
+                id="op-nome"
                 value={opForm.name}
                 onChange={(event) =>
                   setOpForm({
@@ -1022,9 +1125,10 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Local (opcional)</Label>
+              <Label htmlFor="op-local">Local (opcional)</Label>
 
               <Input
+                id="op-local"
                 value={opForm.site}
                 onChange={(event) =>
                   setOpForm({
@@ -1037,7 +1141,7 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Contrato</Label>
+              <Label htmlFor="op-contrato">Contrato</Label>
 
               <Select
                 value={opForm.contract_id || "none"}
@@ -1052,32 +1156,40 @@ export function PainelOperacoes() {
                   })
                 }
               >
-                <SelectTrigger className={SELECT_CLASS}>
+                <SelectTrigger id="op-contrato" className={SELECT_CLASS}>
                   <SelectValue placeholder="Sem contrato" />
                 </SelectTrigger>
 
                 <SelectContent>
                   <SelectItem value="none">Sem contrato (valor próprio)</SelectItem>
 
-                  {clientContracts.map((contract) => (
-                    <SelectItem key={contract.id} value={contract.id}>
-                      {contract.name} —{" "}
-                      {brl(
-                        Number(
-                          contratosDeHoje.get(contract.id)?.["daily_rate"] ?? contract.daily_rate,
-                        ),
-                      )}
-                    </SelectItem>
-                  ))}
+                  {clientContracts.map((contract) => {
+                    const situacao = situacaoDoContrato(contract, hoje);
+                    return (
+                      <SelectItem key={contract.id} value={contract.id}>
+                        {contract.name} —{" "}
+                        {desconhecido(contratosDeHoje)
+                          ? `valor ${textoDesconhecido(contratosDeHoje).toLowerCase()}`
+                          : brl(
+                              Number(
+                                contratosDeHoje.valores.get(contract.id)?.["daily_rate"] ??
+                                  contract.daily_rate,
+                              ),
+                            )}
+                        {situacao ? ` (${situacao})` : ""}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
             {campoDeValorVisivel ? (
               <div className="space-y-2">
-                <Label>Valor por diária (R$)</Label>
+                <Label htmlFor="op-valor">Valor por diária (R$)</Label>
 
                 <Input
+                  id="op-valor"
                   type="number"
                   step="0.01"
                   value={opForm.agreed_amount}
@@ -1104,6 +1216,17 @@ export function PainelOperacoes() {
               </p>
             ) : null}
 
+            {(() => {
+              const escolhido = clientContracts.find((c) => c.id === opForm.contract_id);
+              const situacao = escolhido ? situacaoDoContrato(escolhido, hoje) : "";
+              return situacao ? (
+                <p role="status" className="text-xs text-muted-foreground sm:col-span-2">
+                  Contrato {situacao}. A escolha continua permitida e a cobrança não é bloqueada
+                  automaticamente: confira se este é o contrato certo.
+                </p>
+              ) : null;
+            })()}
+
             {opForm.id && !opForm.contract_id ? (
               <div className="sm:col-span-2">
                 <ValorAcordadoDaOperacao operacaoId={opForm.id} estado={estadoDoMotor} />
@@ -1117,9 +1240,10 @@ export function PainelOperacoes() {
 
             {operacaoAvulsa ? (
               <div className="space-y-2">
-                <Label>Data do serviço</Label>
+                <Label htmlFor="op-data">Data do serviço</Label>
 
                 <Input
+                  id="op-data"
                   type="date"
                   value={opForm.operation_date}
                   onChange={(event) =>
@@ -1134,9 +1258,10 @@ export function PainelOperacoes() {
             ) : null}
 
             <div className="space-y-2 sm:col-span-2">
-              <Label>Observações</Label>
+              <Label htmlFor="op-observacoes">Observações</Label>
 
               <Textarea
+                id="op-observacoes"
                 value={opForm.notes}
                 onChange={(event) =>
                   setOpForm({
@@ -1164,13 +1289,15 @@ export function PainelOperacoes() {
               className="rounded-xl"
               onClick={submitOperation}
               disabled={
-                !opForm.name ||
+                !nomeValido(opForm.name) ||
                 !opForm.client_id ||
                 saveOperation.isPending ||
                 criarOperacaoComVigencia.isPending
               }
             >
-              Salvar operação
+              {saveOperation.isPending || criarOperacaoComVigencia.isPending
+                ? "Salvando..."
+                : "Salvar operação"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1190,9 +1317,10 @@ export function PainelOperacoes() {
 
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label>Nome do turno</Label>
+              <Label htmlFor="turno-nome">Nome do turno</Label>
 
               <Input
+                id="turno-nome"
                 placeholder="1º turno"
                 value={shiftForm.name}
                 onChange={(event) =>
@@ -1206,9 +1334,10 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Início</Label>
+              <Label htmlFor="turno-inicio">Início</Label>
 
               <Input
+                id="turno-inicio"
                 type="time"
                 value={shiftForm.start_time}
                 disabled={jornadaTravada}
@@ -1223,9 +1352,10 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Fim</Label>
+              <Label htmlFor="turno-fim">Fim</Label>
 
               <Input
+                id="turno-fim"
                 type="time"
                 value={shiftForm.end_time}
                 disabled={jornadaTravada}
@@ -1240,9 +1370,10 @@ export function PainelOperacoes() {
             </div>
 
             <div className="space-y-2">
-              <Label>Intervalo (min)</Label>
+              <Label htmlFor="turno-intervalo">Intervalo (min)</Label>
 
               <Input
+                id="turno-intervalo"
                 type="number"
                 value={shiftForm.break_minutes}
                 disabled={jornadaTravada}
@@ -1315,6 +1446,18 @@ export function PainelOperacoes() {
             </div>
           </div>
 
+          {errosDaJornada.length > 0 ? (
+            <ul role="alert" className="list-disc pl-5 text-xs text-destructive">
+              {errosDaJornada.map((mensagem) => (
+                <li key={mensagem}>{mensagem}</li>
+              ))}
+            </ul>
+          ) : avisosDaJornada.length > 0 ? (
+            <p role="status" className="text-xs text-muted-foreground">
+              {avisosDaJornada[0]}
+            </p>
+          ) : null}
+
           {jornadaTravada ? (
             <div
               className="rounded-xl border border-border bg-secondary/30 p-4 text-sm"
@@ -1350,9 +1493,14 @@ export function PainelOperacoes() {
               type="button"
               className="rounded-xl"
               onClick={submitShift}
-              disabled={!shiftForm.name || errosDoPeriodo.length > 0}
+              disabled={
+                !nomeValido(shiftForm.name) ||
+                errosDoPeriodo.length > 0 ||
+                errosDaJornada.length > 0 ||
+                saveShift.isPending
+              }
             >
-              Salvar turno
+              {saveShift.isPending ? "Salvando..." : "Salvar turno"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1477,12 +1625,14 @@ export function PainelOperacoes() {
                               ? nomeDaFuncao(catalogo, employee.job_function_id)
                               : (employee.role ?? "—")}{" "}
                             · custo{" "}
-                            {brl(
-                              Number(
-                                custosDeHoje.get(employee.id)?.["daily_cost"] ??
-                                  employee.daily_cost,
-                              ),
-                            )}
+                            {desconhecido(custosDeHoje)
+                              ? textoDesconhecido(custosDeHoje).toLowerCase()
+                              : brl(
+                                  Number(
+                                    custosDeHoje.valores.get(employee.id)?.["daily_cost"] ??
+                                      employee.daily_cost,
+                                  ),
+                                )}
                           </p>
                         </div>
                       </div>
@@ -1621,6 +1771,8 @@ export function PainelOperacoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AvulsosAntigos />
     </div>
   );
 }

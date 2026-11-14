@@ -1,6 +1,8 @@
 # BS Soluções Logísticas — Como a empresa funciona
 
-Documento de negócio · atualizado em 8 de novembro de 2026.
+Documento de negócio · atualizado em 8 de novembro de 2026 e revisado em 13 de novembro de 2026
+(esclarecimento direto do responsável pela BS sobre duração, regime de cobrança e produção —
+seção 3A).
 
 > **Natureza deste documento.** Descreve como a BS trabalha na realidade. Não descreve o sistema,
 > a tecnologia nem o que está implementado. A relação entre este documento e o sistema fica em
@@ -50,6 +52,55 @@ tenha ele ou não uma operação fixa contratada com a BS. Contêiner é apenas 
 serviço avulso; não representa todo o conjunto.
 
 Um mesmo cliente pode ter operações fixas e serviços avulsos ao mesmo tempo.
+
+## 3A. Duração da operação, regime de cobrança e tipo de serviço
+
+Esclarecimento direto do responsável pela BS (13/11/2026). **A duração de uma operação e a forma
+de cobrança são conceitos independentes.** São três dimensões diferentes, que não se confundem:
+
+| Dimensão               | Valores                                                                                                                    | O que define                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Modalidade operacional | Fixa (recorrente) ou Avulsa (pontual)                                                                                      | Como a demanda chega e é organizada |
+| Regime de cobrança     | Por diária de trabalhador ou por produção/quantidade                                                                       | Como se calcula o valor cobrado     |
+| Tipo de serviço        | Contêiner, carga e descarga, separação, etiquetagem, empacotamento, paletização, limpeza, retrabalho, movimentação, outros | O que foi feito                     |
+
+- Avulsa **não** significa valor fechado; operação temporária **não** significa cobrança por
+  produção; operação fixa **não** significa que o total do período seja imutável.
+- Contêiner é um **tipo de serviço**, não uma terceira modalidade.
+
+### Mão de obra por diária (recorrente ou temporária)
+
+A BS disponibiliza profissionais e cobra uma **diária por trabalhador**, negociada com o cliente. A
+duração pode ser longa ou curta: uma equipe recorrente durante o ano, cinco trabalhadores a mais
+durante um mês de Black Friday, uma equipe por uma semana ou por dois meses.
+
+- O valor final depende das diárias efetivamente apuradas e das ocorrências aplicáveis: presença,
+  falta, substituição, jornada, hora extra, fim de semana, feriado e condições do contrato.
+- Cada colaborador tem custo próprio para a BS, apurado separadamente da cobrança.
+- **Critério de negociação, não regra automática:** operações recorrentes podem ter diária menor
+  (volume e continuidade); operações curtas podem ter diária maior (menor previsibilidade e
+  mobilização mais difícil). Não existe percentual fixo de aumento, desconto ou margem por
+  duração ou modalidade.
+- Exemplo ilustrativo: cinco profissionais por um mês a **R$ 250 por trabalhador/dia — valor
+  apresentado ao cliente**. Não é o custo interno de cada colaborador.
+
+### Serviço por produção ou quantidade
+
+Para alguns serviços a BS negocia um **preço por unidade de produção**: descarga ou carga de
+contêiner, carga e descarga de caminhões, serviços contratados por produto ou por quantidade, e
+outras atividades cuja remuneração comercial seja por produção.
+
+- **Exemplo confirmado:** descarga de 10 contêineres a R$ 300 por contêiner = **R$ 3.000**.
+- A receita decorre da **produção efetivamente executada**, conforme o acordo. Se a equipe
+  executa os dez contêineres pela manhã, a receita continua R$ 3.000, desde que as dez unidades
+  tenham sido executadas.
+- O preço **não** aumenta porque houve mais colaboradores e **não** diminui porque o serviço
+  terminou mais rápido. Horas e quantidade de profissionais não alteram, por si sós, o preço
+  unitário negociado.
+- Os custos e pagamentos dos trabalhadores são registrados **separadamente**, segundo o acordo
+  real de remuneração. O responsável indicou que essa remuneração **pode** estar associada à
+  produção, mas a regra exata **não foi esclarecida** (seção 15). Não se presume divisão igual,
+  percentual fixo, pagamento do preço unitário a cada pessoa nem custo derivado da venda.
 
 ## 4. Como começa um serviço
 
@@ -115,8 +166,12 @@ estruturar a cobrança:
 - **Valor fechado** pelo serviço.
 
 Essas formas são possibilidades de estruturação, não uma afirmação de que todas já sejam
-praticadas. Para contêineres, a diária foi a referência comercial informada, com valores
-negociados conforme as características do serviço.
+praticadas. **Revisão de 13/11/2026:** o responsável confirmou que contêineres (e outros serviços
+de produção) são cobrados **por unidade executada** — 10 contêineres × R$ 300 = R$ 3.000 — e que
+um serviço avulso também pode ser de mão de obra por diária (seção 3A). A frase anterior desta
+seção ("para contêineres, a diária foi a referência comercial informada") fica **substituída**.
+"Valor fechado" pode ser visto como uma unidade "serviço" com quantidade 1, se a empresa o
+praticar.
 
 O preço de um contêiner pode variar conforme o tamanho (20 ou 40 pés), o tipo de mercadoria, o
 peso e o volume, as condições de movimentação, a quantidade de profissionais, a complexidade e a
@@ -307,5 +362,14 @@ Estes itens estão descritos acima, mas ainda não foram confirmados como práti
 - Rotina efetiva de reajuste das diárias individuais: quem registra o novo valor e a partir de
   qual data ele passa a valer.
 - Funções que têm preço próprio e funções agrupadas comercialmente em outra categoria.
-- Modalidades de cobrança dos serviços avulsos ainda não confirmadas na prática: diária, unidade
-  ou valor fechado, além da diária já informada para contêineres.
+- Modalidades de cobrança: confirmados a diária por trabalhador e a produção por unidade
+  (seção 3A); "valor fechado" como prática própria ainda não foi confirmado.
+- **Remuneração dos colaboradores em serviços por produção** (13/11/2026): pode estar associada à
+  produção, mas a regra (por pessoa, por unidade, total dividido, outro critério) não foi
+  esclarecida.
+- Unidades de produção praticadas além de contêiner (caminhão, palete, caixa, produto) e como a
+  quantidade executada é conferida com o cliente.
+- Serviço por produção executado em mais de um dia, execução parcial e alteração da quantidade
+  combinada: como são cobrados.
+- Se as regras de jornada da operação fixa (saída antecipada proporcional, hora extra, domingo e
+  feriado) valem para a mão de obra temporária por diária.

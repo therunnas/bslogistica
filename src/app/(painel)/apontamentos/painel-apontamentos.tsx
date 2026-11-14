@@ -46,14 +46,19 @@ import {
 } from "@/lib/billing";
 import {
   assinaturasSalvas,
+  basesAposEdicao,
+  basesDasSujas,
   colaboradoresFaturados,
   deveAplicarResultado,
   dirtyAposEdicao,
   dirtyAposSalvar,
   linhaGravadaFoiAlterada,
+  linhasEmConflito,
   linhasParaSalvar,
+  mensagemDeConflito,
   montarCarga,
   montarCargaDaRpc,
+  versaoDoGravado,
   type LinhaDoApontamento,
 } from "@/lib/apontamentos-salvar";
 import { mensagemDoErro } from "@/lib/erros-banco";
@@ -103,7 +108,13 @@ import { brl, minutesToLabel, todayISO } from "@/lib/format";
 import { useContractRules } from "@/lib/ledger";
 import { exigirLinhaAfetada } from "@/lib/mutations";
 import { toast } from "@/lib/notificacoes";
-import { MENSAGEM_ENTRADA_IGUAL_SAIDA, entradaIgualSaida } from "@/lib/horarios";
+import {
+  MENSAGEM_ENTRADA_IGUAL_SAIDA,
+  MENSAGEM_SAIDA_ANTES_DA_ENTRADA,
+  chaveDaConfirmacaoDeVirada,
+  entradaIgualSaida,
+  saidaAntesDaEntradaForaDoTurno,
+} from "@/lib/horarios";
 import {
   useClients,
   useEmployees,
@@ -136,6 +147,8 @@ interface DraftState {
   key: string;
   rows: DraftEntry[];
   dirty: ReadonlySet<string>;
+  /** Versão (`updated_at`) de cada linha suja quando a edição começou (D-CP05-02). */
+  bases: ReadonlyMap<string, string>;
 }
 
 /** PostgREST: a função chamada não existe (banco anterior à migration 031). */
@@ -350,6 +363,10 @@ export function PainelApontamentos() {
 
   const [date, setDate] = useState(todayISO());
   const [draft, setDraft] = useState<DraftState | null>(null);
+  // D1: confirmações expressas de jornada que atravessou a meia-noite fora de turno noturno.
+  const [viradasConfirmadas, setViradasConfirmadas] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   const turnoId = shiftId ?? "";
 
@@ -462,6 +479,7 @@ export function PainelApontamentos() {
           key: contextKey,
           rows: servidor,
           dirty: new Set<string>(),
+          bases: new Map<string, string>(),
         };
       }
 
@@ -488,6 +506,7 @@ export function PainelApontamentos() {
         key: contextKey,
         rows: [...mescladas, ...pendentes],
         dirty: atual.dirty,
+        bases: atual.bases,
       };
     });
   }, [
@@ -796,6 +815,24 @@ export function PainelApontamentos() {
     entradaIgualSaida(row.status, row.checkIn, row.checkOut),
   );
 
+  // D1/B3: saída antes da entrada num turno que não vira o dia. Só grava corrigindo o horário ou
+  // com a confirmação expressa da linha, para aquele par de horários (ver `src/lib/horarios.ts`).
+  const chaveDaVirada = (row: DraftEntry) =>
+    `${contextKey}|${chaveDaConfirmacaoDeVirada(row.employeeId, row.checkIn, row.checkOut)}`;
+  const viradasForaDoTurno = aSalvar.filter(({ row }) =>
+    saidaAntesDaEntradaForaDoTurno(row.status, row.checkIn, row.checkOut, shift),
+  );
+  const viradasPendentes = viradasForaDoTurno.filter(
+    ({ row }) => !viradasConfirmadas.has(chaveDaVirada(row)),
+  );
+  const linhaComVirada = new Set(viradasForaDoTurno.map(({ row }) => row.employeeId));
+
+  // D-CP05-01: linhas da equipe ainda sem apontamento. Salvar grava cada uma como está na tela
+  // (presença com o horário do turno, se ninguém mudar): a tela diz isso antes, linha a linha.
+  const naoGravadas = computed.filter(
+    ({ row }) => !row.entryId && !faturados.has(row.employeeId),
+  ).length;
+
   const conflitos = aSalvar.filter(
     ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
   );
@@ -855,6 +892,10 @@ export function PainelApontamentos() {
         throw new Error(MENSAGEM_ENTRADA_IGUAL_SAIDA);
       }
 
+      if (viradasPendentes.length) {
+        throw new Error(MENSAGEM_SAIDA_ANTES_DA_ENTRADA);
+      }
+
       if (conflitos.length) {
         const primeiro = conflitos[0]!;
         const nome = employeeMap.get(primeiro.row.employeeId)?.name ?? "colaborador";
@@ -875,7 +916,44 @@ export function PainelApontamentos() {
       // enviado (e para qual contexto) volta junto, para o resultado não limpar nada de outro lugar.
       const linhasDoLote = aSalvar.map(({ row }) => row as LinhaDoApontamento);
 
-      const { error } = await criarClienteNavegador().rpc("salvar_apontamento_admin", {
+      // D-CP05-02: outra aba (ou pessoa) gravou este dia depois que a tela o leu? Confere a versão
+      // de cada linha no servidor antes de gravar; se mudou, nada é enviado.
+      const cliente = criarClienteNavegador();
+      let consultaDaFolha = cliente
+        .from("timesheets")
+        .select("id")
+        .eq("operation_id", operationId)
+        .eq("work_date", date);
+      consultaDaFolha = turnoId
+        ? consultaDaFolha.eq("shift_id", turnoId)
+        : consultaDaFolha.is("shift_id", null);
+      const { data: folhasAtuais, error: erroDaFolha } = await consultaDaFolha;
+      if (erroDaFolha) throw erroDaFolha;
+      const versoesAtuais = new Map<string, string>();
+      const idsDasFolhas = (folhasAtuais ?? []).map((folha) => folha.id);
+      if (idsDasFolhas.length) {
+        const { data: linhasAtuais, error: erroDasLinhas } = await cliente
+          .from("timesheet_entries")
+          .select("employee_id, updated_at")
+          .in("timesheet_id", idsDasFolhas);
+        if (erroDasLinhas) throw erroDasLinhas;
+        for (const linha of linhasAtuais ?? []) {
+          versoesAtuais.set(linha.employee_id, versaoDoGravado(linha));
+        }
+      }
+      const emConflito = linhasEmConflito(
+        linhasDoLote.map((linha) => linha.employeeId),
+        draft?.bases ?? new Map<string, string>(),
+        new Map(existingEntries.map((entry) => [entry.employee_id, versaoDoGravado(entry)])),
+        versoesAtuais,
+      );
+      if (emConflito.length) {
+        throw new Error(
+          mensagemDeConflito(emConflito.map((id) => employeeMap.get(id)?.name ?? "colaborador")),
+        );
+      }
+
+      const { error } = await cliente.rpc("salvar_apontamento_admin", {
         p_operation_id: operationId,
         ...(turnoId ? { p_shift_id: turnoId } : {}),
         p_work_date: date,
@@ -919,14 +997,12 @@ export function PainelApontamentos() {
 
       // Só limpa quem foi salvo E não mudou desde o envio, e só se o rascunho ainda é do mesmo
       // contexto: um retorno atrasado não apaga alteração de outra operação, turno ou data.
-      setDraft((atual) =>
-        atual && deveAplicarResultado(contexto, atual.key)
-          ? {
-              ...atual,
-              dirty: dirtyAposSalvar(atual.dirty, atual.rows as LinhaDoApontamento[], salvas),
-            }
-          : atual,
-      );
+      setDraft((atual) => {
+        if (!atual || !deveAplicarResultado(contexto, atual.key)) return atual;
+        const dirty = dirtyAposSalvar(atual.dirty, atual.rows as LinhaDoApontamento[], salvas);
+        // O que foi gravado passa a valer pela versão do servidor (já relida acima).
+        return { ...atual, dirty, bases: basesDasSujas(atual.bases, dirty) };
+      });
 
       toast.success("Apontamento salvo.");
     },
@@ -1022,6 +1098,13 @@ export function PainelApontamentos() {
         key: atual.key,
         rows,
         dirty,
+        // D-CP05-02: a 1ª edição registra a versão da linha que a pessoa estava vendo.
+        bases: basesAposEdicao(
+          atual.bases,
+          employeeId,
+          dirty.has(employeeId),
+          versaoDoGravado(gravado),
+        ),
       };
     });
   }
@@ -1062,6 +1145,7 @@ export function PainelApontamentos() {
                 !linhas.length ||
                 !!conflitos.length ||
                 !!horariosIguais.length ||
+                !!viradasPendentes.length ||
                 linhasBloqueadas.length > 0 ||
                 todasFaturadas
               }
@@ -1098,6 +1182,26 @@ export function PainelApontamentos() {
             {horariosIguais.length} linha(s) com entrada igual à saída. O salvamento está bloqueado.
           </p>
           <p className="mt-1 text-xs leading-5">{MENSAGEM_ENTRADA_IGUAL_SAIDA}</p>
+        </div>
+      ) : null}
+
+      {viradasPendentes.length > 0 ? (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-destructive"
+        >
+          <p className="text-sm font-medium">
+            {viradasPendentes.length} linha(s) com saída antes da entrada num turno que não
+            atravessa a meia-noite:{" "}
+            {viradasPendentes
+              .map(
+                ({ row, employee, calc }) =>
+                  `${employee?.name ?? "colaborador"} (${row.checkIn} → ${row.checkOut} = ${minutesToLabel(calc.workedMinutes)})`,
+              )
+              .join("; ")}
+            . O salvamento está bloqueado.
+          </p>
+          <p className="mt-1 text-xs leading-5">{MENSAGEM_SAIDA_ANTES_DA_ENTRADA}</p>
         </div>
       ) : null}
 
@@ -1160,10 +1264,10 @@ export function PainelApontamentos() {
       <Card className="mb-5 overflow-hidden rounded-2xl border-border bg-card text-card-foreground shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
         <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-2">
-            <Label>Operação</Label>
+            <Label htmlFor="apontamentos-operacao">Operação</Label>
 
             <Select value={operationId} onValueChange={setOperationId}>
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="apontamentos-operacao" className={SELECT_CLASS}>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
 
@@ -1178,13 +1282,13 @@ export function PainelApontamentos() {
           </div>
 
           <div className="space-y-2">
-            <Label>Turno</Label>
+            <Label htmlFor="apontamentos-turno">Turno</Label>
 
             <Select
               value={turnoId || "none"}
               onValueChange={(value) => setShiftId(value === "none" ? "" : value)}
             >
-              <SelectTrigger className={SELECT_CLASS}>
+              <SelectTrigger id="apontamentos-turno" className={SELECT_CLASS}>
                 <SelectValue placeholder="Sem turno" />
               </SelectTrigger>
 
@@ -1204,9 +1308,10 @@ export function PainelApontamentos() {
           </div>
 
           <div className="space-y-2">
-            <Label>Data</Label>
+            <Label htmlFor="apontamentos-data">Data</Label>
 
             <Input
+              id="apontamentos-data"
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
@@ -1300,6 +1405,16 @@ export function PainelApontamentos() {
             <p className="mt-1 text-xs text-muted-foreground">
               Presença e horários da equipe alocada no turno selecionado.
             </p>
+
+            {naoGravadas > 0 && !isClosed ? (
+              <p className="mt-1 text-xs font-medium text-foreground">
+                {naoGravadas === 1
+                  ? "1 colaborador ainda sem apontamento neste dia."
+                  : `${naoGravadas} colaboradores ainda sem apontamento neste dia.`}{" "}
+                Ao salvar, cada linha marcada “Não gravado” é gravada como está na tela: quem não
+                for marcado como Falta vira presença com o horário mostrado.
+              </p>
+            ) : null}
 
             {todasFaturadas ? (
               <p className="mt-1 text-xs font-medium text-muted-foreground">
@@ -1410,6 +1525,13 @@ export function PainelApontamentos() {
                                 <Lock className="mr-1 h-3 w-3" />
                                 Faturado
                               </Badge>
+                            ) : !row.entryId ? (
+                              <Badge
+                                variant="secondary"
+                                className="mt-1 border border-amber-500/30 bg-amber-500/10 font-medium text-amber-700 shadow-none dark:text-amber-300"
+                              >
+                                Não gravado
+                              </Badge>
                             ) : null}
 
                             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1500,7 +1622,11 @@ export function PainelApontamentos() {
                           }
                           disabled={isClosed || faturados.has(row.employeeId)}
                         >
-                          <SelectTrigger className="h-9 w-36 rounded-xl border-input bg-secondary/40">
+                          {/* D-CP10-02: nome acessível por linha (leitor de tela anuncia de quem é o campo). */}
+                          <SelectTrigger
+                            aria-label={`Presença de ${employee?.name ?? "colaborador"}`}
+                            className="h-9 w-36 rounded-xl border-input bg-secondary/40"
+                          >
                             <SelectValue />
                           </SelectTrigger>
 
@@ -1519,6 +1645,7 @@ export function PainelApontamentos() {
                       <TableCell>
                         <Input
                           type="time"
+                          aria-label={`Entrada de ${employee?.name ?? "colaborador"}`}
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                           value={row.checkIn}
                           disabled={
@@ -1535,6 +1662,7 @@ export function PainelApontamentos() {
                       <TableCell>
                         <Input
                           type="time"
+                          aria-label={`Saída de ${employee?.name ?? "colaborador"}`}
                           className="h-9 w-28 rounded-xl border-input bg-secondary/40"
                           value={row.checkOut}
                           disabled={
@@ -1546,12 +1674,33 @@ export function PainelApontamentos() {
                             })
                           }
                         />
+
+                        {linhaComVirada.has(row.employeeId) ? (
+                          <label className="mt-1.5 flex w-44 items-start gap-1.5 text-[11px] leading-4 text-destructive">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
+                              checked={viradasConfirmadas.has(chaveDaVirada(row))}
+                              onChange={(event) => {
+                                const chave = chaveDaVirada(row);
+                                setViradasConfirmadas((atuais) => {
+                                  const novas = new Set(atuais);
+                                  if (event.target.checked) novas.add(chave);
+                                  else novas.delete(chave);
+                                  return novas;
+                                });
+                              }}
+                            />
+                            Confirmo que a jornada atravessou a meia-noite
+                          </label>
+                        ) : null}
                       </TableCell>
 
                       <TableCell>
                         <Input
                           type="number"
                           min="0"
+                          aria-label={`Intervalo (min) de ${employee?.name ?? "colaborador"}`}
                           className="h-9 w-20 rounded-xl border-input bg-secondary/40"
                           value={row.breakMinutes}
                           disabled={

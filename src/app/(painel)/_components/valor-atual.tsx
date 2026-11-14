@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { dateBR } from "@/lib/format";
+import { useTravaDoDialogo } from "@/lib/trava";
 import {
   useCorrigirVigencia,
   usePeriodoContratual,
@@ -28,6 +29,7 @@ import {
 import {
   camposDaVigencia,
   hojeEmSaoPaulo,
+  manterDigitados,
   podeRegistrarVigencia,
   situacaoDaVersao,
   validarNovaVigencia,
@@ -87,6 +89,10 @@ export function ValorAtualComAlteracao({
   const [aberto, setAberto] = useState(false);
   const [inicio, setInicio] = useState(hoje);
   const [valores, setValores] = useState<Record<string, string>>({});
+  // Campos que a pessoa digitou neste formulário. Trocar a data NUNCA os sobrescreve (D2 da
+  // QA-BS-01): antes, escolher uma data que coincidia com um valor existente (ou anterior ao
+  // primeiro) recarregava todos os campos com o valor antigo, e o custo digitado sumia sem aviso.
+  const [tocados, setTocados] = useState<ReadonlySet<string>>(() => new Set());
 
   const vigente = useMemo(
     () =>
@@ -128,9 +134,16 @@ export function ValorAtualComAlteracao({
     encerrarAnterior: alvo ? false : true,
   });
   const salvando = registrar.isPending || corrigir.isPending;
+  // Envio único. Sem a trava, um duplo clique chamava `mutate` duas vezes: o TanStack Query só
+  // executa o `onSuccess` da ÚLTIMA chamada, então o sucesso da primeira (que fecha o diálogo) era
+  // descartado e a segunda falhava por sobreposição — valor gravado, diálogo aberto e aviso de erro
+  // (E2E do CP-03, intermitente). Depois de gravar, a trava só se solta quando o diálogo abre de
+  // novo: um clique durante a animação de saída gravaria outra vez (ver useTravaDoDialogo).
+  const trava = useTravaDoDialogo(aberto);
 
   function salvar() {
-    const fechar = { onSuccess: () => setAberto(false) };
+    if (!trava.tentar()) return;
+    const fechar = { onError: trava.liberar, onSuccess: () => setAberto(false) };
     if (alvo) {
       corrigir.mutate(
         {
@@ -154,17 +167,46 @@ export function ValorAtualComAlteracao({
     return atuais;
   }
 
-  function mudarInicio(data: string) {
-    setInicio(data);
-    // Corrigir ou antecipar parte dos valores do valor que será trocado, não dos de hoje.
-    const igual = ativas.find((v) => v.valid_from === data) ?? null;
-    const antes = !igual && primeira !== null && data !== "" && data < primeira.valid_from;
-    setValores(valoresDe(igual ?? (antes ? primeira : vigente)));
+  /**
+   * A versão de onde o formulário parte para a data escolhida: a que começa nela (corrigir), a
+   * primeira quando a data é anterior a ela (antecipar) ou a última que começa antes da data — a
+   * que a nova versão vai encerrar. R-CP07-06: antes, fora dos dois primeiros casos, partia do
+   * valor de HOJE; num contrato que só começa no futuro esse valor não existe e o formulário
+   * nascia vazio (campos ocultos inclusive), com o salvar travado. Só preenchimento: o banco
+   * continua decidindo a vigência.
+   */
+  function versaoNaData(data: string): VersaoComValores | null {
+    if (data === "") return vigente;
+    const igual = ativas.find((v) => v.valid_from === data);
+    if (igual) return igual;
+    if (primeira !== null && data < primeira.valid_from) return primeira;
+    const anteriores = ativas
+      .filter((v) => v.valid_from <= data)
+      .sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+    return anteriores[0] ?? vigente;
   }
 
+  function mudarInicio(data: string) {
+    setInicio(data);
+    // Corrigir, antecipar ou registrar parte dos valores da versão que será trocada, não dos de hoje.
+    setValores((atuais) => manterDigitados(valoresDe(versaoNaData(data)), atuais, tocados));
+  }
+
+  function digitar(chave: string, valor: string) {
+    setValores({ ...valores, [chave]: valor });
+    setTocados((anteriores) => new Set(anteriores).add(chave));
+  }
+
+  // D-CP07-07: sem o valor atual carregado, o formulário nasceria vazio — inclusive os campos
+  // ocultos, que a pessoa não consegue preencher — e o "Salvar" ficaria desabilitado para sempre.
+  const podeAbrir = liberado && versoes.isSuccess;
+
   function abrir() {
-    // Todos os campos partem do valor de hoje; os ocultos seguem assim no envio.
-    setValores(valoresDe(vigente));
+    if (!podeAbrir) return;
+    // Todos os campos partem da versão que vale hoje (ou, sem ela, da que a data de hoje trocaria);
+    // os ocultos seguem assim no envio.
+    setValores(valoresDe(versaoNaData(hoje)));
+    setTocados(new Set());
     setInicio(hoje);
     setAberto(true);
   }
@@ -187,7 +229,7 @@ export function ValorAtualComAlteracao({
             <p className="mt-1 text-sm text-muted-foreground">Sem valor que valha hoje.</p>
           )}
         </div>
-        <Button type="button" className="h-9 rounded-xl" onClick={abrir} disabled={!liberado}>
+        <Button type="button" className="h-9 rounded-xl" onClick={abrir} disabled={!podeAbrir}>
           {rotuloDoBotao}
         </Button>
       </div>
@@ -224,7 +266,7 @@ export function ValorAtualComAlteracao({
                   <select
                     id={`valor-atual-${campo.chave}`}
                     value={valores[campo.chave] || campo.padrao || ""}
-                    onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
+                    onChange={(e) => digitar(campo.chave, e.target.value)}
                     className={`${INPUT_CLASS} w-full border px-3 text-sm`}
                   >
                     {(campo.opcoes ?? []).map((opcao) => (
@@ -238,7 +280,7 @@ export function ValorAtualComAlteracao({
                     id={`valor-atual-${campo.chave}`}
                     inputMode="decimal"
                     value={valores[campo.chave] ?? ""}
-                    onChange={(e) => setValores({ ...valores, [campo.chave]: e.target.value })}
+                    onChange={(e) => digitar(campo.chave, e.target.value)}
                     className={INPUT_CLASS}
                   />
                 )}

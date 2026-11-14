@@ -41,6 +41,19 @@ export function dialogo(page: Page): Locator {
   return page.getByRole("dialog").last();
 }
 
+/**
+ * Abre o diálogo de cadastro pelo botão. O HTML do servidor já mostra o botão antes de o React
+ * hidratar a página; um clique nesse intervalo se perde (sob carga, no E2E completo, aconteceu no
+ * CP-10). Clica de novo só enquanto nenhum diálogo estiver aberto — nunca abre dois.
+ */
+export async function abrirDialogoPor(page: Page, botao: Locator): Promise<Locator> {
+  await expect(async () => {
+    if ((await page.getByRole("dialog").count()) === 0) await botao.click();
+    await expect(page.getByRole("dialog").last()).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  return dialogo(page);
+}
+
 /** Espera o diálogo fechar depois de salvar. */
 export async function esperarFechar(page: Page) {
   await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 20_000 });
@@ -52,8 +65,7 @@ export async function esperarFechar(page: Page) {
 
 export async function criarCliente(page: Page, nome: string) {
   await page.goto("/clientes");
-  await page.getByRole("button", { name: "Novo cliente" }).click();
-  const d = dialogo(page);
+  const d = await abrirDialogoPor(page, page.getByRole("button", { name: "Novo cliente" }));
   await campo(d, "Nome").fill(nome);
   await d.getByRole("button", { name: "Salvar cliente" }).click();
   await esperarFechar(page);
@@ -66,8 +78,7 @@ export async function criarContrato(
 ) {
   await page.goto("/clientes");
   await page.getByRole("tab", { name: "Contratos e regras" }).click();
-  await page.getByRole("button", { name: "Novo contrato" }).click();
-  const d = dialogo(page);
+  const d = await abrirDialogoPor(page, page.getByRole("button", { name: "Novo contrato" }));
   await escolher(page, campo(d, "Cliente"), o.cliente);
   await campo(d, "Nome do contrato").fill(o.nome);
   await campo(d, "Valor da diária (R$)").fill(String(o.diaria));
@@ -78,15 +89,18 @@ export async function criarContrato(
 
 export async function criarColaborador(
   page: Page,
-  o: { nome: string; custo: number; desde: string; funcao?: string },
+  o: { nome: string; custo: number; desde: string; funcao?: string; horaExtra?: number },
 ) {
   await page.goto("/colaboradores");
-  await page.getByRole("button", { name: "Novo colaborador" }).click();
-  const d = dialogo(page);
+  const d = await abrirDialogoPor(page, page.getByRole("button", { name: "Novo colaborador" }));
   await d.locator("#employee-name").fill(o.nome);
   if (o.funcao) await escolher(page, d.locator("#employee-job-function"), o.funcao);
   await d.locator("#employee-cost").fill(String(o.custo));
   await d.locator("#employee-cost-from").fill(o.desde);
+  // Valor-hora acordado da hora extra PAGA (opcional; em branco = custo ÷ 8).
+  if (o.horaExtra !== undefined) {
+    await d.locator("#employee-ot-hourly-cost").fill(String(o.horaExtra));
+  }
   await d.getByRole("button", { name: "Salvar colaborador" }).click();
   await esperarFechar(page);
 }
@@ -103,8 +117,7 @@ export async function criarOperacao(
   },
 ) {
   await page.goto("/operacoes");
-  await page.getByRole("button", { name: "Nova operação" }).click();
-  const d = dialogo(page);
+  const d = await abrirDialogoPor(page, page.getByRole("button", { name: "Nova operação" }));
   await escolher(page, campo(d, "Cliente"), o.cliente);
   if (o.tipo === "Avulsa") await escolher(page, campo(d, "Tipo"), "Avulsa");
   await campo(d, "Nome da operação").fill(o.nome);
@@ -167,8 +180,7 @@ export async function alocar(
 export async function cadastrarFeriado(page: Page, o: { data: string; nome: string }) {
   await page.goto("/clientes");
   await page.getByRole("tab", { name: "Contratos e regras" }).click();
-  await page.getByRole("button", { name: "Novo feriado" }).click();
-  const d = dialogo(page);
+  const d = await abrirDialogoPor(page, page.getByRole("button", { name: "Novo feriado" }));
   await d.locator("#feriado-data").fill(o.data);
   await d.locator("#feriado-nome").fill(o.nome);
   await d.locator("#feriado-motivo").fill("E2E local");
@@ -339,8 +351,7 @@ export async function registrarAdicional(
   page: Page,
   o: { inicio: string; fim: string; mesCompetencia: string; motivo: string; valor: number },
 ) {
-  await page.getByRole("button", { name: "Novo adicional" }).click();
-  const d = dialogo(page);
+  const d = await abrirDialogoPor(page, page.getByRole("button", { name: "Novo adicional" }));
   await d.locator("#adicional-inicio").fill(o.inicio);
   await d.locator("#adicional-fim").fill(o.fim);
   const mes = d.locator("#adicional-competencia-mes");

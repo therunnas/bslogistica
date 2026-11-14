@@ -406,6 +406,61 @@ verificar(
   true,
 );
 
+// ---------------------------------------------------------------------------
+// F. Muitos colaboradores: o `.in(...)` vai em lotes (CP-03 da QA-BS-01)
+// ---------------------------------------------------------------------------
+
+console.log("\nF. Muitos colaboradores: a URL de cada pedido não passa do limite do gateway");
+
+// O gateway local do Supabase responde 414 acima de ~8 KB de URL (medido: 200 IDs passam, 300 não).
+const LIMITE_DE_URL = 8000;
+const recusarUrlLonga = (registro) => {
+  const lista = registro.parametros.employee_id ?? "";
+  return lista.length > LIMITE_DE_URL ? new Response("URI Too Long", { status: 414 }) : undefined;
+};
+const MUITOS = Array.from({ length: 350 }, (_, i) => idDe(100_000 + i));
+reiniciar({ employee_cost_terms: custos(700, MUITOS) }, { interceptar: recusarUrlLonga });
+const lidasMuitos = await lerCustosDosColaboradores(db, MUITOS, true);
+const tamanhosDosLotes = [...gets(), ...heads()].map(
+  (r) => (r.parametros.employee_id ?? "").slice(4, -1).split(",").length,
+);
+verificar(
+  "F1. 350 colaboradores e 700 versões: lê todas, sem perda nem duplicação",
+  [lidasMuitos.length, new Set(lidasMuitos.map((v) => v.id)).size],
+  [700, 700],
+);
+verificar(
+  "F2. nenhum pedido leva mais de 100 colaboradores no .in(...)",
+  Math.max(...tamanhosDosLotes) <= 100,
+  true,
+);
+verificar(
+  "F3. os lotes cobrem todos os colaboradores uma vez",
+  [...new Set(gets().flatMap((r) => (r.parametros.employee_id ?? "").slice(4, -1).split(",")))]
+    .length,
+  350,
+);
+verificar(
+  "F4. colaborador repetido na lista não duplica versões",
+  (await lerCustosDosColaboradores(db, [...MUITOS, ...MUITOS.slice(0, 50)], true)).length,
+  700,
+);
+reiniciar(
+  { employee_cost_terms: custos(700, MUITOS) },
+  {
+    interceptar: (r) =>
+      (r.parametros.employee_id ?? "").includes(MUITOS[250])
+        ? Response.json({ message: "falha simulada" }, { status: 500 })
+        : undefined,
+  },
+);
+const parcial = await tentar(() => lerCustosDosColaboradores(db, MUITOS, true));
+verificar(
+  "F5. um lote com erro derruba a leitura inteira (nunca devolve resultado parcial)",
+  parcial.erro !== null,
+  true,
+);
+
 console.log("");
 if (falhas.length > 0) {
   console.log(`${passou} passaram, ${falhas.length} falharam.`);
