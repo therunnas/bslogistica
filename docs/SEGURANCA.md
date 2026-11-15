@@ -345,6 +345,14 @@ os testes asseveram isso na forma dos arquivos.
   `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
 - `break_minutes` não pode ser negativo (migration `014`): valor negativo inflava
   `billed_amount`.
+- `break_minutes` não pode passar do tempo entre entrada e saída (migration `053`,
+  GATE-FIN-03; **só local e CI, não aplicada em HML nem em Production**): trigger
+  `trg_timesheet_entries_bloqueia_intervalo_maior`, 23514, mesma duração bruta do
+  motor, antes do motor e com ele ligado ou desligado. Ausência e apontamento
+  incompleto ficam fora; o histórico que já viola não é revalidado enquanto a
+  jornada não for regravada. Antes dela, só o núcleo do motor ligado recusava a
+  jornada zerada (22023); com o motor desligado o apontamento era gravado com
+  jornada 0 e a diária cobrada.
 - `src/lib/billing.ts` serve para a interface mostrar o número **antes** de salvar,
   nunca para decidi-lo.
 

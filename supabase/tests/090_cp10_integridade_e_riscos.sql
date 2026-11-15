@@ -209,11 +209,19 @@ select pg_temp.registrar('SEGURO', 'I3. entrada igual à saída é recusada pelo
 select pg_temp.registrar('SEGURO', 'I4. intervalo negativo é recusado (014)', 'erro 23514',
   pg_temp.adm($q$insert into public.timesheet_entries (timesheet_id, employee_id, status, check_in, check_out, break_minutes)
     values ('5c10b000-0000-4000-8000-000000000005', '5c10f000-0000-4000-8000-000000000003', 'present', '08:00', '17:00', -30) returning 'aceito'$q$));
-select pg_temp.registrar('RISCO', 'I5. intervalo maior que a jornada (08:00→09:00 com 300 min) é aceito; jornada vira 0 e a diária é cobrada',
-  'aceito|0',
-  pg_temp.adm($q$with i as (insert into public.timesheet_entries (timesheet_id, employee_id, status, check_in, check_out, break_minutes)
+-- GATE-FIN-03 (053): o intervalo maior que o tempo entre entrada e saída é recusado pelo banco.
+-- Antes da 053 era RISCO ('aceito|0': jornada zerada e a diária cobrada). Cobertura completa
+-- (limite exato, virada, ausência, UPDATE, RPCs) em supabase/tests/053_intervalo_maior_que_jornada.sql.
+-- A chamada e a contagem em comandos separados: no mesmo comando a contagem veria o retrato anterior.
+create temporary table _i5 on commit drop as
+  select pg_temp.adm($q$with i as (insert into public.timesheet_entries (timesheet_id, employee_id, status, check_in, check_out, break_minutes)
     values ('5c10b000-0000-4000-8000-000000000005', '5c10f000-0000-4000-8000-000000000003', 'present', '08:00', '09:00', 300)
-    returning worked_minutes) select 'aceito|' || worked_minutes from i$q$));
+    returning worked_minutes) select 'aceito|' || worked_minutes from i$q$) as r;
+select pg_temp.registrar('SEGURO', 'I5. intervalo maior que a jornada (08:00→09:00 com 300 min) é recusado pelo banco (053) e nada é gravado',
+  'erro 23514|0',
+  (select r from _i5)
+  || '|' || (select count(*)::text from public.timesheet_entries
+              where timesheet_id = '5c10b000-0000-4000-8000-000000000005' and employee_id = '5c10f000-0000-4000-8000-000000000003'));
 select pg_temp.registrar('SEGURO', 'I6. duplo envio: o mesmo colaborador na mesma folha não gera segunda linha (unicidade diária)', 'erro 23505',
   pg_temp.adm($q$insert into public.timesheet_entries (timesheet_id, employee_id, status, check_in, check_out, break_minutes)
     values ('5c10b000-0000-4000-8000-000000000001', '5c10f000-0000-4000-8000-000000000001', 'present', '08:00', '17:00', 60) returning 'aceito'$q$));

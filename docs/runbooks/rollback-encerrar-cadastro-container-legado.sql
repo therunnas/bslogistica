@@ -15,9 +15,11 @@
 -- REVALIDAR DEPOIS: SQL 090 C1 volta a mostrar o cadastro aceito pela API (a suíte da 052 passa a falhar,
 -- de propósito); spec 99 M8 falha; `has_function_privilege('authenticated', …, 'EXECUTE')` = true.
 --
--- Para o histórico de migrations voltar a apontar para 051, remova o registro da 052 somente depois da
--- aprovação explícita da recuperação:
---   delete from supabase_migrations.schema_migrations where version = '20261119120000';
+-- HISTÓRICO DE MIGRATIONS (corrigido no GATE-FIN-03): este rollback NÃO apaga o registro da 052 em
+-- `supabase_migrations.schema_migrations`. O histórico aplicado é preservado como está; a devolução do
+-- privilégio é uma operação distinta, registrada (data, ambiente, autorização, motivo e o resultado da
+-- verificação abaixo) no HANDOFF e no ESTADO_DO_PROJETO. Reaplicar a 052 com autorização é idempotente
+-- (o REVOKE retira o EXECUTE de novo), sem reescrever o histórico.
 begin;
 
 grant execute on function public.registrar_servico_container(jsonb, uuid, text) to authenticated;
