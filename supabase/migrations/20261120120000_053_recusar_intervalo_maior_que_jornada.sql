@@ -33,6 +33,12 @@
 --
 -- ROLLBACK: docs/runbooks/rollback-recusar-intervalo-maior-que-jornada.sql (DROP do trigger e da
 -- função; nenhum dado).
+--
+-- TRANSAÇÃO (GATE-FIN-04B, sessão 21): begin/commit explícitos, como as 045–052. O arquivo é
+-- atômico em qualquer executor e cumpre o contrato de docs/runbooks/aplicar-migration-api.py, que
+-- registra a versão imediatamente antes deste commit final.
+
+begin;
 
 create or replace function public.recusar_intervalo_maior_que_jornada()
 returns trigger
@@ -173,3 +179,5 @@ begin
   drop table pg_temp._verifica_053;
 end;
 $verificacao$;
+
+commit;

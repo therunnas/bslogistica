@@ -7,6 +7,14 @@ tocados.
 
 **Estado: implementada e testada LOCALMENTE e na CI. NÃO aplicada em HML nem em Production.**
 
+**Validação da sessão 19:** HEAD `0553755b88d8ac6cbd929524e85688f76d692eb7` (#136), CI
+[`validar`](https://github.com/therunnas/bslogistica/actions/runs/43618787558/job/132519637592),
+[`sql-local`](https://github.com/therunnas/bslogistica/actions/runs/43618787558/job/132519637937) e
+[`e2e-local`](https://github.com/therunnas/bslogistica/actions/runs/43618787555/job/132519624416)
+SUCCESS (242 testes · 241 PASS · 0 FAIL · 1 FALHA CONHECIDA · 0 PULADO · 1704 s). A sessão 21
+(GATE-FIN-04B, seção própria abaixo) acrescentou o envelope transacional; o SHA final dela e a CI
+correspondente constam no #136 e no relatório de entrega (um commit não carrega o próprio SHA).
+
 ## Problema (CP-10, SQL 090 I5) e diagnóstico corrigido
 
 Com entrada e saída preenchidas, `break_minutes` maior que a duração bruta zera a jornada: o motor
@@ -77,7 +85,8 @@ motor ligado o núcleo já o recusa; com o motor desligado segue gravado.
   de fatura e leitura seguem livres); INSERT de linha que já existe (upsert) fica para o UPDATE do
   `ON CONFLICT` — o padrão da 029;
 - autoverificação: catálogo (gatilho, dona, `search_path`, ACL efetiva) e comportamento num gatilho
-  sobre tabela **temporária** (oito casos, sem tocar dado real).
+  sobre tabela **temporária** (oito casos, sem tocar dado real);
+- envelope `begin;` … `commit;` explícito (sessão 21, GATE-FIN-04B), como as 045–052.
 
 **Não muda:** diária, hora extra, custo, domingo/feriado, faturamento, cancelamento, permissões, RLS,
 assinaturas de RPC, contratos, migrations 001–052. Sem jornada máxima (DEC-CP05-01, 054/058). Sem
@@ -187,13 +196,68 @@ vez da do 22023.
   podendo criar um substituto de registro histórico: o caminho legado não foi integralmente eliminado
   (PROGRESS e HANDOFF).
 
+## GATE-FIN-04B (sessão 21) — envelope transacional da 053
+
+**Defeito** (achado na análise da sessão 20, só de leitura): a 053 nasceu sem `begin;`/`commit;`. O
+executor remoto documentado (`docs/runbooks/aplicar-migration-api.py`) só aceita arquivo que termina
+no próprio `COMMIT;`, porque grava o registro em `supabase_migrations.schema_migrations`
+imediatamente antes dele, na mesma transação. A 053 seria recusada antes de qualquer execução (falha
+fechada). Pelo CLI (`db push`/`db reset`) ela já era atômica por arquivo (a falha da 013 em Production,
+sem `begin`, foi desfeita inteira); executada comando a comando (`psql -f`), não era.
+
+**Correção** (sessão 21, a partir de `0553755`): só o envelope — um comentário, `begin;` antes do
+primeiro comando e `commit;` no fim. Função, gatilho, SQLSTATE, mensagens, fórmula, turno noturno,
+ausência, histórico, grants, dono e autoverificação: idênticos, byte a byte.
+
+**Testes novos:**
+
+- `scripts/testar-migration-053-transacao.mjs` (`test:migration-053-transacao`, na CI `validar`), sem
+  banco: A. o primeiro comando executável é `begin`; B. o último é `commit` e o arquivo termina nele;
+  C. uma única transação no nível de cima (os `begin` do PL/pgSQL não contam); D. o contrato do
+  executor (nome, ordem, marcador, registro montado DENTRO da transação). Controle: as 045–052
+  cumprem o mesmo contrato.
+- `scripts/testar-053-transacional-local.py` (na CI `sql-local`, depois das suítes SQL), só contra o
+  Supabase local por `docker exec`, com cópias em memória da 053 — o original não é alterado e o
+  executor remoto não é executado: P. pré-condição e rollback documentado (estado 052); E1. `psql -f`
+  com falha injetada antes do COMMIT; E2. a montagem do executor (registro de uma versão fictícia
+  antes do COMMIT) + falha injetada, numa consulta única; C. nenhum aviso de transação aninhada ou
+  órfã; F. a montagem sem falha: objetos, catálogo, registro com o texto exato e a suíte SQL 053
+  (31/31); Z. limpeza só do registro fictício, por chave exata.
+
+**RED no `0553755`** (o original): estático 5 falhas (A, B, B2, C, D4; controles K1–K3 passam);
+dinâmico 6 de 9 — **E1b: depois da falha injetada sobraram a função e o gatilho**
+(`true|true|false`, aplicação parcial), E2a e F0: a montagem do executor é impossível. Repetido com as
+versões finais dos dois testes num worktree temporário do `0553755`: mesmo resultado.
+
+**GREEN:** estático 11/11; dinâmico 17/17 — falha injetada não deixa nem objeto nem registro (E1b,
+E2c), a aplicação bem-sucedida grava objetos e registro juntos (F2), sem aviso de transação (C1), com o
+catálogo esperado (F3, F4) e a suíte 053 31/31 sobre ela (F6). SQL do zero (`db reset`): 54 suítes PASS
+(053: 31/31; 090: 33 SEGURO, 13 RISCO); nenhum aviso de transação no log.
+
+| Verificação (sessão 21, com o envelope)                                 | Resultado                                                                                                      |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `npm run e2e:local`                                                     | **242 testes · 241 PASS · 0 FAIL · 1 FALHA CONHECIDA (CN-D) · 0 PULADO** · 1840 s · nenhuma rede externa       |
+| SQL local do zero (`db reset`)                                          | 54 suítes PASS (053: 31/31; 090: 33 SEGURO, 13 RISCO)                                                          |
+| Atomicidade (`testar-053-transacional-local.py`)                        | 17/17                                                                                                          |
+| `test:*`                                                                | 83/83 (82 de antes + `test:migration-053-transacao`, 11 asserções)                                             |
+| lint · `tsc` · Prettier · `check:workflow` · `git diff --check` · build | PASS (Prettier: PROGRESS e HANDOFF seguem fora do padrão como já estavam; os arquivos novos e alterados, PASS) |
+| travas                                                                  | 25/25                                                                                                          |
+
+**Nada mudou no financeiro:** a 053 continua recusando o intervalo maior que a jornada com o motor
+desligado (SQL 090 I5, 053) e ligado (spec 80 IJ1–IJ4); diárias, horas extras, sábado, domingo e
+feriado, custo, snapshots, fechamento, faturas e faturados conferidos pelas mesmas suítes, sem nenhuma
+expectativa alterada. I1 e I7 seguem RISCO.
+
 ## Riscos que permanecem
 
 - **I1** (AUT-CP05-01): saída antes da entrada em turno diurno vira jornada de 23h50 — a duração bruta
   de 08:00→07:50 é 1430, e a 053 não a toca. Decisão de jornada máxima: DEC-CP05-01 (054/058).
 - **I7**: versão obsoleta sobrescreve sem erro (sem controle de versão no banco).
 - Violações históricas em HML/Production: não contadas (preflight remoto não autorizado).
-- O teto do intervalo do **turno** (`shifts`) não faz parte da 053 (a tela já recusa, D-CP04-03).
+- O teto do intervalo do **turno** (`shifts`) não faz parte da 053 (a tela já recusa, D-CP04-03); o
+  preflight da 053 não conta turnos com intervalo inválido (achado da sessão 20).
+- Intervalo igual à duração (jornada zero): com o motor ligado o núcleo recusa (22023, mensagem
+  técnica); com o motor desligado é gravado com a diária — decisão pendente (sessão 20).
 - Seguem os riscos do 090: AUT-CP07-01, DEC-CP06-04, DEC-CP07-03, DEC-CP02-01, F2/F4/F7/F11/F12,
   D3–D5, K1. O `postgres` local é superusuário; em Production não é — a conferência de ACL e dono no
   ambiente remoto faz parte do gate de aplicação.

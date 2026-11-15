@@ -212,6 +212,17 @@ alterado. **Só local e CI; não aplicada em HML nem em Production.** Detalhe em
 [docs/qa/GATE-FIN-03-migration-053.md](docs/qa/GATE-FIN-03-migration-053.md). Seguem riscos: I1
 (saída antes da entrada, AUT-CP05-01/DEC-CP05-01, 054/058) e I7 (versão obsoleta).
 
+GATE-FIN-04 (sessão 20, análise só de leitura) e GATE-FIN-04B (sessão 21, no #136): a análise do I1
+e do I7 propôs a 054 (expandir: versão gravada pelo banco, confirmação de virada auditada, operador
+por RPCs v2, sem recusar os apps atuais) → app novo → 058 (contrair: versão obrigatória, virada com
+confirmação, limite de jornada, sem DELETE direto). **Antes de escrever a 054/058 faltam decisões:**
+limite de jornada (DEC-CP05-01), quem confirma a virada, permissões por coluna do operador (ou
+desenho alternativo), revogar o DELETE direto e o caminho de reserva do app, retentativa
+idempotente, incompatibilidade dos frontends antigos a partir da 058, preflight remoto e jornada
+zero. A análise também achou a 053 sem `begin;`/`commit;`, recusável pelo executor remoto: a sessão
+21 acrescentou o envelope (regra inalterada) e dois testes (contrato estático e atomicidade no
+PostgreSQL local). I1 e I7 seguem RISCO.
+
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,
 cancelamento e detalhe da fatura; vínculo com a nota fiscal). Autorização pendente:
