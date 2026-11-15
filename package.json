@@ -37,6 +37,7 @@
     "test:seguranca-cp10": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-seguranca-cp10.mjs",
     "test:legado-local": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-legado-local.mjs",
     "test:migration-053-transacao": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-migration-053-transacao.mjs",
+    "test:migration-054": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-migration-054.mjs",
     "test:clientes-contratos": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-clientes-contratos.mjs",
     "test:mensagens-auth": "node --experimental-strip-types --import ./scripts/_resolver-ts.mjs scripts/testar-mensagens-auth.mjs",
     "test:configuracoes": "node --experimental-strip-types scripts/testar-configuracoes.mjs",

@@ -242,7 +242,8 @@ select pg_temp.assert_eq('R3 fixture domingo V2 e bônus 30',
  (select billed_amount::text||'|'||cost_amount||'|'||billed_special_amount||'|'||additional_amount||'|'||calc_version
   from public.timesheet_entries where id=pg_temp.id_de('1','2026-03-01')),'95.00|20.00|65.00|30.00|2');
 create function pg_temp.financeiro(e uuid) returns jsonb language sql as $$
- select to_jsonb(t)-array['notes','updated_at'] from public.timesheet_entries t where id=e
+ -- `versao` (054) é metadado da escrita, como `updated_at`: sobe com a nota.
+ select to_jsonb(t)-array['notes','updated_at','versao'] from public.timesheet_entries t where id=e
 $$;
 create temporary table _r3_antes as select id,pg_temp.financeiro(id) as j from public.timesheet_entries
  where id in (pg_temp.id_de('1','2026-03-01'),pg_temp.id_de('1','2026-03-02'));

@@ -418,7 +418,8 @@ begin
   -- e cobertura anual, todas com RLS desde a criação — 28. A 045 acrescenta execução,
   -- participantes e auditoria de containers — 31. Bancos 043/044 conservam seus totais exatos.
   perform pg_temp.registrar('F3. todas as tabelas de public seguem com RLS ativa',
-    case when to_regclass('public.container_services') is not null then '31'
+    case when to_regclass('public.apontamento_confirmacoes_virada') is not null then '32'
+         when to_regclass('public.container_services') is not null then '31'
          when to_regclass('public.municipality_catalog') is null then '25' else '28' end,
     (select count(*)::text from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
@@ -546,7 +547,8 @@ begin
   -- A 040 acrescenta o gatilho que grava os snapshots de função e período (sem tocar em valor): são 16.
   -- A 044 acrescenta somente o snapshot territorial: 17 no banco 044, os 16 originais no 043.
   -- A 053 acrescenta a recusa de intervalo maior que a jornada (o teto que este arquivo dizia
-  -- não existir): são 18.
+  -- não existir): são 18. A 054 acrescenta a versão (BEFORE, o último) e a invalidação da
+  -- confirmação de virada (AFTER): são 20.
   perform pg_temp.registrar('I1. lista exata de triggers de timesheet_entries preserva todos os anteriores, o snapshot territorial da 044 quando instalada e o teto do intervalo da 053',
     'trg_timesheet_entries_ancora_folha, ' ||
     case when to_regclass('public.municipality_catalog') is null then ''
@@ -562,7 +564,9 @@ begin
     'trg_timesheet_entries_bloqueio_financeiro, trg_timesheet_entries_bz_snapshots_funcao_periodo, '
     'trg_timesheet_entries_calculo_financeiro, '
     'trg_timesheet_entries_calculo_vigencia, '
-    'trg_timesheet_entries_chave, trg_timesheet_entries_updated',
+    'trg_timesheet_entries_chave, trg_timesheet_entries_updated' ||
+    case when to_regclass('public.apontamento_confirmacoes_virada') is null then ''
+      else ', trg_timesheet_entries_zz_invalida_virada, trg_timesheet_entries_zz_versao' end,
     (select string_agg(t.tgname, ', ' order by t.tgname)
        from pg_trigger t join pg_class c on c.oid = t.tgrelid
       where not t.tgisinternal and c.relname = 'timesheet_entries'

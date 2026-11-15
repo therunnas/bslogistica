@@ -205,13 +205,16 @@ test("M3 controle: o admin passa da guarda das RPCs (a recusa acima é do papel,
     expect(error?.code, `${f.nome}: a chamada chegou ao banco`).not.toBe("PGRST202");
   }
   // Só as RPCs do operador recusam o admin pelo papel; as demais param no payload nulo (22023…).
+  // 054: as 2 RPCs v2 do operador também recusam o admin pelo papel.
   expect(recusadasPorPapel.sort()).toEqual(
     [
       "listar_apontamentos_do_operador",
+      "listar_apontamentos_do_operador_v2",
       "listar_equipe_do_operador",
       "listar_operacoes_do_operador",
       "listar_turnos_do_operador",
       "salvar_apontamento_operacional",
+      "salvar_apontamento_operacional_v2",
     ].sort(),
   );
 });

@@ -644,9 +644,9 @@ const migrations = readdirSync("supabase/migrations")
   .filter((f) => f.endsWith(".sql"))
   .sort();
 verificar(
-  "G1. a 030 existe, a 053 (recusa intervalo maior que a jornada, GATE-FIN-03) é a última migration e a 019 continua ausente",
+  "G1. a 030 existe, a 054 (versão e confirmação de virada, GATE-FIN-05) é a última migration e a 019 continua ausente",
   [migrations.includes(NOME), migrations.at(-1), migrations.some((m) => m.includes("_019_"))],
-  [true, "20261120120000_053_recusar_intervalo_maior_que_jornada.sql", false],
+  [true, "20261121120000_054_versao_e_confirmacao_de_virada.sql", false],
 );
 verificar(
   "G2. arredondamento só na COBRANÇA: o custo usa o excedente exato; o feriado só no custo",
