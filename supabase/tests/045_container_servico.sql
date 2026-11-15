@@ -328,7 +328,7 @@ select pg_temp.faturar('fatura-mista',2,'2026-02-01','2026-02-15');
 select pg_temp.assert_eq('fatura mista soma receita e custo uma única vez',
  (select total_amount||'|'||total_cost||'|'||total_dailies from public.invoices where id=pg_temp.id('fatura-mista')),'300.01|110.03|1.00');
 select pg_temp.assert_eq('faturamento só adiciona invoice_id ao snapshot OFF',
- (select ((to_jsonb(te)-'invoice_id')=((select snapshot from _off)-'invoice_id'))::text
+ (select ((to_jsonb(te)-'invoice_id'-'versao')=((select snapshot from _off)-'invoice_id'-'versao'))::text
  from public.timesheet_entries te where id='5c45b100-0000-4000-8000-000000000001'),'true');
 select pg_temp.assert_eq('fatura mista não incorpora custo de outro cliente',
  (select count(*)::text from public.container_services s join public.billing_additionals a on a.id=s.billing_additional_id

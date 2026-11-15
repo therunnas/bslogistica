@@ -43,11 +43,12 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
   nega. Acesso direto exige também `admin`. Nenhuma verificação de PAPEL foi
   removida. `user_roles` segue fora do enforcement. Não remover a policy global sem
   substituição segura.
-- **`operacional` só alcança dados pelas cinco RPCs operacionais**, que revalidam
+- **`operacional` só alcança dados pelas cinco RPCs operacionais** (e, desde a 054,
+  pelas duas v2 com versão, com as mesmas guardas e o mesmo dono), que revalidam
   papel, nível de MFA e atribuição por dentro, sempre sobre `auth.uid()`, nunca
   sobre um `user_id` recebido. Nenhum valor financeiro atravessa essa superfície.
-  Não ampliar grants, não trocar grant de coluna por grant de tabela, não trocar
-  o dono das funções.
+  Não ampliar grants (único acréscimo autorizado: `SELECT(versao)`, 054), não
+  trocar grant de coluna por grant de tabela, não trocar o dono das funções.
 - **A CSP está em enforcement** (`src/proxy.ts`); não a afrouxar. Ver
   [Segurança](docs/SEGURANCA.md).
 - **Função `SECURITY DEFINER` roda acima da RLS**: a verificação de papel e do piso

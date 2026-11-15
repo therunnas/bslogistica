@@ -392,7 +392,8 @@ begin
     (select count(*)::text from pg_policies
       where schemaname = 'public' and tablename = 'user_operation_access'));
 
-  perform pg_temp.registrar('C5. as 5 RPCs operacionais seguem com o dono dedicado', '5',
+  perform pg_temp.registrar('C5. as 5 RPCs operacionais (mais as 2 v2 da 054, quando aplicada) seguem com o dono dedicado',
+    case when to_regprocedure('public.salvar_apontamento_operacional_v2(uuid,uuid,date,jsonb)') is null then '5' else '7' end,
     (select count(*)::text from pg_proc p
        join pg_namespace n on n.oid = p.pronamespace
        join pg_roles r on r.oid = p.proowner

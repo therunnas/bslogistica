@@ -515,10 +515,11 @@ select pg_temp.registrar('S4. nenhuma RPC criou fatura nem item', '1|0',
   (select (select count(*) from public.invoices where client_id = '5c0dc000-0000-4000-8000-0000000000ca')::text || '|' || (select count(*) from public.invoice_items where invoice_id = '5c0db200-0000-4000-8000-000000000001')::text));
 select pg_temp.registrar('T1. o apontamento da operação 2 (nunca tocado) está idêntico ao de antes', 'true',
   (select (a.linha = to_jsonb(te))::text from _entradas_antes a join public.timesheet_entries te on te.id = a.id where a.id = '5c0db100-0000-4000-8000-000000000003'));
+-- `versao` (054) é metadado da escrita, como `updated_at`.
 select pg_temp.registrar('T2. o apontamento 1 só diferiu no que o teste mudou de propósito (referência, horário e valores recalculados)', 'true',
   (select (count(*) = 0)::text from (
-     select a.linha - array['operation_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'daily_rate_snapshot', 'ot_hour_rate_snapshot', 'updated_at'] as antes,
-            to_jsonb(te) - array['operation_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'daily_rate_snapshot', 'ot_hour_rate_snapshot', 'updated_at'] as depois
+     select a.linha - array['operation_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'daily_rate_snapshot', 'ot_hour_rate_snapshot', 'updated_at', 'versao'] as antes,
+            to_jsonb(te) - array['operation_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'daily_rate_snapshot', 'ot_hour_rate_snapshot', 'updated_at', 'versao'] as depois
        from _entradas_antes a join public.timesheet_entries te on te.id = a.id where a.id <> '5c0db100-0000-4000-8000-000000000003') x
    where x.antes is distinct from x.depois));
 select pg_temp.registrar('T3. nenhuma outra coluna de condições foi preenchida por RPC', '0',
@@ -617,9 +618,10 @@ select pg_temp.registrar('V3. as 7 funções SECURITY DEFINER novas são do post
                         'valor_acordado_operacao_na_data', 'exigir_valor_acordado_operacao_na_data', 'condicoes_encerrar_operacao_interno')));
 -- Mantém o inventário anterior à 044, sem incluir o novo snapshot territorial;
 -- nenhum dos 15 gatilhos já exigidos deixa de ser contado.
-select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 + snapshots da 040 = 15, todos habilitados (snapshot da 044 e teto do intervalo da 053 fora deste inventário)', '15',
+select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 + snapshots da 040 = 15, todos habilitados (snapshot da 044, teto do intervalo da 053 e versão da 054 fora deste inventário)', '15',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'
-    and tgname not in ('trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior')));
+    and tgname not in ('trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior',
+                       'trg_timesheet_entries_zz_versao', 'trg_timesheet_entries_zz_invalida_virada')));
 select pg_temp.registrar('V5. shifts: 4 triggers originais + o da classificação do turno (039) habilitados + o congelamento DESABILITADO', '5|1',
   (select count(*) filter (where tgenabled = 'O')::text || '|' || count(*) filter (where tgenabled = 'D')::text from pg_trigger where tgrelid = 'public.shifts'::regclass and not tgisinternal));
 select pg_temp.registrar('V6. a derivação financeira e gerar_fatura não citam as versões', '0',

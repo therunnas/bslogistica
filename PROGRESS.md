@@ -223,6 +223,19 @@ zero. A análise também achou a 053 sem `begin;`/`commit;`, recusável pelo exe
 21 acrescentou o envelope (regra inalterada) e dois testes (contrato estático e atomicidade no
 PostgreSQL local). I1 e I7 seguem RISCO.
 
+GATE-FIN-05 (15/11/2026, sessão 22, PR Draft empilhado sobre o #136, branch
+`fix/gate-fin-05-migration-054`): **migration 054 — expandir.** `timesheet_entries.versao` mantida só
+pelo banco (último gatilho BEFORE); contratos v2 com versão obrigatória e conferência atômica sob trava
+(`salvar_apontamento_admin_v2`, `salvar_apontamento_operacional_v2`, `listar_apontamentos_do_operador_v2`):
+obsoleta com conteúdo diferente = 40001, idêntica = sem alteração e sem subir a versão; confirmação de
+virada só pelo admin, verificada no banco e registrada na trilha `apontamento_confirmacoes_virada`,
+invalidada quando o confirmado muda. Operador ganha só `SELECT(versao)`. Legado (v1, upsert, escrita
+direta, DELETE do admin) intacto e ainda sem versão nem confirmação: **I1 e I7 seguem RISCO** até a 058.
+Concorrência real em duas conexões (46/46) na CI. **Só local e CI; não aplicada em HML nem em
+Production.** Detalhe em [docs/qa/GATE-FIN-05-migration-054.md](docs/qa/GATE-FIN-05-migration-054.md).
+**Pendente para a 058:** decisão de jornada (DEC-CP05-01), jornada zero, app novo publicado usando os
+v2, revogação da escrita direta e das v1.
+
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,
 cancelamento e detalhe da fatura; vínculo com a nota fiscal). Autorização pendente:

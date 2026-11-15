@@ -97,7 +97,7 @@ e um erro no ensaio encerra o líder e o filho (G22–G25).
 
 | Arquivo | O que cobre |
 | --- | --- |
-| `00-fumaca.spec.ts` | estado do banco (58 migrations — as 56 da Production + a 052 e a 053, só locais —, motor ON, resolução OFF, dobro ON, RLS em tudo), leitura somente leitura, admin abre as 10 telas, operacional restrito |
+| `00-fumaca.spec.ts` | estado do banco (59 migrations — as 56 da Production + a 052, a 053 e a 054, só locais —, motor ON, resolução OFF, dobro ON, RLS em tudo), leitura somente leitura, admin abre as 10 telas, operacional restrito |
 | `10-ciclo-completo.spec.ts` | cadastros pela tela; V1–V5 do PR #132; operação fixa ao centavo (normal, incompleta, horas extras, limites 15/45, sábado, domingo, feriado, noturno, falta, substituição); avulsa genérica com 2 participantes; fechamento; Excel interno × Excel do cliente (sem custo/margem); CSV; adicional e fatura; sem cobrança dupla; faturado travado; Dashboard e Relatórios |
 | `20-seguranca.spec.ts` | operador só por RPC e sem chave financeira; tabela direta devolve zero linha; chave extra recusada com `22023`; admin não usa a RPC do operador; faturado travado para o operador; sem sessão não há dado |
 | `30-falhas-conhecidas.spec.ts` | defeitos do plano de estabilização (D1, D2, D3 e D4): todos corrigidos e conferidos pelo comportamento correto (D4 desde o CP-07); a única falha conhecida restante é a CN-D, em `50-clientes-contratos` |

@@ -133,7 +133,7 @@ modelo completo, incluindo MFA e recuperação de senha, está em
 | ---------------------------------------- | ------------ | ------------------------------------ |
 | tabelas de negócio, pelo PostgREST       | piso de MFA  | **nenhuma**, em nenhum nível         |
 | `user_operation_access`                  | piso de MFA  | nenhuma                              |
-| cinco RPCs operacionais                  | recusadas    | operações atribuídas, sem financeiro |
+| RPCs operacionais (5 + 2 v2 da 054)      | recusadas    | operações atribuídas, sem financeiro |
 | `profiles`                               | vê todos     | só o próprio                         |
 | `user_roles`                             | só a própria | só a própria                         |
 | telas administrativas (`/usuarios` etc.) | sim          | bloqueadas no servidor               |
@@ -395,3 +395,19 @@ verificado e os limites de evidência estão em [ESTADO_DO_PROJETO.md](ESTADO_DO
 migration já aplicada** — criar nova com `supabase migration new <nome>`. Antes
 de commitar mudança de esquema, rodar `supabase db advisors --linked --type
 security`. Testes de banco ficam em `supabase/tests/`.
+
+### Versão dos apontamentos e contratos v2 (054, GATE-FIN-05)
+
+`timesheet_entries.versao` é mantida só pelo banco: o gatilho `trg_timesheet_entries_zz_versao`
+(o último BEFORE da tabela) grava 1 no INSERT e soma 1 a cada UPDATE com mudança efetiva; o cliente
+não escolhe a versão. Os contratos v2 — `salvar_apontamento_admin_v2`,
+`salvar_apontamento_operacional_v2` e `listar_apontamentos_do_operador_v2` — exigem `versao_esperada`
+por linha e comparam sob trava da linha (`FOR UPDATE`): versão obsoleta com conteúdo diferente devolve
+`40001`; conteúdo idêntico devolve `sem_alteracao` sem subir a versão. A virada da meia-noite fora de
+turno que vira o dia é confirmada pelo admin (`confirmar_virada_do_apontamento`) e registrada na trilha
+`apontamento_confirmacoes_virada`, invalidada quando horário, status, folha ou colaborador mudam.
+
+Na 054 isso é **expansão**: as RPCs v1, o upsert antigo e a escrita direta continuam aceitos sem
+versão e sem confirmação. Tornar versão e confirmação obrigatórias, revogar o DELETE direto e aplicar
+o limite de jornada é da 058, depois do aplicativo novo. Detalhe em
+[docs/qa/GATE-FIN-05-migration-054.md](qa/GATE-FIN-05-migration-054.md).

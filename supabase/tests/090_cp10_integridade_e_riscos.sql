@@ -152,8 +152,8 @@ select pg_temp.registrar('SEGURO', 'S4. sem papel: toda DEFINER recusa (42501), 
 select pg_temp.registrar('SEGURO', 'S5. operacional: idem, mais a própria lista de operações',
   'identidade_atual_utilizavel,listar_operacoes_do_operador,mfa_bloqueia_excecao_aal1,mfa_cotidiano_ok',
   (select string_agg(funcao, ',' order by funcao) from _varredura where quem = 'operacional' and estado <> '42501'));
-select pg_temp.registrar('SEGURO', 'S6. controle: o admin só é recusado pelo papel nas 5 RPCs do operador',
-  'listar_apontamentos_do_operador,listar_equipe_do_operador,listar_operacoes_do_operador,listar_turnos_do_operador,salvar_apontamento_operacional',
+select pg_temp.registrar('SEGURO', 'S6. controle: o admin só é recusado pelo papel nas RPCs do operador (as 5 e as 2 v2 da 054)',
+  'listar_apontamentos_do_operador,listar_apontamentos_do_operador_v2,listar_equipe_do_operador,listar_operacoes_do_operador,listar_turnos_do_operador,salvar_apontamento_operacional,salvar_apontamento_operacional_v2',
   (select string_agg(funcao, ',' order by funcao) from _varredura where quem = 'admin' and estado = '42501'));
 select pg_temp.registrar('SEGURO', 'S7. a varredura não é vazia (mais de 50 funções por conta)', 'true',
   ((select count(*) from _varredura where quem = 'admin') > 50)::text);

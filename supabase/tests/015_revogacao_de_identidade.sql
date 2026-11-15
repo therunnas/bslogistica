@@ -797,11 +797,13 @@ do $bloco_h_forma$
 declare _n int; _sobra int;
 begin
   perform pg_temp.registrar('H-F1. public conserva o total exato de policies esperado para o schema',
-    case when to_regclass('public.container_services') is not null then '87'
+    case when to_regclass('public.apontamento_confirmacoes_virada') is not null then '88'
+         when to_regclass('public.container_services') is not null then '87'
          when to_regclass('public.municipality_catalog') is null then '78' else '81' end,
     (select count(*)::text from pg_policies where schemaname = 'public'));
-  perform pg_temp.registrar('H-F2. inventário exato RESTRICTIVE/PERMISSIVE por versão043/044/045',
-    case when to_regclass('public.container_services') is not null then '43/44'
+  perform pg_temp.registrar('H-F2. inventário exato RESTRICTIVE/PERMISSIVE por versão043/044/045/054',
+    case when to_regclass('public.apontamento_confirmacoes_virada') is not null then '43/45'
+         when to_regclass('public.container_services') is not null then '43/44'
          when to_regclass('public.municipality_catalog') is null then '40/38' else '40/41' end,
     (select count(*) filter (where permissive = 'RESTRICTIVE') || '/' || count(*) filter (where permissive = 'PERMISSIVE')
        from pg_policies where schemaname = 'public'));
@@ -906,6 +908,11 @@ begin
       ('container_service_audit', 'container_service_audit_require_admin', 'RESTRICTIVE', 'ALL')
     ) containers(tablename,policyname,permissive,cmd)
     where to_regclass('public.container_services') is not null
+    union all
+    select * from (values
+      ('apontamento_confirmacoes_virada', 'apontamento_confirmacoes_virada_leitura_admin', 'PERMISSIVE', 'SELECT')
+    ) virada(tablename,policyname,permissive,cmd)
+    where to_regclass('public.apontamento_confirmacoes_virada') is not null
   ), atual as (
     select tablename, policyname, permissive, cmd from pg_policies where schemaname = 'public'
   )
@@ -915,13 +922,15 @@ begin
   perform pg_temp.registrar('H-F3. inventario de policies identico ao anterior (tabela, nome, tipo, comando)', '0', _n::text);
 
   perform pg_temp.registrar('H-F4. todas as policies seguem TO authenticated',
-    case when to_regclass('public.container_services') is not null then '87'
+    case when to_regclass('public.apontamento_confirmacoes_virada') is not null then '88'
+         when to_regclass('public.container_services') is not null then '87'
          when to_regclass('public.municipality_catalog') is null then '78' else '81' end,
     (select count(*)::text from pg_policies
       where schemaname = 'public' and roles = array['authenticated']::name[]));
 
   perform pg_temp.registrar('H-F5. todas as tabelas seguem com RLS ligada',
-    case when to_regclass('public.container_services') is not null then '31'
+    case when to_regclass('public.apontamento_confirmacoes_virada') is not null then '32'
+         when to_regclass('public.container_services') is not null then '31'
          when to_regclass('public.municipality_catalog') is null then '25' else '28' end,
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relrowsecurity));
@@ -943,8 +952,9 @@ begin
     (select count(*)::text from pg_class c
       where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and c.relforcerowsecurity));
 
-  perform pg_temp.registrar('H-F7. policies antigas e novas da044/045 usam has_role()/is_staff()',
-    case when to_regclass('public.container_services') is not null then '63'
+  perform pg_temp.registrar('H-F7. policies antigas e novas da044/045/054 usam has_role()/is_staff()',
+    case when to_regclass('public.apontamento_confirmacoes_virada') is not null then '64'
+         when to_regclass('public.container_services') is not null then '63'
          when to_regclass('public.municipality_catalog') is null then '54' else '57' end,
     (select count(*)::text from pg_policies
       where schemaname = 'public'

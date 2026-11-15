@@ -541,10 +541,11 @@ select pg_temp.registrar('S3. e continua imutável para o admin', 'erro 42501',
 select pg_temp.registrar('S4. nenhuma RPC criou fatura nem item', '1|0',
   (select (select count(*) from public.invoices where client_id = '5c0cc000-0000-4000-8000-0000000000ca')::text || '|' || (select count(*) from public.invoice_items where invoice_id = '5c0cb200-0000-4000-8000-000000000001')::text));
 
+-- `versao` (054) é metadado da escrita, como `updated_at`: sobe quando o preparo do teste altera a linha.
 select pg_temp.registrar('T1. apontamentos antigos intactos, exceto as colunas de referência que o preparo do teste preencheu', 'true',
   (select (count(*) = 0)::text from (
-     select a.id, a.linha - array['contract_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'updated_at'] as antes,
-            to_jsonb(te) - array['contract_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'updated_at'] as depois
+     select a.id, a.linha - array['contract_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'updated_at', 'versao'] as antes,
+            to_jsonb(te) - array['contract_terms_id', 'terms_origin', 'invoice_id', 'billed_amount', 'cost_amount', 'check_out', 'worked_minutes', 'overtime_minutes', 'updated_at', 'versao'] as depois
        from _entradas_antes a join public.timesheet_entries te on te.id = a.id) x
    where x.antes is distinct from x.depois));
 select pg_temp.registrar('T2. nenhuma das 7 colunas novas foi preenchida por RPC além do preparo manual do teste (colunas de snapshot e custo seguem NULL)', '0',
@@ -655,9 +656,9 @@ select pg_temp.registrar('V3. as 16 funções SECURITY DEFINER são do postgres,
                         'condicoes_exigir_admin', 'condicoes_auditar', 'condicoes_encerrar_contrato_interno', 'condicoes_encerrar_colaborador_interno')));
 -- O inventário permanece fixado no conjunto da 023: o snapshot territorial da 044
 -- é aditivo e fica explicitamente fora, como os acréscimos posteriores já listados.
-select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (os da 024, 029, 031, 040, 044 e 053, se aplicadas, ficam de fora da conta)', '11',
+select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (os da 024, 029, 031, 040, 044, 053 e 054, se aplicadas, ficam de fora da conta)', '11',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'
-      and tgname not in ('trg_timesheet_entries_bloqueia_condicoes_operacao', 'trg_timesheet_entries_bloqueia_horario_igual', 'trg_timesheet_entries_bloqueia_folha_fechada', 'trg_timesheet_entries_bz_snapshots_funcao_periodo', 'trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior')));
+      and tgname not in ('trg_timesheet_entries_bloqueia_condicoes_operacao', 'trg_timesheet_entries_bloqueia_horario_igual', 'trg_timesheet_entries_bloqueia_folha_fechada', 'trg_timesheet_entries_bz_snapshots_funcao_periodo', 'trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior', 'trg_timesheet_entries_zz_versao', 'trg_timesheet_entries_zz_invalida_virada')));
 select pg_temp.registrar('V5. a derivação financeira e gerar_fatura não citam as versões (continuam como estavam)', '0',
   (select count(*)::text from pg_proc where pronamespace = 'public'::regnamespace and proname in ('derivar_valores_financeiros', 'gerar_fatura')
      and (prosrc ilike '%contract_terms%' or prosrc ilike '%employee_cost_terms%' or prosrc ilike '%financial_terms_audit%')));

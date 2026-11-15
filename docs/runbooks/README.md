@@ -80,6 +80,13 @@ Fora da cadeia financeira acima:
   com o motor desligado o intervalo maior volta a zerar a jornada com a diária cobrada; com o motor
   ligado, o núcleo volta a ser a única barreira, com mensagem técnica (22023). Não toca dados nem
   `schema_migrations`. Ensaiado só localmente.
+- [rollback-versao-e-confirmacao-de-virada.sql](rollback-versao-e-confirmacao-de-virada.sql):
+  054 → comportamento da 053 (remove as RPCs v2, a confirmação de virada e os gatilhos de versão e
+  invalidação; devolve o papel do operador ao inventário da 053). **Preserva** a coluna `versao` e a
+  trilha `apontamento_confirmacoes_virada` (com a proteção dela); não toca valores, faturas, RPCs v1
+  nem `schema_migrations`. Antes de executar: nenhum app publicado usando as v2. Ensaiado só
+  localmente (dados idênticos antes e depois; 054 reaplicada). Preflight só de leitura em
+  `supabase/preflight/054_versao_e_virada_preflight.sql`.
 
 A ordem nominal inversa (043 → 042 → … → 035) é apenas uma relação de
 precedência dos estágios financeiros. **Não é uma sequência de comandos pronta

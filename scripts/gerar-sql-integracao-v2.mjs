@@ -474,7 +474,8 @@ create temporary table _soma on commit drop as
          coalesce(sum(coalesce(billed_overtime_minutes, overtime_minutes)) filter (where status <> 'absent'), 0) as minutos
     from public.timesheet_entries where invoice_id is null;
 create temporary table _antes_fatura on commit drop as
-  select id, md5((to_jsonb(e) - 'invoice_id' - 'updated_at')::text) as h from public.timesheet_entries e;
+  -- \`versao\` (054) é metadado da escrita, como \`updated_at\`: o vínculo da fatura a sobe.
+  select id, md5((to_jsonb(e) - 'invoice_id' - 'updated_at' - 'versao')::text) as h from public.timesheet_entries e;
 select pg_temp.registrar('X14. resumo financeiro: receita dos apontamentos = soma do cobrado', 'ok',
   (select case when pg_temp.adm($q$select receita_apontamentos::text from public.resumo_financeiro_periodo(date '2026-03-01', date '2026-03-15', '${CLIENTE}')$q$) = s.billed::text
                then 'ok' else pg_temp.adm($q$select receita_apontamentos::text from public.resumo_financeiro_periodo(date '2026-03-01', date '2026-03-15', '${CLIENTE}')$q$) || ' <> ' || s.billed::text end
@@ -498,7 +499,7 @@ select pg_temp.registrar('X18. fatura: lançamentos = presenças e substituiçõ
      from public.invoices i, _fatura f, _soma s where i.id = f.id));
 select pg_temp.registrar('X19. gerar a fatura não recalculou nenhum lançamento (só o vínculo mudou)', '0',
   (select count(*)::text from _antes_fatura a join public.timesheet_entries e on e.id = a.id
-    where md5((to_jsonb(e) - 'invoice_id' - 'updated_at')::text) <> a.h));
+    where md5((to_jsonb(e) - 'invoice_id' - 'updated_at' - 'versao')::text) <> a.h));
 
 -- X20 a X23. Faturado imutável
 select pg_temp.registrar('X20. faturado: editar a saída é recusado (42501)', 'erro 42501', ${upd(r495.n, "check_out = '16:30'")});
