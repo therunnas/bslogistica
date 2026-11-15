@@ -110,6 +110,9 @@ jobs:
       - name: Teste da fixture local de registro antigo (GATE-FIN-02)
         run: npm run test:legado-local
 
+      - name: Contrato transacional da migration 053 (GATE-FIN-04B)
+        run: npm run test:migration-053-transacao
+
       - name: Teste troca
         run: npm run test:troca
 
@@ -339,3 +342,6 @@ jobs:
 
       - name: Testes SQL incluindo backend de containers
         run: bash scripts/testar-sql-local.sh
+
+      - name: Atomicidade da migration 053 no PostgreSQL local (GATE-FIN-04B)
+        run: python3 -I scripts/testar-053-transacional-local.py
