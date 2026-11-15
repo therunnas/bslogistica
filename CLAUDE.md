@@ -211,7 +211,9 @@ implementar isso só no guard ou no frontend:** o enforcement do banco é o que 
 
 Cinco RPCs de contrato fechado — `listar_operacoes_do_operador`,
 `listar_turnos_do_operador`, `listar_equipe_do_operador`,
-`listar_apontamentos_do_operador` e `salvar_apontamento_operacional` — mais
+`listar_apontamentos_do_operador` e `salvar_apontamento_operacional` — e, desde a
+054 (GATE-FIN-05), as duas v2 com versão: `listar_apontamentos_do_operador_v2` e
+`salvar_apontamento_operacional_v2`, com as mesmas guardas e o mesmo dono; mais
 `public.user_operation_access` e os helpers internos. A interface as consome por
 `src/lib/operacional/` e pela tela `/operacional`, e só por elas. O desenho
 completo está em [docs/SEGURANCA.md](docs/SEGURANCA.md). Regras permanentes:
@@ -222,7 +224,9 @@ completo está em [docs/SEGURANCA.md](docs/SEGURANCA.md). Regras permanentes:
   `cliente_nome`**. "Faturado" chega como **boolean derivado**.
 - **A escrita aceita seis campos por linha** (`employee_id`, `status`,
   `check_in`, `check_out`, `break_minutes`, `notes`) e **recusa a chamada
-  inteira** com `22023` diante de qualquer outra chave. Não existe DELETE.
+  inteira** com `22023` diante de qualquer outra chave. A v2 aceita esses seis e
+  `versao_esperada`, obrigatória (0 = linha nova; obsoleta com conteúdo diferente =
+  `40001`). O operador não confirma virada. Não existe DELETE.
 - **Cada função revalida tudo por dentro:** papel `operacional` (não `admin`),
   nível aceito (`aal1` sem MFA bloqueando, ou `aal2`), conta existente e
   atribuição em `user_operation_access`. A decisão é sempre sobre `auth.uid()`;
@@ -236,7 +240,8 @@ completo está em [docs/SEGURANCA.md](docs/SEGURANCA.md). Regras permanentes:
   das migrations de proteção financeira isentam `postgres`. **Todos os grants do
   papel são por coluna**, nenhum por tabela, e ele não tem nenhuma coluna
   financeira, nem para ler. **Não ampliar esses grants, nunca trocar grant de
-  coluna por `GRANT ... ON TABLE`, e não trocar o dono das funções.**
+  coluna por `GRANT ... ON TABLE`, e não trocar o dono das funções.** Único
+  acréscimo autorizado: `SELECT(versao)` em `timesheet_entries` (054).
 - **O papel não tem nada no schema `auth`.** Em Production o `postgres` não
   consegue conceder `USAGE` em `auth` a outro papel; uma RPC que referencie
   `auth.*` quebra. Identidade entra por `uid_do_operador()`.

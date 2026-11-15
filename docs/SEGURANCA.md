@@ -35,7 +35,7 @@ automático do primeiro admin foi **removido** (migration
 | --------------------- | -------------------------------------------------------------- |
 | `admin` sem fator     | tudo do papel (e-mail e senha bastam; ver risco residual)      |
 | `admin` com fator     | tudo do papel, depois do TOTP; em AAL1 o guard envia a `/mfa`  |
-| `operacional`         | **nenhuma** tabela de negócio pelo PostgREST; só as cinco RPCs |
+| `operacional`         | **nenhuma** tabela de negócio pelo PostgREST; só as RPCs v1/v2 |
 | autenticado sem papel | nenhum dado de negócio                                         |
 | não autenticado       | redirecionado ao login                                         |
 
@@ -74,8 +74,8 @@ depende só do PAPEL.
 | `admin` sem fator verificado         | e-mail e senha (AAL1) | todas as de `admin` (usuários, faturamento, vigências, motor, auditoria...) |
 | `admin` com fator, após o TOTP       | senha + TOTP (AAL2)   | todas as de `admin`, sem novo código                                        |
 | `admin` com fator, só a senha (AAL1) | barrado em `/mfa`     | nenhuma (app e banco)                                                       |
-| `operacional` sem fator              | e-mail e senha (AAL1) | só as cinco RPCs operacionais                                               |
-| `operacional` com fator, após TOTP   | senha + TOTP (AAL2)   | só as cinco RPCs operacionais                                               |
+| `operacional` sem fator              | e-mail e senha (AAL1) | só as RPCs operacionais v1/v2                                               |
+| `operacional` com fator, após TOTP   | senha + TOTP (AAL2)   | só as RPCs operacionais v1/v2                                               |
 | `operacional` com fator, só senha    | barrado em `/mfa`     | nenhuma                                                                     |
 
 `operacional` nunca alcança função de `admin`, em nenhum nível. Nenhuma verificação de papel
@@ -283,7 +283,11 @@ os testes asseveram isso na forma dos arquivos.
   predicado). O operador não a consulta; ela o autoriza.
 - Cinco RPCs de contrato fechado: `listar_operacoes_do_operador`,
   `listar_turnos_do_operador`, `listar_equipe_do_operador`,
-  `listar_apontamentos_do_operador` e `salvar_apontamento_operacional`.
+  `listar_apontamentos_do_operador` e `salvar_apontamento_operacional`. Desde a 054
+  (GATE-FIN-05; **só local e CI, não aplicada em HML nem em Production**), mais duas,
+  com versão: `listar_apontamentos_do_operador_v2` (as colunas da v1 e `versao`) e
+  `salvar_apontamento_operacional_v2`, com as mesmas guardas, o mesmo dono e a mesma
+  ordem de verificação da v1.
 - **Elegibilidade** (`operador_elegivel_operacional()`): `aal1` com
   `mfa_bloqueia_excecao_aal1() = false` **ou** `aal2`; papel `operacional` e **não**
   `admin`; conta ainda existente; atribuição em `user_operation_access`. A decisão
@@ -299,10 +303,14 @@ os testes asseveram isso na forma dos arquivos.
 - **A escrita aceita seis campos por linha** (`employee_id`, `status`, `check_in`,
   `check_out`, `break_minutes`, `notes`) e **recusa a chamada inteira** com
   `22023` diante de qualquer outra chave. Não existe `DELETE`; linha ausente do
-  payload é linha não tocada.
+  payload é linha não tocada. A v2 aceita os seis e `versao_esperada`,
+  obrigatória; `confirmar_virada` e qualquer outra chave são recusadas (o operador
+  não confirma virada).
 - **As RPCs não rodam como `postgres`.** Pertencem a `bslog_rpc_operacional`:
   `NOLOGIN`, `BYPASSRLS`, sem membership em `anon`, `authenticated` ou
-  `service_role`, e com grants **por coluna** — nenhum privilégio de tabela. Sem
+  `service_role`, e com grants **por coluna** — nenhum privilégio de tabela (a 054
+  acrescentou só `SELECT(versao)` em `timesheet_entries`; a versão é escrita pelo
+  gatilho, que não exige privilégio). Sem
   dono próprio, as guardas de `010`/`011` que isentam `postgres` seriam
   contornadas pela superfície do papel menos privilegiado. Um comando que nomeie
   coluna financeira é recusado com `42501` pelo próprio PostgreSQL. Em `timesheets` e `shifts`
@@ -345,6 +353,18 @@ os testes asseveram isso na forma dos arquivos.
   `work_date`/`operation_id`/`shift_id` da folha e a linha do apontamento.
 - `break_minutes` não pode ser negativo (migration `014`): valor negativo inflava
   `billed_amount`.
+- **Versão e confirmação de virada (migration `054`, GATE-FIN-05; só local e CI):**
+  `timesheet_entries.versao` é mantida só pelo banco (último gatilho BEFORE; o
+  cliente não a escolhe). Os contratos v2 (admin e operador) exigem a versão
+  esperada e comparam sob `FOR UPDATE`: obsoleta com conteúdo diferente = `40001`;
+  conteúdo idêntico = `sem_alteracao`, sem subir a versão. A virada fora de turno
+  que vira o dia é confirmada só pelo admin (`confirmar_virada_do_apontamento`,
+  `SECURITY DEFINER` da `postgres`, papel e MFA conferidos dentro) e registrada em
+  `apontamento_confirmacoes_virada`: RLS, leitura só do admin, nenhuma escrita por
+  papel da API, gatilho que recusa alterar o confirmado ou apagar (nem a dona).
+  **Ainda não obrigatório:** o legado (RPCs v1, upsert, escrita direta) grava sem
+  versão e sem confirmação, e o DELETE direto do admin continua — I1 e I7 seguem
+  RISCO até a 058.
 - `break_minutes` não pode passar do tempo entre entrada e saída (migration `053`,
   GATE-FIN-03; **só local e CI, não aplicada em HML nem em Production**): trigger
   `trg_timesheet_entries_bloqueia_intervalo_maior`, 23514, mesma duração bruta do
