@@ -118,20 +118,21 @@ verificar(
   ],
   [true, true, true, true],
 );
+// GATE-FIN-06: a mesma regra no operador, mas SEM a caixa de confirmação: a virada fora de turno
+// noturno só é confirmada pelo administrador (054), e a tela do operador bloqueia e explica.
 verificar(
-  "A9. tela do operador: a mesma regra, pelo turno da folha, no botão e no envio",
+  "A9. tela do operador: a mesma regra, pelo turno da folha, no botão e no envio — sem confirmação",
   [
     /saidaAntesDaEntradaForaDoTurno\(linha\.status, linha\.check_in, linha\.check_out, turno\)/.test(
       operador,
     ),
-    /viradasPendentes\.length > 0\s*\n?\s*\}/.test(operador) ||
-      /horariosIguais\.length > 0 \|\|\s*viradasPendentes\.length > 0/.test(operador),
-    /if \(viradasPendentes\.length > 0\) \{\s*toast\.error\(MENSAGEM_SAIDA_ANTES_DA_ENTRADA\);/.test(
+    /horariosIguais\.length > 0 \|\|\s*viradasPendentes\.length > 0/.test(operador),
+    /if \(viradasPendentes\.length > 0\) \{\s*toast\.error\(MENSAGEM_VIRADA_DO_OPERADOR\);/.test(
       operador,
     ),
     /Confirmo que a jornada atravessou a meia-noite/.test(operador),
   ],
-  [true, true, true, true],
+  [true, true, true, false],
 );
 
 // ---------------------------------------------------------------------------------------------
@@ -188,26 +189,34 @@ verificar(
   ],
   ["bia"],
 );
+// GATE-FIN-06: a versão é a coluna `versao` da 054 (inteiro mantido pelo banco), não mais o
+// `updated_at`; sem a coluna, a versão é desconhecida (null) e a linha não é enviada.
 verificar(
-  "B6. versão: updated_at do gravado, ou nova",
+  "B6. versão: a coluna versao do gravado, 0 para linha nova, null sem a coluna",
   [
-    versaoDoGravado({ updated_at: "2026-11-12T10:00:00Z" }),
+    versaoDoGravado({ versao: 3 }),
     versaoDoGravado(undefined),
+    versaoDoGravado({ updated_at: "2026-11-12T10:00:00Z" }),
     VERSAO_NOVA,
   ],
-  ["2026-11-12T10:00:00Z", "novo", "novo"],
+  [3, 0, null, 0],
 );
 verificar(
-  "B7. a mensagem diz que nada foi gravado e manda recarregar",
-  /Nada foi gravado\. Recarregue a página/.test(mensagemDeConflito(["Bia"])) &&
+  "B7. a mensagem diz que nada foi gravado, que o digitado ficou, e nomeia as linhas",
+  /Nada foi gravado\./.test(mensagemDeConflito(["Bia"])) &&
+    /O que você digitou foi mantido/.test(mensagemDeConflito(["Bia"])) &&
     /Ana, Bia, Caio e mais 1/.test(mensagemDeConflito(["Ana", "Bia", "Caio", "Davi"])),
   true,
 );
+// GATE-FIN-06: a conferência saiu da tela (leitura do updated_at antes da RPC, fora da transação)
+// para o banco (a v2 confere a versão sob trava). A tela ainda não envia com conflito VISÍVEL.
 verificar(
-  "B8. a tela confere a versão ANTES da RPC e não envia em conflito",
-  /linhasEmConflito\([\s\S]{0,400}?\);\s*if \(emConflito\.length\) \{\s*throw new Error\([\s\S]{0,200}?\}\s*const \{ error \} = await cliente\.rpc\("salvar_apontamento_admin"/.test(
+  "B8. conflito visível bloqueia o envio; a versão vai na v2 e o banco confere (sem pré-leitura)",
+  /if \(conflitosDeVersao\.length\) \{\s*throw new Error\([\s\S]{0,300}?\}[\s\S]{0,2500}?salvarDiaAdminV2\(/.test(
     admin,
-  ),
+  ) &&
+    /versaoEsperada,/.test(admin) &&
+    !/select\("employee_id, updated_at"\)/.test(admin),
   true,
 );
 

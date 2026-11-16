@@ -439,12 +439,14 @@ console.log(
     String(/\bimport\b|\bfetch\(|criarClienteNavegador|useQuery/.test(bloco)),
     "false",
   );
+  // GATE-FIN-06: a folha nasce dentro da RPC v2 (atômica, 054); a tela não faz mais INSERT de
+  // folha nem upsert de linhas (era o caminho anterior à 031).
   verificar(
-    "E8. a criação da folha e o upsert seguem como estavam",
+    "E8. a folha e as linhas são gravadas só pela RPC v2 (sem INSERT de folha nem upsert na tela)",
     String(
-      /\.from\("timesheets"\)\s*\.insert\(\{\s*operation_id: operationId,\s*shift_id: turnoId \|\| null,\s*work_date: date,\s*status: "open",/.test(
-        t,
-      ) && /\.from\("timesheet_entries"\)\.upsert\(payload\)/.test(t),
+      !/\.from\("timesheets"\)\s*\.insert\(/.test(t) &&
+        !/\.from\("timesheet_entries"\)\.upsert\(/.test(t) &&
+        /salvarDiaAdminV2\(/.test(t),
     ),
     "true",
   );

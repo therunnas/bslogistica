@@ -49,6 +49,10 @@ ou Lovable. `@tanstack/react-query` **permanece**. É `proxy.ts`, nunca
   sobre um `user_id` recebido. Nenhum valor financeiro atravessa essa superfície.
   Não ampliar grants (único acréscimo autorizado: `SELECT(versao)`, 054), não
   trocar grant de coluna por grant de tabela, não trocar o dono das funções.
+- **O app grava apontamento só pelas v2, com a versão lida do banco** (GATE-FIN-06;
+  admin por `salvar_apontamento_admin_v2`). **Sem fallback** para a v1, upsert ou
+  INSERT de folha quando a v2 faltar; `40001` é conflito para a pessoa decidir,
+  nunca retry automático com a versão nova. As v1 ficam só para o app antigo, até a 058.
 - **A CSP está em enforcement** (`src/proxy.ts`); não a afrouxar. Ver
   [Segurança](docs/SEGURANCA.md).
 - **Função `SECURITY DEFINER` roda acima da RLS**: a verificação de papel e do piso

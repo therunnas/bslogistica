@@ -375,16 +375,17 @@ verificar(
   0,
 );
 
-console.log("\nF. Payload: só o que mudou, só os seis campos\n");
+console.log("\nF. Payload: só o que mudou, só os sete campos da v2 (054)\n");
 
 {
   const rascunho = montarRascunho(EQUIPE, [], 60);
   const pendentes = linhasAlteradas(rascunho, []);
   verificar("F1. linha nova entra no payload", pendentes.length, 2);
   verificar(
-    "F2. e carrega exatamente os seis campos",
+    // GATE-FIN-06: os seis da 013 mais `versao_esperada` (0 = linha nova), exigida pela v2.
+    "F2. e carrega exatamente os sete campos (os seis da 013 e a versão)",
     Object.keys(pendentes[0]).sort().join(","),
-    "break_minutes,check_in,check_out,employee_id,notes,status",
+    "break_minutes,check_in,check_out,employee_id,notes,status,versao_esperada",
   );
   verificar("F3. horário vazio vira nulo explícito", pendentes[0].check_in, null);
   verificar("F4. observação vazia vira nulo explícito", pendentes[0].notes, null);
@@ -771,9 +772,11 @@ verificar(
 
 console.log("\nL. O rascunho sobrevive ao refetch e morre com o escopo\n");
 
+// GATE-FIN-06: o rascunho passou a guardar só as linhas EDITADAS (com a versão do início da
+// edição); as demais acompanham a leitura v2. As garantias do bloco L continuam as mesmas.
 verificar(
-  "L1. o rascunho guarda o escopo a que pertence",
-  /useState<\{\s*escopo: string;\s*linhas: LinhaDoRascunho\[\];\s*\} \| null>\(null\)/.test(
+  "L1. o rascunho guarda o escopo a que pertence (e só as linhas editadas)",
+  /useState<\{\s*escopo: string;\s*editadas: ReadonlyMap<string, LinhaDoRascunho>;\s*\} \| null>\(null\)/.test(
     fontes.tela,
   ),
   true,
@@ -784,8 +787,8 @@ verificar(
   true,
 );
 verificar(
-  "L3. e preserva o rascunho do mesmo escopo",
-  /setRascunho\(\(atual\) => \(atual\?\.escopo === escopo \? atual : \{ escopo, linhas: base \}\)\)/.test(
+  "L3. e preserva o rascunho do mesmo escopo (só reconcilia o que ficou igual ao banco)",
+  /atual\?\.escopo === escopo\s*\?\s*\{ escopo, editadas: editadasReconciliadas\(atual\.editadas, apontamentos\.data\) \}\s*:\s*atual/.test(
     fontes.tela,
   ),
   true,
@@ -814,7 +817,10 @@ verificar(
 );
 verificar(
   "L8. as linhas exibidas pertencem ao escopo atual",
-  /const linhas = rascunho\?\.escopo === escopo \? rascunho\.linhas : base;/.test(fontes.tela),
+  /rascunho\?\.escopo === escopo \? rascunho\.editadas : new Map/.test(fontes.tela) &&
+    /const linhas = useMemo\(\(\) => linhasDaTela\(base, editadas\), \[base, editadas\]\);/.test(
+      fontes.tela,
+    ),
   true,
 );
 verificar(
@@ -827,10 +833,15 @@ verificar(
   /onError:[^}]*setRascunho/.test(fontes.tela),
   false,
 );
+// GATE-FIN-06: o sucesso agora reconcilia o rascunho com o RESULTADO da v2 (versão por linha):
+// tira só o que foi gravado sem mudança e dá a versão nova ao que foi editado durante o envio. Não
+// o descarta inteiro, e só no escopo do envio.
 verificar(
-  "L11. o sucesso também não o descarta à mão",
-  /onSuccess:[^}]*setRascunho/.test(fontes.tela),
-  false,
+  "L11. o sucesso não descarta o rascunho: só reconcilia com o resultado, no escopo do envio",
+  /onSuccess:[\s\S]{0,300}atual\?\.escopo === escopoDoEnvio[\s\S]{0,200}editadasAposSalvar\(/.test(
+    fontes.tela,
+  ) && !/onSuccess:[^}]*setRascunho\(null\)/.test(fontes.tela),
+  true,
 );
 
 // Depois de salvar, a camada B2.1 invalida só a chave daquele contexto. O

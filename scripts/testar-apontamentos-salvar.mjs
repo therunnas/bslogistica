@@ -369,15 +369,23 @@ const salvar = telaSemComentarios.slice(
   telaSemComentarios.indexOf("const toggleStatus = useMutation("),
 );
 
+// GATE-FIN-06: o salvamento passou para a v2 da 054 (versão por linha). O caminho anterior à 031
+// (INSERT de folha + upsert direto) saiu da tela: sem a v2 no banco, a falha é controlada.
+const moduloV2 = semComentarios(ler("src/lib/apontamentos-admin-v2.ts"));
 verificar(
-  "D1. a tela importa as funções do módulo",
+  "D1. a tela importa as funções dos módulos (seleção de linhas e salvamento v2)",
   /from "@\/lib\/apontamentos-salvar"/.test(tela) &&
-    ["linhasParaSalvar", "montarCarga", "colaboradoresFaturados"].every((n) => tela.includes(n)),
+    /from "@\/lib\/apontamentos-admin-v2"/.test(tela) &&
+    ["linhasParaSalvar", "colaboradoresFaturados", "salvarDiaAdminV2"].every((n) =>
+      tela.includes(n),
+    ),
   true,
 );
 verificar(
-  "D2. o salvamento monta a carga da RPC por montarCargaDaRpc; o caminho anterior (banco sem a 031) por montarCarga",
-  /montarCargaDaRpc\(/.test(salvar) && /montarCarga\(/.test(telaSemComentarios),
+  "D2. o salvamento passa por salvarDiaAdminV2, que monta a carga por montarCargaDaRpcV2; a tela não monta carga de upsert",
+  /salvarDiaAdminV2\(/.test(salvar) &&
+    /montarCargaDaRpcV2\(/.test(moduloV2) &&
+    !/montarCarga\(/.test(telaSemComentarios),
   true,
 );
 verificar(
@@ -395,15 +403,15 @@ verificar(
   [],
 );
 verificar(
-  "D4. o upsert em duas escritas só existe no caminho anterior à 031; o salvamento normal é uma RPC atômica",
-  (telaSemComentarios.match(/\.upsert\(/g) ?? []).length === 1 &&
-    /salvarPeloCaminhoAnterior\(/.test(salvar) &&
-    /\.rpc\("salvar_apontamento_admin"/.test(salvar),
+  "D4. não há upsert nem caminho anterior: o salvamento é uma RPC atômica (v2)",
+  (telaSemComentarios.match(/\.upsert\(/g) ?? []).length === 0 &&
+    !/salvarPeloCaminhoAnterior/.test(telaSemComentarios) &&
+    /salvarDiaAdminV2\(/.test(salvar),
   true,
 );
 verificar(
-  "D5. o id das linhas novas (crypto.randomUUID) só é gerado no caminho anterior; a RPC resolve a linha por colaborador na folha",
-  /globalThis\.crypto\.randomUUID\(\)/.test(telaSemComentarios) && !/randomUUID/.test(salvar),
+  "D5. nenhum id de linha é gerado na tela: a RPC resolve a linha por colaborador na folha",
+  !/randomUUID/.test(telaSemComentarios),
   true,
 );
 verificar(
@@ -451,9 +459,11 @@ verificar(
   [],
 );
 verificar(
-  "D11b. a única RPC da tela é salvar_apontamento_admin (031), com o caminho anterior só se a função não existir",
-  [...telaSemComentarios.matchAll(/\.rpc\("([a-z_]+)"/g)].map((m) => m[1]).join(",") ===
-    "salvar_apontamento_admin" && /CODIGO_DA_RPC_AUSENTE = "PGRST202"/.test(telaSemComentarios),
+  "D11b. a tela não chama RPC à mão: a v2 e as da virada (054) passam pelo módulo, e só elas",
+  [...telaSemComentarios.matchAll(/\.rpc\("([a-z_]+)"/g)].length === 0 &&
+    !/CODIGO_DA_RPC_AUSENTE/.test(telaSemComentarios) &&
+    [...moduloV2.matchAll(/: "([a-z0-9_]+)",/g)].map((m) => m[1]).join(",") ===
+      "salvar_apontamento_admin_v2,situacao_da_virada,confirmar_virada_do_apontamento",
   true,
 );
 const modulo = ler("src/lib/apontamentos-salvar.ts");

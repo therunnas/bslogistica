@@ -236,6 +236,24 @@ Production.** Detalhe em [docs/qa/GATE-FIN-05-migration-054.md](docs/qa/GATE-FIN
 **Pendente para a 058:** decisão de jornada (DEC-CP05-01), jornada zero, app novo publicado usando os
 v2, revogação da escrita direta e das v1.
 
+GATE-FIN-06 (16/11/2026, sessão 23, PR Draft empilhado sobre o #137, branch
+`fix/gate-fin-06-frontend-v2`; sessão 22 concluída e validada no HEAD `3dda0f1`): **o aplicativo nos
+contratos v2 da 054.** O admin grava só por `salvar_apontamento_admin_v2` e o operador só pelas v2
+dele, com a versão lida do banco (nunca inventada nem incrementada na tela). Conflito 40001 é mostrado
+na linha com o gravado e a alteração da pessoa; o rascunho fica e só a decisão dela libera o
+salvamento (sem retry automático). Repetição idêntica (resposta perdida, mesma alteração em outra aba)
+= `sem_alteracao`, sem versão nova nem linha nova. A virada fora de turno noturno só se conclui com a
+confirmação do admin, registrada em `apontamento_confirmacoes_virada` (e a situação da linha gravada é
+mostrada e confirmável); o operador não confirma — a tela dele explica e não envia. O caminho anterior
+(INSERT de folha + upsert) saiu da tela; sem a v2 no banco, falha controlada, sem fallback. Valores
+inalterados (v2 = v1 ao centavo). Testes: `test:frontend-v2` (RED 41/43 → 43/43) e a spec 82 (RED
+16/23 → 23/23); expectativas de 7 suítes Node e das specs 20 e 80 trocadas pela regra nova (cenários
+mantidos). **Só local e CI; nada publicado: o app novo exige a 054, e HML e Production estão na 051.**
+Ordem por ambiente, cada passo com autorização própria: 052–054 validadas, catálogo e permissões
+conferidos, app publicado, fluxos homologados, só então a 058. **I1 e I7 seguem RISCO** no banco (o
+app antigo e a API direta ainda gravam pela v1). Detalhe em
+[docs/qa/GATE-FIN-06-frontend-v2.md](docs/qa/GATE-FIN-06-frontend-v2.md).
+
 Decisões do CP-07 (nenhuma implementada): DEC-CP07-01 (dia aberto: avisar, confirmar ou
 bloquear), DEC-CP07-02 (fatura complementar na mesma competência), DEC-CP07-03 (estados, ciclo,
 cancelamento e detalhe da fatura; vínculo com a nota fiscal). Autorização pendente:
@@ -369,9 +387,17 @@ o ambiente principal passa a ser a sessão em nuvem e a CI.
   `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`. Backup `pg_dump` de 11/11 com segunda cópia, guardado pelo
   responsável. Sem dados de negócio (1 cliente de teste "te"); 7 `profiles` e 7 `user_roles` órfãos;
   nenhum feriado cadastrado.
-- **HML** (`qbnfcmrxmssnwkhaitgd`): **051**, interruptor de domingo/feriado em dobro **ligado**,
-  resolução comercial OFF. **Limpo em 11/11/2026** (sem clientes, colaboradores, apontamentos ou
-  faturas; contas e papéis preservados), pronto para o teste manual do responsável.
+- **HML** (`qbnfcmrxmssnwkhaitgd`): **054 desde 16/11/2026** (GATE-FIN-07D, sessão 28: 052, 053 e
+  054 aplicadas pelo executor, 59 migrations, head `20261121120000`), interruptor de
+  domingo/feriado em dobro **ligado**, resolução comercial OFF. O expurgo de 11/11/2026 deixou de
+  descrever o banco: a leitura de 16/11 encontrou dados de desenvolvimento e homologação (2
+  clientes, 5 apontamentos, 1 fatura, 17 contas), que o responsável mandou **preservar**. Production
+  segue na **051**; o app do #138 exige a 054 e não está publicado em Production.
+- **Fluxo de entrega definido pelo responsável (16/11/2026):** HML e Preview aceitam dados
+  sintéticos; o Preview é a superfície principal de homologação (testes da IA e do responsável,
+  depois a orientação de uso); a entrega final é feita **sem dados de demonstração**, por limpeza
+  própria (inventário, backup, autorização, contas necessárias preservadas, teste de primeiro
+  uso) — **não autorizada ainda**.
 - **Vercel:** vínculos comprovados em 11/11/2026: Preview → HML, Production → Production.
 - **Homologação de telas** em localhost → HML: 9 cenários, fluxo avulso e avulsa sem contrato
   com valor acordado, PASS.
@@ -396,6 +422,15 @@ R$ 150 grava R$ 500 e R$ 300 (conferido no HML com o interruptor ligado, em tran
 Pendente: **cidade do cliente-piloto**, para os feriados municipais da lista única.
 
 ### Próxima etapa
+
+**Gates da homologação do #138 (GATE-FIN-07):** A — prontidão do HML (sessão 27, **PASS**); B —
+052, 053 e 054 no HML (sessão 28, **PASS**); C — Preview do HEAD do #138 vinculado ao HML com a
+054 (sessão 29); D — homologação funcional no navegador, com dados sintéticos identificáveis,
+pela IA e pelo responsável; E — revisão independente, decisões financeiras, integração e
+preparação de Production. Depois: 058 (com DEC-CP05-01 e o app novo homologado), CP-11/CP-12 e a
+limpeza de entrega. Cada gate exige autorização própria.
+
+Fila anterior, ainda válida para o piloto:
 
 1. Cadastrar os feriados (nacionais, de SC e os municipais da cidade do piloto), no HML e
    depois em Production, **antes** dos apontamentos (o tipo do dia fica congelado no

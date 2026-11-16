@@ -116,6 +116,9 @@ jobs:
       - name: Forma da migration 054 (GATE-FIN-05)
         run: npm run test:migration-054
 
+      - name: App nos contratos v2 da 054 (GATE-FIN-06)
+        run: npm run test:frontend-v2
+
       - name: Teste troca
         run: npm run test:troca
 

@@ -365,6 +365,16 @@ os testes asseveram isso na forma dos arquivos.
   **Ainda não obrigatório:** o legado (RPCs v1, upsert, escrita direta) grava sem
   versão e sem confirmação, e o DELETE direto do admin continua — I1 e I7 seguem
   RISCO até a 058.
+- **O aplicativo nos contratos v2 (GATE-FIN-06; só local e CI):** a tela do admin
+  grava só por `salvar_apontamento_admin_v2` e a do operador só pelas v2 dele, com
+  a versão lida do banco. Sem fallback: banco sem a v2 (PGRST202) = falha controlada,
+  sem v1, upsert nem INSERT de folha. `40001` = conflito com o rascunho mantido e a
+  decisão da pessoa; nunca retry automático. A confirmação de virada existe só na
+  tela do admin (`confirmar_virada` da v2 ou `confirmar_virada_do_apontamento`); a
+  do operador não a oferece e a RPC dele recusa a chave. A camada do operador recusa
+  coluna fora do contrato na listagem v2 (nada financeiro chega). **Isto não muda a
+  proteção do banco**: o app antigo ainda grava pela v1 sem versão (I1 e I7 seguem
+  RISCO até a 058), e o app novo só funciona com a 054 aplicada.
 - `break_minutes` não pode passar do tempo entre entrada e saída (migration `053`,
   GATE-FIN-03; **só local e CI, não aplicada em HML nem em Production**): trigger
   `trg_timesheet_entries_bloqueia_intervalo_maior`, 23514, mesma duração bruta do

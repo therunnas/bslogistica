@@ -674,14 +674,14 @@ test("RB1 duplo clique em “Salvar” grava cada colaborador uma vez; falha de 
   const data = "2026-11-09";
   await abrirDia(page, { operacao: OP, turno: DIA, data });
   await preencher(page, [{ colaborador: ANA, saida: "17:30" }]);
-  // Falha de rede: nada gravado, mensagem em português.
-  await page.route("**/rest/v1/rpc/salvar_apontamento_admin", (r) => r.abort("failed"));
+  // Falha de rede: nada gravado, mensagem em português. (GATE-FIN-06: a tela grava pela v2 da 054.)
+  await page.route("**/rest/v1/rpc/salvar_apontamento_admin_v2", (r) => r.abort("failed"));
   await salvarBotao(page).click();
   await expect(
     page.locator("[data-sonner-toast]").filter({ hasText: /conex|rede|internet/i }),
   ).toBeVisible({ timeout: 20_000 });
   expect(gravados(`and te.work_date = ${lit(data)}`)).toHaveLength(0);
-  await page.unroute("**/rest/v1/rpc/salvar_apontamento_admin");
+  await page.unroute("**/rest/v1/rpc/salvar_apontamento_admin_v2");
   // Depois do erro a tela relê os dados (botão desabilitado até terminar): o clique de dentro do
   // `evaluate` não espera, então esperamos o botão voltar antes do duplo clique.
   await expect(salvarBotao(page)).toBeEnabled();
@@ -730,7 +730,11 @@ test("RB2 duas abas no mesmo dia: a segunda não sobrescreve sem aviso o que a p
 // D1 NA TELA DO OPERADOR (/operacional)
 // =============================================================================================
 
-test("D1 operador: saída antes da entrada no turno diurno bloqueia até confirmar; aviso de presenças sem horário", async ({
+// GATE-FIN-06: até a sessão 22 o operador confirmava a virada numa caixa da própria tela (a v1 não
+// registrava nada). Com a 054 a confirmação excepcional é ato do ADMINISTRADOR, registrada no banco:
+// a tela do operador bloqueia, explica e não envia; o administrador confirma no apontamento dele. O
+// cenário continua o mesmo (Ana 08:00 → 07:50 num turno diurno), com o mesmo valor ao centavo.
+test("D1 operador: saída antes da entrada no turno diurno bloqueia sem confirmação do operador; o administrador confirma; aviso de presenças sem horário", async ({
   page,
   browser,
 }) => {
@@ -760,17 +764,36 @@ test("D1 operador: saída antes da entrada no turno diurno bloqueia até confirm
   await tr.locator("input[type=time]").nth(1).fill("07:50");
   await expect(op.getByText(/presentes? sem horário/)).toHaveCount(0);
   const salvarOp = op.getByRole("button", { name: "Salvar apontamento" });
-  await expect(op.getByRole("alert").filter({ hasText: "saída antes da entrada" })).toBeVisible();
+  const alerta = op.getByRole("alert").filter({ hasText: "saída antes da entrada" });
+  await expect(alerta).toBeVisible();
+  await expect(alerta).toContainText("Só o administrador pode confirmar");
+  await expect(op.getByText("Confirmo que a jornada atravessou a meia-noite")).toHaveCount(0);
   await expect(salvarOp).toBeDisabled();
-  await tr
+  await expect(tr.locator("input[type=time]").nth(1)).toHaveValue("07:50");
+  await contexto.close();
+  expect(gravado(ANA, data), "o operador não grava a virada fora do turno").toBeUndefined();
+
+  // O administrador revisa e confirma no apontamento dele: a confirmação fica registrada no banco.
+  await abrirDia(page, { operacao: OP, turno: DIA, data });
+  await preencher(page, [
+    { colaborador: ANA, entrada: "08:00", saida: "07:50", intervalo: 60 },
+    ...EQUIPE_DIA.filter((n) => n !== ANA).map((colaborador) => ({
+      colaborador,
+      presenca: "Falta" as const,
+    })),
+  ]);
+  await linhaDo(page, ANA)
     .getByRole("checkbox", { name: /Confirmo que a jornada atravessou a meia-noite/ })
     .check();
-  await expect(salvarOp).toBeEnabled();
-  await salvarOp.click();
-  await esperarAviso(op, "Apontamento salvo.");
-  await contexto.close();
-  // O valor é derivado pelo banco; o operador não o vê.
+  await salvar(page);
+  // O valor é derivado pelo banco (o operador não o vê): o mesmo de antes, ao centavo.
   expect(`${conferir(ANA, data).receita}/${gravado(ANA, data)!.custo}`).toBe("915.00/456.67");
+  const [{ confirmacoes }] = consultar<{ confirmacoes: number }>(
+    `select count(*)::int as confirmacoes from public.apontamento_confirmacoes_virada c
+       join public.employees e on e.id = c.employee_id
+      where e.name = ${lit(ANA)} and c.work_date = ${lit(data)} and c.invalidada_em is null`,
+  );
+  expect(confirmacoes, "a confirmação do administrador ficou registrada").toBe(1);
 });
 
 // =============================================================================================
@@ -983,7 +1006,12 @@ test("IJ3 operador: intervalo maior que a jornada é recusado pela RPC e nada é
 
   await tr.locator("input[type=number]").first().fill("59");
   await salvarOp.click();
-  await esperarAviso(op, "Apontamento salvo.");
+  // Espera o aviso de SUCESSO pelo texto: o de recusa acima ainda pode estar visível, e
+  // `esperarAviso` lê o primeiro aviso da tela (GATE-FIN-06: a gravação do operador relê os
+  // apontamentos antes de avisar, o que atrasa o sucesso o bastante para a corrida aparecer na CI).
+  await expect(
+    op.locator("[data-sonner-toast]").filter({ hasText: "Apontamento salvo." }),
+  ).toBeVisible({ timeout: 30_000 });
   await contexto.close();
   const g = conferir(ANA, data);
   expect({ intervalo: g.intervalo, trabalhados: g.trabalhados }).toEqual({
