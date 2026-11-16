@@ -411,3 +411,26 @@ Na 054 isso é **expansão**: as RPCs v1, o upsert antigo e a escrita direta con
 versão e sem confirmação. Tornar versão e confirmação obrigatórias, revogar o DELETE direto e aplicar
 o limite de jornada é da 058, depois do aplicativo novo. Detalhe em
 [docs/qa/GATE-FIN-05-migration-054.md](qa/GATE-FIN-05-migration-054.md).
+
+### O aplicativo nos contratos v2 (GATE-FIN-06)
+
+- **Admin** (`/apontamentos`): o salvamento passa por `salvarDiaAdminV2`
+  (`src/lib/apontamentos-admin-v2.ts`, cliente injetado), que monta a carga com `montarCargaDaRpcV2`
+  (`src/lib/apontamentos-salvar.ts`: as colunas editáveis da v1, `versao_esperada` e `confirmar_virada`
+  só nas linhas que o admin confirmou) e lê o retorno campo a campo (`lerResultadoDoSalvamentoAdmin`).
+  A versão vem da coluna `versao` lida por `useEntries` (`select("*")`); a de uma linha suja é a do
+  início da edição (`bases`). Uma linha suja cuja base difere da versão atual do banco aparece como
+  conflito e bloqueia o salvamento até a pessoa decidir; a linha suja que ficou igual ao banco
+  (resposta perdida, mesma alteração em outra aba) é reconciliada. A situação da virada de linha já
+  gravada vem de `situacao_da_virada`, e o admin pode registrar a confirmação dela.
+- **Operador** (`/operacional`): `src/lib/operacional/` fala com `listar_apontamentos_do_operador_v2`
+  e `salvar_apontamento_operacional_v2` (sete campos, `versao_esperada` obrigatória; listagem com as
+  colunas exatas do contrato e versão em toda linha). O rascunho guarda só as linhas editadas, cada
+  uma com a versão do início da edição; as demais acompanham a leitura. A tela não oferece
+  confirmação de virada.
+- **Sem caminho antigo:** o `salvarPeloCaminhoAnterior` (INSERT de folha + upsert) saiu da tela; nada
+  volta para a v1 depois de um erro da v2. O app novo **exige a 054** no banco do ambiente.
+
+Sequência segura de publicação (cada passo com autorização própria por ambiente): validar a 054 no
+ambiente-alvo; conferir catálogo e permissões; publicar o app compatível; homologar os fluxos reais;
+só então preparar a 058. Detalhe em [docs/qa/GATE-FIN-06-frontend-v2.md](qa/GATE-FIN-06-frontend-v2.md).

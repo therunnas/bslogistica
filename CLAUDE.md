@@ -218,6 +218,14 @@ Cinco RPCs de contrato fechado — `listar_operacoes_do_operador`,
 `src/lib/operacional/` e pela tela `/operacional`, e só por elas. O desenho
 completo está em [docs/SEGURANCA.md](docs/SEGURANCA.md). Regras permanentes:
 
+- **O app grava apontamento só pelas v2, com a versão lida do banco** (GATE-FIN-06):
+  o operador por `listar_apontamentos_do_operador_v2` e
+  `salvar_apontamento_operacional_v2`; o admin por `salvar_apontamento_admin_v2`
+  (`src/lib/apontamentos-admin-v2.ts`). **Sem fallback**: se a v2 faltar no banco
+  (PGRST202), a tela falha e não grava pela v1, por upsert nem por INSERT de folha.
+  `40001` é conflito para a pessoa decidir, **nunca retry automático com a versão
+  nova**. As v1 ficam no banco só para o app antigo, até a 058.
+
 - **O operador não recebe valor financeiro.** Nem `billed_amount`, `cost_amount`,
   snapshot, `invoice_id`, `daily_cost`, `daily_rate`, `shift_hours`, `ot_factor`,
   `ot_tolerance_min` ou `agreed_amount`. Do cliente atravessa **apenas
