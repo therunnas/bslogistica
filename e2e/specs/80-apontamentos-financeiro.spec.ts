@@ -1006,7 +1006,12 @@ test("IJ3 operador: intervalo maior que a jornada é recusado pela RPC e nada é
 
   await tr.locator("input[type=number]").first().fill("59");
   await salvarOp.click();
-  await esperarAviso(op, "Apontamento salvo.");
+  // Espera o aviso de SUCESSO pelo texto: o de recusa acima ainda pode estar visível, e
+  // `esperarAviso` lê o primeiro aviso da tela (GATE-FIN-06: a gravação do operador relê os
+  // apontamentos antes de avisar, o que atrasa o sucesso o bastante para a corrida aparecer na CI).
+  await expect(
+    op.locator("[data-sonner-toast]").filter({ hasText: "Apontamento salvo." }),
+  ).toBeVisible({ timeout: 30_000 });
   await contexto.close();
   const g = conferir(ANA, data);
   expect({ intervalo: g.intervalo, trabalhados: g.trabalhados }).toEqual({

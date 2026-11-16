@@ -184,9 +184,18 @@ async function aviso(page: Page, texto: string | RegExp) {
   });
 }
 
+/** Espera a RESPOSTA da RPC deste clique: o banco já gravou quando o teste segue. */
+function respostaDa(page: Page, rpc: string) {
+  return page.waitForResponse(
+    (r) => new URL(r.url()).pathname === `/rest/v1/rpc/${rpc}` && r.request().method() === "POST",
+  );
+}
+
 async function salvar(page: Page, texto = "Apontamento salvo.") {
   await expect(salvarBotao(page)).toBeEnabled();
+  const resposta = respostaDa(page, "salvar_apontamento_admin_v2");
   await salvarBotao(page).click();
+  await resposta;
   await aviso(page, texto);
 }
 
@@ -200,6 +209,15 @@ async function abrirOperador(page: Page, data: string, turno = DIA) {
 
 const linhaOp = (page: Page, nome: string) => page.locator("tr").filter({ hasText: nome }).first();
 const salvarOpBotao = (page: Page) => page.getByRole("button", { name: "Salvar apontamento" });
+
+/** Salva pela tela do operador e espera a resposta da v2 e o aviso com o texto. */
+async function salvarOp(page: Page, texto = "Apontamento salvo.") {
+  await expect(salvarOpBotao(page)).toBeEnabled();
+  const resposta = respostaDa(page, "salvar_apontamento_operacional_v2");
+  await salvarOpBotao(page).click();
+  await resposta;
+  await aviso(page, texto);
+}
 
 async function preencherOp(
   page: Page,
@@ -373,8 +391,7 @@ test("A5 retry idêntico: outra aba com a MESMA alteração recebe sem_alteracao
   await salvar(page);
   // A segunda aba (leitura da versão 1) faz exatamente a mesma alteração: não é conflito.
   await preencher(outra, { colaborador: ODE, saida: "17:30" });
-  await salvarBotao(outra).click();
-  await aviso(outra, "já estava gravad");
+  await salvar(outra, "já estava gravad");
   expect(linhaDe(ODE, data)!.versao, "sem versão nova").toBe(2);
   await outra.close();
 
@@ -718,8 +735,7 @@ test.describe("operador", () => {
     await abrirOperador(page, data);
     for (const n of EQUIPE_DIA)
       await preencherOp(page, { colaborador: n, entrada: "08:00", saida: "17:00" });
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     const primeira = chamadas.find(
       (c) => c.caminho === "/rest/v1/rpc/salvar_apontamento_operacional_v2",
     )!.corpo as { p_linhas: { versao_esperada: number }[] };
@@ -727,8 +743,7 @@ test.describe("operador", () => {
     expect(linhas(data).map((l) => l.versao)).toEqual([1, 1, 1]);
     // Edição: só Max, com a versão 1 lida pela listagem v2.
     await preencherOp(page, { colaborador: MAX, saida: "17:30" });
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     const segunda = chamadas.filter(
       (c) => c.caminho === "/rest/v1/rpc/salvar_apontamento_operacional_v2",
     )[1]!.corpo as { p_linhas: { versao_esperada: number }[] };
@@ -756,13 +771,11 @@ test.describe("operador", () => {
     await abrirOperador(page, data);
     for (const n of EQUIPE_DIA)
       await preencherOp(page, { colaborador: n, entrada: "08:00", saida: "17:00" });
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     const outra = await context.newPage();
     await abrirOperador(outra, data);
     await preencherOp(page, { colaborador: LIA, nota: "primeira sessão" });
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     await preencherOp(outra, { colaborador: LIA, nota: "segunda sessão" });
     await salvarOpBotao(outra).click();
     await expect(
@@ -776,8 +789,7 @@ test.describe("operador", () => {
     await expect(painel).toContainText(LIA);
     await expect(salvarOpBotao(outra)).toBeDisabled();
     await painel.getByRole("button", { name: `Manter a minha alteração (${LIA})` }).click();
-    await salvarOpBotao(outra).click();
-    await aviso(outra, "Apontamento salvo.");
+    await salvarOp(outra, "Apontamento salvo.");
     expect(linhaDe(LIA, data)!.notas).toBe("segunda sessão");
     await outra.close();
   });
@@ -790,8 +802,7 @@ test.describe("operador", () => {
     await abrirOperador(page, data);
     for (const n of EQUIPE_DIA)
       await preencherOp(page, { colaborador: n, entrada: "08:00", saida: "17:00" });
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     const adm = await browser.newContext({ storageState: estadoDe("admin") });
     const pa = await adm.newPage();
     await abrirDia(pa, { operacao: OP, turno: DIA, data });
@@ -815,16 +826,13 @@ test.describe("operador", () => {
     await abrirOperador(page, data);
     for (const n of EQUIPE_DIA)
       await preencherOp(page, { colaborador: n, entrada: "08:00", saida: "17:00" });
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     const outra = await context.newPage();
     await abrirOperador(outra, data);
     await preencherOp(page, { colaborador: ODE, saida: "16:00" });
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     await preencherOp(outra, { colaborador: ODE, saida: "16:00" });
-    await salvarOpBotao(outra).click();
-    await aviso(outra, "já estava gravad");
+    await salvarOp(outra, "já estava gravad");
     expect(linhaDe(ODE, data)!.versao).toBe(2);
     await outra.close();
 
@@ -902,8 +910,7 @@ test.describe("operador", () => {
     await abrirOperador(page, data, NOITE);
     await preencherOp(page, { colaborador: NOE, entrada: "22:00", saida: "07:00" });
     await expect(page.getByRole("alert").filter({ hasText: "administrador" })).toHaveCount(0);
-    await salvarOpBotao(page).click();
-    await esperarAviso(page, "Apontamento salvo.");
+    await salvarOp(page, "Apontamento salvo.");
     const l = linhaDe(NOE, data, NOITE)!;
     expect([l.entrada, l.saida, l.versao]).toEqual(["22:00", "07:00", 1]);
     expect(confirmacoes(l.id)).toEqual([]);

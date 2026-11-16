@@ -86,6 +86,8 @@ ainda disponível.
 
 Nenhum teste foi removido; nenhum risco da SQL 090 mudou de classificação.
 
+**CI do primeiro HEAD (`281107e`):** `validar` e `sql-local` SUCCESS; `e2e-local` falhou em 1 de 265 (spec 80 IJ3). Causa: corrida no TESTE, não erro de gravação. A gravação do operador passou a reler os apontamentos antes de avisar (`onSettled`), o que atrasa o aviso de sucesso; `esperarAviso` lê o primeiro aviso da tela e pegou o de recusa anterior. Correção: o IJ3 espera o aviso de sucesso pelo texto, e na spec 82 cada salvamento espera a resposta da RPC v2 antes de seguir. Specs 80 e 82 de novo no banco limpo: 42/42. O CI do HEAD final está no PR.
+
 ## Regressão financeira
 
 Nenhum cálculo mudou: o banco deriva todos os valores (gatilhos), e as RPCs v2 gravam as mesmas
