@@ -1117,13 +1117,14 @@ verificar(
   true,
 );
 verificar(
+  // GATE-FIN-06: a carga agora sai de salvarDiaAdminV2 (v2 da 054); a garantia é a mesma.
   "G13. Apontamentos: continua salvando só linhas alteradas, sem valor financeiro no payload (U1 e U2)",
   /linhasParaSalvar\(/.test(apontamentos) &&
-    /montarCarga\(/.test(apontamentos) &&
+    /salvarDiaAdminV2\(/.test(apontamentos) &&
     !/billed_amount|cost_amount|daily_rate_snapshot/.test(
       apontamentos.slice(
-        apontamentos.indexOf("montarCarga("),
-        apontamentos.indexOf("montarCarga(") + 600,
+        apontamentos.indexOf("salvarDiaAdminV2("),
+        apontamentos.indexOf("salvarDiaAdminV2(") + 900,
       ),
     ),
   true,

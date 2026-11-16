@@ -68,7 +68,12 @@ export interface MembroDaEquipeDoOperador {
   active: boolean;
 }
 
-/** `listar_apontamentos_do_operador(uuid, uuid, date)` — folha + linha. */
+/**
+ * `listar_apontamentos_do_operador_v2(uuid, uuid, date)` (migration 054) — folha + linha + versão.
+ *
+ * `versao` é a versão da linha mantida pelo banco; nula só na linha "de folha" (folha sem nenhum
+ * apontamento, o LEFT JOIN da RPC). É ela que vai de volta como `versao_esperada`.
+ */
 export interface ApontamentoDoOperador {
   timesheet_id: string;
   shift_id: string;
@@ -82,11 +87,18 @@ export interface ApontamentoDoOperador {
   notes: string | null;
   /** Nunca nulo: o helper do banco fecha com `coalesce(..., false)`. */
   faturado: boolean;
+  versao: number | null;
 }
 
-/** Os seis campos que a RPC de escrita aceita por linha. Ver `rpc.ts`. */
+/** Os sete campos que a RPC de escrita v2 aceita por linha. Ver `rpc.ts`. */
 export type CampoDaLinha =
-  "employee_id" | "status" | "check_in" | "check_out" | "break_minutes" | "notes";
+  | "employee_id"
+  | "status"
+  | "check_in"
+  | "check_out"
+  | "break_minutes"
+  | "notes"
+  | "versao_esperada";
 
 /** Uma linha já normalizada, pronta para virar JSON da RPC de escrita. */
 export interface LinhaDoApontamento {
@@ -96,6 +108,8 @@ export interface LinhaDoApontamento {
   check_out: string | null;
   break_minutes: number | null;
   notes: string | null;
+  /** A versão lida do banco quando a edição começou; 0 para linha nova. */
+  versao_esperada: number;
 }
 
 /** O que a interface entrega antes da normalização. */
@@ -106,6 +120,15 @@ export interface EntradaDaLinha {
   check_out?: string | null;
   break_minutes?: number | null;
   notes?: string | null;
+  versao_esperada: number;
+}
+
+export type ResultadoDaLinhaOperacional = "inserido" | "atualizado" | "sem_alteracao";
+
+/** O retorno de `salvar_apontamento_operacional_v2`: a folha e, por colaborador, versão e resultado. */
+export interface ResultadoDaGravacaoOperacional {
+  timesheet_id: string;
+  linhas: { employee_id: string; versao: number; resultado: ResultadoDaLinhaOperacional }[];
 }
 
 /** Parâmetros da escrita. */

@@ -39,8 +39,6 @@ import { todayISO } from "@/lib/format";
 import { toast } from "@/lib/notificacoes";
 import {
   MENSAGEM_ENTRADA_IGUAL_SAIDA,
-  MENSAGEM_SAIDA_ANTES_DA_ENTRADA,
-  chaveDaConfirmacaoDeVirada,
   entradaIgualSaida,
   saidaAntesDaEntradaForaDoTurno,
 } from "@/lib/horarios";
@@ -53,15 +51,24 @@ import {
 } from "@/lib/operacional/queries";
 
 import {
+  MENSAGEM_VIRADA_DO_OPERADOR,
+  aplicarEdicao,
+  apontamentosPorColaborador,
+  conflitosDoRascunho,
+  editadasAposSalvar,
+  editadasReconciliadas,
   escolhaAutomatica,
   faseDaTela,
   folhaEstaFechada,
   leituraConcluida,
   linhasAlteradas,
+  linhasDaTela,
+  manterMinhaAlteracao,
   mensagemDeErro,
   montarRascunho,
   normalizarIntervalo,
   podeSalvar,
+  usarOGravado,
   type Leitura,
   type LinhaDoRascunho,
 } from "./_dominio";
@@ -127,12 +134,25 @@ function Aviso({
  * Erro nunca vira estado vazio: dizer "nenhum turno configurado" porque a rede
  * caiu manda a pessoa procurar o administrador por um problema que não existe.
  */
-function FalhaDeLeitura({ oQue, tentarDeNovo }: { oQue: string; tentarDeNovo: () => void }) {
+function FalhaDeLeitura({
+  oQue,
+  tentarDeNovo,
+  erro,
+}: {
+  oQue: string;
+  tentarDeNovo: () => void;
+  erro?: unknown;
+}) {
+  // A leitura v2 ausente (PGRST202) não é problema de conexão: é banco sem a migration 054.
+  const semV2 =
+    typeof erro === "object" && erro !== null && (erro as { code?: unknown }).code === "PGRST202";
   return (
     <Aviso tipo="alerta">
       <p className="font-medium text-foreground">Não foi possível carregar {oQue}.</p>
 
-      <p className="mt-1">Verifique sua conexão e tente novamente.</p>
+      <p className="mt-1">
+        {semV2 ? mensagemDeErro(erro) : "Verifique sua conexão e tente novamente."}
+      </p>
 
       <Button type="button" variant="outline" className="mt-5 rounded-xl" onClick={tentarDeNovo}>
         Tentar novamente
@@ -166,14 +186,12 @@ export function PainelOperacional() {
   const [operationId, setOperationId] = useState<string | null>(null);
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [workDate, setWorkDate] = useState(todayISO());
-  // D1: confirmações expressas de jornada que atravessou a meia-noite fora de turno noturno.
-  const [viradasConfirmadas, setViradasConfirmadas] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
 
+  // GATE-FIN-06: o rascunho guarda só as linhas EDITADAS, cada uma com a versão do início da edição;
+  // as demais acompanham a leitura v2. Trocar operação, turno ou data descarta o rascunho.
   const [rascunho, setRascunho] = useState<{
     escopo: string;
-    linhas: LinhaDoRascunho[];
+    editadas: ReadonlyMap<string, LinhaDoRascunho>;
   } | null>(null);
 
   const operacoes = useOperacoesDoOperador();
@@ -219,13 +237,23 @@ export function PainelOperacional() {
     [equipe.data, apontamentos.data, turno],
   );
 
+  const editadas = useMemo(
+    () => (rascunho?.escopo === escopo ? rascunho.editadas : new Map<string, LinhaDoRascunho>()),
+    [rascunho, escopo],
+  );
+
+  // A cada leitura nova, a linha editada que ficou igual ao banco deixa de ser pendência (a
+  // gravação da resposta perdida, ou a mesma alteração feita por outra sessão).
   useEffect(() => {
     if (!pronto) return;
+    setRascunho((atual) =>
+      atual?.escopo === escopo
+        ? { escopo, editadas: editadasReconciliadas(atual.editadas, apontamentos.data) }
+        : atual,
+    );
+  }, [pronto, escopo, apontamentos.data]);
 
-    setRascunho((atual) => (atual?.escopo === escopo ? atual : { escopo, linhas: base }));
-  }, [pronto, escopo, base]);
-
-  const linhas = rascunho?.escopo === escopo ? rascunho.linhas : base;
+  const linhas = useMemo(() => linhasDaTela(base, editadas), [base, editadas]);
 
   function trocarOperacao(valor: string) {
     setOperationId(valor);
@@ -243,18 +271,31 @@ export function PainelOperacional() {
     setRascunho(null);
   }
 
-  function editar(employeeId: string, mudanca: Partial<LinhaDoRascunho>) {
+  function editar(employeeId: string, mudanca: Partial<Omit<LinhaDoRascunho, "versao">>) {
     setRascunho((atual) => ({
       escopo,
-      linhas: (atual?.escopo === escopo ? atual.linhas : base).map((linha) =>
-        linha.employee_id === employeeId
-          ? {
-              ...linha,
-              ...mudanca,
-            }
-          : linha,
+      editadas: aplicarEdicao(
+        atual?.escopo === escopo ? atual.editadas : new Map(),
+        base,
+        employeeId,
+        mudanca,
       ),
     }));
+  }
+
+  /** Decisão explícita sobre um conflito: manter a alteração (versão atual) ou ficar com o gravado. */
+  function decidirConflito(employeeId: string, decisao: "manter" | "usar") {
+    setRascunho((atual) =>
+      atual?.escopo === escopo
+        ? {
+            escopo,
+            editadas:
+              decisao === "manter"
+                ? manterMinhaAlteracao(atual.editadas, employeeId, apontamentos.data)
+                : usarOGravado(atual.editadas, employeeId),
+          }
+        : atual,
+    );
   }
 
   const pendentes = pronto ? linhasAlteradas(linhas, apontamentos.data) : [];
@@ -264,20 +305,18 @@ export function PainelOperacional() {
     entradaIgualSaida(linha.status, linha.check_in, linha.check_out),
   );
 
-  // D1/B3: saída antes da entrada num turno que não vira o dia exige corrigir ou confirmar a linha.
-  const chaveDaVirada = (linha: {
-    employee_id: string;
-    check_in?: string | null;
-    check_out?: string | null;
-  }) =>
-    `${escopo}|${chaveDaConfirmacaoDeVirada(linha.employee_id, linha.check_in, linha.check_out)}`;
-  const viradasForaDoTurno = pendentes.filter((linha) =>
+  // D1/B3 e GATE-FIN-06: saída antes da entrada num turno que não vira o dia é jornada excepcional,
+  // e só o ADMINISTRADOR a confirma (054). O operador corrige o horário ou pede a revisão: a tela
+  // não oferece confirmação nem envia a linha.
+  const viradasPendentes = pendentes.filter((linha) =>
     saidaAntesDaEntradaForaDoTurno(linha.status, linha.check_in, linha.check_out, turno),
   );
-  const viradasPendentes = viradasForaDoTurno.filter(
-    (linha) => !viradasConfirmadas.has(chaveDaVirada(linha)),
-  );
-  const linhaComVirada = new Set(viradasForaDoTurno.map((linha) => linha.employee_id));
+  const linhaComVirada = new Set(viradasPendentes.map((linha) => linha.employee_id));
+
+  // GATE-FIN-06: linha editada sobre uma versão que o banco já não tem (outra sessão gravou antes).
+  const conflitos =
+    pronto && !salvar.isPending ? conflitosDoRascunho(editadas, apontamentos.data) : [];
+  const gravadosPorColaborador = apontamentosPorColaborador(apontamentos.data);
 
   // D-CP05-01: linhas ainda sem apontamento entram no salvamento como estão — presença, mesmo sem
   // horário (diária inteira no dia útil e no sábado). A tela diz isso antes de salvar.
@@ -303,11 +342,18 @@ export function PainelOperacional() {
     }
 
     if (viradasPendentes.length > 0) {
-      toast.error(MENSAGEM_SAIDA_ANTES_DA_ENTRADA);
+      toast.error(MENSAGEM_VIRADA_DO_OPERADOR);
 
       return;
     }
 
+    if (conflitos.length > 0) {
+      toast.error("Resolva os conflitos de gravação antes de salvar.");
+
+      return;
+    }
+
+    const escopoDoEnvio = escopo;
     salvar.mutate(
       {
         operationId,
@@ -316,7 +362,25 @@ export function PainelOperacional() {
         linhas: pendentes,
       },
       {
-        onSuccess: () => toast.success("Apontamento salvo."),
+        onSuccess: (resultado, enviado) => {
+          // Só o rascunho do mesmo contexto: um retorno atrasado não toca outro dia ou turno.
+          setRascunho((atual) =>
+            atual?.escopo === escopoDoEnvio
+              ? {
+                  escopo: escopoDoEnvio,
+                  editadas: editadasAposSalvar(atual.editadas, enviado.linhas, resultado),
+                }
+              : atual,
+          );
+          const iguais = resultado.linhas.filter((l) => l.resultado === "sem_alteracao").length;
+          toast.success(
+            iguais === 0
+              ? "Apontamento salvo."
+              : iguais === resultado.linhas.length
+                ? "Apontamento salvo. A linha já estava gravada assim: nada mudou."
+                : `Apontamento salvo. ${iguais} linha(s) já estava(m) gravada(s) assim.`,
+          );
+        },
 
         onError: (erro) => toast.error(mensagemDeErro(erro)),
       },
@@ -503,7 +567,11 @@ export function PainelOperacional() {
       ) : null}
 
       {fase === "erro-apontamentos" ? (
-        <FalhaDeLeitura oQue="os apontamentos" tentarDeNovo={() => void apontamentos.refetch()} />
+        <FalhaDeLeitura
+          oQue="os apontamentos"
+          erro={apontamentos.error}
+          tentarDeNovo={() => void apontamentos.refetch()}
+        />
       ) : null}
 
       {fase === "carregando" ? <Aviso tipo="carregando">Carregando apontamento...</Aviso> : null}
@@ -525,6 +593,64 @@ export function PainelOperacional() {
                   Disponível apenas para consulta.
                 </p>
               </div>
+            </div>
+          ) : null}
+
+          {conflitos.length > 0 ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-sm text-destructive"
+            >
+              <p className="font-medium">Conflito de gravação</p>
+              <p className="mt-1 text-xs leading-5">
+                Outra sessão gravou estas linhas depois que você as abriu. Nada foi sobrescrito.
+                Escolha, em cada uma, o que deve valer; depois salve de novo.
+              </p>
+              <ul className="mt-2 space-y-2">
+                {conflitos.map((id) => {
+                  const minha = editadas.get(id);
+                  const gravado = gravadosPorColaborador.get(id);
+                  const nome = minha?.employee_name ?? "colaborador";
+                  const descrever = (l: {
+                    status: string | null;
+                    check_in: string | null;
+                    check_out: string | null;
+                    notes: string | null;
+                  }) =>
+                    `${STATUS.find((x) => x.valor === l.status)?.rotulo ?? "sem apontamento"}${
+                      l.status && l.status !== "absent"
+                        ? ` ${(l.check_in ?? "").slice(0, 5) || "—"}–${(l.check_out ?? "").slice(0, 5) || "—"}`
+                        : ""
+                    }${l.notes ? ` · ${l.notes}` : ""}`;
+                  return (
+                    <li key={id} className="text-xs leading-5 text-foreground">
+                      <span className="font-medium">{nome}</span>: gravado agora{" "}
+                      {gravado ? descrever(gravado) : "sem apontamento"}; sua alteração{" "}
+                      {minha ? descrever(minha) : "—"}.
+                      <span className="mt-1 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 rounded-lg text-xs"
+                          aria-label={`Manter a minha alteração (${nome})`}
+                          onClick={() => decidirConflito(id, "manter")}
+                        >
+                          Manter a minha alteração
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 rounded-lg text-xs"
+                          aria-label={`Usar o que está gravado (${nome})`}
+                          onClick={() => decidirConflito(id, "usar")}
+                        >
+                          Usar o que está gravado
+                        </Button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           ) : null}
 
@@ -691,23 +817,10 @@ export function PainelOperacional() {
                             />
 
                             {linhaComVirada.has(linha.employee_id) ? (
-                              <label className="mt-1.5 flex w-44 items-start gap-1.5 text-[11px] leading-4 text-destructive">
-                                <input
-                                  type="checkbox"
-                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
-                                  checked={viradasConfirmadas.has(chaveDaVirada(linha))}
-                                  onChange={(event) => {
-                                    const chave = chaveDaVirada(linha);
-                                    setViradasConfirmadas((atuais) => {
-                                      const novas = new Set(atuais);
-                                      if (event.target.checked) novas.add(chave);
-                                      else novas.delete(chave);
-                                      return novas;
-                                    });
-                                  }}
-                                />
-                                Confirmo que a jornada atravessou a meia-noite
-                              </label>
+                              <p className="mt-1.5 w-44 text-[11px] leading-4 text-destructive">
+                                Jornada até o dia seguinte fora de turno noturno: só o administrador
+                                confirma.
+                              </p>
                             ) : null}
                           </TableCell>
 
@@ -784,7 +897,7 @@ export function PainelOperacional() {
               {viradasPendentes.length > 0 ? (
                 <p role="alert" className="mt-1 text-xs text-destructive">
                   {viradasPendentes.length} linha(s) com saída antes da entrada num turno que não
-                  atravessa a meia-noite. {MENSAGEM_SAIDA_ANTES_DA_ENTRADA}
+                  atravessa a meia-noite. {MENSAGEM_VIRADA_DO_OPERADOR}
                 </p>
               ) : null}
             </div>
@@ -801,7 +914,8 @@ export function PainelOperacional() {
                   salvando: salvar.isPending,
                 }) ||
                 horariosIguais.length > 0 ||
-                viradasPendentes.length > 0
+                viradasPendentes.length > 0 ||
+                conflitos.length > 0
               }
             >
               <Save className="h-4 w-4" />

@@ -24,20 +24,28 @@ import type {
   LinhaDoApontamento,
   MembroDaEquipeDoOperador,
   OperacaoDoOperador,
+  ResultadoDaGravacaoOperacional,
   TurnoDoOperador,
 } from "./tipos";
 
-/** Nomes das cinco RPCs, como o banco as expõe. */
+/**
+ * Nomes das cinco RPCs, como o banco as expõe. A listagem e a gravação de apontamentos são as v2
+ * da migration 054 (GATE-FIN-06): com a versão da linha, conferida pelo banco sob trava. As v1
+ * continuam no banco para o app antigo durante a expansão; esta camada não as chama, nem como
+ * reserva (sem a v2 a chamada falha com PGRST202 e nada é gravado).
+ */
 export const RPC_OPERACIONAL = {
   operacoes: "listar_operacoes_do_operador",
   turnos: "listar_turnos_do_operador",
   equipe: "listar_equipe_do_operador",
-  apontamentos: "listar_apontamentos_do_operador",
-  salvar: "salvar_apontamento_operacional",
+  apontamentos: "listar_apontamentos_do_operador_v2",
+  salvar: "salvar_apontamento_operacional_v2",
 } as const;
 
 /**
- * Os SEIS campos que `salvar_apontamento_operacional` aceita por linha.
+ * Os SETE campos que `salvar_apontamento_operacional_v2` aceita por linha: os seis da 013 e
+ * `versao_esperada` (054). `confirmar_virada` NÃO está aqui: confirmar a virada da meia-noite é
+ * ato do administrador, e a RPC do operador recusa a chave.
  *
  * A lista não é conveniência: a RPC recusa **a chamada inteira** com `22023`
  * diante de qualquer outra chave no JSON, e o papel dono das RPCs não tem
@@ -51,6 +59,23 @@ export const CAMPOS_DA_LINHA: readonly CampoDaLinha[] = [
   "check_out",
   "break_minutes",
   "notes",
+  "versao_esperada",
+];
+
+/** As colunas de `listar_apontamentos_do_operador_v2`. Coluna a mais é quebra de contrato. */
+const COLUNAS_DA_LISTAGEM: readonly string[] = [
+  "timesheet_id",
+  "shift_id",
+  "work_date",
+  "folha_status",
+  "employee_id",
+  "status",
+  "check_in",
+  "check_out",
+  "break_minutes",
+  "notes",
+  "faturado",
+  "versao",
 ];
 
 /**
@@ -176,20 +201,63 @@ function exigirLista<T>(dados: unknown, chamada: string): T[] {
 
 const FORMATO_DE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const ehVersao = (valor: unknown, minimo: number): valor is number =>
+  typeof valor === "number" && Number.isSafeInteger(valor) && valor >= minimo;
+
 /**
- * A escrita devolve o id da folha, e isso é verificado, não afirmado.
- *
- * Um `as string` convence o TypeScript e não olha o valor. Se a resposta vier
- * nula, vazia ou de outra forma, a mutation não pode ser dada como bem
- * sucedida: a tela invalidaria o cache e mostraria "salvo" sem ter id nenhum.
+ * A listagem v2 é conferida linha a linha: só as colunas do contrato (nenhuma outra chega à tela,
+ * financeira ou não) e a versão presente em toda linha de apontamento. Sem versão não há como
+ * gravar com segurança, então a falta dela é quebra de contrato, não um "0" presumido.
  */
-function exigirIdentificadorDaFolha(dados: unknown, chamada: string): string {
-  if (typeof dados !== "string" || !FORMATO_DE_UUID.test(dados)) {
-    throw new ErroDeContratoOperacional(
-      `A RPC ${chamada} devia devolver o identificador da folha.`,
-    );
+function exigirApontamentos(dados: unknown, chamada: string): ApontamentoDoOperador[] {
+  const lista = exigirLista<Record<string, unknown>>(dados, chamada);
+  for (const linha of lista) {
+    if (linha === null || typeof linha !== "object") {
+      throw new ErroDeContratoOperacional(`Resposta inválida da RPC ${chamada}.`);
+    }
+    const extra = Object.keys(linha).filter((c) => !COLUNAS_DA_LISTAGEM.includes(c));
+    if (extra.length > 0) {
+      throw new ErroDeContratoOperacional(
+        `Resposta inválida da RPC ${chamada}: coluna fora do contrato.`,
+      );
+    }
+    const temLinha = linha["employee_id"] !== null && linha["employee_id"] !== undefined;
+    if (temLinha ? !ehVersao(linha["versao"], 1) : linha["versao"] !== null) {
+      throw new ErroDeContratoOperacional(`Resposta inválida da RPC ${chamada}: versão ausente.`);
+    }
   }
-  return dados;
+  return lista as unknown as ApontamentoDoOperador[];
+}
+
+const RESULTADOS: readonly string[] = ["inserido", "atualizado", "sem_alteracao"];
+
+/**
+ * A escrita v2 devolve `{timesheet_id, linhas: [{employee_id, versao, resultado}]}`, e isso é
+ * verificado, não afirmado: a v1 devolvia só o id da folha, e um `as` convenceria o TypeScript sem
+ * olhar o valor. Cada colaborador enviado volta exatamente uma vez.
+ */
+function lerResultadoDaGravacao(
+  dados: unknown,
+  enviados: readonly string[],
+  chamada: string,
+): ResultadoDaGravacaoOperacional {
+  const falha = (): never => {
+    throw new ErroDeContratoOperacional(`A RPC ${chamada} devolveu uma resposta fora do contrato.`);
+  };
+  if (dados === null || typeof dados !== "object" || Array.isArray(dados)) return falha();
+  const { timesheet_id, linhas } = dados as Record<string, unknown>;
+  if (typeof timesheet_id !== "string" || !FORMATO_DE_UUID.test(timesheet_id)) falha();
+  if (!Array.isArray(linhas)) return falha();
+  const lidas = linhas.map((l) => {
+    if (l === null || typeof l !== "object") return falha();
+    const { employee_id, versao, resultado } = l as Record<string, unknown>;
+    if (typeof employee_id !== "string" || !ehVersao(versao, 1)) falha();
+    if (typeof resultado !== "string" || !RESULTADOS.includes(resultado)) falha();
+    return { employee_id, versao, resultado } as ResultadoDaGravacaoOperacional["linhas"][number];
+  });
+  const devolvidos = lidas.map((l) => l.employee_id).sort();
+  if (JSON.stringify(devolvidos) !== JSON.stringify([...enviados].sort())) falha();
+  return { timesheet_id: timesheet_id as string, linhas: lidas };
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +342,7 @@ export async function buscarApontamentosDoOperador(
     p_shift_id: exigirTexto(shiftId, "shiftId"),
     p_work_date: exigirData(workDate, "workDate"),
   });
-  return exigirLista<ApontamentoDoOperador>(
+  return exigirApontamentos(
     exigirSucesso(resposta, RPC_OPERACIONAL.apontamentos),
     RPC_OPERACIONAL.apontamentos,
   );
@@ -285,7 +353,7 @@ export async function buscarApontamentosDoOperador(
 // ---------------------------------------------------------------------------
 
 /**
- * Normaliza as linhas para exatamente os seis campos que a RPC aceita.
+ * Normaliza as linhas para exatamente os sete campos que a RPC aceita.
  *
  * A conferência acontece aqui **e** no banco, em três camadas independentes: a
  * lista branca da própria RPC, o privilégio por coluna do papel dono e as
@@ -316,6 +384,11 @@ export function montarLinhasDoApontamento(entradas: EntradaDaLinha[]): LinhaDoAp
 
     const employeeId = exigirTexto(entrada.employee_id, "employee_id");
     const status = exigirTexto(entrada.status, "status");
+    // A versão vem da leitura (0 = linha nova). Ausente ou fora do formato, a linha não sai daqui:
+    // a camada não inventa nem presume versão.
+    if (!ehVersao(entrada.versao_esperada, 0)) {
+      throw new Error(`Versão ausente na linha do apontamento: ${employeeId}.`);
+    }
 
     return {
       employee_id: employeeId,
@@ -324,6 +397,7 @@ export function montarLinhasDoApontamento(entradas: EntradaDaLinha[]): LinhaDoAp
       check_out: entrada.check_out ?? null,
       break_minutes: entrada.break_minutes ?? null,
       notes: entrada.notes ?? null,
+      versao_esperada: entrada.versao_esperada,
     };
   });
 }
@@ -331,22 +405,26 @@ export function montarLinhasDoApontamento(entradas: EntradaDaLinha[]): LinhaDoAp
 /**
  * Grava o apontamento do par operação/turno numa data.
  *
- * Devolve o id da folha, que é o que a RPC retorna. Não existe exclusão nesta
- * superfície: linha ausente do payload é linha **não tocada**, nunca apagada.
- * Fechar ou reabrir folha também não passa por aqui — é ato administrativo.
+ * Devolve a folha e, por colaborador, a versão gravada e o resultado (`inserido`, `atualizado` ou
+ * `sem_alteracao`). Não existe exclusão nesta superfície: linha ausente do payload é linha **não
+ * tocada**, nunca apagada. Fechar ou reabrir folha também não passa por aqui — é ato
+ * administrativo. Versão obsoleta com conteúdo diferente chega como `ErroRpcOperacional` 40001 e
+ * não é repetida aqui: trocar a versão é decisão da pessoa, na tela.
  */
 export async function salvarApontamentoOperacional(
   cliente: ClienteOperacional,
   { operationId, shiftId, workDate, linhas }: EscritaDoApontamento,
-): Promise<string> {
-  const resposta = await cliente.rpc(RPC_OPERACIONAL.salvar, {
+): Promise<ResultadoDaGravacaoOperacional> {
+  const parametros = {
     p_operation_id: exigirTexto(operationId, "operationId"),
     p_shift_id: exigirTexto(shiftId, "shiftId"),
     p_work_date: exigirData(workDate, "workDate"),
-    p_linhas: montarLinhasDoApontamento(linhas),
-  });
-  return exigirIdentificadorDaFolha(
+  };
+  const p_linhas = montarLinhasDoApontamento(linhas);
+  const resposta = await cliente.rpc(RPC_OPERACIONAL.salvar, { ...parametros, p_linhas });
+  return lerResultadoDaGravacao(
     exigirSucesso(resposta, RPC_OPERACIONAL.salvar),
+    p_linhas.map((l) => l.employee_id),
     RPC_OPERACIONAL.salvar,
   );
 }

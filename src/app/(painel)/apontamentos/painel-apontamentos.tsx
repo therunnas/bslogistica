@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
   BadgeDollarSign,
@@ -45,22 +45,34 @@ import {
   type AttendanceStatus,
 } from "@/lib/billing";
 import {
+  MENSAGEM_BANCO_SEM_V2,
+  MENSAGEM_RESULTADO_INCERTO,
+  MENSAGEM_VERSAO_DESCONHECIDA,
   assinaturasSalvas,
   basesAposEdicao,
+  basesAposSalvar,
   basesDasSujas,
   colaboradoresFaturados,
   deveAplicarResultado,
   dirtyAposEdicao,
   dirtyAposSalvar,
+  dirtyReconciliado,
   linhaGravadaFoiAlterada,
   linhasEmConflito,
   linhasParaSalvar,
   mensagemDeConflito,
-  montarCarga,
-  montarCargaDaRpc,
+  mensagemDoResultado,
   versaoDoGravado,
+  versaoEsperadaDaLinha,
   type LinhaDoApontamento,
 } from "@/lib/apontamentos-salvar";
+import {
+  ErroDoSalvamentoAdmin,
+  comoClienteDoApontamento,
+  confirmarViradaRegistrada,
+  consultarSituacaoDaVirada,
+  salvarDiaAdminV2,
+} from "@/lib/apontamentos-admin-v2";
 import { mensagemDoErro } from "@/lib/erros-banco";
 import { somarLinhas, valorDaLinha, type CondicaoDoDia } from "@/lib/apontamentos-financeiro";
 import { calcEntryComNucleo } from "@/lib/previa-v2";
@@ -147,12 +159,12 @@ interface DraftState {
   key: string;
   rows: DraftEntry[];
   dirty: ReadonlySet<string>;
-  /** Versão (`updated_at`) de cada linha suja quando a edição começou (D-CP05-02). */
-  bases: ReadonlyMap<string, string>;
+  /**
+   * Versão (coluna `versao` da 054) de cada linha suja quando a edição começou (D-CP05-02,
+   * GATE-FIN-06). É o que vai como `versao_esperada`; `null` = desconhecida (não é enviada).
+   */
+  bases: ReadonlyMap<string, number | null>;
 }
-
-/** PostgREST: a função chamada não existe (banco anterior à migration 031). */
-const CODIGO_DA_RPC_AUSENTE = "PGRST202";
 
 /** Índice que garante a invariável de diária, em public.timesheet_entries. */
 const INDICE_DA_DIARIA = "timesheet_entries_uma_diaria_por_operacao_dia";
@@ -479,7 +491,7 @@ export function PainelApontamentos() {
           key: contextKey,
           rows: servidor,
           dirty: new Set<string>(),
-          bases: new Map<string, string>(),
+          bases: new Map<string, number | null>(),
         };
       }
 
@@ -502,11 +514,16 @@ export function PainelApontamentos() {
           !servidor.some((linha) => linha.employeeId === row.employeeId),
       );
 
+      const rows = [...mescladas, ...pendentes];
+      // GATE-FIN-06: a linha suja que ficou igual ao banco (resposta perdida depois do COMMIT, ou a
+      // mesma alteração feita por outra sessão) deixa de ser pendência; nada é descartado.
+      const dirty = dirtyReconciliado(atual.dirty, rows as LinhaDoApontamento[], existingEntries);
+
       return {
         key: contextKey,
-        rows: [...mescladas, ...pendentes],
-        dirty: atual.dirty,
-        bases: atual.bases,
+        rows,
+        dirty,
+        bases: basesDasSujas(atual.bases, dirty),
       };
     });
   }, [
@@ -815,10 +832,35 @@ export function PainelApontamentos() {
     entradaIgualSaida(row.status, row.checkIn, row.checkOut),
   );
 
-  // D1/B3: saída antes da entrada num turno que não vira o dia. Só grava corrigindo o horário ou
-  // com a confirmação expressa da linha, para aquele par de horários (ver `src/lib/horarios.ts`).
+  // GATE-FIN-06: a versão de cada linha no banco (054) e a que vai no envio.
+  const versoesMostradas = new Map(
+    existingEntries.map((entry) => [entry.employee_id, versaoDoGravado(entry)] as const),
+  );
+  const versaoEsperada = (employeeId: string) =>
+    versaoEsperadaDaLinha(employeeId, draft?.bases ?? new Map(), versoesMostradas);
+
+  // Linhas sujas editadas sobre uma versão que o banco já não tem: outra sessão gravou antes. A
+  // tela mostra o conflito e só a decisão da pessoa troca a versão de partida.
+  const conflitosDeVersao = linhasEmConflito<number | null>(
+    [...(draft?.dirty ?? new Set<string>())].filter((id) =>
+      linhas.some((row) => row.employeeId === id),
+    ),
+    draft?.bases ?? new Map(),
+    versoesMostradas,
+    versoesMostradas,
+    0,
+  );
+
+  // D1/B3 e GATE-FIN-06: saída antes da entrada num turno que não vira o dia. Só grava corrigindo
+  // o horário ou com a confirmação expressa do ADMINISTRADOR, registrada no banco
+  // (`confirmar_virada` da v2). A confirmação vale para o colaborador, o par de horários, o turno
+  // (jornada vigente) e a versão de partida: mudar qualquer um exige nova avaliação.
   const chaveDaVirada = (row: DraftEntry) =>
-    `${contextKey}|${chaveDaConfirmacaoDeVirada(row.employeeId, row.checkIn, row.checkOut)}`;
+    `${contextKey}|${shift?.start_time ?? ""}-${shift?.end_time ?? ""}-${String(
+      shift?.crosses_midnight ?? false,
+    )}|${chaveDaConfirmacaoDeVirada(row.employeeId, row.checkIn, row.checkOut)}|${String(
+      versaoEsperada(row.employeeId),
+    )}`;
   const viradasForaDoTurno = aSalvar.filter(({ row }) =>
     saidaAntesDaEntradaForaDoTurno(row.status, row.checkIn, row.checkOut, shift),
   );
@@ -837,42 +879,6 @@ export function PainelApontamentos() {
     ({ row }) => row.status !== "absent" && diariaEmOutraFolha.has(row.employeeId),
   );
 
-  /** O caminho de antes da 031: folha e linhas em duas escritas (não atômico). Só para banco sem a 031. */
-  async function salvarPeloCaminhoAnterior(linhas: (typeof aSalvar)[number]["row"][]) {
-    let timesheetId = timesheet?.id;
-
-    if (!timesheetId) {
-      const { data, error } = await criarClienteNavegador()
-        .from("timesheets")
-        .insert({
-          operation_id: operationId,
-          shift_id: turnoId || null,
-          work_date: date,
-          status: "open",
-        })
-        .select("id")
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      timesheetId = data.id;
-    }
-
-    const payload = linhas.map((row) =>
-      montarCarga(row, { timesheetId: timesheetId!, operationId, workDate: date }, () =>
-        globalThis.crypto.randomUUID(),
-      ),
-    );
-
-    const { error } = await criarClienteNavegador().from("timesheet_entries").upsert(payload);
-
-    if (error) {
-      throw error;
-    }
-  }
-
   const saveAll = useMutation({
     mutationFn: async () => {
       // Sem leitura confiável, "não há folha" pode ser só uma consulta que falhou.
@@ -885,7 +891,16 @@ export function PainelApontamentos() {
           gravadas: 0,
           contexto: contextKey,
           salvas: new Map<string, string>() as ReadonlyMap<string, string>,
+          resultado: null,
         };
+      }
+
+      if (conflitosDeVersao.length) {
+        throw new Error(
+          mensagemDeConflito(
+            conflitosDeVersao.map((id) => employeeMap.get(id)?.name ?? "colaborador"),
+          ),
+        );
       }
 
       if (horariosIguais.length) {
@@ -916,75 +931,44 @@ export function PainelApontamentos() {
       // enviado (e para qual contexto) volta junto, para o resultado não limpar nada de outro lugar.
       const linhasDoLote = aSalvar.map(({ row }) => row as LinhaDoApontamento);
 
-      // D-CP05-02: outra aba (ou pessoa) gravou este dia depois que a tela o leu? Confere a versão
-      // de cada linha no servidor antes de gravar; se mudou, nada é enviado.
-      const cliente = criarClienteNavegador();
-      let consultaDaFolha = cliente
-        .from("timesheets")
-        .select("id")
-        .eq("operation_id", operationId)
-        .eq("work_date", date);
-      consultaDaFolha = turnoId
-        ? consultaDaFolha.eq("shift_id", turnoId)
-        : consultaDaFolha.is("shift_id", null);
-      const { data: folhasAtuais, error: erroDaFolha } = await consultaDaFolha;
-      if (erroDaFolha) throw erroDaFolha;
-      const versoesAtuais = new Map<string, string>();
-      const idsDasFolhas = (folhasAtuais ?? []).map((folha) => folha.id);
-      if (idsDasFolhas.length) {
-        const { data: linhasAtuais, error: erroDasLinhas } = await cliente
-          .from("timesheet_entries")
-          .select("employee_id, updated_at")
-          .in("timesheet_id", idsDasFolhas);
-        if (erroDasLinhas) throw erroDasLinhas;
-        for (const linha of linhasAtuais ?? []) {
-          versoesAtuais.set(linha.employee_id, versaoDoGravado(linha));
-        }
-      }
-      const emConflito = linhasEmConflito(
-        linhasDoLote.map((linha) => linha.employeeId),
-        draft?.bases ?? new Map<string, string>(),
-        new Map(existingEntries.map((entry) => [entry.employee_id, versaoDoGravado(entry)])),
-        versoesAtuais,
-      );
-      if (emConflito.length) {
-        throw new Error(
-          mensagemDeConflito(emConflito.map((id) => employeeMap.get(id)?.name ?? "colaborador")),
-        );
-      }
-
-      const { error } = await cliente.rpc("salvar_apontamento_admin", {
-        p_operation_id: operationId,
-        ...(turnoId ? { p_shift_id: turnoId } : {}),
-        p_work_date: date,
-        p_linhas: montarCargaDaRpc(
-          linhasDoLote,
-          snapshotsDeFuncao
-            ? new Map(linhasDoLote.map((l) => [l.employeeId, funcaoDaLinha(l.employeeId)]))
-            : undefined,
-        ),
+      // GATE-FIN-06: uma chamada só, `salvar_apontamento_admin_v2`. A versão de cada linha é a lida
+      // do banco quando a pessoa começou a editar; o banco a confere sob trava (40001 = outra sessão
+      // gravou antes). Sem caminho alternativo: sem a v2 no banco, nada é gravado.
+      const resultado = await salvarDiaAdminV2(comoClienteDoApontamento(criarClienteNavegador()), {
+        operationId,
+        shiftId: turnoId || null,
+        workDate: date,
+        linhas: linhasDoLote,
+        versaoEsperada,
+        funcoesDoDia: snapshotsDeFuncao
+          ? new Map(linhasDoLote.map((l) => [l.employeeId, funcaoDaLinha(l.employeeId)]))
+          : undefined,
+        // Só chegam aqui viradas confirmadas na linha (as pendentes bloqueiam acima).
+        viradasConfirmadas: new Set(viradasForaDoTurno.map(({ row }) => row.employeeId)),
       });
-
-      if (error && error.code === CODIGO_DA_RPC_AUSENTE) {
-        // Banco anterior à migration 031 (a função não existe): segue o caminho antigo, de duas
-        // escritas, que é o único que esse banco tem. Com a 031, nunca passa por aqui.
-        await salvarPeloCaminhoAnterior(aSalvar.map(({ row }) => row));
-      } else if (error) {
-        throw error;
-      }
 
       return {
         gravadas: linhasDoLote.length,
         contexto: contextKey,
         salvas: assinaturasSalvas(linhasDoLote),
+        resultado,
       };
     },
 
-    onSuccess: async ({ gravadas, contexto, salvas }) => {
-      if (!gravadas) {
+    onSuccess: async ({ gravadas, contexto, salvas, resultado }) => {
+      if (!gravadas || !resultado) {
         toast.info("Nenhuma alteração para salvar.");
         return;
       }
+
+      // Só limpa quem foi salvo E não mudou desde o envio, e só se o rascunho ainda é do mesmo
+      // contexto: um retorno atrasado não apaga alteração de outra operação, turno ou data. A linha
+      // editada enquanto salvava passa a partir da versão que ESTE salvamento gravou.
+      setDraft((atual) => {
+        if (!atual || !deveAplicarResultado(contexto, atual.key)) return atual;
+        const dirty = dirtyAposSalvar(atual.dirty, atual.rows as LinhaDoApontamento[], salvas);
+        return { ...atual, dirty, bases: basesAposSalvar(atual.bases, dirty, resultado) };
+      });
 
       await Promise.all([
         queryClient.invalidateQueries({
@@ -993,24 +977,42 @@ export function PainelApontamentos() {
         queryClient.invalidateQueries({
           queryKey: ["timesheet_entries"],
         }),
+        queryClient.invalidateQueries({ queryKey: ["situacao_da_virada"] }),
       ]);
 
-      // Só limpa quem foi salvo E não mudou desde o envio, e só se o rascunho ainda é do mesmo
-      // contexto: um retorno atrasado não apaga alteração de outra operação, turno ou data.
-      setDraft((atual) => {
-        if (!atual || !deveAplicarResultado(contexto, atual.key)) return atual;
-        const dirty = dirtyAposSalvar(atual.dirty, atual.rows as LinhaDoApontamento[], salvas);
-        // O que foi gravado passa a valer pela versão do servidor (já relida acima).
-        return { ...atual, dirty, bases: basesDasSujas(atual.bases, dirty) };
-      });
-
-      toast.success("Apontamento salvo.");
+      toast.success(mensagemDoResultado(resultado));
     },
 
     onError: (error: unknown) => {
       // A gravação é atômica: nada foi criado. Reler assim mesmo mantém a tela fiel ao banco.
       void queryClient.invalidateQueries({ queryKey: ["timesheets"] });
       void queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] });
+
+      // GATE-FIN-06: cada falha da v2 com a sua explicação; nenhuma vira retry automático.
+      if (error instanceof ErroDoSalvamentoAdmin) {
+        if (error.falha === "conflito") {
+          toast.error(mensagemDeConflito([]));
+          return;
+        }
+        if (error.falha === "banco_sem_v2") {
+          toast.error(MENSAGEM_BANCO_SEM_V2);
+          return;
+        }
+        if (error.falha === "rede") {
+          toast.error(MENSAGEM_RESULTADO_INCERTO);
+          return;
+        }
+        if (error.falha === "versao") {
+          toast.error(MENSAGEM_VERSAO_DESCONHECIDA);
+          return;
+        }
+        if (error.falha === "contrato") {
+          toast.error(
+            "O banco respondeu fora do contrato esperado. Os dados foram relidos: confira o dia antes de salvar de novo.",
+          );
+          return;
+        }
+      }
 
       if (ehViolacaoDeDiaria(error)) {
         toast.error(mensagemDeDiariaDuplicada());
@@ -1099,13 +1101,48 @@ export function PainelApontamentos() {
         rows,
         dirty,
         // D-CP05-02: a 1ª edição registra a versão da linha que a pessoa estava vendo.
-        bases: basesAposEdicao(
+        bases: basesAposEdicao<number | null>(
           atual.bases,
           employeeId,
           dirty.has(employeeId),
           versaoDoGravado(gravado),
         ),
       };
+    });
+  }
+
+  /**
+   * Decisão explícita sobre um conflito de versão (GATE-FIN-06). "Manter" adota a versão ATUAL do
+   * banco como ponto de partida da alteração da pessoa (o próximo salvamento a sobrepõe, por
+   * decisão dela); "usar o gravado" descarta a alteração e mostra o que está no banco.
+   */
+  function decidirConflito(employeeId: string, decisao: "manter" | "usar") {
+    const gravado = existingEntries.find((entry) => entry.employee_id === employeeId);
+    setDraft((atual) => {
+      if (!atual) return atual;
+      if (decisao === "manter") {
+        const bases = new Map(atual.bases);
+        bases.set(employeeId, versaoDoGravado(gravado));
+        return { ...atual, bases };
+      }
+      const rows = atual.rows.map((row) =>
+        row.employeeId === employeeId && gravado
+          ? {
+              ...row,
+              entryId: gravado.id,
+              status: gravado.status,
+              checkIn: gravado.check_in?.slice(0, 5) ?? "",
+              checkOut: gravado.check_out?.slice(0, 5) ?? "",
+              breakMinutes: gravado.break_minutes,
+              notes: gravado.notes ?? "",
+            }
+          : row,
+      );
+      const dirty = new Set(atual.dirty);
+      dirty.delete(employeeId);
+      const bases = new Map(atual.bases);
+      bases.delete(employeeId);
+      return { ...atual, rows, dirty, bases };
     });
   }
 
@@ -1146,6 +1183,7 @@ export function PainelApontamentos() {
                 !!conflitos.length ||
                 !!horariosIguais.length ||
                 !!viradasPendentes.length ||
+                !!conflitosDeVersao.length ||
                 linhasBloqueadas.length > 0 ||
                 todasFaturadas
               }
@@ -1202,6 +1240,79 @@ export function PainelApontamentos() {
             . O salvamento está bloqueado.
           </p>
           <p className="mt-1 text-xs leading-5">{MENSAGEM_SAIDA_ANTES_DA_ENTRADA}</p>
+        </div>
+      ) : null}
+
+      {conflitosDeVersao.length > 0 && !saveAll.isPending ? (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-destructive"
+        >
+          <p className="text-sm font-medium">Conflito de gravação</p>
+          <p className="mt-1 text-xs leading-5">
+            Outra sessão (outra aba ou outra pessoa) gravou estas linhas depois que você começou a
+            editá-las. Nada foi sobrescrito e o que você digitou continua na tela. Escolha, em cada
+            uma, o que deve valer; o salvamento fica bloqueado até a decisão.
+          </p>
+          <ul className="mt-2 space-y-2">
+            {conflitosDeVersao.map((id) => {
+              const minha = linhas.find((row) => row.employeeId === id);
+              const gravado = existingEntries.find((entry) => entry.employee_id === id);
+              const nome = employeeMap.get(id)?.name ?? "colaborador";
+              const descrever = (l: {
+                status: AttendanceStatus;
+                entrada: string;
+                saida: string;
+                notas: string;
+              }) =>
+                `${attendanceLabel[l.status]}${
+                  l.status === "absent" ? "" : ` ${l.entrada || "—"}–${l.saida || "—"}`
+                }${l.notas ? ` · ${l.notas}` : ""}`;
+              return (
+                <li key={id} className="text-xs leading-5 text-foreground">
+                  <span className="font-medium">{nome}</span>: gravado agora{" "}
+                  {gravado
+                    ? descrever({
+                        status: gravado.status,
+                        entrada: gravado.check_in?.slice(0, 5) ?? "",
+                        saida: gravado.check_out?.slice(0, 5) ?? "",
+                        notas: gravado.notes ?? "",
+                      })
+                    : "sem apontamento"}
+                  ; sua alteração{" "}
+                  {minha
+                    ? descrever({
+                        status: minha.status,
+                        entrada: minha.checkIn,
+                        saida: minha.checkOut,
+                        notas: minha.notes,
+                      })
+                    : "—"}
+                  .
+                  <span className="mt-1 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 rounded-lg text-xs"
+                      aria-label={`Manter a minha alteração (${nome})`}
+                      onClick={() => decidirConflito(id, "manter")}
+                    >
+                      Manter a minha alteração
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 rounded-lg text-xs"
+                      aria-label={`Usar o que está gravado (${nome})`}
+                      onClick={() => decidirConflito(id, "usar")}
+                    >
+                      Usar o que está gravado
+                    </Button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       ) : null}
 
@@ -1676,23 +1787,46 @@ export function PainelApontamentos() {
                         />
 
                         {linhaComVirada.has(row.employeeId) ? (
-                          <label className="mt-1.5 flex w-44 items-start gap-1.5 text-[11px] leading-4 text-destructive">
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
-                              checked={viradasConfirmadas.has(chaveDaVirada(row))}
-                              onChange={(event) => {
-                                const chave = chaveDaVirada(row);
-                                setViradasConfirmadas((atuais) => {
-                                  const novas = new Set(atuais);
-                                  if (event.target.checked) novas.add(chave);
-                                  else novas.delete(chave);
-                                  return novas;
-                                });
-                              }}
-                            />
-                            Confirmo que a jornada atravessou a meia-noite
-                          </label>
+                          <div className="mt-1.5 w-52 text-[11px] leading-4 text-destructive">
+                            <p>
+                              Entrada {row.checkIn} · saída {row.checkOut} do dia seguinte ·{" "}
+                              {minutesToLabel(calc.workedMinutes)} de jornada. A confirmação fica
+                              registrada no banco em seu nome.
+                            </p>
+                            <label className="mt-1 flex items-start gap-1.5">
+                              <input
+                                type="checkbox"
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
+                                checked={viradasConfirmadas.has(chaveDaVirada(row))}
+                                onChange={(event) => {
+                                  const chave = chaveDaVirada(row);
+                                  setViradasConfirmadas((atuais) => {
+                                    const novas = new Set(atuais);
+                                    if (event.target.checked) novas.add(chave);
+                                    else novas.delete(chave);
+                                    return novas;
+                                  });
+                                }}
+                              />
+                              Confirmo que a jornada atravessou a meia-noite
+                            </label>
+                          </div>
+                        ) : null}
+
+                        {gravado &&
+                        saidaAntesDaEntradaForaDoTurno(
+                          gravado.status,
+                          gravado.check_in,
+                          gravado.check_out,
+                          shift,
+                        ) ? (
+                          <SituacaoDaViradaGravada
+                            entryId={gravado.id}
+                            versao={versaoDoGravado(gravado)}
+                            entrada={gravado.check_in?.slice(0, 5) ?? ""}
+                            saida={gravado.check_out?.slice(0, 5) ?? ""}
+                            podeConfirmar={!(draft?.dirty ?? new Set<string>()).has(row.employeeId)}
+                          />
                         ) : null}
                       </TableCell>
 
@@ -1762,6 +1896,126 @@ export function PainelApontamentos() {
           aoFechar={() => setCorrigindo(null)}
           catalogo={funcoes.data ?? []}
         />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A situação da virada de um apontamento JÁ GRAVADO (GATE-FIN-06), lida do banco por
+ * `situacao_da_virada`: confirmada pelo administrador, ou sem confirmação (gravada por um caminho
+ * anterior, sem registro). Para a pendente, o administrador registra a confirmação pela
+ * `confirmar_virada_do_apontamento`, na versão mostrada; se outra sessão mudou a linha, o banco
+ * recusa (40001) e a tela relê.
+ */
+function SituacaoDaViradaGravada({
+  entryId,
+  versao,
+  entrada,
+  saida,
+  podeConfirmar,
+}: {
+  entryId: string;
+  versao: number | null;
+  entrada: string;
+  saida: string;
+  podeConfirmar: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [abrindo, setAbrindo] = useState(false);
+  const situacao = useQuery({
+    queryKey: ["situacao_da_virada", entryId, versao],
+    queryFn: () =>
+      consultarSituacaoDaVirada(comoClienteDoApontamento(criarClienteNavegador()), entryId),
+  });
+  const confirmar = useMutation({
+    mutationFn: () => {
+      if (versao === null) throw new Error(MENSAGEM_VERSAO_DESCONHECIDA);
+      return confirmarViradaRegistrada(
+        comoClienteDoApontamento(criarClienteNavegador()),
+        entryId,
+        versao,
+      );
+    },
+    onSuccess: () => {
+      setAbrindo(false);
+      toast.success("Confirmação da virada registrada.");
+    },
+    onError: (erro: unknown) =>
+      toast.error(
+        erro instanceof ErroDoSalvamentoAdmin && erro.falha === "conflito"
+          ? mensagemDeConflito([])
+          : mensagemDoErro(erro),
+      ),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["situacao_da_virada"] }),
+        queryClient.invalidateQueries({ queryKey: ["timesheet_entries"] }),
+      ]),
+  });
+
+  if (situacao.isPending) return null;
+  if (situacao.isError) {
+    return (
+      <p className="mt-1.5 w-52 text-[11px] leading-4 text-muted-foreground">
+        Não foi possível consultar a confirmação da virada.
+      </p>
+    );
+  }
+  if (situacao.data === "confirmada") {
+    return (
+      <Badge
+        variant="secondary"
+        className="mt-1.5 border border-border bg-secondary text-[10px] font-medium text-muted-foreground shadow-none"
+      >
+        Virada confirmada
+      </Badge>
+    );
+  }
+  if (situacao.data !== "pendente") return null;
+  return (
+    <div className="mt-1.5 w-52 text-[11px] leading-4 text-destructive">
+      <Badge
+        variant="secondary"
+        className="border border-destructive/30 bg-destructive/10 text-[10px] font-medium text-destructive shadow-none"
+      >
+        Virada sem confirmação
+      </Badge>
+      {podeConfirmar && !abrindo ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-1 h-7 rounded-lg text-[11px]"
+          onClick={() => setAbrindo(true)}
+        >
+          Confirmar virada
+        </Button>
+      ) : null}
+      {abrindo ? (
+        <div className="mt-1">
+          <p>
+            Entrada {entrada} · saída {saida} do dia seguinte. A confirmação fica registrada no
+            banco em seu nome, para este apontamento e estes horários.
+          </p>
+          <span className="mt-1 flex gap-2">
+            <Button
+              type="button"
+              className="h-7 rounded-lg text-[11px]"
+              disabled={confirmar.isPending}
+              onClick={() => confirmar.mutate()}
+            >
+              Registrar confirmação
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-7 rounded-lg text-[11px]"
+              onClick={() => setAbrindo(false)}
+            >
+              Cancelar
+            </Button>
+          </span>
+        </div>
       ) : null}
     </div>
   );

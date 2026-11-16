@@ -1213,6 +1213,7 @@ export type Database = {
           terms_origin: string | null;
           timesheet_id: string;
           updated_at: string;
+          versao: number;
           work_date: string;
           worked_minutes: number;
         };
@@ -1257,6 +1258,7 @@ export type Database = {
           terms_origin?: string | null;
           timesheet_id: string;
           updated_at?: string;
+          versao?: number;
           work_date: string;
           worked_minutes?: number;
         };
@@ -1301,6 +1303,7 @@ export type Database = {
           terms_origin?: string | null;
           timesheet_id?: string;
           updated_at?: string;
+          versao?: number;
           work_date?: string;
           worked_minutes?: number;
         };
@@ -1525,6 +1528,10 @@ export type Database = {
           p_valid_to?: string;
         };
         Returns: string;
+      };
+      confirmar_virada_do_apontamento: {
+        Args: { p_entry_id: string; p_versao: number };
+        Returns: Json;
       };
       consultar_calendario_operacao: {
         Args: { p_operation_id: string; p_data: string };
@@ -1949,6 +1956,27 @@ export type Database = {
           work_date: string;
         }[];
       };
+      listar_apontamentos_do_operador_v2: {
+        Args: {
+          p_operation_id: string;
+          p_shift_id: string;
+          p_work_date: string;
+        };
+        Returns: {
+          break_minutes: number;
+          check_in: string;
+          check_out: string;
+          employee_id: string;
+          faturado: boolean;
+          folha_status: Database["public"]["Enums"]["timesheet_status"];
+          notes: string;
+          shift_id: string;
+          status: Database["public"]["Enums"]["attendance_status"];
+          timesheet_id: string;
+          versao: number;
+          work_date: string;
+        }[];
+      };
       listar_equipe_do_operador: {
         Args: { p_operation_id: string; p_shift_id: string };
         Returns: {
@@ -2222,6 +2250,10 @@ export type Database = {
         Args: { p_linhas: Json; p_operation_id: string; p_shift_id?: string; p_work_date: string };
         Returns: Json;
       };
+      salvar_apontamento_admin_v2: {
+        Args: { p_linhas: Json; p_operation_id: string; p_shift_id: string; p_work_date: string };
+        Returns: Json;
+      };
       salvar_apontamento_operacional: {
         Args: {
           p_linhas: Json;
@@ -2231,7 +2263,17 @@ export type Database = {
         };
         Returns: string;
       };
+      salvar_apontamento_operacional_v2: {
+        Args: {
+          p_linhas: Json;
+          p_operation_id: string;
+          p_shift_id: string;
+          p_work_date: string;
+        };
+        Returns: Json;
+      };
       sincronizar_colunas_legadas: { Args: { p_reason: string }; Returns: Json };
+      situacao_da_virada: { Args: { p_entry_id: string }; Returns: string };
       travar_turno_da_operacao: {
         Args: { p_operation_id: string; p_shift_id: string };
         Returns: boolean;

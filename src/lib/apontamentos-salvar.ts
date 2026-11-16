@@ -243,55 +243,93 @@ export function montarCargaDaRpc(
 }
 
 // ---------------------------------------------------------------------------
-// D-CP05-02 (QA-BS-01) — duas abas (ou duas pessoas) no mesmo dia
+// D-CP05-02 (QA-BS-01) e GATE-FIN-06 — duas abas (ou duas pessoas) no mesmo dia
 //
-// A RPC grava por colaborador na folha, sem conferir versão: a segunda aba, com a leitura de antes,
-// regravava as linhas da primeira (no E2E, a saída das 18:00 virou falta sem aviso). Antes de
-// gravar, a tela lê a versão (`updated_at`) de cada linha no servidor e compara com a versão sobre
-// a qual a pessoa editou. Diferente: nada é gravado e a tela pede para recarregar.
+// Antes da 054 a tela lia o `updated_at` de cada linha e comparava com o que tinha visto, ANTES de
+// chamar a RPC: uma conferência fora da transação, com uma janela entre ler e gravar. Com a 054 a
+// versão é do banco (`timesheet_entries.versao`, mantida pelo gatilho) e a RPC v2 a confere sob
+// `FOR UPDATE`, na mesma transação da gravação. A tela só informa a versão em que a pessoa
+// COMEÇOU a editar cada linha; quem decide é o banco (40001). A versão nunca é inventada,
+// incrementada nem inferida aqui: ou vem da leitura, ou é 0 (linha que não existe).
 
-/** Versão de uma linha no servidor: o `updated_at` do apontamento, ou `VERSAO_NOVA` sem apontamento. */
-export const VERSAO_NOVA = "novo";
+/** Versão de uma linha que ainda não existe no banco. */
+export const VERSAO_NOVA = 0;
 
-export function versaoDoGravado(gravado: { updated_at?: string | null } | undefined): string {
-  return gravado?.updated_at ?? VERSAO_NOVA;
+const ehVersaoGravada = (valor: unknown): valor is number =>
+  typeof valor === "number" && Number.isSafeInteger(valor) && valor >= 1;
+
+const ehVersaoEsperada = (valor: unknown): valor is number =>
+  typeof valor === "number" && Number.isSafeInteger(valor) && valor >= 0;
+
+/**
+ * A versão de uma linha no banco: a coluna `versao` do gravado; `VERSAO_NOVA` sem gravado.
+ * `null` = DESCONHECIDA (banco sem a 054, ou leitura sem a coluna): a linha não pode ser enviada.
+ */
+export function versaoDoGravado(gravado: { versao?: unknown } | undefined): number | null {
+  if (gravado === undefined) return VERSAO_NOVA;
+  return ehVersaoGravada(gravado.versao) ? gravado.versao : null;
 }
 
 /**
- * As linhas do lote que outra sessão gravou desde que esta tela as mostrou.
+ * As linhas do lote cuja versão de partida difere da versão atual no banco (outra sessão gravou).
  *
  * - `bases`: a versão em que a pessoa COMEÇOU a editar cada linha (registrada na 1ª edição);
- * - `mostradas`: a versão que a tela tem agora, para a linha que não foi editada (a linha nova,
- *   ainda não gravada, entra no lote mesmo sem edição);
- * - `atuais`: as versões lidas do servidor imediatamente antes de gravar.
+ * - `mostradas`: a versão que a tela tem agora, para a linha que não foi editada;
+ * - `atuais`: as versões lidas do banco.
  */
-export function linhasEmConflito(
+export function linhasEmConflito<V>(
   colaboradores: readonly string[],
-  bases: ReadonlyMap<string, string>,
-  mostradas: ReadonlyMap<string, string>,
-  atuais: ReadonlyMap<string, string>,
+  bases: ReadonlyMap<string, V>,
+  mostradas: ReadonlyMap<string, V>,
+  atuais: ReadonlyMap<string, V>,
+  nova: V = VERSAO_NOVA as V,
 ): string[] {
   return colaboradores.filter((id) => {
-    const base = bases.get(id) ?? mostradas.get(id) ?? VERSAO_NOVA;
-    return (atuais.get(id) ?? VERSAO_NOVA) !== base;
+    const base = bases.get(id) ?? mostradas.get(id) ?? nova;
+    return (atuais.get(id) ?? nova) !== base;
   });
 }
 
+/** A versão que vai no envio: a da 1ª edição; sem edição, a mostrada; sem gravado, 0. */
+export function versaoEsperadaDaLinha(
+  employeeId: string,
+  bases: ReadonlyMap<string, number | null>,
+  mostradas: ReadonlyMap<string, number | null>,
+): number | null {
+  if (bases.has(employeeId)) return bases.get(employeeId) ?? null;
+  if (mostradas.has(employeeId)) return mostradas.get(employeeId) ?? null;
+  return VERSAO_NOVA;
+}
+
+export const MENSAGEM_CONFLITO_DE_VERSAO =
+  "Este apontamento foi alterado por outra sessão (outra aba ou outra pessoa) depois que você o abriu. Nada foi gravado. O que você digitou foi mantido: revise as linhas marcadas e escolha, em cada uma, manter a sua alteração ou usar o que está gravado.";
+
+export const MENSAGEM_BANCO_SEM_V2 =
+  "O banco deste ambiente ainda não tem a versão exigida por esta tela (migration 054). Nada foi gravado. Avise o administrador do sistema.";
+
+export const MENSAGEM_RESULTADO_INCERTO =
+  "Não foi possível confirmar se o apontamento foi gravado (falha de conexão). O que você digitou foi mantido e os dados foram relidos: salvar de novo não duplica nem sobrescreve o que outra sessão gravou.";
+
+export const MENSAGEM_VERSAO_DESCONHECIDA =
+  "A versão de uma linha não pôde ser lida do banco. Nada foi gravado. Recarregue a página.";
+
+/** Mensagem de conflito com os nomes (lista curta). */
 export function mensagemDeConflito(nomes: readonly string[]): string {
+  if (nomes.length === 0) return MENSAGEM_CONFLITO_DE_VERSAO;
   const quem =
     nomes.length > 3
       ? `${nomes.slice(0, 3).join(", ")} e mais ${nomes.length - 3}`
       : nomes.join(", ");
-  return `Este dia foi alterado em outra aba ou por outra pessoa depois que você o abriu (${quem}). Nada foi gravado. Recarregue a página para ver o que está gravado e refaça a alteração.`;
+  return `${MENSAGEM_CONFLITO_DE_VERSAO} (${quem})`;
 }
 
 /** As bases depois de uma edição: a 1ª edição registra a versão vista; desfazer a edição a esquece. */
-export function basesAposEdicao(
-  bases: ReadonlyMap<string, string>,
+export function basesAposEdicao<V>(
+  bases: ReadonlyMap<string, V>,
   employeeId: string,
   continuaSuja: boolean,
-  versaoMostrada: string,
-): Map<string, string> {
+  versaoMostrada: V,
+): Map<string, V> {
   const novo = new Map(bases);
   if (!continuaSuja) novo.delete(employeeId);
   else if (!novo.has(employeeId)) novo.set(employeeId, versaoMostrada);
@@ -299,11 +337,190 @@ export function basesAposEdicao(
 }
 
 /** Só sobrevivem as bases das linhas que continuam sujas (as gravadas passam a valer o servidor). */
-export function basesDasSujas(
-  bases: ReadonlyMap<string, string>,
+export function basesDasSujas<V>(
+  bases: ReadonlyMap<string, V>,
   sujas: ReadonlySet<string>,
-): Map<string, string> {
+): Map<string, V> {
   return new Map([...bases].filter(([id]) => sujas.has(id)));
+}
+
+/**
+ * Carga da RPC `salvar_apontamento_admin_v2`: a da v1 (`montarCargaDaRpc`) mais `versao_esperada`
+ * por linha e `confirmar_virada: true` só nas linhas que o ADMINISTRADOR confirmou nesta tela.
+ * Versão desconhecida ou fora do formato recusa o lote inteiro, antes de qualquer chamada.
+ */
+export function montarCargaDaRpcV2(
+  linhas: readonly LinhaDoApontamento[],
+  versaoEsperada: (employeeId: string) => unknown,
+  funcoesDoDia?: ReadonlyMap<string, string>,
+  viradasConfirmadas?: ReadonlySet<string>,
+) {
+  const base = montarCargaDaRpc(linhas, funcoesDoDia);
+  return base.map((carga) => {
+    const versao = versaoEsperada(carga.employee_id);
+    if (!ehVersaoEsperada(versao)) {
+      throw new ErroDeVersaoDesconhecida(MENSAGEM_VERSAO_DESCONHECIDA);
+    }
+    return {
+      ...carga,
+      versao_esperada: versao,
+      ...(viradasConfirmadas?.has(carga.employee_id) ? { confirmar_virada: true as const } : {}),
+    };
+  });
+}
+
+/** Versão que não veio do banco: nenhuma linha é enviada. */
+export class ErroDeVersaoDesconhecida extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = "ErroDeVersaoDesconhecida";
+  }
+}
+
+/** Retorno da RPC v2 fora do contrato: nunca tratado como gravação bem-sucedida. */
+export class ErroDeContratoDoSalvamento extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = "ErroDeContratoDoSalvamento";
+  }
+}
+
+export type ResultadoDaLinha = "inserido" | "atualizado" | "sem_alteracao";
+
+export interface LinhaGravadaAdmin {
+  employee_id: string;
+  entry_id: string;
+  versao: number;
+  resultado: ResultadoDaLinha;
+}
+
+export interface ResultadoDoSalvamentoAdmin {
+  timesheet_id: string;
+  folha_criada: boolean;
+  linhas: LinhaGravadaAdmin[];
+}
+
+const FORMATO_DE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RESULTADOS: readonly string[] = ["inserido", "atualizado", "sem_alteracao"];
+
+const ehObjeto = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+/**
+ * Lê o retorno de `salvar_apontamento_admin_v2` (`{timesheet_id, folha_criada, linhas[]}`), campo a
+ * campo, sem cast genérico. Cada colaborador enviado precisa voltar exatamente uma vez.
+ */
+export function lerResultadoDoSalvamentoAdmin(
+  dados: unknown,
+  enviados: readonly string[],
+): ResultadoDoSalvamentoAdmin {
+  const falha = (motivo: string): never => {
+    throw new ErroDeContratoDoSalvamento(
+      `Resposta inválida de salvar_apontamento_admin_v2: ${motivo}.`,
+    );
+  };
+  if (!ehObjeto(dados)) return falha("não é um objeto");
+  const { timesheet_id, folha_criada, linhas } = dados;
+  if (typeof timesheet_id !== "string" || !FORMATO_DE_UUID.test(timesheet_id)) falha("folha");
+  if (typeof folha_criada !== "boolean") falha("folha_criada");
+  if (!Array.isArray(linhas)) return falha("linhas");
+  const lidas = linhas.map((l) => {
+    if (!ehObjeto(l)) return falha("linha");
+    const { employee_id, entry_id, versao, resultado } = l;
+    if (typeof employee_id !== "string" || !FORMATO_DE_UUID.test(employee_id)) falha("colaborador");
+    if (typeof entry_id !== "string" || !FORMATO_DE_UUID.test(entry_id)) falha("apontamento");
+    if (!ehVersaoGravada(versao)) falha("versão");
+    if (typeof resultado !== "string" || !RESULTADOS.includes(resultado)) falha("resultado");
+    return { employee_id, entry_id, versao, resultado } as LinhaGravadaAdmin;
+  });
+  const devolvidos = lidas.map((l) => l.employee_id).sort();
+  if (JSON.stringify(devolvidos) !== JSON.stringify([...enviados].sort())) {
+    falha("as linhas devolvidas não são as enviadas");
+  }
+  return {
+    timesheet_id: timesheet_id as string,
+    folha_criada: folha_criada as boolean,
+    linhas: lidas,
+  };
+}
+
+export type FalhaDoSalvamento =
+  "conflito" | "banco_sem_v2" | "rede" | "contrato" | "versao" | "outra";
+
+/**
+ * Classifica a falha pelo SQLSTATE e pelo tipo, nunca pelo texto do banco: 40001 é conflito de
+ * versão; PGRST202 é a função ausente (banco sem a 054); erro sem código com o texto do `fetch` é
+ * falha de rede — e, numa gravação, resultado INCERTO (o banco pode ter gravado).
+ */
+export function classificarFalhaDoSalvamento(erro: unknown): FalhaDoSalvamento {
+  if (erro instanceof ErroDeContratoDoSalvamento) return "contrato";
+  if (erro instanceof ErroDeVersaoDesconhecida) return "versao";
+  const e = ehObjeto(erro) ? erro : {};
+  const codigo = typeof e["code"] === "string" ? e["code"] : "";
+  const mensagem = typeof e["message"] === "string" ? e["message"] : "";
+  if (codigo === "40001") return "conflito";
+  if (codigo === "PGRST202") return "banco_sem_v2";
+  if (
+    codigo === "" &&
+    /^(TypeError: )?(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed|fetch failed)$/i.test(
+      mensagem.trim(),
+    )
+  ) {
+    return "rede";
+  }
+  return "outra";
+}
+
+/** O texto do sucesso, dizendo quando a linha já estava gravada (retentativa idempotente). */
+export function mensagemDoResultado(resultado: ResultadoDoSalvamentoAdmin): string {
+  const iguais = resultado.linhas.filter((l) => l.resultado === "sem_alteracao").length;
+  if (iguais === 0) return "Apontamento salvo.";
+  if (iguais === resultado.linhas.length) {
+    return iguais === 1
+      ? "Apontamento salvo. A linha já estava gravada assim: nada mudou."
+      : `Apontamento salvo. As ${iguais} linhas já estavam gravadas assim: nada mudou.`;
+  }
+  return `Apontamento salvo. ${iguais} linha(s) já estava(m) gravada(s) assim.`;
+}
+
+/**
+ * As bases depois de um salvamento: a linha que segue suja (editada enquanto salvava) passa a ter
+ * como base a versão que ESTE salvamento gravou — a edição nova está sobre o que a própria pessoa
+ * enviou. A linha limpa sai das bases (vale a versão do banco).
+ */
+export function basesAposSalvar(
+  bases: ReadonlyMap<string, number | null>,
+  dirty: ReadonlySet<string>,
+  resultado: ResultadoDoSalvamentoAdmin,
+): Map<string, number | null> {
+  const versoes = new Map(resultado.linhas.map((l) => [l.employee_id, l.versao]));
+  const novo = new Map<string, number | null>();
+  for (const id of dirty) {
+    if (versoes.has(id)) novo.set(id, versoes.get(id)!);
+    else if (bases.has(id)) novo.set(id, bases.get(id)!);
+  }
+  return novo;
+}
+
+/**
+ * Reconciliação com o banco: a linha suja que ficou IGUAL ao gravado deixa de ser pendência (a
+ * gravação da resposta perdida, ou a mesma alteração feita por outra sessão). Nada é descartado:
+ * o que está na tela é o que está no banco.
+ */
+export function dirtyReconciliado(
+  dirty: ReadonlySet<string>,
+  linhas: readonly LinhaDoApontamento[],
+  gravados: readonly ApontamentoGravado[],
+): Set<string> {
+  const porColaborador = new Map(gravados.map((g) => [g.employee_id, g]));
+  const restante = new Set(dirty);
+  for (const linha of linhas) {
+    const gravado = porColaborador.get(linha.employeeId);
+    if (restante.has(linha.employeeId) && gravado && !linhaFoiAlterada(linha, gravado)) {
+      restante.delete(linha.employeeId);
+    }
+  }
+  return restante;
 }
 
 /**

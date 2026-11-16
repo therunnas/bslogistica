@@ -108,8 +108,13 @@ export interface TimesheetEntry {
   cost_amount: number;
   invoice_id: string | null;
   notes: string | null;
-  /** Mantido pelo trigger `trg_timesheet_entries_updated`; é a versão da linha (D-CP05-02). */
+  /** Mantido pelo trigger `trg_timesheet_entries_updated`. Exibição; não é controle de concorrência. */
   updated_at?: string;
+  /**
+   * Versão da linha mantida pelo banco (migration 054, gatilho `trg_timesheet_entries_zz_versao`):
+   * é o controle de concorrência das RPCs v2 (`versao_esperada`). Ausente num banco sem a 054.
+   */
+  readonly versao?: number;
   /** Condições financeiras gravadas pelo banco (migrations 022 e 024); nulas em apontamento legado. */
   terms_origin?: string | null;
   shift_hours_snapshot?: number | null;

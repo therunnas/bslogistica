@@ -1,14 +1,15 @@
 /**
  * Escrita da superfície operacional AAL1.
  *
- * Um caminho só: `salvar_apontamento_operacional`. Não há mutation de exclusão
- * — a superfície não tem DELETE —, nem de fechar ou reabrir folha, que é ato
- * administrativo.
+ * Um caminho só: `salvar_apontamento_operacional_v2` (migration 054), com a versão de cada linha.
+ * Não há mutation de exclusão — a superfície não tem DELETE —, nem de fechar ou reabrir folha,
+ * que é ato administrativo, nem de confirmar virada da meia-noite, que é ato do administrador.
  *
  * Depois do sucesso, invalida **apenas** os apontamentos daquele par
  * operação/turno e data. Operações, turnos e equipe não mudam por conta de uma
  * gravação de apontamento, e derrubar o cache inteiro custaria quatro
- * requisições para nada.
+ * requisições para nada. O resultado (versão e resultado por linha) volta para
+ * a tela reconciliar o rascunho.
  */
 
 "use client";
@@ -26,10 +27,9 @@ export function useSalvarApontamentoOperacional() {
   return useMutation({
     mutationFn: (escrita: EscritaDoApontamento) =>
       salvarApontamentoOperacional(clienteOperacional(), escrita),
-    onSuccess: (_folhaId, { operationId, shiftId, workDate }) => {
+    onSettled: (_resultado, _erro, { operationId, shiftId, workDate }) =>
       queryClient.invalidateQueries({
         queryKey: chavesOperacionais.apontamentos(operationId, shiftId, workDate),
-      });
-    },
+      }),
   });
 }

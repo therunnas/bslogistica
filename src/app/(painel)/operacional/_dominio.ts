@@ -14,6 +14,7 @@ import type {
   ApontamentoDoOperador,
   EntradaDaLinha,
   MembroDaEquipeDoOperador,
+  ResultadoDaGravacaoOperacional,
 } from "@/lib/operacional/tipos";
 
 /**
@@ -122,6 +123,12 @@ export interface LinhaDoRascunho {
   notes: string;
   /** Linha já vinculada a uma fatura. Booleano derivado, nunca o id. */
   faturado: boolean;
+  /**
+   * A versão da linha no banco quando ela entrou no rascunho (0 = ainda não existe). Numa linha
+   * editada é a versão do INÍCIO da edição: é o que vai como `versao_esperada`, e é o que faz o
+   * banco recusar (40001) a gravação feita sobre uma leitura antiga.
+   */
+  versao: number;
 }
 
 /**
@@ -208,8 +215,135 @@ export function montarRascunho(
         break_minutes: normalizarIntervalo(gravado ? gravado.break_minutes : intervaloPadrao),
         notes: gravado?.notes ?? "",
         faturado: gravado?.faturado ?? false,
+        versao: gravado?.versao ?? 0,
       };
     });
+}
+
+// ---------------------------------------------------------------------------
+// GATE-FIN-06 — o rascunho sobre a leitura v2 (versão da linha)
+//
+// O rascunho guarda só as linhas EDITADAS; as demais acompanham a leitura do banco. Cada linha
+// editada guarda a versão de quando a edição começou. Se o banco já está em outra versão, a linha
+// está em conflito: nada a regrava sem a pessoa decidir (manter a sua ou usar o gravado).
+
+export type Editadas = ReadonlyMap<string, LinhaDoRascunho>;
+
+/** Aplica uma edição: na 1ª, a linha entra no rascunho com a versão que a tela mostrava. */
+export function aplicarEdicao(
+  editadas: Editadas,
+  base: readonly LinhaDoRascunho[],
+  employeeId: string,
+  mudanca: Partial<Omit<LinhaDoRascunho, "versao">>,
+): Map<string, LinhaDoRascunho> {
+  const atual = editadas.get(employeeId) ?? base.find((l) => l.employee_id === employeeId);
+  const novo = new Map(editadas);
+  if (atual) novo.set(employeeId, { ...atual, ...mudanca, versao: atual.versao });
+  return novo;
+}
+
+/** O que a tela mostra: a linha editada no lugar da lida; as demais, como o banco as tem. */
+export function linhasDaTela(
+  base: readonly LinhaDoRascunho[],
+  editadas: Editadas,
+): LinhaDoRascunho[] {
+  return base.map((l) => editadas.get(l.employee_id) ?? l);
+}
+
+const versaoNoBanco = (gravado: ApontamentoDoOperador | undefined): number => gravado?.versao ?? 0;
+
+const mesmoConteudo = (linha: LinhaDoRascunho, gravado: ApontamentoDoOperador): boolean =>
+  gravado.status === linha.status &&
+  soHoraEMinuto(gravado.check_in) === soHoraEMinuto(linha.check_in) &&
+  soHoraEMinuto(gravado.check_out) === soHoraEMinuto(linha.check_out) &&
+  normalizarIntervalo(gravado.break_minutes) === normalizarIntervalo(linha.break_minutes) &&
+  (gravado.notes ?? "") === linha.notes;
+
+/** Linhas editadas cuja versão de partida não é mais a do banco (outra sessão gravou antes). */
+export function conflitosDoRascunho(
+  editadas: Editadas,
+  apontamentos: readonly ApontamentoDoOperador[] | undefined,
+): string[] {
+  const gravados = apontamentosPorColaborador(apontamentos);
+  return [...editadas.values()]
+    .filter((l) => {
+      const g = gravados.get(l.employee_id);
+      if (g && mesmoConteudo(l, g)) return false;
+      return l.versao !== versaoNoBanco(g);
+    })
+    .map((l) => l.employee_id);
+}
+
+/**
+ * Reconciliação com a leitura: a linha editada que ficou igual ao banco (a resposta perdida, ou a
+ * mesma alteração feita por outra sessão) sai do rascunho — não há o que gravar nela.
+ */
+export function editadasReconciliadas(
+  editadas: Editadas,
+  apontamentos: readonly ApontamentoDoOperador[] | undefined,
+): Map<string, LinhaDoRascunho> {
+  const gravados = apontamentosPorColaborador(apontamentos);
+  return new Map(
+    [...editadas].filter(([id, l]) => {
+      const g = gravados.get(id);
+      return !(g && mesmoConteudo(l, g));
+    }),
+  );
+}
+
+/**
+ * Depois de gravar: a linha que continua igual ao que foi enviado sai do rascunho; a que foi
+ * editada enquanto gravava fica, com a versão que ESTA gravação produziu (a edição nova está sobre
+ * o que a própria pessoa enviou).
+ */
+export function editadasAposSalvar(
+  editadas: Editadas,
+  enviadas: readonly EntradaDaLinha[],
+  resultado: ResultadoDaGravacaoOperacional,
+): Map<string, LinhaDoRascunho> {
+  const versoes = new Map(resultado.linhas.map((l) => [l.employee_id, l.versao]));
+  const porColaborador = new Map(enviadas.map((e) => [e.employee_id, e]));
+  const novo = new Map<string, LinhaDoRascunho>();
+  for (const [id, linha] of editadas) {
+    const enviada = porColaborador.get(id);
+    const versao = versoes.get(id);
+    if (!enviada || versao === undefined) {
+      novo.set(id, linha);
+      continue;
+    }
+    const igual =
+      enviada.status === linha.status &&
+      soHoraEMinuto(enviada.check_in) === soHoraEMinuto(linha.check_in) &&
+      soHoraEMinuto(enviada.check_out) === soHoraEMinuto(linha.check_out) &&
+      normalizarIntervalo(enviada.break_minutes) === normalizarIntervalo(linha.break_minutes) &&
+      (enviada.notes ?? "") === linha.notes;
+    if (!igual) novo.set(id, { ...linha, versao });
+  }
+  return novo;
+}
+
+/** Decisão explícita: manter a alteração da pessoa sobre a versão ATUAL do banco. */
+export function manterMinhaAlteracao(
+  editadas: Editadas,
+  employeeId: string,
+  apontamentos: readonly ApontamentoDoOperador[] | undefined,
+): Map<string, LinhaDoRascunho> {
+  const linha = editadas.get(employeeId);
+  const novo = new Map(editadas);
+  if (linha) {
+    novo.set(employeeId, {
+      ...linha,
+      versao: versaoNoBanco(apontamentosPorColaborador(apontamentos).get(employeeId)),
+    });
+  }
+  return novo;
+}
+
+/** Decisão explícita: descartar a alteração da pessoa e ficar com o que está gravado. */
+export function usarOGravado(editadas: Editadas, employeeId: string): Map<string, LinhaDoRascunho> {
+  const novo = new Map(editadas);
+  novo.delete(employeeId);
+  return novo;
 }
 
 /** `"08:00"` e `"08:00:00"` são o mesmo horário para quem aponta. */
@@ -253,6 +387,7 @@ export function linhasAlteradas(
       check_out: vazioComoNulo(linha.check_out),
       break_minutes: normalizarIntervalo(linha.break_minutes),
       notes: vazioComoNulo(linha.notes),
+      versao_esperada: linha.versao,
     }));
 }
 
@@ -276,6 +411,19 @@ export function linhasAlteradas(
  * que a tela sabe com certeza — folha fechada, linha faturada — ela mostra
  * antes, pela leitura, e não por dedução de erro.
  */
+export const MENSAGEM_CONFLITO_DO_OPERADOR =
+  "Este apontamento foi alterado por outra sessão depois que você o abriu. Nada foi gravado. O que você digitou foi mantido: em cada linha marcada, escolha manter a sua alteração ou usar o que está gravado.";
+
+export const MENSAGEM_BANCO_SEM_V2_DO_OPERADOR =
+  "O banco deste ambiente ainda não tem a versão exigida por esta tela (migration 054). Nada foi gravado. Avise o administrador.";
+
+/**
+ * Virada da meia-noite fora de turno que vira o dia: só o administrador a confirma (054). O
+ * operador não tem como registrar a confirmação, e a tela não finge que tem.
+ */
+export const MENSAGEM_VIRADA_DO_OPERADOR =
+  "Saída antes da entrada num turno que não atravessa a meia-noite. Só o administrador pode confirmar uma jornada assim: corrija o horário ou peça ao administrador que registre e confirme este lançamento. O que você digitou foi mantido.";
+
 export function mensagemDeErro(erro: unknown): string {
   const codigo =
     typeof erro === "object" && erro !== null && "code" in erro
@@ -283,6 +431,12 @@ export function mensagemDeErro(erro: unknown): string {
       : "";
 
   switch (codigo) {
+    // GATE-FIN-06 (054): versão obsoleta com conteúdo diferente. Nada foi gravado.
+    case "40001":
+      return MENSAGEM_CONFLITO_DO_OPERADOR;
+    // A RPC v2 não existe neste banco: o app novo exige a migration 054. Sem caminho antigo.
+    case "PGRST202":
+      return MENSAGEM_BANCO_SEM_V2_DO_OPERADOR;
     case "42501":
       return "Este apontamento não pode ser alterado, ou você não tem acesso a esta operação. Atualize os dados e tente novamente.";
     case "23514":
@@ -299,9 +453,19 @@ export function mensagemDeErro(erro: unknown): string {
       return "Este apontamento não pode ser alterado no estado atual. Atualize os dados e tente novamente.";
     case "23P01":
       return "Há um conflito no cadastro de períodos. Avise o administrador.";
-    default:
-      return erro instanceof Error && erro.message
-        ? erro.message
-        : "Não foi possível salvar o apontamento. Tente novamente.";
+    default: {
+      const mensagem = erro instanceof Error ? erro.message : "";
+      // Falha de rede numa gravação: o banco pode ter gravado. Salvar de novo é seguro — a v2 não
+      // duplica e devolve `sem_alteracao` se o conteúdo já estiver lá.
+      if (
+        codigo === "" &&
+        /^(TypeError: )?(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed|fetch failed)$/i.test(
+          mensagem.trim(),
+        )
+      ) {
+        return "Não foi possível confirmar se o apontamento foi gravado (falha de conexão). O que você digitou foi mantido e os dados foram relidos: salvar de novo não duplica nem sobrescreve o que outra sessão gravou.";
+      }
+      return mensagem || "Não foi possível salvar o apontamento. Tente novamente.";
+    }
   }
 }

@@ -156,16 +156,19 @@ test("operacional: a tela usa só as RPCs e nenhuma resposta traz valor financei
   expect(respostas.length).toBeGreaterThan(0);
   // Nenhuma leitura direta de tabela pelo navegador do operador: só /rest/v1/rpc/<função>.
   for (const r of respostas) expect(r.caminho).toMatch(/^\/rest\/v1\/rpc\/[a-z0-9_]+$/);
-  // As cinco RPCs do contrato do operador foram as usadas para a tela de apontamento.
+  // As cinco RPCs do contrato do operador foram as usadas para a tela de apontamento. GATE-FIN-06:
+  // listagem e gravação são as v2 da 054 (com a versão); as v1 não são chamadas pela tela nova.
   const usadas = new Set(respostas.map((r) => r.caminho.replace("/rest/v1/rpc/", "")));
   for (const rpc of [
     "listar_operacoes_do_operador",
     "listar_turnos_do_operador",
     "listar_equipe_do_operador",
-    "listar_apontamentos_do_operador",
-    "salvar_apontamento_operacional",
+    "listar_apontamentos_do_operador_v2",
+    "salvar_apontamento_operacional_v2",
   ])
     expect(usadas.has(rpc), `RPC ${rpc}`).toBe(true);
+  for (const antiga of ["listar_apontamentos_do_operador", "salvar_apontamento_operacional"])
+    expect(usadas.has(antiga), `RPC antiga ${antiga}`).toBe(false);
   await test.info().attach("rpcs-do-operador.txt", {
     body: [...usadas].sort().join("\n"),
     contentType: "text/plain",

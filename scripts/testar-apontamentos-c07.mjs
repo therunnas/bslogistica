@@ -289,9 +289,11 @@ console.log("\nE. Forma da tela\n");
   )
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
+  // GATE-FIN-06: a RPC atômica agora é a v2 (054), chamada pelo módulo `apontamentos-admin-v2`,
+  // que monta a carga (com a versão) por `montarCargaDaRpcV2`.
   verificar(
-    "E1. o salvamento chama a RPC atômica com a carga montada pelo módulo",
-    /\.rpc\("salvar_apontamento_admin"/.test(fonte) && /montarCargaDaRpc\(/.test(fonte),
+    "E1. o salvamento chama a RPC atômica (v2) pelo módulo, com a versão de cada linha",
+    /salvarDiaAdminV2\(/.test(fonte) && /versaoEsperada,/.test(fonte),
     true,
   );
   verificar(
@@ -320,9 +322,12 @@ console.log("\nE. Forma da tela\n");
     /onError[\s\S]{0,200}invalidateQueries\(\{ queryKey: \["timesheets"\]/.test(fonte),
     true,
   );
+  // GATE-FIN-06: sem a v2 no banco (PGRST202) não há mais caminho anterior: falha controlada.
   verificar(
-    "E7. banco sem a 031: caminho anterior só quando a função não existe (PGRST202)",
-    /error\.code === CODIGO_DA_RPC_AUSENTE/.test(fonte),
+    "E7. banco sem a v2 (PGRST202): falha controlada e explicada, sem caminho anterior",
+    /error\.falha === "banco_sem_v2"/.test(fonte) &&
+      /MENSAGEM_BANCO_SEM_V2/.test(fonte) &&
+      !/salvarPeloCaminhoAnterior/.test(fonte),
     true,
   );
 }

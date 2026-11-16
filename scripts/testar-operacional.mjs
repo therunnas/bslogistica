@@ -329,15 +329,22 @@ for (const [rotulo, invalida] of [
   );
 }
 
-console.log("\nD. A escrita usa salvar_apontamento_operacional\n");
+console.log("\nD. A escrita usa salvar_apontamento_operacional_v2 (054)\n");
+
+// GATE-FIN-06: a v2 devolve a folha e, por colaborador, a versão gravada e o resultado. A v1
+// devolvia só o id da folha; agora isso é quebra de contrato (D5.texto-da-v1 abaixo).
+const RESPOSTA_V2 = {
+  timesheet_id: FOLHA,
+  linhas: [{ employee_id: COLABORADOR, versao: 1, resultado: "inserido" }],
+};
 
 {
-  const cliente = clienteFalso({ data: FOLHA, error: null });
+  const cliente = clienteFalso({ data: RESPOSTA_V2, error: null });
   const folha = await salvarApontamentoOperacional(cliente, {
     operationId: OPERACAO,
     shiftId: TURNO,
     workDate: DATA,
-    linhas: [{ employee_id: COLABORADOR, status: "present" }],
+    linhas: [{ employee_id: COLABORADOR, status: "present", versao_esperada: 0 }],
   });
   verificar(
     "D1. a escrita chama a RPC do contrato",
@@ -349,7 +356,12 @@ console.log("\nD. A escrita usa salvar_apontamento_operacional\n");
     Object.keys(cliente.chamadas[0].parametros).join(","),
     "p_operation_id,p_shift_id,p_work_date,p_linhas",
   );
-  verificar("D3. devolve o id da folha que a RPC retornou", folha, FOLHA);
+  verificar("D3. devolve a folha que a RPC retornou", folha.timesheet_id, FOLHA);
+  verificar(
+    "D3b. e a versão e o resultado de cada linha",
+    `${folha.linhas[0].versao}:${folha.linhas[0].resultado}`,
+    "1:inserido",
+  );
   verificar("D4. nenhuma segunda chamada acontece", cliente.chamadas.length, 1);
 }
 
@@ -363,6 +375,22 @@ for (const [rotulo, invalido] of [
   ["texto vazio", ""],
   ["texto que não é uuid", "folha-1"],
   ["número", 7],
+  ["texto-da-v1 (só o id da folha)", FOLHA],
+  ["sem a linha enviada", { timesheet_id: FOLHA, linhas: [] }],
+  [
+    "resultado desconhecido",
+    {
+      timesheet_id: FOLHA,
+      linhas: [{ employee_id: COLABORADOR, versao: 1, resultado: "gravado" }],
+    },
+  ],
+  [
+    "versão zero",
+    {
+      timesheet_id: FOLHA,
+      linhas: [{ employee_id: COLABORADOR, versao: 0, resultado: "inserido" }],
+    },
+  ],
 ]) {
   const cliente = clienteFalso({ data: invalido, error: null });
   const erro = await objetoDoErro(() =>
@@ -370,26 +398,29 @@ for (const [rotulo, invalido] of [
       operationId: OPERACAO,
       shiftId: TURNO,
       workDate: DATA,
-      linhas: [{ employee_id: COLABORADOR, status: "present" }],
+      linhas: [{ employee_id: COLABORADOR, status: "present", versao_esperada: 0 }],
     }),
   );
   verificar(
     `D5.${rotulo} — retorno ${rotulo} não conta como gravação bem-sucedida`,
     erro?.message,
-    `A RPC ${RPC_OPERACIONAL.salvar} devia devolver o identificador da folha.`,
+    `A RPC ${RPC_OPERACIONAL.salvar} devolveu uma resposta fora do contrato.`,
   );
   verificar(`D6.${rotulo} — e é erro de contrato`, erro instanceof ErroDeContratoOperacional, true);
 }
 
 {
-  const cliente = clienteFalso({ data: FOLHA.toUpperCase(), error: null });
+  const cliente = clienteFalso({
+    data: { ...RESPOSTA_V2, timesheet_id: FOLHA.toUpperCase() },
+    error: null,
+  });
   const folha = await salvarApontamentoOperacional(cliente, {
     operationId: OPERACAO,
     shiftId: TURNO,
     workDate: DATA,
-    linhas: [{ employee_id: COLABORADOR, status: "present" }],
+    linhas: [{ employee_id: COLABORADOR, status: "present", versao_esperada: 0 }],
   });
-  verificar("D7. uuid em maiúsculas continua válido", folha, FOLHA.toUpperCase());
+  verificar("D7. uuid em maiúsculas continua válido", folha.timesheet_id, FOLHA.toUpperCase());
 }
 
 console.log("\nE. Parâmetro obrigatório impede chamada incompleta\n");
@@ -457,7 +488,7 @@ verificar(
       operationId: OPERACAO,
       shiftId: "",
       workDate: DATA,
-      linhas: [{ employee_id: COLABORADOR, status: "present" }],
+      linhas: [{ employee_id: COLABORADOR, status: "present", versao_esperada: 0 }],
     }),
   );
   verificar(
@@ -468,22 +499,28 @@ verificar(
   verificar("E16. e nada foi gravado", cliente.chamadas.length, 0);
 }
 
-console.log("\nF. O payload carrega os seis campos, e só eles\n");
+console.log("\nF. O payload carrega os sete campos da v2 (013 + versao_esperada), e só eles\n");
 
-verificar("F1. o contrato tem seis campos", CAMPOS_DA_LINHA.length, 6);
+verificar("F1. o contrato tem sete campos", CAMPOS_DA_LINHA.length, 7);
 verificar(
-  "F2. e são exatamente os da migration 013",
+  "F2. e são exatamente os da migration 013 mais a versão da 054",
   [...CAMPOS_DA_LINHA].join(","),
-  "employee_id,status,check_in,check_out,break_minutes,notes",
+  "employee_id,status,check_in,check_out,break_minutes,notes,versao_esperada",
 );
 
 {
   const [linha] = montarLinhasDoApontamento([
-    { employee_id: COLABORADOR, status: "present", check_in: "08:00", notes: "chegou cedo" },
+    {
+      employee_id: COLABORADOR,
+      status: "present",
+      check_in: "08:00",
+      notes: "chegou cedo",
+      versao_esperada: 0,
+    },
   ]);
-  verificar("F3. a linha normalizada tem seis chaves", Object.keys(linha).length, 6);
+  verificar("F3. a linha normalizada tem sete chaves", Object.keys(linha).length, 7);
   verificar(
-    "F4. e são as seis permitidas",
+    "F4. e são as sete permitidas",
     Object.keys(linha).sort().join(","),
     [...CAMPOS_DA_LINHA].sort().join(","),
   );
@@ -526,15 +563,15 @@ for (const proibido of [
 }
 
 {
-  const cliente = clienteFalso({ data: FOLHA, error: null });
+  const cliente = clienteFalso({ data: RESPOSTA_V2, error: null });
   await salvarApontamentoOperacional(cliente, {
     operationId: OPERACAO,
     shiftId: TURNO,
     workDate: DATA,
-    linhas: [{ employee_id: COLABORADOR, status: "absent" }],
+    linhas: [{ employee_id: COLABORADOR, status: "absent", versao_esperada: 0 }],
   });
   const enviado = cliente.chamadas[0].parametros.p_linhas[0];
-  verificar("F10. o que sobe ao banco tem seis chaves", Object.keys(enviado).length, 6);
+  verificar("F10. o que sobe ao banco tem sete chaves", Object.keys(enviado).length, 7);
   verificar(
     "F11. e nenhuma fora do contrato",
     Object.keys(enviado).every((c) => CAMPOS_DA_LINHA.includes(c)),
@@ -580,7 +617,7 @@ console.log("\nG. Erro da RPC é erro, nunca sucesso silencioso\n");
       operationId: OPERACAO,
       shiftId: TURNO,
       workDate: DATA,
-      linhas: [{ employee_id: COLABORADOR, status: "present" }],
+      linhas: [{ employee_id: COLABORADOR, status: "present", versao_esperada: 0 }],
     }),
   );
   verificar(
@@ -633,7 +670,7 @@ console.log("\nG. Erro da RPC é erro, nunca sucesso silencioso\n");
       operationId: OPERACAO,
       shiftId: TURNO,
       workDate: DATA,
-      linhas: [{ employee_id: COLABORADOR, status: "present" }],
+      linhas: [{ employee_id: COLABORADOR, status: "present", versao_esperada: 0 }],
     }),
   );
   verificar("G8. 23505 chega à tela como código", erro?.code, "23505");
