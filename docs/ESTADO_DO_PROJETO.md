@@ -5,6 +5,61 @@ atual desta linha é o [HANDOFF](HANDOFF.md), e a fila fica em
 [PROGRESS.md](../PROGRESS.md). Os históricos abaixo conservam as datas e limites
 originais; não são nova verificação de banco/Production.
 
+## HML NA 054 — GATE-FIN-07C E 07D (16/11/2026, sessões 27 e 28)
+
+**Gate A (sessão 27, PASS), só leitura no HML `qbnfcmrxmssnwkhaitgd`.** Transporte: endpoint
+`/database/query/read-only` da Management API (papel `supabase_read_only_user`, transação somente
+leitura), uma instrução por chamada. Banco `ACTIVE_HEALTHY`, PostgreSQL 17.11; head 051
+(`20261118120000`), 56 migrations, md5 das versões `2612ecd5ea3f5cf0c0000aa0d7ae8055`; 31 tabelas,
+todas com RLS; 87 policies; `bslog_rpc_operacional` (NOLOGIN, NOINHERIT, BYPASSRLS) dono das 5
+RPCs; `postgres` membro dele com SET, dono do banco e com CREATE em `public` (o operador, sem);
+55 grants por coluna do operador, 0 de tabela, nenhuma coluna financeira. Preflights: 052 (0
+registros de contêiner), 053 (5 apontamentos, 0 violações), 054 (0 viradas, 0 jornada zero, 5 entre
+8 h e 10 h). **Divergência:** o HML não estava limpo como o registro de 11/11 dizia: 2 clientes, 2
+contratos, 5 colaboradores, 4 operações, 5 apontamentos, 1 fatura, 17 contas (137 linhas em
+`public`, 411 em `auth`, nenhum arquivo no Storage); o responsável confirmou que são dados de
+desenvolvimento e homologação e mandou preservá-los. ACL do HML igual ou mais restrita que a de
+um banco montado só pelas migrations (padrão já visto na sessão 05).
+
+Backup lógico novo, cifrado (AES-256-CBC, PBKDF2), entregue ao responsável fora do Git (arquivo
+e senha em entregas separadas): JSON de todas as tabelas de `public`, de
+`supabase_migrations.schema_migrations` e de `auth.users`, `auth.identities` e `auth.mfa_factors`
+(35 tabelas, 229 linhas), com contagem e md5 por tabela calculados no próprio HML e fotografia do
+catálogo. **Cobertura parcial, de propósito:** sem sessões e tokens do Auth, sem configuração de
+Auth, chaves, `vault`, objetos do Storage (0), event triggers de plataforma e Vercel; a estrutura
+vem das migrations versionadas. **Restauração comprovada** em Supabase local descartável (sem as
+052–054): contagem e md5 iguais nas 35 tabelas, 83 FKs sem órfãs, policies, constraints, índices,
+ACL de colunas e memberships iguais; preflights sobre a cópia iguais aos do HML. Diferenças só de
+plataforma (ACL de tabelas e funções mais restrita no HML, estado dos gatilhos do motor, versões de
+Auth/Storage).
+
+**Gate B (sessão 28, PASS).** Antes: os 35 checksums e o catálogo idênticos ao backup (backup
+vigente); dono do banco, SET ROLE, ausência dos objetos 052–054 e flags conferidos. Aplicadas
+**052, 053 e 054, em ordem, uma vez cada**, só por
+[`aplicar-migration-api.py`](runbooks/aplicar-migration-api.py) (conferência e depois
+`--executar`): **PASS nas três** (56 → 57 → 58 → 59, nenhuma tabela com menos linhas, RLS em todas,
+motor e tarifas iguais). Depois, por leitura:
+
+- 052: `registrar_servico_container` com EXECUTE só da dona `postgres` (DEFINER);
+  `corrigir_`/`cancelar_servico_container` seguem com `authenticated`;
+- 053: `recusar_intervalo_maior_que_jornada()` DEFINER da `postgres`, `search_path` fixo, sem
+  EXECUTE externo; gatilho `trg_timesheet_entries_bloqueia_intervalo_maior` ativo; preflight 0;
+- 054: `timesheet_entries.versao bigint not null default 1`, os 5 apontamentos em versão 1; 9
+  funções novas — v2 do operador da `bslog_rpc_operacional`, demais da `postgres`, só as 5
+  públicas com EXECUTE de `authenticated`; v1 com o mesmo dono e o mesmo md5; operador com 56
+  grants por coluna (+`SELECT(versao)`), 0 de tabela, nada financeiro, sem CREATE em `public`;
+  trilha `apontamento_confirmacoes_virada` com RLS, 0 linhas, leitura só do admin;
+  `trg_timesheet_entries_zz_versao` último BEFORE;
+- final: head `20261121120000`, **59 migrations distintas**, md5 das versões
+  `6474986cf48d19713e018c332a761807` (igual ao do repositório); 32 tabelas com RLS;
+- dados: 34 de 35 tabelas com md5 idêntico do início ao fim (a 35ª é `schema_migrations`);
+  financeiro igual (5 apontamentos, R$ 1.250,00 cobrados e R$ 770,00 de custo; 3 faturados, R$
+  750,00; 1 fatura fechada R$ 750,00/470,00); flags iguais; Auth (`users`, `identities`,
+  `mfa_factors`) idêntico.
+
+Production **não foi acessado** e segue na 051 (último registro). Nenhum merge, deploy ou
+publicação. O app do #138 (contratos v2) exige a 054: só pode ser homologado no Preview → HML.
+
 ## FUNC-03 — composição técnica isolada (09/11/2026)
 
 Main 75c47cd9a30e4888b197ca6ae27aa236c71ec589 preservada. #117 documental recebeu

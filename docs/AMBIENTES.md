@@ -4,7 +4,7 @@ Inventário factual, sem credenciais, dos ambientes do painel. Cada afirmação 
 o limite da evidência. Mudanças de configuração exigem autorização própria e não
 são executadas por este documento.
 
-Atualização de 11/11/2026 (tarde): HML e Production receberam a 051 com o interruptor de domingo/feriado em dobro ligado; site de Production publicado com `ecd67f2`. Atualização de 11/11/2026: Production recebeu 035–050 e o site de `d33e8b2`; vínculos Preview → HML e Production → Production comprovados pela API da Vercel (ver [HANDOFF](HANDOFF.md)). Atualização de 09/11/2026: HML recebeu 046–050. O restante desta página é a verificação de **05/11/2026**, após a aplicação autorizada de 035–045 no HML
+Atualização de 16/11/2026: HML recebeu 052, 053 e 054 (GATE-FIN-07D, sessão 28), head `20261121120000`, 59 migrations; Production segue na 051. Atualização de 11/11/2026 (tarde): HML e Production receberam a 051 com o interruptor de domingo/feriado em dobro ligado; site de Production publicado com `ecd67f2`. Atualização de 11/11/2026: Production recebeu 035–050 e o site de `d33e8b2`; vínculos Preview → HML e Production → Production comprovados pela API da Vercel (ver [HANDOFF](HANDOFF.md)). Atualização de 09/11/2026: HML recebeu 046–050. O restante desta página é a verificação de **05/11/2026**, após a aplicação autorizada de 035–045 no HML
 (sessão 05), por consultas somente leitura ao GitHub, à API da Vercel (nomes,
 escopos e host do Supabase, sem chaves) e à Supabase CLI. A única escrita remota
 foi o `db push` no HML.
@@ -27,14 +27,14 @@ vínculo explícito com o HML autorizado estiver comprovado.
 | ---------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Local      | Next.js local                                                                                       | Instância descartável por tarefa                       | Conforme reset local                 | Permitido apenas após comprovar isolamento                                                                                                                  |
 | CI         | GitHub Actions, jobs `validar` e `sql-local`                                                        | Supabase local efêmero no job SQL                      | Até a migration versionada no commit | Sem secrets nem vínculo remoto                                                                                                                              |
-| Preview    | Deployment automático de branch/PR; URL gerada protegida por Vercel SSO                             | HML `qbnfcmrxmssnwkhaitgd` pela configuração vigente   | 051 (o do HML)                       | Vínculo comprovado em 11/11/2026 (`NEXT_PUBLIC_SUPABASE_URL` de Preview → `qbnfcm…`); homologação das telas feita em localhost → HML (9/9 PASS, 09/11/2026) |
-| HML        | Não há domínio Vercel distinto comprovado; pode servir de backend de Preview após vínculo explícito | `bs-logistica-homologacao`, ref `qbnfcmrxmssnwkhaitgd` | 051 — `20261118120000`               | 046–050 em 09/11/2026; 051 em 11/11/2026 com `dias_especiais_em_dobro` ligado (ver HANDOFF)                                                                  |
+| Preview    | Deployment automático de branch/PR; URL gerada protegida por Vercel SSO                             | HML `qbnfcmrxmssnwkhaitgd` pela configuração vigente   | 054 (o do HML)                       | Vínculo comprovado em 11/11/2026 (`NEXT_PUBLIC_SUPABASE_URL` de Preview → `qbnfcm…`); reconferência do Preview do #138 no GATE-FIN-07E (ver HANDOFF); homologação das telas feita em localhost → HML (9/9 PASS, 09/11/2026) |
+| HML        | Não há domínio Vercel distinto comprovado; pode servir de backend de Preview após vínculo explícito | `bs-logistica-homologacao`, ref `qbnfcmrxmssnwkhaitgd` | 054 — `20261121120000`               | 046–050 em 09/11/2026; 051 em 11/11/2026 com `dias_especiais_em_dobro` ligado; 052–054 em 16/11/2026 (GATE-FIN-07D, 59 migrations; ver ESTADO_DO_PROJETO) |
 | Production | Vercel `bs-logistica-sistema`, domínio `admin.bslogisticas.com.br`, deploy de `main`                | `bs-logistica-sistema`, ref `ehkduqokntemtmqzdrbd`     | 051 — `20261118120000`               | 035–051 em 11/11/2026, `dias_especiais_em_dobro` ligado; site `ecd67f2` (`dpl_2zSqLHxW42m693VWr9m4QeFPQWqb`)                                                           |
 
-O repositório contém migrations até a **051**
-(`20261118120000_051_domingo_feriado_em_dobro.sql`). HML está na 051 desde 11/11/2026, com o
-interruptor de domingo/feriado em dobro ligado. Production também, desde 11/11/2026, com o
-interruptor ligado.
+A `main` contém migrations até a **051**; a cadeia #135–#137 acrescenta 052–054
+(`20261121120000_054_versao_e_confirmacao_de_virada.sql`). HML está na **054** desde 16/11/2026,
+com o interruptor de domingo/feriado em dobro ligado. Production está na 051 desde 11/11/2026, com
+o interruptor ligado.
 
 ## GitHub
 

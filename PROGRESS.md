@@ -387,9 +387,17 @@ o ambiente principal passa a ser a sessão em nuvem e a CI.
   `dpl_d5xJB7s7CULxQXbFg94FVS9sJj1C`. Backup `pg_dump` de 11/11 com segunda cópia, guardado pelo
   responsável. Sem dados de negócio (1 cliente de teste "te"); 7 `profiles` e 7 `user_roles` órfãos;
   nenhum feriado cadastrado.
-- **HML** (`qbnfcmrxmssnwkhaitgd`): **051**, interruptor de domingo/feriado em dobro **ligado**,
-  resolução comercial OFF. **Limpo em 11/11/2026** (sem clientes, colaboradores, apontamentos ou
-  faturas; contas e papéis preservados), pronto para o teste manual do responsável.
+- **HML** (`qbnfcmrxmssnwkhaitgd`): **054 desde 16/11/2026** (GATE-FIN-07D, sessão 28: 052, 053 e
+  054 aplicadas pelo executor, 59 migrations, head `20261121120000`), interruptor de
+  domingo/feriado em dobro **ligado**, resolução comercial OFF. O expurgo de 11/11/2026 deixou de
+  descrever o banco: a leitura de 16/11 encontrou dados de desenvolvimento e homologação (2
+  clientes, 5 apontamentos, 1 fatura, 17 contas), que o responsável mandou **preservar**. Production
+  segue na **051**; o app do #138 exige a 054 e não está publicado em Production.
+- **Fluxo de entrega definido pelo responsável (16/11/2026):** HML e Preview aceitam dados
+  sintéticos; o Preview é a superfície principal de homologação (testes da IA e do responsável,
+  depois a orientação de uso); a entrega final é feita **sem dados de demonstração**, por limpeza
+  própria (inventário, backup, autorização, contas necessárias preservadas, teste de primeiro
+  uso) — **não autorizada ainda**.
 - **Vercel:** vínculos comprovados em 11/11/2026: Preview → HML, Production → Production.
 - **Homologação de telas** em localhost → HML: 9 cenários, fluxo avulso e avulsa sem contrato
   com valor acordado, PASS.
@@ -414,6 +422,15 @@ R$ 150 grava R$ 500 e R$ 300 (conferido no HML com o interruptor ligado, em tran
 Pendente: **cidade do cliente-piloto**, para os feriados municipais da lista única.
 
 ### Próxima etapa
+
+**Gates da homologação do #138 (GATE-FIN-07):** A — prontidão do HML (sessão 27, **PASS**); B —
+052, 053 e 054 no HML (sessão 28, **PASS**); C — Preview do HEAD do #138 vinculado ao HML com a
+054 (sessão 29); D — homologação funcional no navegador, com dados sintéticos identificáveis,
+pela IA e pelo responsável; E — revisão independente, decisões financeiras, integração e
+preparação de Production. Depois: 058 (com DEC-CP05-01 e o app novo homologado), CP-11/CP-12 e a
+limpeza de entrega. Cada gate exige autorização própria.
+
+Fila anterior, ainda válida para o piloto:
 
 1. Cadastrar os feriados (nacionais, de SC e os municipais da cidade do piloto), no HML e
    depois em Production, **antes** dos apontamentos (o tipo do dia fica congelado no
