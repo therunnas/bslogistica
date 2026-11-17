@@ -353,7 +353,9 @@ revalidados (GREEN); inventário, matriz de valores e decisões em
 | D-CP02-08 | "Salvar cliente" sem estado de carregamento                                                 | P3         | corrigido |
 
 Decisões pendentes do CP-02: **DEC-CP02-01** (o fim do contrato e o status Inativo não limitam a
-cobrança: dia depois do fim é lançado e cobrado; E2E `@falha-conhecida`), **DEC-CP02-02**
+cobrança: dia depois do fim é lançado e cobrado; E2E `@falha-conhecida`) — **decidida em
+16/11/2026** (execução dentro da vigência; faturamento posterior permitido; ver
+[Gate C](docs/qa/GATE-C-achados-D1-D8.md)), implementação pendente —, **DEC-CP02-02**
 (excluir cliente sem histórico faturado apaga em cascata apontamentos não faturados; a tela agora
 avisa) e **DEC-CP02-03** (saneamento do registro `01/01/0001` do HML, não lido nesta sessão).
 
@@ -429,6 +431,16 @@ Pendente: **cidade do cliente-piloto**, para os feriados municipais da lista ún
 pela IA e pelo responsável; E — revisão independente, decisões financeiras, integração e
 preparação de Production. Depois: 058 (com DEC-CP05-01 e o app novo homologado), CP-11/CP-12 e a
 limpeza de entrega. Cada gate exige autorização própria.
+
+**Achados do Gate C (sessões 31–32, [detalhe](docs/qa/GATE-C-achados-D1-D8.md)):** D8 (prévia e
+histórico de vigências na mesma chave de cache) corrigido **só localmente**, sem publicação; D1
+(fim de contrato inválido aceito pelo banco), D6 (CNPJ sem validação), D3–D5 (carregamento) e D7
+(cor de status) na fila; D2 é comportamento esperado. **Decisões do responsável (16/11/2026):**
+a execução do serviço deve estar dentro da vigência do contrato, o faturamento posterior ao fim
+é permitido, sem fim = vigência aberta, histórico não muda (**DEC-CP02-01 decidida**;
+**DEC-CP02-03** parcialmente — falta o valor correto do registro `01/01/0001` e a autorização de
+escrita no HML); CNPJ opcional e, se preenchido, válido (sem obrigatoriedade, unicidade ou CPF
+presumidos). Implementação de ambas: sessões próprias, com migration.
 
 Fila anterior, ainda válida para o piloto:
 
