@@ -329,9 +329,24 @@ export function useCompetenciaDeCobranca(clienteId: string, data: string, habili
   });
 }
 
+/**
+ * Chave de cache das versões de uma entidade (D8, Gate C). O histórico lê TODAS as versões
+ * (inclusive as aposentadas) e a prévia do apontamento só as ATIVAS: são respostas diferentes e
+ * precisam de entradas diferentes — com a mesma chave, quem abria uma tela primeiro decidia o que
+ * a outra recebia. O prefixo `["vigencias"]` continua o mesmo, então toda invalidação por ele
+ * (`invalidarVigencias`, tarifas, diária individual, motor) alcança as duas.
+ */
+export function chaveDasVersoes(
+  tipo: TipoDeVigencia,
+  entidadeId: string | null,
+  escopo: "todas" | "ativas",
+) {
+  return ["vigencias", tipo, entidadeId, escopo] as const;
+}
+
 export function useVersoes(tipo: TipoDeVigencia, entidadeId: string | null) {
   return useQuery({
-    queryKey: ["vigencias", tipo, entidadeId],
+    queryKey: chaveDasVersoes(tipo, entidadeId, "todas"),
     enabled: Boolean(entidadeId),
     queryFn: async (): Promise<VersaoDeVigencia[]> => {
       const id = entidadeId as string;
@@ -362,12 +377,12 @@ export function useTermosDoApontamento(p: {
 }) {
   const ativo = p.habilitado;
   const contrato = useQuery({
-    queryKey: ["vigencias", "contrato", p.contratoId],
+    queryKey: chaveDasVersoes("contrato", p.contratoId, "ativas"),
     enabled: ativo && Boolean(p.contratoId),
     queryFn: () => lerVersoesDoContrato(cliente(), p.contratoId as string, true),
   });
   const operacao = useQuery({
-    queryKey: ["vigencias", "operacao", p.operacaoId],
+    queryKey: chaveDasVersoes("operacao", p.operacaoId, "ativas"),
     enabled: ativo && Boolean(p.operacaoId),
     queryFn: () => lerVersoesDaOperacao(cliente(), p.operacaoId as string, true),
   });

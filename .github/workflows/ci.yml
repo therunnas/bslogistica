@@ -119,6 +119,9 @@ jobs:
       - name: App nos contratos v2 da 054 (GATE-FIN-06)
         run: npm run test:frontend-v2
 
+      - name: Chaves de cache das vigências (Gate C, D8)
+        run: npm run test:d8-chaves-vigencias
+
       - name: Teste troca
         run: npm run test:troca
 
