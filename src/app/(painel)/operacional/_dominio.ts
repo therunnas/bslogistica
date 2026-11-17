@@ -424,10 +424,22 @@ export const MENSAGEM_BANCO_SEM_V2_DO_OPERADOR =
 export const MENSAGEM_VIRADA_DO_OPERADOR =
   "Saída antes da entrada num turno que não atravessa a meia-noite. Só o administrador pode confirmar uma jornada assim: corrija o horário ou peça ao administrador que registre e confirme este lançamento. O que você digitou foi mantido.";
 
+/**
+ * Data fora da vigência do contrato da operação (055, Gate C D1). O `23514` sozinho não diz a causa;
+ * o gatilho da 055 marca a recusa com o detalhe fixo `vigencia_do_contrato`, que o banco controla —
+ * é marcador, não texto traduzível. O operador não vê o contrato nem as datas dele.
+ */
+export const MENSAGEM_FORA_DA_VIGENCIA_DO_OPERADOR =
+  "Esta data está fora da vigência do contrato desta operação. Nada foi gravado. Confira a data ou avise o administrador.";
+
 export function mensagemDeErro(erro: unknown): string {
   const codigo =
     typeof erro === "object" && erro !== null && "code" in erro
       ? String((erro as { code?: unknown }).code ?? "")
+      : "";
+  const detalhe =
+    typeof erro === "object" && erro !== null && "details" in erro
+      ? String((erro as { details?: unknown }).details ?? "")
       : "";
 
   switch (codigo) {
@@ -440,6 +452,7 @@ export function mensagemDeErro(erro: unknown): string {
     case "42501":
       return "Este apontamento não pode ser alterado, ou você não tem acesso a esta operação. Atualize os dados e tente novamente.";
     case "23514":
+      if (detalhe === "vigencia_do_contrato") return MENSAGEM_FORA_DA_VIGENCIA_DO_OPERADOR;
       return "Não foi possível salvar: os dados não são válidos para esta operação. Revise turno, equipe e intervalo.";
     case "22023":
       return "Dados do apontamento inválidos. Revise os campos informados.";

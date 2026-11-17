@@ -140,9 +140,9 @@ insert into public.clients (id, name) values
   ('5c05c000-0000-4000-8000-0000000000cb', 'C05 marcador cliente B'),
   ('5c05c000-0000-4000-8000-0000000000cc', 'C05 marcador cliente C');
 
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c05d000-0000-4000-8000-00000000000a', '5c05c000-0000-4000-8000-0000000000ca', 'KA do cliente A', 100, 8, 1.5, 10),
-  ('5c05d000-0000-4000-8000-00000000000b', '5c05c000-0000-4000-8000-0000000000cb', 'KB do cliente B', 200, 8, 2.0, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c05d000-0000-4000-8000-00000000000a', '5c05c000-0000-4000-8000-0000000000ca', 'KA do cliente A', 100, 8, 1.5, 10, date '2000-01-01'),
+  ('5c05d000-0000-4000-8000-00000000000b', '5c05c000-0000-4000-8000-0000000000cb', 'KB do cliente B', 200, 8, 2.0, 10, date '2000-01-01');
 
 insert into public.operations (id, client_id, contract_id, name) values
   ('5c05e000-0000-4000-8000-000000000001', '5c05c000-0000-4000-8000-0000000000ca', '5c05d000-0000-4000-8000-00000000000a', 'C05 base coerente');
@@ -185,7 +185,7 @@ begin
     '1', pg_temp.admin(format($q$with u as (update public.operations set client_id = %L where id = '5c05e000-0000-4000-8000-000000000015' returning 1) select count(*)::text from u$q$, _cb)));
 
   -- A6. apagar contrato desvincula e preserva o cliente da operação
-  insert into public.contracts (id, client_id, name) values ('5c05d000-0000-4000-8000-000000000006', _ca::uuid, 'K6 a apagar');
+  insert into public.contracts (id, client_id, name, valid_from) values ('5c05d000-0000-4000-8000-000000000006', _ca::uuid, 'K6 a apagar', date '2000-01-01');
   insert into public.operations (id, client_id, contract_id, name)
     values ('5c05e000-0000-4000-8000-000000000016', _ca::uuid, '5c05d000-0000-4000-8000-000000000006', 'A6');
   perform pg_temp.registrar('A6. apagar o contrato (admin)',
@@ -415,7 +415,7 @@ select pg_temp.registrar('I2. troca de cliente de um contrato referenciado: SQLS
 do $j$
 begin
   insert into public.clients (id, name) values ('5c05c000-0000-4000-8000-0000000000cd', 'C05 marcador cliente D');
-  insert into public.contracts (id, client_id, name) values ('5c05d000-0000-4000-8000-0000000000d1', '5c05c000-0000-4000-8000-0000000000cd', 'KD');
+  insert into public.contracts (id, client_id, name, valid_from) values ('5c05d000-0000-4000-8000-0000000000d1', '5c05c000-0000-4000-8000-0000000000cd', 'KD', date '2000-01-01');
   insert into public.operations (id, client_id, contract_id, name)
     values ('5c05e000-0000-4000-8000-0000000000d1', '5c05c000-0000-4000-8000-0000000000cd', '5c05d000-0000-4000-8000-0000000000d1', 'OD');
   delete from public.clients where id = '5c05c000-0000-4000-8000-0000000000cd';

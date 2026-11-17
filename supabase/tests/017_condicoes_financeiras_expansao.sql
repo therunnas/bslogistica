@@ -149,9 +149,9 @@ select pg_temp.registrar('S7. os triggers financeiros anteriores continuam todos
 -- ---------------------------------------------------------------------------
 
 insert into public.clients (id, name) values ('5c0bc000-0000-4000-8000-0000000000ca', 'C05B marcador cliente');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c0bd000-0000-4000-8000-00000000000a', '5c0bc000-0000-4000-8000-0000000000ca', 'KA C05B', 100, 8, 1.5, 10),
-  ('5c0bd000-0000-4000-8000-00000000000b', '5c0bc000-0000-4000-8000-0000000000ca', 'KB C05B', 120, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c0bd000-0000-4000-8000-00000000000a', '5c0bc000-0000-4000-8000-0000000000ca', 'KA C05B', 100, 8, 1.5, 10, date '2000-01-01'),
+  ('5c0bd000-0000-4000-8000-00000000000b', '5c0bc000-0000-4000-8000-0000000000ca', 'KB C05B', 120, 8, 1.5, 10, date '2000-01-01');
 insert into public.employees (id, name, daily_cost) values
   ('5c0bf000-0000-4000-8000-000000000001', 'C05B colaborador 1', 60),
   ('5c0bf000-0000-4000-8000-000000000002', 'C05B colaborador 2', 80);

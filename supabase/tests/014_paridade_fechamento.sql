@@ -83,11 +83,11 @@ insert into public.clients (id, name) values
   ('33333333-3333-4333-8333-333333333399', 'Cliente de Outra Empresa');
 
 -- Contratos: taxa, horas do turno, fator de hora extra e tolerância.
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('c0c0c0c0-0000-4000-8000-000000000001', '33333333-3333-4333-8333-333333333333', 'Alfa',    150.00, 8, 1.5, 10),
-  ('c0c0c0c0-0000-4000-8000-000000000002', '33333333-3333-4333-8333-333333333333', 'Delta',     0.10, 8, 1.5, 10),
-  ('c0c0c0c0-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'Epsilon',   0.20, 8, 1.5, 10),
-  ('c0c0c0c0-0000-4000-8000-000000000099', '33333333-3333-4333-8333-333333333399', 'Outro',   150.00, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('c0c0c0c0-0000-4000-8000-000000000001', '33333333-3333-4333-8333-333333333333', 'Alfa',    150.00, 8, 1.5, 10, date '2000-01-01'),
+  ('c0c0c0c0-0000-4000-8000-000000000002', '33333333-3333-4333-8333-333333333333', 'Delta',     0.10, 8, 1.5, 10, date '2000-01-01'),
+  ('c0c0c0c0-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'Epsilon',   0.20, 8, 1.5, 10, date '2000-01-01'),
+  ('c0c0c0c0-0000-4000-8000-000000000099', '33333333-3333-4333-8333-333333333399', 'Outro',   150.00, 8, 1.5, 10, date '2000-01-01');
 
 insert into public.operations (id, client_id, contract_id, name, agreed_amount) values
   ('0b0b0b0b-0000-4000-8000-000000000001', '33333333-3333-4333-8333-333333333333', 'c0c0c0c0-0000-4000-8000-000000000001', 'Operação Alfa',    null),

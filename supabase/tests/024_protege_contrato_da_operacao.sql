@@ -141,15 +141,15 @@ insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, c
 insert into public.clients (id, name) values
   ('5c80c000-0000-4000-8000-0000000000c1', 'C05B56 cliente 1'),
   ('5c80c000-0000-4000-8000-0000000000c2', 'C05B56 cliente 2');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c80d000-0000-4000-8000-0000000000d1', '5c80c000-0000-4000-8000-0000000000c1', 'KA', 100, 8, 1.5, 10),
-  ('5c80d000-0000-4000-8000-0000000000d2', '5c80c000-0000-4000-8000-0000000000c1', 'KB', 130, 8, 1.5, 10),
-  ('5c80d000-0000-4000-8000-0000000000d3', '5c80c000-0000-4000-8000-0000000000c2', 'KX outro cliente', 150, 8, 1.5, 10);
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c80d000-0000-4000-8000-0000000000d4', '5c80c000-0000-4000-8000-0000000000c1', 'KD contrato com vigencia de valor acordado', 110, 8, 1.5, 10),
-  ('5c80d000-0000-4000-8000-0000000000d5', '5c80c000-0000-4000-8000-0000000000c1', 'KE contrato sem historico', 120, 8, 1.5, 10),
-  ('5c80d000-0000-4000-8000-0000000000d6', '5c80c000-0000-4000-8000-0000000000c1', 'KF contrato sem operacao', 125, 8, 1.5, 10),
-  ('5c80d000-0000-4000-8000-0000000000d7', '5c80c000-0000-4000-8000-0000000000c1', 'KG contrato sem historico (motor ligado)', 126, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c80d000-0000-4000-8000-0000000000d1', '5c80c000-0000-4000-8000-0000000000c1', 'KA', 100, 8, 1.5, 10, date '2000-01-01'),
+  ('5c80d000-0000-4000-8000-0000000000d2', '5c80c000-0000-4000-8000-0000000000c1', 'KB', 130, 8, 1.5, 10, date '2000-01-01'),
+  ('5c80d000-0000-4000-8000-0000000000d3', '5c80c000-0000-4000-8000-0000000000c2', 'KX outro cliente', 150, 8, 1.5, 10, date '2000-01-01');
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c80d000-0000-4000-8000-0000000000d4', '5c80c000-0000-4000-8000-0000000000c1', 'KD contrato com vigencia de valor acordado', 110, 8, 1.5, 10, date '2000-01-01'),
+  ('5c80d000-0000-4000-8000-0000000000d5', '5c80c000-0000-4000-8000-0000000000c1', 'KE contrato sem historico', 120, 8, 1.5, 10, date '2000-01-01'),
+  ('5c80d000-0000-4000-8000-0000000000d6', '5c80c000-0000-4000-8000-0000000000c1', 'KF contrato sem operacao', 125, 8, 1.5, 10, date '2000-01-01'),
+  ('5c80d000-0000-4000-8000-0000000000d7', '5c80c000-0000-4000-8000-0000000000c1', 'KG contrato sem historico (motor ligado)', 126, 8, 1.5, 10, date '2000-01-01');
 insert into public.employees (id, name, daily_cost) values
   ('5c80f000-0000-4000-8000-000000000001', 'EA', 60);
 -- O1 com contrato, sem histórico; O2 sem contrato com valor acordado cadastrado; O3 com contrato e

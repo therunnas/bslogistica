@@ -101,11 +101,11 @@ insert into auth.sessions (id, user_id, not_after) values ('${SESSAO}', '${ADMIN
 insert into public.user_roles (user_id, role) values ('${ADMIN}', 'admin');
 
 insert into public.clients (id, name) values ('${CLIENTE}', 'INT cliente sintético');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
 ${contratos
   .map(
     ({ c, i }) =>
-      `  (${idDe("5c36d000", i)}, '${CLIENTE}', 'K${c.cfg}', ${reais(DIARIA_CENTAVOS)}, 8, 1.5, ${c.tolerancia})`,
+      `  (${idDe("5c36d000", i)}, '${CLIENTE}', 'K${c.cfg}', ${reais(DIARIA_CENTAVOS)}, 8, 1.5, ${c.tolerancia}, date '2000-01-01')`,
   )
   .join(",\n")};
 insert into public.contract_terms

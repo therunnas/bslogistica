@@ -132,9 +132,9 @@ insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, c
    where ur.role = 'admin';
 
 insert into public.clients (id, name) values ('5c0cc000-0000-4000-8000-0000000000ca', 'C05B3 cliente');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c0cd000-0000-4000-8000-00000000000a', '5c0cc000-0000-4000-8000-0000000000ca', 'KA C05B3', 120, 8, 1.5, 10),
-  ('5c0cd000-0000-4000-8000-00000000000b', '5c0cc000-0000-4000-8000-0000000000ca', 'KB C05B3', 120, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c0cd000-0000-4000-8000-00000000000a', '5c0cc000-0000-4000-8000-0000000000ca', 'KA C05B3', 120, 8, 1.5, 10, date '2000-01-01'),
+  ('5c0cd000-0000-4000-8000-00000000000b', '5c0cc000-0000-4000-8000-0000000000ca', 'KB C05B3', 120, 8, 1.5, 10, date '2000-01-01');
 insert into public.employees (id, name, daily_cost) values
   ('5c0cf000-0000-4000-8000-000000000001', 'C05B3 colaborador 1', 80);
 
@@ -656,9 +656,9 @@ select pg_temp.registrar('V3. as 16 funções SECURITY DEFINER são do postgres,
                         'condicoes_exigir_admin', 'condicoes_auditar', 'condicoes_encerrar_contrato_interno', 'condicoes_encerrar_colaborador_interno')));
 -- O inventário permanece fixado no conjunto da 023: o snapshot territorial da 044
 -- é aditivo e fica explicitamente fora, como os acréscimos posteriores já listados.
-select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (os da 024, 029, 031, 040, 044, 053 e 054, se aplicadas, ficam de fora da conta)', '11',
+select pg_temp.registrar('V4. os 10 triggers de timesheet_entries anteriores à 023 seguem habilitados, mais o guard da 022 (11); a 023 não criou nenhum (os da 024, 029, 031, 040, 044, 053, 054 e 055, se aplicadas, ficam de fora da conta)', '11',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'
-      and tgname not in ('trg_timesheet_entries_bloqueia_condicoes_operacao', 'trg_timesheet_entries_bloqueia_horario_igual', 'trg_timesheet_entries_bloqueia_folha_fechada', 'trg_timesheet_entries_bz_snapshots_funcao_periodo', 'trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior', 'trg_timesheet_entries_zz_versao', 'trg_timesheet_entries_zz_invalida_virada')));
+      and tgname not in ('trg_timesheet_entries_bloqueia_fora_da_vigencia', 'trg_timesheet_entries_bloqueia_condicoes_operacao', 'trg_timesheet_entries_bloqueia_horario_igual', 'trg_timesheet_entries_bloqueia_folha_fechada', 'trg_timesheet_entries_bz_snapshots_funcao_periodo', 'trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior', 'trg_timesheet_entries_zz_versao', 'trg_timesheet_entries_zz_invalida_virada')));
 select pg_temp.registrar('V5. a derivação financeira e gerar_fatura não citam as versões (continuam como estavam)', '0',
   (select count(*)::text from pg_proc where pronamespace = 'public'::regnamespace and proname in ('derivar_valores_financeiros', 'gerar_fatura')
      and (prosrc ilike '%contract_terms%' or prosrc ilike '%employee_cost_terms%' or prosrc ilike '%financial_terms_audit%')));

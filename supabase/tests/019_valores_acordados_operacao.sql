@@ -133,8 +133,8 @@ insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, c
    where ur.role = 'admin';
 
 insert into public.clients (id, name) values ('5c0dc000-0000-4000-8000-0000000000ca', 'C05B3b cliente');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min)
-  values ('5c0dd000-0000-4000-8000-00000000000a', '5c0dc000-0000-4000-8000-0000000000ca', 'K C05B3b', 120, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from)
+  values ('5c0dd000-0000-4000-8000-00000000000a', '5c0dc000-0000-4000-8000-0000000000ca', 'K C05B3b', 120, 8, 1.5, 10, date '2000-01-01');
 insert into public.employees (id, name, daily_cost) values
   ('5c0df000-0000-4000-8000-000000000001', 'C05B3b colaborador', 80);
 
@@ -618,9 +618,10 @@ select pg_temp.registrar('V3. as 7 funções SECURITY DEFINER novas são do post
                         'valor_acordado_operacao_na_data', 'exigir_valor_acordado_operacao_na_data', 'condicoes_encerrar_operacao_interno')));
 -- Mantém o inventário anterior à 044, sem incluir o novo snapshot territorial;
 -- nenhum dos 15 gatilhos já exigidos deixa de ser contado.
-select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 + snapshots da 040 = 15, todos habilitados (snapshot da 044, teto do intervalo da 053 e versão da 054 fora deste inventário)', '15',
+select pg_temp.registrar('V4. timesheet_entries: 10 triggers originais + guard da 022 + guard da 024 + recusa de horário igual da 029 + folha fechada da 031 + snapshots da 040 = 15, todos habilitados (snapshot da 044, teto do intervalo da 053, versão da 054 e vigência do contrato da 055 fora deste inventário)', '15',
   (select count(*)::text from pg_trigger where tgrelid = 'public.timesheet_entries'::regclass and not tgisinternal and tgenabled = 'O'
     and tgname not in ('trg_timesheet_entries_ba_snapshot_territorial', 'trg_timesheet_entries_bloqueia_intervalo_maior',
+                       'trg_timesheet_entries_bloqueia_fora_da_vigencia',
                        'trg_timesheet_entries_zz_versao', 'trg_timesheet_entries_zz_invalida_virada')));
 select pg_temp.registrar('V5. shifts: 4 triggers originais + o da classificação do turno (039) habilitados + o congelamento DESABILITADO', '5|1',
   (select count(*) filter (where tgenabled = 'O')::text || '|' || count(*) filter (where tgenabled = 'D')::text from pg_trigger where tgrelid = 'public.shifts'::regclass and not tgisinternal));

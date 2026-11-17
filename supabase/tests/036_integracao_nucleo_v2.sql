@@ -63,12 +63,12 @@ insert into auth.sessions (id, user_id, not_after) values ('ec360000-0000-4000-8
 insert into public.user_roles (user_id, role) values ('5c360000-0000-4000-8000-0000000000a1', 'admin');
 
 insert into public.clients (id, name) values ('5c36c000-0000-4000-8000-0000000000c1', 'INT cliente sintético');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c36d000-0000-4000-8000-000000000001', '5c36c000-0000-4000-8000-0000000000c1', 'KA', 133.33, 8, 1.5, 0),
-  ('5c36d000-0000-4000-8000-000000000002', '5c36c000-0000-4000-8000-0000000000c1', 'KB', 133.33, 8, 1.5, 10),
-  ('5c36d000-0000-4000-8000-000000000003', '5c36c000-0000-4000-8000-0000000000c1', 'KC', 133.33, 8, 1.5, 15),
-  ('5c36d000-0000-4000-8000-000000000004', '5c36c000-0000-4000-8000-0000000000c1', 'KD', 133.33, 8, 1.5, 10),
-  ('5c36d000-0000-4000-8000-000000000005', '5c36c000-0000-4000-8000-0000000000c1', 'KE', 133.33, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c36d000-0000-4000-8000-000000000001', '5c36c000-0000-4000-8000-0000000000c1', 'KA', 133.33, 8, 1.5, 0, date '2000-01-01'),
+  ('5c36d000-0000-4000-8000-000000000002', '5c36c000-0000-4000-8000-0000000000c1', 'KB', 133.33, 8, 1.5, 10, date '2000-01-01'),
+  ('5c36d000-0000-4000-8000-000000000003', '5c36c000-0000-4000-8000-0000000000c1', 'KC', 133.33, 8, 1.5, 15, date '2000-01-01'),
+  ('5c36d000-0000-4000-8000-000000000004', '5c36c000-0000-4000-8000-0000000000c1', 'KD', 133.33, 8, 1.5, 10, date '2000-01-01'),
+  ('5c36d000-0000-4000-8000-000000000005', '5c36c000-0000-4000-8000-0000000000c1', 'KE', 133.33, 8, 1.5, 10, date '2000-01-01');
 insert into public.contract_terms
   (contract_id, valid_from, daily_rate, shift_hours, ot_factor, ot_tolerance_min, active, origin, reason,
    ot_rounding_mode, saturday_shift_hours, holiday_pay_factor) values

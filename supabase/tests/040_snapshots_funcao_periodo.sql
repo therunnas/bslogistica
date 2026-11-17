@@ -100,9 +100,9 @@ insert into public.user_roles (user_id, role) values
 
 insert into public.clients (id, name) values
   ('5c40c000-0000-4000-8000-0000000000c1', 'C01'), ('5c40c000-0000-4000-8000-0000000000c2', 'C02');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c40d000-0000-4000-8000-0000000000d1', '5c40c000-0000-4000-8000-0000000000c1', 'K1', 100, 8, 1.5, 10),
-  ('5c40d000-0000-4000-8000-0000000000d2', '5c40c000-0000-4000-8000-0000000000c2', 'K2', 120, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c40d000-0000-4000-8000-0000000000d1', '5c40c000-0000-4000-8000-0000000000c1', 'K1', 100, 8, 1.5, 10, date '2000-01-01'),
+  ('5c40d000-0000-4000-8000-0000000000d2', '5c40c000-0000-4000-8000-0000000000c2', 'K2', 120, 8, 1.5, 10, date '2000-01-01');
 insert into public.contract_terms
   (contract_id, valid_from, daily_rate, shift_hours, ot_factor, ot_tolerance_min, active, origin, reason,
    ot_rounding_mode, saturday_shift_hours, holiday_pay_factor) values

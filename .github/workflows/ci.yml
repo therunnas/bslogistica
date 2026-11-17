@@ -122,6 +122,9 @@ jobs:
       - name: Chaves de cache das vigências (Gate C, D8)
         run: npm run test:d8-chaves-vigencias
 
+      - name: Vigência do contrato na aplicação e forma da migration 055 (Gate C, D1)
+        run: npm run test:d1-vigencia-contrato
+
       - name: Teste troca
         run: npm run test:troca
 
