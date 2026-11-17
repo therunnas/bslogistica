@@ -549,7 +549,7 @@ begin
   -- A 053 acrescenta a recusa de intervalo maior que a jornada (o teto que este arquivo dizia
   -- não existir): são 18. A 054 acrescenta a versão (BEFORE, o último) e a invalidação da
   -- confirmação de virada (AFTER): são 20.
-  perform pg_temp.registrar('I1. lista exata de triggers de timesheet_entries preserva todos os anteriores, o snapshot territorial da 044 quando instalada e o teto do intervalo da 053',
+  perform pg_temp.registrar('I1. lista exata de triggers de timesheet_entries preserva todos os anteriores, o snapshot territorial da 044 quando instalada, o teto do intervalo da 053 e a vigência do contrato da 055',
     'trg_timesheet_entries_ancora_folha, ' ||
     case when to_regclass('public.municipality_catalog') is null then ''
       else 'trg_timesheet_entries_ba_snapshot_territorial, ' end ||
@@ -557,7 +557,7 @@ begin
     'trg_timesheet_entries_bloqueia_condicoes_operacao, '
     'trg_timesheet_entries_bloqueia_delete_faturado, '
     'trg_timesheet_entries_bloqueia_desvinculo, trg_timesheet_entries_bloqueia_edicao_faturada, '
-    'trg_timesheet_entries_bloqueia_folha_fechada, '
+    'trg_timesheet_entries_bloqueia_folha_fechada, trg_timesheet_entries_bloqueia_fora_da_vigencia, '
     'trg_timesheet_entries_bloqueia_horario_igual, '
     'trg_timesheet_entries_bloqueia_intervalo_maior, '
     'trg_timesheet_entries_bloqueia_truncate, trg_timesheet_entries_bloqueia_vinculo_direto, '

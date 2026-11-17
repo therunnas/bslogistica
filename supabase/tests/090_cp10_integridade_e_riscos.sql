@@ -414,8 +414,8 @@ select pg_temp.registrar('SEGURO', 'C9. o cancelamento do histórico segue pela 
 -- K. Contrato encerrado (DEC-CP02-01)
 -- ---------------------------------------------------------------------------
 
-select pg_temp.registrar('RISCO', 'K1. DEC-CP02-01: dia DEPOIS do fim do contrato (inativo, fim 10/03, dia 12/03) é lançado e cobrado pela diária dele',
-  'aceito|300.00',
+select pg_temp.registrar('SEGURO', 'K1. DEC-CP02-01: dia DEPOIS do fim do contrato (inativo, fim 10/03, dia 12/03) é recusado pelo banco (055) e nada é cobrado',
+  'erro 23514',
   pg_temp.adm($q$with i as (insert into public.timesheet_entries (timesheet_id, employee_id, status, check_in, check_out, break_minutes)
     values ('5c10b000-0000-4000-8000-000000000004', '5c10f000-0000-4000-8000-000000000001', 'present', '08:00', '17:00', 60)
     returning billed_amount) select 'aceito|' || billed_amount from i$q$));

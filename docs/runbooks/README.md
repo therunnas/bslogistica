@@ -87,6 +87,13 @@ Fora da cadeia financeira acima:
   nem `schema_migrations`. Antes de executar: nenhum app publicado usando as v2. Ensaiado só
   localmente (dados idênticos antes e depois; 054 reaplicada). Preflight só de leitura em
   `supabase/preflight/054_versao_e_virada_preflight.sql`.
+- [rollback-vigencia-do-contrato.sql](rollback-vigencia-do-contrato.sql):
+  055 → comportamento da 054 quanto à vigência do contrato (`DROP` do gatilho, da função e do CHECK
+  `contracts_vigencia_valida`). **Reabre o D1 e o DEC-CP02-01**: dia fora da vigência volta a ser
+  lançado e cobrado; datas inválidas de contrato voltam a ser aceitas. Não toca dados, valores,
+  faturas nem `schema_migrations`. Preflight só de leitura em
+  `supabase/preflight/055_vigencia_do_contrato_preflight.sql`. Roteiro (não executado) para aplicar a 055 no
+  HML: [hml-055-vigencia-do-contrato.md](hml-055-vigencia-do-contrato.md).
 
 A ordem nominal inversa (043 → 042 → … → 035) é apenas uma relação de
 precedência dos estágios financeiros. **Não é uma sequência de comandos pronta

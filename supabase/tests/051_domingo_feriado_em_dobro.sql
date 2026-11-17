@@ -96,8 +96,8 @@ insert into public.clients (id, name) values
 insert into public.employees (id, name, daily_cost) values (pg_temp.u('5c51f000-0000-4000-8000-', 1), 'E51-1', 150);
 insert into public.employee_cost_terms (employee_id, valid_from, daily_cost, active, origin, reason)
   values (pg_temp.u('5c51f000-0000-4000-8000-', 1), date '2026-01-01', 150, true, 'informada', 'REC051');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min)
-  values (pg_temp.u('5c51d000-0000-4000-8000-', 1), pg_temp.u('5c51c000-0000-4000-8000-', 1), 'K51', 250, 8, 1.5, 0);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from)
+  values (pg_temp.u('5c51d000-0000-4000-8000-', 1), pg_temp.u('5c51c000-0000-4000-8000-', 1), 'K51', 250, 8, 1.5, 0, date '2000-01-01');
 insert into public.contract_terms
   (contract_id, valid_from, daily_rate, shift_hours, ot_factor, ot_tolerance_min, active, origin, reason,
    ot_rounding_mode, saturday_shift_hours, holiday_pay_factor)

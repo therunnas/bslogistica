@@ -4,6 +4,7 @@ import { contarPorNome, lancamento, lit } from "../apoio/banco";
 import { consultar, estadoDe, expect, test, valor } from "../apoio/fixtures";
 import {
   P,
+  abrirDia,
   alocar,
   campo,
   cartaoDaOperacao,
@@ -18,6 +19,7 @@ import {
   esperarFechar,
   gerarFechamento,
   lancarDia,
+  linhaDo,
   reais,
   valorDoCartao,
 } from "../apoio/telas";
@@ -626,38 +628,50 @@ test("CV1 lista de contratos: sem os valores de hoje (erro ou carregando) não m
   await page.unroute("**/rest/v1/contract_terms**");
 });
 
-// [RISCO] com decisão pendente (DEC-CP02-01 no documento do CP-02): o "Fim do contrato" não
-// limita a vigência das condições, então um dia depois do fim é lançado e cobrado. Bloquear exige
-// decidir a regra (e mexe no motor/contrato SQL): fica registrado como falha conhecida.
-test(
-  "CN-D [RISCO] contrato com fim: lançamento depois do fim do contrato é aceito e cobrado",
-  {
-    tag: "@falha-conhecida",
-  },
-  async ({ page }) => {
-    // Fim do contrato em 20/10/2026 (edição comum do contrato).
-    await abrirContratos(page);
-    await page.getByRole("button", { name: `Editar ${CTR_A}`, exact: true }).click();
-    const d = dialogo(page);
-    await campo(d, "Fim do contrato (opcional)").fill("2026-10-20");
-    await d.getByRole("button", { name: "Salvar contrato" }).click();
-    await esperarAviso(page, "Registro salvo.");
-    await esperarFechar(page);
-    expect(contratoNoBanco(CTR_A)[0]?.fim).toBe("2026-10-20");
-    await expect(linhaDaTabela(page, CTR_A)).toContainText("01/10/2026 até 20/10/2026");
+// DEC-CP02-01, decidida em 16/11/2026 e imposta no banco pela 055 (Gate C, D1): a data de execução
+// precisa estar dentro da vigência do contrato, com o fim INCLUSIVO. Era a falha conhecida CN-D (um
+// dia depois do fim era lançado e cobrado); agora o último dia é aceito e o seguinte é recusado.
+test("CN-D contrato com fim: o último dia é lançado e o dia depois do fim é recusado pelo banco (055)", async ({
+  page,
+}) => {
+  // Fim do contrato em 20/10/2026 (edição comum do contrato).
+  await abrirContratos(page);
+  await page.getByRole("button", { name: `Editar ${CTR_A}`, exact: true }).click();
+  const d = dialogo(page);
+  await campo(d, "Fim do contrato (opcional)").fill("2026-10-20");
+  await d.getByRole("button", { name: "Salvar contrato" }).click();
+  await esperarAviso(page, "Registro salvo.");
+  await esperarFechar(page);
+  expect(contratoNoBanco(CTR_A)[0]?.fim).toBe("2026-10-20");
+  await expect(linhaDaTabela(page, CTR_A)).toContainText("01/10/2026 até 20/10/2026");
 
-    // A vigência das condições continua aberta: o fim do contrato não a limita.
-    expect(vigenciasDoContrato(CTR_A).at(-1)?.fim, "vigência das condições").toBeNull();
-    // Registro do comportamento atual: um dia DEPOIS do fim do contrato é lançado e cobrado.
-    await lancarDia(page, {
-      operacao: OP_A,
-      turno: TURNO,
-      data: "2026-10-22",
-      linhas: [{ colaborador: ANA, entrada: "08:00", saida: "17:00", intervalo: 60 }],
-    });
-    expect(lancamento(OP_A, ANA, "2026-10-22")?.receita).toBe("320.00");
-  },
-);
+  // A vigência das CONDIÇÕES continua aberta: a 055 limita pela vigência do contrato, sem mexer nelas.
+  expect(vigenciasDoContrato(CTR_A).at(-1)?.fim, "vigência das condições").toBeNull();
+
+  // O último dia da vigência (fim inclusivo) é lançado e cobrado pela condição da data.
+  await lancarDia(page, {
+    operacao: OP_A,
+    turno: TURNO,
+    data: "2026-10-20",
+    linhas: [{ colaborador: ANA, entrada: "08:00", saida: "17:00", intervalo: 60 }],
+  });
+  expect(lancamento(OP_A, ANA, "2026-10-20")?.receita).toBe("320.00");
+
+  // Um dia DEPOIS do fim: o banco recusa, a tela mostra a mensagem dele e nada é gravado.
+  await abrirDia(page, { operacao: OP_A, turno: TURNO, data: "2026-10-22" });
+  const tr = linhaDo(page, ANA);
+  await expect(tr).toBeVisible();
+  await tr.locator("input[type=time]").nth(0).fill("08:00");
+  await tr.locator("input[type=time]").nth(1).fill("17:00");
+  await tr.locator("input[type=number]").first().fill("60");
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  const recusa = page.locator("[data-sonner-toast]").filter({
+    hasText:
+      "A data 22/10/2026 está fora da vigência do contrato desta operação (de 01/10/2026 até 20/10/2026).",
+  });
+  await expect(recusa).toBeVisible({ timeout: 30_000 });
+  expect(lancamento(OP_A, ANA, "2026-10-22"), "nada gravado em 22/10").toBeUndefined();
+});
 
 test("CT3 excluir contrato: sem uso remove (com as vigências); usado em apontamento é recusado", async ({
   page,

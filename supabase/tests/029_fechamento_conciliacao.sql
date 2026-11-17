@@ -102,8 +102,8 @@ insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, c
    where ur.role = 'admin';
 
 insert into public.clients (id, name) values ('5c40c000-0000-4000-8000-0000000000c1', 'B819 cliente FQ');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c40d000-0000-4000-8000-0000000000d1', '5c40c000-0000-4000-8000-0000000000c1', 'FQ', 120, 8, 1.5, 10);
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c40d000-0000-4000-8000-0000000000d1', '5c40c000-0000-4000-8000-0000000000c1', 'FQ', 120, 8, 1.5, 10, date '2000-01-01');
 insert into public.employees (id, name, daily_cost) values
   ('5c40f000-0000-4000-8000-000000000001', 'E1', 80),
   ('5c40f000-0000-4000-8000-000000000002', 'E2', 150),

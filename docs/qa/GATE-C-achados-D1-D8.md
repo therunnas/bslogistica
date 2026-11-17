@@ -10,7 +10,7 @@ seguem **pendentes**.
 
 | ID  | Achado                                          | Classificação                                                                  | Prioridade | Migration      |
 | --- | ----------------------------------------------- | ------------------------------------------------------------------------------ | ---------- | -------------- |
-| D1  | Contrato TESTE-MANUAL "até 01/01/0001", "Ativo" | CONFIRMADO: dado gravado em 11/11 pela tela anterior ao #134 (D-CP02-02); status é campo manual | P2         | sim (decisão abaixo) |
+| D1  | Contrato TESTE-MANUAL "até 01/01/0001", "Ativo" | CONFIRMADO: dado gravado em 11/11 pela tela anterior ao #134 (D-CP02-02); status é campo manual | P2         | sim — **055 local, sessão 35** ([detalhe](GATE-C-D1-vigencia-do-contrato.md)) |
 | D2  | Ana: R$ 250 cobrado × R$ 260 no contrato; custo R$ 470 × R$ 180 hoje | COMPORTAMENTO ESPERADO: vigência de 250 até 11/11; fatura emitida (12:19:50) antes da correção do custo para 180 (12:20); faturado congelado | —          | não            |
 | D3  | Operações ~4 s e Clientes ~14 s com contadores zerados | CONFIRMADO (zeros sem `isPending`; leituras sequenciais; uma consulta por linha no "valor de hoje"); os 14 s de Clientes NÃO COMPROVADO | P3         | não            |
 | D4  | Consultas repetidas em Apontamentos             | CONFIRMADO: parte é o desenho da leitura paginada; parte é duplicação (foco da aba, RPC da virada por linha) | P3         | não            |
@@ -73,7 +73,7 @@ decidido nada sobre obrigatoriedade, unicidade ou CPF, e nada disso deve ser pre
 ## Fila (cada item com autorização própria)
 
 1. Publicar o D8 (PR Draft, CI, Preview) e revalidar pelo Claude in Chrome.
-2. Regra de contratos (DEC-CP02-01, D1, DEC-CP02-03) — migration.
+2. Regra de contratos (DEC-CP02-01, D1) — **implementada só localmente na sessão 35 (migration 055)**; falta publicar e a decisão sobre o registro antigo (DEC-CP02-03).
 3. CNPJ (D6) — migration.
 4. Carregamento (D3, D4, D5).
 5. Padronização visual (D7).

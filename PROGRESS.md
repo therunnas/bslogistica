@@ -440,7 +440,7 @@ a execução do serviço deve estar dentro da vigência do contrato, o faturamen
 é permitido, sem fim = vigência aberta, histórico não muda (**DEC-CP02-01 decidida**;
 **DEC-CP02-03** parcialmente — falta o valor correto do registro `01/01/0001` e a autorização de
 escrita no HML); CNPJ opcional e, se preenchido, válido (sem obrigatoriedade, unicidade ou CPF
-presumidos). Implementação de ambas: sessões próprias, com migration.
+presumidos). Implementação de ambas: sessões próprias, com migration. **D1 implementado só localmente na sessão 35** — migration 055 (CHECK NOT VALID das datas do contrato e gatilho da data de execução), sem publicação nem aplicação remota ([detalhe](docs/qa/GATE-C-D1-vigencia-do-contrato.md)); D6 (CNPJ) segue na fila.
 
 Fila anterior, ainda válida para o piloto:
 

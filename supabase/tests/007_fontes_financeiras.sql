@@ -147,11 +147,11 @@ insert into public.clients (id, name) values
   ('33333333-3333-4333-8333-333333333333', 'Cliente'),
   ('33333333-3333-4333-8333-33333333333b', 'Cliente B destino');
 
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
   ('33333333-3333-4333-8333-333333333334', '33333333-3333-4333-8333-333333333333',
-   'Contrato', 200, 8, 1.5, 10),
+   'Contrato', 200, 8, 1.5, 10, date '2000-01-01'),
   ('33333333-3333-4333-8333-333333333335', '33333333-3333-4333-8333-333333333333',
-   'Contrato Caro', 5000, 8, 1.5, 10);
+   'Contrato Caro', 5000, 8, 1.5, 10, date '2000-01-01');
 
 -- QUATRO operações, e a separação é necessária: no baseline os DELETE de
 -- operacional REALMENTE funcionam, e se mirassem a OP-B a cascata levaria
@@ -1039,8 +1039,8 @@ begin
 
   -- J51c / J51d. Escolher contrato: o do novo cliente passa, o do cliente antigo não.
   begin
-    insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min)
-    values ('33333333-3333-4333-8333-33333333333c', '33333333-3333-4333-8333-33333333333b', 'Contrato B destino', 200, 8, 1.5, 10);
+    insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from)
+    values ('33333333-3333-4333-8333-33333333333c', '33333333-3333-4333-8333-33333333333b', 'Contrato B destino', 200, 8, 1.5, 10, date '2000-01-01');
     _e := 'contrato criado';
   exception when others then _e := 'erro ' || sqlstate; end;
   perform pg_temp.registrar('J51b. admin cria contrato do cliente destino', 'contrato criado', _e);
@@ -2061,9 +2061,9 @@ declare
 begin
   -- Contrato NOVO, sem apontamento nenhum derivado dele.
   execute 'reset role';
-  insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min)
+  insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from)
   values ('33333333-3333-4333-8333-333333333336', '33333333-3333-4333-8333-333333333333',
-          'Contrato sem uso', 300, 8, 1.5, 10);
+          'Contrato sem uso', 300, 8, 1.5, 10, date '2000-01-01');
 
   perform set_config('request.jwt.claims', json_build_object(
     'sub', '11111111-1111-4111-8111-111111111111', 'session_id', 'e1111111-1111-4111-8111-111111111111', 'role', 'authenticated', 'aal', 'aal2')::text, true);

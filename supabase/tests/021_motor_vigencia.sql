@@ -132,12 +132,12 @@ insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, c
    where ur.role = 'admin';
 
 insert into public.clients (id, name) values ('5c10c000-0000-4000-8000-0000000000c1', 'C05B43C cliente');
-insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min) values
-  ('5c10d000-0000-4000-8000-0000000000d1', '5c10c000-0000-4000-8000-0000000000c1', 'K1', 120, 8, 1.5, 10),
-  ('5c10d000-0000-4000-8000-0000000000d2', '5c10c000-0000-4000-8000-0000000000c1', 'K2', 150, 8, 1.5, 10),
+insert into public.contracts (id, client_id, name, daily_rate, shift_hours, ot_factor, ot_tolerance_min, valid_from) values
+  ('5c10d000-0000-4000-8000-0000000000d1', '5c10c000-0000-4000-8000-0000000000c1', 'K1', 120, 8, 1.5, 10, date '2000-01-01'),
+  ('5c10d000-0000-4000-8000-0000000000d2', '5c10c000-0000-4000-8000-0000000000c1', 'K2', 150, 8, 1.5, 10, date '2000-01-01'),
   -- K3 e K4: contratos antigos com jornada <= 0 (a tabela `contracts` não tem CHECK); o motor antigo usa 8.
-  ('5c10d000-0000-4000-8000-0000000000d3', '5c10c000-0000-4000-8000-0000000000c1', 'K3 jornada zero', 100, 0, 1.5, 10),
-  ('5c10d000-0000-4000-8000-0000000000d4', '5c10c000-0000-4000-8000-0000000000c1', 'K4 jornada negativa', 90, -3, 1, 10);
+  ('5c10d000-0000-4000-8000-0000000000d3', '5c10c000-0000-4000-8000-0000000000c1', 'K3 jornada zero', 100, 0, 1.5, 10, date '2000-01-01'),
+  ('5c10d000-0000-4000-8000-0000000000d4', '5c10c000-0000-4000-8000-0000000000c1', 'K4 jornada negativa', 90, -3, 1, 10, date '2000-01-01');
 insert into public.employees (id, name, daily_cost) values
   ('5c10f000-0000-4000-8000-000000000001', 'E1', 80),
   ('5c10f000-0000-4000-8000-000000000002', 'E2', 60),
