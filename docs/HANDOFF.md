@@ -15,7 +15,7 @@
 | Branch | `test/e2e-playwright-local` (#133; recebeu a main por merge, sem force push). `claude/jolly-allen-fqechw` (#132) integrada e preservada |
 | Base | main `1c6042e424e1030a0d4280e73e339730ebc87a65` (squash do #132) |
 | HEAD validado | 5b4f44ab607f0a6b01cf16a705d16374fb5f22b4 (#133: `validar`, `sql-local` e `e2e-local` SUCCESS, 58 PASS, 5 FALHA CONHECIDA, 21 travas). O merge da main nesta branch muda só este checkpoint e é revalidado no novo HEAD do #133 antes da integração |
-| Alterações não commitadas | Nenhuma além deste conjunto |
+| Alterações não commitadas | VIS-02 na branch `claude/vis-02-logo-light-dark` (worktree local), sem commit; ver "Última tarefa" |
 | PR | #132 integrado (`1c6042e`); #133 em integração. Abertos e não tocados: #134 (Draft, base `test/e2e-playwright-local`) e #125 (Draft, não mesclar) |
 | Ambiente-alvo | HML e Production (aplicados) |
 | Última ação comprovada | Production: 051 PASS pelo script; 26/26 com o interruptor desligado e 7/7 com ele ligado, em transações desfeitas; `dias_especiais_em_dobro=true`, `tarifas_por_funcao=false`; 1 cliente, 3 contas, 0 apontamentos, 0 feriados; site READY e domínio no deployment novo |
@@ -33,6 +33,18 @@
 | Dynamis | Conciliação técnica encerrada: a planilha usa datas 1904 (01–15/09/2026; o E06 leu 2022). Com intervalo de 2h em dia útil o V2 reproduz HE e arredondamento; diferenças comprovadas: saída antecipada −R$ 338,04 (49 dias), sábado 05/09 +R$ 46,88 (2 linhas), arredondamento por lançamento +R$ 0,075. Pendentes comerciais da Dynamis: intervalo do dia útil, saída antecipada, os dois sábados. Regras gerais da BS inalteradas |
 
 ## Última tarefa
+
+| Campo | Valor |
+| --- | --- |
+| Tarefa executada | VIS-02 (24/11/2026), pedido do responsável ("alinhar o painel"): o painel passa a usar as versões LIGHT/DARK oficiais do kit de marca (Drive, `07_APLICACOES/07_SISTEMA-INTERNO`), com o B sempre vermelho `#E51B23`, no lugar das cópias monocromáticas preta/branca. `public/branding`: entram `bs-logo-horizontal-light.svg`, `bs-logo-horizontal-dark.svg`, `bs-simbolo-light.svg` e `bs-simbolo-dark.svg` (cópias byte a byte dos `BS-sistema-*`); saem as quatro preta/branca. `BSLogo`: claro → LIGHT, escuro → DARK, tema → os dois via `dark:`. Login: celular com a horizontal LIGHT; painel escuro da direita com o símbolo DARK isolado, como o manual define. Ajuste pedido pelo responsável ("só deixar centralizado"): logo centralizada no login do celular e nas cinco telas de autenticação (`BSBrand align="center"` em esqueci-senha, confirmar-recuperacao, mfa, redefinir-senha e redefinir-senha/mfa); no painel escuro do login, símbolo, título e texto de apoio formam um bloco centralizado na horizontal e na vertical (rodapé mantido embaixo). `scripts/testar-marca.mjs` reescrito para a regra nova |
+| Resultados e testes comprovados | Worktree local Windows, base `main` `f6df1fbf58e8eb34648e2328b926ef99c7ad7164`: `npm run lint` e `npx tsc --noEmit` limpos; `test:marca` 33/33 PASS; `npm run build` exit 0; demais suítes `test:*` PASS, exceto três por ambiente Windows, sem relação com a mudança (`calendario-runners` sem `python3`; `workflow` espera `/` e recebe `\`; `vercel-deployments` quebra o caminho com espaço em "PC CASA"); a CI em Linux é a prova dessas três. Navegador (dev em `localhost:3001`): `/login` no desktop carrega `bs-simbolo-dark.svg` (192 px) no painel escuro; no celular (375 px) e em `/esqueci-senha` aparece `bs-logo-horizontal-light.svg`. Sidebar não conferida visualmente (exige sessão; nenhum login feito): a troca por tema fica coberta pelo B2 do `test:marca` |
+| Código e PR afetados | Branch `claude/vis-02-logo-light-dark` (de `main` `f6df1fb`), sem commit e sem PR: `public/branding/*`, `src/components/branding/bs-logo.tsx`, `src/components/branding/bs-brand.tsx` (comentário), `src/app/login/page.tsx`, as cinco telas de autenticação (só o `align`), `scripts/testar-marca.mjs`, este HANDOFF. Nenhuma migration, RLS ou regra financeira |
+| Ambientes envolvidos | Só local (app de desenvolvimento ligado ao `.env` local, sem login e sem escrita). Nenhum acesso a HML, Production, Vercel ou banco remoto |
+| Pendências e decisões | Visual aprovado pelo responsável (símbolo DARK, título e texto centralizados no painel escuro; logo centralizada no celular e nas telas de auth). Favicon e ícone 512 continuam os aprovados (hashes inalterados). Achados do kit, fora deste escopo: títulos dos SVGs oficiais ainda dizem "para aprovação" (W03 da auditoria do kit) |
+| Próxima ação exata | Depois do squash com CI verde, publicar a `main` em Production pela API da Vercel (só frontend, sem migration) e conferir `admin.bslogisticas.com.br/login`; o SHA integrado e o deployment ficam no PR e no relatório da tarefa (o checkpoint não pode citar o próprio commit de integração). Sidebar nos temas claro e escuro: conferir no primeiro login real |
+| Autorizações e proibições | Autorizado pelo responsável (24/11/2026): alinhar as logos ao manual, aprovar o visual, commit, push, PR, merge com CI verde e publicação em Production ("só merge e deixa pronto, já bota em produção"). Não autorizado: migrations, banco, variáveis, flags e qualquer outra mudança em Production além do deploy do site. O HANDOFF não commitado do checkout principal (`claude/jolly-allen-fqechw`) é de outra tarefa e não foi tocado |
+
+### Tarefa anterior — INTEGRACAO-132-133 (12/11/2026)
 
 | Campo | Valor |
 | --- | --- |

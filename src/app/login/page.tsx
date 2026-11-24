@@ -36,15 +36,15 @@ function AvisoSenhaRedefinida() {
   );
 }
 
-/** Painel esquerdo e versão mobile: fundo claro → logo preta. Painel direito: fundo preto → logo branca. */
+/**
+ * Versão mobile (fundo claro): logo horizontal LIGHT. Painel direito (fundo escuro): símbolo
+ * DARK isolado, como o manual da marca define para o login do sistema interno.
+ */
 function LogoLogin({ mobile = false }: { mobile?: boolean }) {
-  return (
-    <BSLogo
-      fundo={mobile ? "claro" : "escuro"}
-      priority
-      className={mobile ? "w-56" : "w-[360px] xl:w-[440px]"}
-    />
-  );
+  if (mobile) {
+    return <BSLogo fundo="claro" priority className="w-56" />;
+  }
+  return <BSLogo fundo="escuro" forma="simbolo" priority className="w-48 xl:w-56" />;
 }
 
 export default function Login() {
@@ -96,7 +96,7 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-background lg:grid lg:grid-cols-2">
       <section className="relative z-10 flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
-        <div className="mb-8 lg:hidden">
+        <div className="mb-8 flex justify-center lg:hidden">
           <LogoLogin mobile />
         </div>
 
@@ -190,19 +190,17 @@ export default function Login() {
         <div className="pointer-events-none absolute bottom-24 left-20 h-40 w-40 rounded-full bg-red-700/[0.06] blur-3xl" />
 
         <div className="relative z-10 flex min-h-screen flex-col px-16 pb-8 pt-14 xl:px-20 xl:pb-8 xl:pt-16">
-          <div className="mx-auto">
+          <div className="flex flex-1 flex-col items-center justify-center pb-16">
             <LogoLogin />
-          </div>
 
-          <div className="flex flex-1 items-start pt-14 xl:pt-16">
-            <div className="max-w-xl">
+            <div className="mt-14 max-w-xl text-center xl:mt-16">
               <h2 className="font-display text-[40px] font-semibold leading-[1.1] tracking-[-0.025em] text-white xl:text-[36px]">
                 Gestão operacional
                 <br />
                 em um só lugar.
               </h2>
 
-              <p className="mt-9 max-w-md text-[15px] leading-7 text-white/60">
+              <p className="mx-auto mt-9 max-w-md text-[15px] leading-7 text-white/60">
                 Pessoas, operações e resultados conectados em uma plataforma centralizada.
               </p>
             </div>
