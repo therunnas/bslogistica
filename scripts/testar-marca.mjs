@@ -1,10 +1,10 @@
 /**
- * Identidade visual (VIS-01): a logo oficial, sem alteração, escolhida pela cor do fundo.
+ * Identidade visual (VIS-01, VIS-02): a logo oficial, sem alteração, escolhida pela cor do fundo.
  *
  * COMO RODAR:  npm run test:marca
  *
  *   A  arquivos oficiais íntegros (SHA-256 das cópias = o dos originais aprovados) e sem fundo
- *   B  regra de cor: fundo claro = logo preta, fundo escuro = logo branca
+ *   B  regra de cor do manual: fundo claro = LIGHT, fundo escuro = DARK (B sempre vermelho)
  *   C  pontos de uso: login, sidebar/mobile, autenticação, favicon e metadata
  *   D  nome no plural e nenhuma referência à marca antiga
  */
@@ -30,16 +30,17 @@ const sha = (p) => createHash("sha256").update(lerBin(p)).digest("hex");
 const semComentarios = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 console.log("\nA. Arquivos oficiais\n");
-// SHA-256 dos originais aprovados em `01_LOGO-MASTER`/`03_VARIACOES`/`04_AVATARES-E-ICONES`.
+// SHA-256 dos originais aprovados do kit de marca: logos e símbolos de
+// `07_APLICACOES/07_SISTEMA-INTERNO`; favicon e ícone de `04_AVATARES-E-ICONES`.
 const OFICIAIS = {
-  "public/branding/bs-logo-horizontal-preta.svg":
-    "23bd1f7937b4677bb140d80171d1aa033a7c748ee0d8f45a41b6e713093c56ab",
-  "public/branding/bs-logo-horizontal-branca.svg":
-    "a348bc41273720eb0c1b1f3da72813f272157b1e63d0f897601980d308591071",
-  "public/branding/bs-simbolo-preto.svg":
-    "b237ce3f9bda71f20072ffcc2ea4a5b35561983556101bdfc91d68f20a712af2",
-  "public/branding/bs-simbolo-branco.svg":
-    "a4199a3f9706d3e208d527fca95488a3029a945b1b04733edf25bda825994217",
+  "public/branding/bs-logo-horizontal-light.svg":
+    "41bc0d468e691a5888af3814556bb7c84f031b1294349a228199d9d3967fcafb",
+  "public/branding/bs-logo-horizontal-dark.svg":
+    "f737f2f0d8e7b9dce2e552cc9342440b99f6b5d7e9e4cc394857d99a7a8cf36c",
+  "public/branding/bs-simbolo-light.svg":
+    "c14c33ff2ff44f60afd4ad7b92582ed35ee618475598e62a74245ef172ed13ef",
+  "public/branding/bs-simbolo-dark.svg":
+    "9b9517da8b5564852777b5c28d4f07ed0a9f2db1fada52a36fa9d1e42f779607",
   "public/branding/bs-favicon.svg":
     "c35642aeabb31cab40b1543749a235b753c93dd242b4d040c312dab22d4bba95",
   "public/branding/bs-favicon-32x32.png":
@@ -56,68 +57,92 @@ for (const [arquivo, hash] of Object.entries(OFICIAIS)) {
     hash,
   );
 }
-const preta = ler("public/branding/bs-logo-horizontal-preta.svg");
-const branca = ler("public/branding/bs-logo-horizontal-branca.svg");
-const simPreto = ler("public/branding/bs-simbolo-preto.svg");
-const simBranco = ler("public/branding/bs-simbolo-branco.svg");
+const light = ler("public/branding/bs-logo-horizontal-light.svg");
+const dark = ler("public/branding/bs-logo-horizontal-dark.svg");
+const simLight = ler("public/branding/bs-simbolo-light.svg");
+const simDark = ler("public/branding/bs-simbolo-dark.svg");
 const cores = (svg) =>
   [
     ...new Set([...svg.matchAll(/fill="(#[0-9A-Fa-f]{6})"/g)].map((m) => m[1].toUpperCase())),
   ].sort();
 verificar(
   "A2. nenhum SVG da marca tem fundo (sem <rect>, <image>, gradiente ou filtro)",
-  [preta, branca, simPreto, simBranco].some((s) => /<rect|<image|Gradient|<filter/i.test(s)),
+  [light, dark, simLight, simDark].some((s) => /<rect|<image|Gradient|<filter/i.test(s)),
   false,
 );
-verificar("A3. logo preta usa só preto (#000000)", cores(preta), ["#000000"]);
 verificar(
-  "A4. logo branca desenha só em branco (o preto do grupo-pai é sobrescrito pelos filhos)",
+  "A3. só cores oficiais: vermelho, preto, branco (e o #333333 de inspeção do grupo-pai)",
+  [light, dark, simLight, simDark].every((s) =>
+    cores(s).every((c) => ["#E51B23", "#000000", "#FFFFFF", "#333333"].includes(c)),
+  ),
+  true,
+);
+verificar(
+  "A4. LIGHT: B vermelho; S e wordmark pretos (o grupo-pai é sobrescrito pelos filhos)",
   [
-    /<g id="letter-b" fill="#FFFFFF"/.test(branca),
-    /<g id="letter-s" fill="#FFFFFF"/.test(branca),
-    /id="horizontal-signature"[^>]*fill="#FFFFFF"/.test(branca),
+    /<g id="letter-b" fill="#E51B23"/.test(light),
+    /<g id="letter-s" fill="#000000"/.test(light),
+    /id="horizontal-signature"[^>]*fill="#000000"/.test(light),
   ],
   [true, true, true],
 );
 verificar(
-  "A5. símbolo preto e branco: letras #000000 e #FFFFFF",
+  "A5. DARK: B vermelho; S e wordmark brancos",
   [
-    /id="letter-b" fill="#000000"/.test(simPreto) && /id="letter-s" fill="#000000"/.test(simPreto),
-    /id="letter-b" fill="#FFFFFF"/.test(simBranco) &&
-      /id="letter-s" fill="#FFFFFF"/.test(simBranco),
+    /<g id="letter-b" fill="#E51B23"/.test(dark),
+    /<g id="letter-s" fill="#FFFFFF"/.test(dark),
+    /id="horizontal-signature"[^>]*fill="#FFFFFF"/.test(dark),
+  ],
+  [true, true, true],
+);
+verificar(
+  "A6. símbolo LIGHT e DARK: B vermelho; S #000000 e #FFFFFF",
+  [
+    /id="letter-b" fill="#E51B23"/.test(simLight) && /id="letter-s" fill="#000000"/.test(simLight),
+    /id="letter-b" fill="#E51B23"/.test(simDark) && /id="letter-s" fill="#FFFFFF"/.test(simDark),
   ],
   [true, true],
 );
 verificar(
-  "A6. proporção declarada = a do arquivo (horizontal 2920x735, símbolo 1340x730)",
+  "A7. proporção declarada = a do arquivo (horizontal 2920x735, símbolo 1340x730)",
   [
-    /viewBox="0 0 2920 735"/.test(preta) && /viewBox="0 0 2920 735"/.test(branca),
-    /viewBox="0 0 1340 730"/.test(simPreto) && /viewBox="0 0 1340 730"/.test(simBranco),
+    /viewBox="0 0 2920 735"/.test(light) && /viewBox="0 0 2920 735"/.test(dark),
+    /viewBox="0 0 1340 730"/.test(simLight) && /viewBox="0 0 1340 730"/.test(simDark),
   ],
   [true, true],
 );
-
-console.log("\nB. Regra de cor\n");
-const logo = semComentarios(ler("src/components/branding/bs-logo.tsx"));
 verificar(
-  "B1. fundo claro → arquivo PRETO; fundo escuro → arquivo BRANCO",
-  /fundo === "claro"\) \{\s*return <Image \{\.\.\.preta\}/.test(logo) &&
-    /fundo === "escuro"\) \{\s*return <Image \{\.\.\.branca\}/.test(logo),
-  true,
-);
-verificar(
-  "B2. fundo do tema: preta no claro (dark:hidden) e branca no escuro (hidden dark:block)",
-  /\{\.\.\.preta\}[\s\S]*?dark:hidden/.test(logo) &&
-    /\{\.\.\.branca\}[\s\S]*?hidden dark:block/.test(logo),
-  true,
-);
-verificar(
-  "B3. os quatro arquivos apontam para os SVGs oficiais",
+  "A8. as cópias monocromáticas (preta/branca) saíram do painel",
   [
     "bs-logo-horizontal-preta.svg",
     "bs-logo-horizontal-branca.svg",
     "bs-simbolo-preto.svg",
     "bs-simbolo-branco.svg",
+  ].map((a) => existsSync(new URL(`../public/branding/${a}`, import.meta.url))),
+  [false, false, false, false],
+);
+
+console.log("\nB. Regra de cor\n");
+const logo = semComentarios(ler("src/components/branding/bs-logo.tsx"));
+verificar(
+  "B1. fundo claro → arquivo LIGHT; fundo escuro → arquivo DARK",
+  /fundo === "claro"\) \{\s*return <Image \{\.\.\.light\}/.test(logo) &&
+    /fundo === "escuro"\) \{\s*return <Image \{\.\.\.dark\}/.test(logo),
+  true,
+);
+verificar(
+  "B2. fundo do tema: LIGHT no claro (dark:hidden) e DARK no escuro (hidden dark:block)",
+  /\{\.\.\.light\}[\s\S]*?dark:hidden/.test(logo) &&
+    /\{\.\.\.dark\}[\s\S]*?hidden dark:block/.test(logo),
+  true,
+);
+verificar(
+  "B3. os quatro arquivos apontam para os SVGs oficiais",
+  [
+    "bs-logo-horizontal-light.svg",
+    "bs-logo-horizontal-dark.svg",
+    "bs-simbolo-light.svg",
+    "bs-simbolo-dark.svg",
   ].every((a) => logo.includes(`/branding/${a}`)),
   true,
 );
@@ -135,8 +160,9 @@ verificar(
 console.log("\nC. Pontos de uso\n");
 const login = semComentarios(ler("src/app/login/page.tsx"));
 verificar(
-  "C1. login: painel direito (preto) usa logo BRANCA e o claro/mobile usa a PRETA",
-  /fundo=\{mobile \? "claro" : "escuro"\}/.test(login),
+  "C1. login: mobile (claro) usa a horizontal LIGHT; painel direito (escuro), o símbolo DARK",
+  /if \(mobile\) \{\s*return <BSLogo fundo="claro"/.test(login) &&
+    /<BSLogo fundo="escuro" forma="simbolo"/.test(login),
   true,
 );
 verificar(
@@ -157,7 +183,7 @@ verificar(
 );
 const brand = semComentarios(ler("src/components/branding/bs-brand.tsx"));
 verificar(
-  "C5. telas de senha/MFA (fundo claro): BSBrand → logo preta, sem legenda em texto",
+  "C5. telas de senha/MFA (fundo claro): BSBrand → logo LIGHT, sem legenda em texto",
   /fundo=\{variant === "dark" \? "escuro" : "claro"\}/.test(brand) && !/<p/.test(brand),
   true,
 );

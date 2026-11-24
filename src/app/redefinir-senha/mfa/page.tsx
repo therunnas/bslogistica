@@ -38,7 +38,7 @@ function MolduraMfa({ titulo, descricao, children }: MolduraMfaProps) {
     <main className="flex min-h-screen flex-col bg-[#f4f7fa] px-6 py-8">
       {/* Marca */}
       <div className="mx-auto w-full max-w-6xl">
-        <BSBrand variant="light" size="sm" align="start" priority />
+        <BSBrand variant="light" size="sm" align="center" priority />
       </div>
 
       {/* Conteúdo */}

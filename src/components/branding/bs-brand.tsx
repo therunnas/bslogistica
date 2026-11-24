@@ -16,8 +16,8 @@ const tamanhos = {
 
 /**
  * Marca das telas de autenticação. A composição horizontal oficial já traz o nome "SOLUÇÕES
- * LOGÍSTICAS", então não há legenda em texto. `variant="light"` = fundo claro (logo preta);
- * `"dark"` = fundo escuro (logo branca).
+ * LOGÍSTICAS", então não há legenda em texto. `variant="light"` = fundo claro (logo LIGHT);
+ * `"dark"` = fundo escuro (logo DARK).
  */
 export function BSBrand({
   variant = "light",

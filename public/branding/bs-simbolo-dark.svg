@@ -3,7 +3,7 @@
   <title id="symbol-title">BS — símbolo vetorial para aprovação</title>
   <desc id="symbol-description">Monograma BS frontal. Reconstrução da face frontal da referência R4, conferida com R1 e R3. Preenchimento neutro de inspeção; cores não definidas.</desc>
   <g id="bs-symbol" fill="#333333" fill-rule="nonzero">
-    <g id="letter-b" fill="#FFFFFF">
+    <g id="letter-b" fill="#E51B23">
       <path id="b-upper" d="M 35,35 H 505 C 628,35 710,135 720,267 C 650,261 605,229 553,194 C 521,173 499,160 468,160 H 150 Z" />
       <path id="b-stem" d="M 80,195 H 245 V 525 L 80,660 Z" />
       <path id="b-lower" d="M 280,295 H 465 C 484,374 565,425 670,425 H 721 C 747,447 752,488 737,532 C 707,620 622,685 505,685 H 100 L 266,545 H 510 C 558,545 592,518 592,480 C 592,442 561,417 513,417 H 382 Z" />
